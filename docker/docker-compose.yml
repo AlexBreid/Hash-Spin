@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:14-alpine # Используем стабильную и легковесную версию
+    restart: always
+    environment:
+      POSTGRES_USER: Docker # Имя пользователя БД
+      POSTGRES_PASSWORD: Docker # Пароль
+      POSTGRES_DB: casino_db # Имя базы данных
+    ports:
+      - "5432:5432" # Проброс порта на хост
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Сохранение данных между перезапусками
+
+volumes:
+  postgres_data:
