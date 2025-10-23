@@ -1,8 +1,11 @@
+// src/pages/AuthHandler.tsx
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 // ВАЖНО: Убедитесь, что Ngrok ЗАПУЩЕН и это его АКТУАЛЬНЫЙ HTTPS-адрес
+// Если Ngrok перезапустится, этот адрес ИЗМЕНИТСЯ, и его нужно будет обновить здесь!
 const API_BASE_URL = 'https://bullheadedly-mobilizable-paulene.ngrok-free.dev'; 
 
 const AuthHandler: React.FC = () => {
@@ -19,6 +22,7 @@ const AuthHandler: React.FC = () => {
 
         if (!oneTimeToken) {
             setStatus('Ошибка: Токен не найден. Перенаправление на страницу входа.');
+            // Добавляем replace: true, чтобы не оставлять страницу с токеном в истории
             navigate('/login', { replace: true }); 
             return;
         }
@@ -26,7 +30,6 @@ const AuthHandler: React.FC = () => {
         const handleLogin = async () => {
             try {
                 // 1. Отправляем токен на бэкенд для обмена
-                // Полный путь: https://bullheadedly-mobilizable-paulene.ngrok-free.dev/api/v1/auth/login-with-token
                 const response = await axios.post(`${API_BASE_URL}/api/v1/auth/login-with-token`, { 
                     token: oneTimeToken
                 });
@@ -42,9 +45,12 @@ const AuthHandler: React.FC = () => {
                 navigate('/', { replace: true }); 
 
             } catch (error) {
-                // Это должно быть самой частой ошибкой (просроченный токен или CORS)
-                setStatus('Ошибка авторизации. Токен недействителен или просрочен.');
+                // Обработка ошибки, которая сейчас происходит (Token rejected)
+                // Ошибка авторизации. Токен недействителен или просрочен.
+                setStatus('Ошибка авторизации. Проблема с токеном или API. Пожалуйста, попробуйте снова.'); 
                 console.error("Auth Error:", error);
+
+                // Если ошибка - перенаправляем на /login, чтобы избежать бесконечного цикла
                 navigate('/login', { replace: true }); 
             }
         };
@@ -53,12 +59,13 @@ const AuthHandler: React.FC = () => {
     }, [location.search, navigate]);
 
     return (
-        // Улучшены стили для центрирования и добавлен отступ
-        <div className="auth-handler-page flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4">
+        // ИСПРАВЛЕНО: Используем bg-background и text-foreground для поддержки темы
+        <div className="auth-handler-page flex flex-col items-center justify-center h-screen bg-background text-foreground p-4">
             
-            {/* Анимация загрузки, которая отображается только при 'Авторизация...' */}
+            {/* Анимация загрузки */}
             {isLoading && (
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-6"></div>
+                // Используем border-primary (синий цвет в вашей палитре)
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mb-6"></div>
             )}
 
             <h1 className="text-2xl font-bold text-center">{status}</h1>
@@ -67,8 +74,8 @@ const AuthHandler: React.FC = () => {
             {status.includes('Ошибка') && (
                 <button 
                     onClick={() => navigate('/login')} 
-                    // Улучшенный красный стиль кнопки
-                    className="mt-6 p-3 px-6 bg-red-600 rounded-lg hover:bg-red-700 transition duration-300 shadow-lg"
+                    // Используем bg-destructive (красный цвет в вашей палитре)
+                    className="mt-6 p-3 px-6 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/80 transition duration-300 shadow-lg"
                 >
                     Перейти ко входу
                 </button>
