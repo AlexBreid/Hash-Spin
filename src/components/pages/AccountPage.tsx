@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // React удален, остальное оставлено
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
@@ -11,8 +11,11 @@ import { useNavigate } from 'react-router-dom';
 // ---------------------------------------------------------------------
 const API_BASE_URL = 'https://bullheadedly-mobilizable-paulene.ngrok-free.dev'; 
 
+// 🔴 РЕЖИМ ОТЛАДКИ: ВКЛЮЧЕН. Пропускаем запрос к API, чтобы отобразить данные БЕЗ ТОКЕНА.
+const MOCKING_ENABLED = true; 
+
 // ---------------------------------------------------------------------
-// ИНТЕРФЕЙС ДАННЫХ (Основан на возвращаемом JSON с бэкенда)
+// МОКОВЫЕ ДАННЫЕ ДЛЯ ID 1 (для проверки рендеринга)
 // ---------------------------------------------------------------------
 interface UserData {
   id: string;
@@ -27,6 +30,19 @@ interface UserData {
   totalGames: number;
   createdAt: string;
 }
+
+const MOCK_DATA: UserData = {
+    id: '1',
+    username: 'test_user_1',
+    firstName: 'Иван',
+    lastName: 'Иванов',
+    photoUrl: null,
+    vipLevel: 'Gold',
+    level: 15,
+    totalScore: 4500.55,
+    totalGames: 128,
+    createdAt: '2023-01-10T10:00:00Z',
+} as UserData;
 
 const initialUserData: UserData = {
     id: '0',
@@ -49,15 +65,37 @@ function useUserData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // DEBUG_TOKEN теперь не используется, так как MOCKING_ENABLED = true.
+  const DEBUG_TOKEN = ''; 
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const token = localStorage.getItem('casino_jwt_token');
-
-      if (!token) {
-        setError('Требуется авторизация.');
+      
+      if (MOCKING_ENABLED) {
+        console.warn('⚠️ Режим мокирования включен. Имитация успешной загрузки данных для ID 1 (Иван Иванов).');
+        // Имитируем задержку для лучшего тестирования загрузочного экрана
+        await new Promise(resolve => setTimeout(resolve, 500)); 
+        setData(MOCK_DATA);
         setIsLoading(false);
-        navigate('/login');
+        return; 
+      }
+      
+      // ---------------------------------------------------------------------
+      // РЕАЛЬНЫЙ API-ЗАПРОС (ОТКЛЮЧЕН, ЕСЛИ MOCKING_ENABLED = true)
+      // ---------------------------------------------------------------------
+      
+      let token = DEBUG_TOKEN; 
+
+      // Токен теперь берется ТОЛЬКО из DEBUG_TOKEN, если MOCKING_ENABLED = false.
+
+      console.log('Используемый токен:', token ? 'НАЙДЕН' : 'НЕ НАЙДЕН');
+
+      // 🛑 ЕСЛИ ТОКЕНА НЕТ, ПОКАЗАТЬ ЭКРАН ОШИБКИ АВТОРИЗАЦИИ
+      if (!token) {
+        setError('Требуется авторизация. Пожалуйста, вставьте валидный JWT-токен в константу DEBUG_TOKEN.');
+        setIsLoading(false);
+        // navigate('/login'); 
         return;
       }
 
@@ -66,7 +104,6 @@ function useUserData() {
           `${API_BASE_URL}/api/v1/user/profile`,
           {
             headers: {
-              // Прикрепляем токен для аутентификации
               Authorization: `Bearer ${token}`, 
             },
           }
@@ -76,13 +113,12 @@ function useUserData() {
         
       } catch (err) {
         console.error("Failed to fetch user data:", err);
-        // Обработка 401: сессия недействительна
+        // Обработка ошибок, как раньше
         if (axios.isAxiosError(err) && err.response?.status === 401) {
             localStorage.removeItem('casino_jwt_token');
-            navigate('/login');
+            // navigate('/login');
             setError('Сессия истекла. Войдите снова. (Код 401)');
         } else if (axios.isAxiosError(err)) {
-             // Собираем максимально подробную информацию об ошибке
              const status = err.response?.status ? ` (Status: ${err.response.status})` : '';
              const responseData = err.response?.data ? JSON.stringify(err.response.data) : 'Нет данных ответа';
              const message = err.response?.data?.error || err.message;
@@ -94,7 +130,6 @@ function useUserData() {
              );
 
         } else {
-             // Для не-axios ошибок (например, проблемы с сетью)
              setError(`[СЕТЕВАЯ ОШИБКА] ${err instanceof Error ? err.message : String(err)}`);
         }
 
@@ -110,7 +145,7 @@ function useUserData() {
 }
 
 // ---------------------------------------------------------------------
-// КОМПОНЕНТ ACCOUNT PAGE (С исправлением)
+// КОМПОНЕНТ ACCOUNT PAGE 
 // ---------------------------------------------------------------------
 export function AccountPage() {
   const { data, isLoading, error } = useUserData();
@@ -137,9 +172,10 @@ export function AccountPage() {
 
   const user = data || initialUserData;
   
-  // Улучшенная функция для инициалов
-  const getAvatarFallback = (name: string | null) => {
+  // Улучшенная функция для инициалов: принимает string | null, но возвращает string.
+  const getAvatarFallback = (name: string | null): string => {
     if (!name || name.trim().length === 0) return '??';
+    
     const trimmedName = name.trim();
     const parts = trimmedName.split(/\s+/); 
 
@@ -149,7 +185,8 @@ export function AccountPage() {
     return trimmedName.substring(0, 2).toUpperCase();
   };
   
-  const displayName = user.firstName || user.username || 'Неизвестный игрок';
+  // Здесь displayName гарантированно является string, так как 'Неизвестный игрок' - фолбэк.
+  const displayName: string = user.firstName || user.username || 'Неизвестный игрок';
 
   const registrationDate = user.createdAt 
     ? new Date(user.createdAt).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) 
@@ -176,6 +213,7 @@ export function AccountPage() {
         <div className="flex items-center space-x-4 mb-6">
           <Avatar className="w-20 h-20 border-2 border-primary">
             <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-2xl font-bold">
+              {/* Тип здесь гарантированно string, что решает проблему */}
               {getAvatarFallback(displayName)}
             </AvatarFallback>
           </Avatar>
