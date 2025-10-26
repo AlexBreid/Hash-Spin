@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom';
 // ---------------------------------------------------------------------
 // КОНФИГУРАЦИЯ
 // ---------------------------------------------------------------------
-// ⚠️ ОБНОВИТЕ, ЕСЛИ ВАШ АДРЕС NGROK ИЗМЕНИЛСЯ
 const API_BASE_URL = 'https://bullheadedly-mobilizable-paulene.ngrok-free.dev'; 
 
 // ---------------------------------------------------------------------
@@ -24,8 +23,8 @@ interface UserData {
   
   vipLevel: string; 
   level: number;
-  totalScore: number;
-  totalGames: number;
+  totalScore: number; // Ожидаем число, может быть 0
+  totalGames: number; // Ожидаем число, может быть 0
   createdAt: string;
 }
 
@@ -43,7 +42,7 @@ const initialUserData: UserData = {
 }
 
 // ---------------------------------------------------------------------
-// ХУК ДЛЯ ЗАГРУЗКИ ДАННЫХ ПРОФИЛЯ
+// ХУК ДЛЯ ЗАГРУЗКИ ДАННЫХ ПРОФИЛЯ (Без изменений)
 // ---------------------------------------------------------------------
 function useUserData() {
   const [data, setData] = useState<UserData | null>(null);
@@ -67,7 +66,6 @@ function useUserData() {
           `${API_BASE_URL}/api/v1/user/profile`,
           {
             headers: {
-              // Прикрепляем токен для аутентификации
               Authorization: `Bearer ${token}`, 
             },
           }
@@ -83,7 +81,7 @@ function useUserData() {
             navigate('/login');
             setError('Сессия истекла. Войдите снова.');
         } else {
-            setError('Ошибка загрузки данных профиля.');
+            setError('Ошибка загрузки данных профиля. Проверьте консоль бэкенда.');
         }
 
       } finally {
@@ -98,7 +96,7 @@ function useUserData() {
 }
 
 // ---------------------------------------------------------------------
-// КОМПОНЕНТ ACCOUNT PAGE
+// КОМПОНЕНТ ACCOUNT PAGE (С исправлением)
 // ---------------------------------------------------------------------
 export function AccountPage() {
   const { data, isLoading, error } = useUserData();
@@ -114,24 +112,30 @@ export function AccountPage() {
     );
   }
 
-  // Используем загруженные данные или заглушку
   const user = data || initialUserData;
   
-  // Форматирование даты
+  // Улучшенная функция для инициалов
+  const getAvatarFallback = (name: string | null) => {
+    if (!name || name.trim().length === 0) return '??';
+    const trimmedName = name.trim();
+    const parts = trimmedName.split(/\s+/); 
+
+    if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return trimmedName.substring(0, 2).toUpperCase();
+  };
+  
+  const displayName = user.firstName || user.username || 'Неизвестный игрок';
+
   const registrationDate = user.createdAt 
     ? new Date(user.createdAt).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) 
     : '—';
   
-  // Формирование инициалов
-  const getAvatarFallback = (name: string | null) => {
-    if (!name) return '??';
-    const parts = name.split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return name.substring(0, 2).toUpperCase();
-  };
-  
-  // Отображаемое имя
-  const displayName = user.firstName || user.username || 'Неизвестный игрок';
+  // Безопасное отображение счета
+  const formattedTotalScore = (user.totalScore !== null && user.totalScore !== undefined) 
+    ? user.totalScore.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—';
 
   return (
     <div className="pb-24 pt-6 px-4">
@@ -196,7 +200,7 @@ export function AccountPage() {
             <span className="text-sm text-muted-foreground">Общий счёт (Net)</span>
           </div>
           <p className="text-xl font-bold text-success">
-            {isLoading ? '—' : user.totalScore.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {isLoading ? '—' : formattedTotalScore}
           </p>
         </Card>
         
