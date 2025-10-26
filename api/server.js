@@ -1,38 +1,35 @@
-const express = require('express'); // <-- ИСПРАВЛЕНО: Добавлен express
+const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
 // --- ИМПОРТЫ НАШЕЙ ЛОГИКИ ---
 const prisma = require('./prismaClient'); // Инициализированный клиент Prisma
 const authRoutes = require('./src/routes/authRoutes'); // Роуты для авторизации
+const userRoutes = require('./src/routes/userRoutes'); // <-- НОВЫЙ ИМПОРТ: Роуты для пользователя
 const telegramBot = require('./src/bots/telegramBot'); // Запуск бота (если он тут инициализируется)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// FRONTEND_URL используется для информации, но не для CORS, поэтому оставляем
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://hash-spin.vercel.app';
 
 // --- КОНФИГУРАЦИЯ CORS (КРИТИЧЕСКИ ВАЖНО) ---
 const allowedOrigins = [
-    // 1. Ваш публичный домен фронтенда (УБРАН СЛЭШ!)
-    'https://hash-spin.vercel.app',
-
-    // 2. Домены, которые использует Telegram Web App
+    'https://hash-spin.vercel.app', // Ваш публичный домен фронтенда
     'https://web.telegram.org',
     'https://t.me',
-
-    // 3. Локальный хост (если вы тестируете локальный фронтенд)
-    'http://localhost:3000',
-    'http://localhost:5173' // Порт по умолчанию для Vite/React
+    // 💡 Добавляем Ngrok для работы во время разработки
+    'https://bullheadedly-mobilizable-paulene.ngrok-free.dev',
+    // Для локальной разработки, если это необходимо
+    'http://localhost:5173', 
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Разрешаем запросы без Origin (например, прямые запросы через curl/Postman)
+        // Разрешаем запросы без Origin (например, прямые запросы через curl/Postman или внутренние)
         if (!origin) return callback(null, true);
 
         // Разрешаем, если домен находится в списке
-        if (allowedOrigins.includes(origin)) {
+        if (allowedOrigins.includes(origin) || allowedOrigins.some(ao => origin.includes(ao.replace(/https?:\/\//, '')))) {
             callback(null, true);
         } else {
             // Если домен не разрешен - отклоняем и логируем для отладки
@@ -41,7 +38,7 @@ app.use(cors({
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true // Важно для передачи куки и заголовков авторизации
+    credentials: true // Важно для передачи заголовков авторизации (JWT)
 }));
 
 app.use(bodyParser.json());
@@ -51,9 +48,11 @@ app.get('/', (req, res) => {
     res.send(`Casino API is running on port ${PORT}. Frontend URL: ${FRONTEND_URL}`);
 });
 
-// Роуты авторизации: /api/v1/auth/*
+// Роуты авторизации: /api/v1/auth/* (логин, регистрация)
 app.use('/api/v1/auth', authRoutes);
 
+// Роуты для пользователя: /api/v1/user/* (профиль, статистика)
+app.use('/api/v1/user', userRoutes); // <-- ДОБАВЛЕНО
 
 // --- ЗАПУСК СЕРВЕРА ---
 async function startServer() {
