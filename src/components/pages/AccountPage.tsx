@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; // React удален, остальное оставлено
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
@@ -23,8 +23,8 @@ interface UserData {
   
   vipLevel: string; 
   level: number;
-  totalScore: number; // Ожидаем число, может быть 0
-  totalGames: number; // Ожидаем число, может быть 0
+  totalScore: number;
+  totalGames: number;
   createdAt: string;
 }
 
@@ -42,7 +42,7 @@ const initialUserData: UserData = {
 }
 
 // ---------------------------------------------------------------------
-// ХУК ДЛЯ ЗАГРУЗКИ ДАННЫХ ПРОФИЛЯ (Без изменений)
+// ХУК ДЛЯ ЗАГРУЗКИ ДАННЫХ ПРОФИЛЯ
 // ---------------------------------------------------------------------
 function useUserData() {
   const [data, setData] = useState<UserData | null>(null);
@@ -66,6 +66,7 @@ function useUserData() {
           `${API_BASE_URL}/api/v1/user/profile`,
           {
             headers: {
+              // Прикрепляем токен для аутентификации
               Authorization: `Bearer ${token}`, 
             },
           }
@@ -79,9 +80,22 @@ function useUserData() {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
             localStorage.removeItem('casino_jwt_token');
             navigate('/login');
-            setError('Сессия истекла. Войдите снова.');
+            setError('Сессия истекла. Войдите снова. (Код 401)');
+        } else if (axios.isAxiosError(err)) {
+             // Собираем максимально подробную информацию об ошибке
+             const status = err.response?.status ? ` (Status: ${err.response.status})` : '';
+             const responseData = err.response?.data ? JSON.stringify(err.response.data) : 'Нет данных ответа';
+             const message = err.response?.data?.error || err.message;
+
+             setError(
+                 `[API ОШИБКА] Не удалось получить данные профиля${status}:\n` +
+                 `Сообщение: ${message}\n` + 
+                 `Ответ сервера: ${responseData}`
+             );
+
         } else {
-            setError('Ошибка загрузки данных профиля. Проверьте консоль бэкенда.');
+             // Для не-axios ошибок (например, проблемы с сетью)
+             setError(`[СЕТЕВАЯ ОШИБКА] ${err instanceof Error ? err.message : String(err)}`);
         }
 
       } finally {
@@ -103,9 +117,18 @@ export function AccountPage() {
   
   if (error) {
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-background text-red-500 p-4">
-            <h1 className="text-2xl font-bold">{error}</h1>
-            <Button onClick={() => window.location.reload()} className="mt-4">
+        <div className="flex flex-col items-center justify-center h-screen bg-background text-red-500 p-4 text-center">
+            <h1 className="text-2xl font-bold mb-4 text-red-400">
+                ❌ ОШИБКА ЗАГРУЗКИ ПРОФИЛЯ
+            </h1>
+            {/* Карточка для отображения подробных логов */}
+            <Card className="p-4 bg-red-900/20 border-red-500/50 max-w-lg w-full">
+                <p className="text-red-300 font-medium mb-2">Детали ошибки:</p>
+                <pre className="text-xs text-left whitespace-pre-wrap break-all text-red-100 bg-red-900/50 p-3 rounded-lg border border-red-500/20 overflow-auto max-h-64">
+                    {error}
+                </pre>
+            </Card>
+            <Button onClick={() => window.location.reload()} className="mt-6 bg-red-500 hover:bg-red-600">
                 Повторить попытку
             </Button>
         </div>
