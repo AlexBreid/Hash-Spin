@@ -1,0 +1,38 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const service_1 = require("../../../service");
+const e2e_util_1 = require("../../e2e.util");
+const getCardanoRosettaRpc = async (testnet) => await service_1.TatumSDK.init(e2e_util_1.e2eUtil.initConfig(testnet ? service_1.Network.CARDANO_ROSETTA_PREPROD : service_1.Network.CARDANO_ROSETTA));
+const networks = [
+    { testnet: false, blockchain: 'cardano', network: 'mainnet' },
+    //{ testnet: true, blockchain: 'cardano', network: 'preprod' },
+];
+describe.each(networks)('Cardano Rosetta', ({ testnet, network, blockchain }) => {
+    describe(`${testnet ? 'Testnet' : 'Mainnet'}`, () => {
+        let tatum;
+        beforeEach(async () => {
+            tatum = await getCardanoRosettaRpc(testnet);
+        });
+        afterEach(async () => {
+            await tatum.destroy();
+        });
+        it('should get network status', async () => {
+            const response = await tatum.rpc.getNetworkStatus({
+                networkIdentifier: { blockchain, network },
+            });
+            expect(response).toBeDefined();
+        });
+        it.skip('should get network list', async () => {
+            const response = await tatum.rpc.getNetworkList({});
+            expect(response).toBeDefined();
+        });
+        it('should get block', async () => {
+            const response = await tatum.rpc.getBlock({
+                networkIdentifier: { blockchain, network },
+                blockIdentifier: { index: 1 },
+            });
+            expect(response).toBeDefined();
+        });
+    });
+});
+//# sourceMappingURL=tatum.rpc.cardano.rosetta.spec.js.map

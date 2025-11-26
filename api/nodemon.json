@@ -1,0 +1,20 @@
+{
+  "watch": [
+    "src",
+    "apiServer.js",
+    "botServer.js",
+    "prismaClient.js"
+  ],
+  "ignore": [
+    "node_modules/**",
+    ".git/**",
+    "src/api/**",
+    "*.json",
+    "*.log"
+  ],
+  "ext": "js",
+  "delay": 1000,
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

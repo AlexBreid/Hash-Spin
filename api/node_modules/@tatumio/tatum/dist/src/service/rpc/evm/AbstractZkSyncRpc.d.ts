@@ -1,0 +1,32 @@
+import { BigNumber } from 'bignumber.js';
+import { JsonRpcResponse, TxPayload } from '../../../dto';
+import { Logger } from '../../../service/logger/logger.types';
+import { AbstractEvmRpc } from './AbstractEvmRpc';
+import { GetProofParams, GetProofResponse, TokenDetails, TokenMapping, ZksGetL2ToL1MsgProofParams, ZksGetL2ToL1ProofResponse, ZkSyncRpcInterface } from '../../../dto/rpc/ZkSyncRpcSuite';
+export declare abstract class AbstractZkSyncRpc extends AbstractEvmRpc implements ZkSyncRpcInterface {
+    protected abstract logger: Logger;
+    protected abstract rpcCall<T>(method: string, params?: unknown[]): Promise<T>;
+    zksEstimateFee(payload: TxPayload): Promise<JsonRpcResponse<any>>;
+    zksEstimateGasL1ToL2(payload: TxPayload): Promise<JsonRpcResponse<BigNumber>>;
+    zksGetBridgeHubContract(): Promise<JsonRpcResponse<string>>;
+    zksGetMinContract(): Promise<JsonRpcResponse<string>>;
+    zksGetBridgeContracts(): Promise<JsonRpcResponse<any>>;
+    zksL1ChainId(): Promise<JsonRpcResponse<BigNumber>>;
+    zksGetBaseTokenL1Address(): Promise<JsonRpcResponse<string>>;
+    zksGetConfirmedTokens(): Promise<JsonRpcResponse<TokenDetails[]>>;
+    zksGetAllAccountBalances(address: string): Promise<JsonRpcResponse<TokenMapping>>;
+    zksGetL2ToL1MsgProof(params: ZksGetL2ToL1MsgProofParams): Promise<JsonRpcResponse<ZksGetL2ToL1ProofResponse>>;
+    zksGetL2ToL1LogProof(txHash: string, logIndex?: number): Promise<JsonRpcResponse<ZksGetL2ToL1ProofResponse>>;
+    zksL1BatchNumber(): Promise<JsonRpcResponse<BigNumber>>;
+    zksGetBlockDetails(blockNumber: number): Promise<JsonRpcResponse<any>>;
+    zksGetTransactionDetails(txHash: string): Promise<JsonRpcResponse<any>>;
+    zksGetRawBlockTransactions(blockNumber: number): Promise<JsonRpcResponse<any>>;
+    zksGetL1BatchDetails(batchNumber: number): Promise<JsonRpcResponse<any>>;
+    zksGetBytecodeByHash(txHash: string): Promise<JsonRpcResponse<number[]>>;
+    zksGetL1BatchBlockRange(batchNumber: number): Promise<JsonRpcResponse<string[]>>;
+    zksGetL1GasPrice(): Promise<JsonRpcResponse<BigNumber>>;
+    zksGetFeeParams(): Promise<JsonRpcResponse<any>>;
+    zksGetProtocolVersion(versionId?: number): Promise<JsonRpcResponse<any>>;
+    zksGetProof(params: GetProofParams): Promise<JsonRpcResponse<GetProofResponse>>;
+    zksSendRawTransactionWithDetailedOutput(data: string): Promise<JsonRpcResponse<any>>;
+}

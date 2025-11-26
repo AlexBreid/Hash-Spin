@@ -2,7 +2,9 @@ import { Card } from '../ui/card';
 import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
-import { Moon, Sun, Globe, Bell, Shield, HelpCircle, LogOut, Palette } from 'lucide-react';
+import { Moon, Sun, Globe, HelpCircle, LogOut, Palette } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface SettingsPageProps {
   isDarkMode: boolean;
@@ -11,6 +13,14 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ isDarkMode, onThemeToggle, onNavigate }: SettingsPageProps) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <div className="pb-24 pt-6 px-4">
       <div className="mb-6">
@@ -69,67 +79,6 @@ export function SettingsPage({ isDarkMode, onThemeToggle, onNavigate }: Settings
         </div>
       </Card>
 
-      {/* Notifications */}
-      <Card className="p-5 mb-6">
-        <div className="flex items-center space-x-2 mb-4">
-          <Bell className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-lg">Уведомления</h3>
-        </div>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-6 h-6" />
-              <div>
-                <p className="font-semibold">Push-уведомления</p>
-                <p className="text-sm text-muted-foreground">Результаты игр и бонусы</p>
-              </div>
-            </div>
-            <Switch defaultChecked />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-6 h-6" />
-              <div>
-                <p className="font-semibold">Email-уведомления</p>
-                <p className="text-sm text-muted-foreground">Акции и новости</p>
-              </div>
-            </div>
-            <Switch defaultChecked />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-6 h-6" />
-              <div>
-                <p className="font-semibold">SMS-уведомления</p>
-                <p className="text-sm text-muted-foreground">Оповещения безопасности</p>
-              </div>
-            </div>
-            <Switch />
-          </div>
-        </div>
-      </Card>
-
-      {/* Security */}
-      <Card className="p-5 mb-6">
-        <div className="flex items-center space-x-2 mb-4">
-          <Shield className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-lg">Безопасность</h3>
-        </div>
-        <div className="space-y-3">
-          <Button variant="outline" className="w-full justify-start py-3 rounded-2xl border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-            <Shield className="w-5 h-5 mr-3" />
-            Изменить пароль
-          </Button>
-          
-          <Button variant="outline" className="w-full justify-start py-3 rounded-2xl border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-            <Shield className="w-5 h-5 mr-3" />
-            Двухфакторная аутентификация
-          </Button>
-        </div>
-      </Card>
-
       {/* Support */}
       <Card className="p-5 mb-6">
         <div className="flex items-center space-x-2 mb-4">
@@ -157,10 +106,14 @@ export function SettingsPage({ isDarkMode, onThemeToggle, onNavigate }: Settings
         </div>
       </Card>
 
-      {/* Account Actions */}
+      {/* Logout */}
       <Card className="p-5">
         <div className="space-y-3">
-          <Button variant="destructive" className="w-full justify-start py-3 rounded-2xl font-semibold">
+          <Button 
+            variant="destructive" 
+            className="w-full justify-start py-3 rounded-2xl font-semibold"
+            onClick={handleLogout}
+          >
             <LogOut className="w-5 h-5 mr-3" />
             Выйти из аккаунта
           </Button>

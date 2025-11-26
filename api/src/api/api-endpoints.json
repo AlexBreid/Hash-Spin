@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2025-11-22T17:09:02.445Z",
+  "baseUrl": "http://localhost:4000",
+  "totalEndpoints": 19,
+  "endpoints": {
+    "AUTH_POST_login-with-token": {
+      "path": "/login-with-token",
+      "method": "POST"
+    },
+    "AUTH_POST_login-with-credentials": {
+      "path": "/login-with-credentials",
+      "method": "POST"
+    },
+    "DEPOSIT_POST_create-address": {
+      "path": "/create-address",
+      "method": "POST"
+    },
+    "DEPOSIT_GET_status_": {
+      "path": "/status/:transactionId",
+      "method": "GET"
+    },
+    "LEADERBOARD_GET_leaderboard": {
+      "path": "/api/v1/leaderboard",
+      "method": "GET"
+    },
+    "LEADERBOARD_GET_leaderboard_top3": {
+      "path": "/api/v1/leaderboard/top3",
+      "method": "GET"
+    },
+    "REFERRAL_GET_referral_stats": {
+      "path": "/api/v1/referral/stats",
+      "method": "GET"
+    },
+    "REFERRAL_GET_referral_history": {
+      "path": "/api/v1/referral/history",
+      "method": "GET"
+    },
+    "REFERRAL_POST_referral_claim-bonus": {
+      "path": "/api/v1/referral/claim-bonus",
+      "method": "POST"
+    },
+    "REFERRAL_GET_referral_referee_": {
+      "path": "/api/v1/referral/referee/:refereeId",
+      "method": "GET"
+    },
+    "USER_GET_profile": {
+      "path": "/profile",
+      "method": "GET"
+    },
+    "WALLET_GET_wallet_balance": {
+      "path": "/api/v1/wallet/balance",
+      "method": "GET"
+    },
+    "WALLET_GET_wallet_tokens": {
+      "path": "/api/v1/wallet/tokens",
+      "method": "GET"
+    },
+    "WALLET_POST_wallet_deposit_create-address": {
+      "path": "/api/v1/wallet/deposit/create-address",
+      "method": "POST"
+    },
+    "WALLET_GET_wallet_deposit_status_": {
+      "path": "/api/v1/wallet/deposit/status/:transactionId",
+      "method": "GET"
+    },
+    "WALLET_POST_wallet_webhook_deposit": {
+      "path": "/api/v1/wallet/webhook/deposit",
+      "method": "POST"
+    },
+    "WALLET_POST_wallet_deposit": {
+      "path": "/api/v1/wallet/deposit",
+      "method": "POST"
+    },
+    "WALLET_POST_wallet_withdraw": {
+      "path": "/api/v1/wallet/withdraw",
+      "method": "POST"
+    },
+    "WALLET_GET_wallet_history": {
+      "path": "/api/v1/wallet/history",
+      "method": "GET"
+    }
+  }
+}

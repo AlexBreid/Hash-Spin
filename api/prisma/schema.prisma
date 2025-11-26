@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 🐘 Наш выбор: PostgreSQL для надежности транзакций
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================================================
+// 0. СПРАВОЧНИКИ (TOKENS, ENUMS)
+// ====================================================
+
+// --- Криптовалюты (Токены) ---
+model CryptoToken {
+  id              Int       @id @default(autoincrement())
+  
+  // Например, 'BTC', 'ETH', 'USDT'
+  symbol          String    @unique
+  name            String
+  // Сеть: 'ERC-20', 'BEP-20', 'TRC-20'
+  network         String    @default("ERC-20") 
+  
+  // Количество знаков после запятой (для правильного отображения и расчетов)
+  decimals        Int
+  
+  createdAt       DateTime  @default(now())
+
+  // Связи
+  balances        Balance[]
+  transactions    Transaction[]
+  bets            Bet[]
+  leaderboard     LeaderboardEntry[]
+  userBonuses     UserBonus[]
+  referralCommissions ReferralTransaction[]
+}
+
+// --- Типы Игр ---
+enum GameType {
+  SLOT
+  ROULETTE
+  BLACKJACK
+  CRASH
+  LIVE_DEALER
+}
+
+// --- Типы Транзакций (Включая внутренние) ---
+enum TransactionType {
+  DEPOSIT   // Пополнение с внешнего кошелька
+  WITHDRAW  // Вывод на внешний кошелек
+  BONUS     // Получение бонуса
+  REFUND    // Возврат средств
+  TRANSFER  // Внутренний перевод (напр., с/на Бонусный баланс)
+}
+
+// --- Статусы Транзакций ---
+enum TransactionStatus {
+  PENDING   // В ожидании (подтверждение блокчейна/администратора)
+  COMPLETED // Завершено
+  FAILED    // Отменено/Неуспешно
+}
+
+// --- Типы Баланса ---
+enum BalanceType {
+  MAIN     // Основной баланс (на который ставят и выводят)
+  BONUS    // Бонусный баланс (с условиями отыгрыша)
+}
+
+// --- Типы Реферальных Событий ---
+enum ReferralEventType {
+  BET_COMMISSION // Комиссия за ставку реферала
+  DEPOSIT_BONUS  // Бонус за первый депозит реферала
+}
+
+// ====================================================
+// 1. АУТЕНТИФИКАЦИЯ И ПОЛЬЗОВАТЕЛИ (USERS)
+// ====================================================
+
+model User {
+  id            Int      @id @default(autoincrement())
+  telegramId    String   @unique
+  username      String?  @unique
+  firstName     String?
+  lastName      String?
+  photoUrl      String?
+
+  // --- Новые поля для входа по логину/паролю ---
+  passwordHash  String? // Хеш пароля
+  salt          String? // Соль (для безопасности хеширования)
+  // ---------------------------------------------
+
+  isAdmin       Boolean  @default(false)
+  isBlocked     Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // --- Реферальная система ---
+  referralCode  String   @unique @default(cuid()) 
+  referredById  Int?     
+  referrer      User?    @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("UserReferrals") 
+
+  // Связи (оставлены без изменений)
+  balances          Balance[]
+  transactions      Transaction[]
+  bets              Bet[]
+  leaderboardEntries LeaderboardEntry[]
+  bonuses           UserBonus[]
+  commissions       ReferralTransaction[] 
+  referralActions   ReferralTransaction[] @relation("RefereeActions")
+  authTokens       OneTimeToken[] 
+}
+
+// ====================================================
+// 2. ФИНАНСЫ И БАЛАНС (BALANCE)
+// ====================================================
+
+model Balance {
+  id            Int           @id @default(autoincrement())
+  
+  userId        Int
+  user          User          @relation(fields: [userId], references: [id])
+  
+  tokenId       Int
+  token         CryptoToken   @relation(fields: [tokenId], references: [id])
+  
+  type          BalanceType   @default(MAIN)
+  
+  // **КРИПТО-ТОЧНОСТЬ**: Decimal(30, 18) для безопасного хранения крипты
+  amount        Decimal       @default(0.0) @db.Decimal(30, 18) 
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Уникальный ключ: только один тип баланса (MAIN/BONUS) для каждого токена у пользователя
+  @@unique([userId, tokenId, type]) 
+}
+
+// ====================================================
+// 3. ТРАНЗАКЦИИ (Ввод/Вывод)
+// ====================================================
+
+model Transaction {
+  id            Int                 @id @default(autoincrement())
+  
+  userId        Int
+  user          User                @relation(fields: [userId], references: [id])
+  
+  tokenId       Int
+  token         CryptoToken         @relation(fields: [tokenId], references: [id])
+
+  type          TransactionType
+  status        TransactionStatus   @default(PENDING)
+  
+  amount        Decimal             @db.Decimal(30, 18)
+  
+  txHash        String?             @unique // Хеш транзакции в блокчейне (критически важен)
+  walletAddress String?             
+  
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+// ====================================================
+// 4. СТАВКИ И ИГРЫ (BETS)
+// ====================================================
+
+model Bet {
+  id            Int         @id @default(autoincrement())
+  
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  
+  tokenId       Int 
+  token         CryptoToken @relation(fields: [tokenId], references: [id])
+  
+  gameType      GameType
+  
+  betAmount     Decimal     @db.Decimal(30, 18)
+  payoutAmount  Decimal     @db.Decimal(30, 18)
+  netAmount     Decimal     @db.Decimal(30, 18) // Чистый результат (payout - bet)
+  
+  payoutRatio   Float
+  roundId       String
+  details       Json?       
+  
+  createdAt     DateTime    @default(now())
+  
+  // Индекс для быстрого поиска ставок пользователя по игре и дате
+  @@index([userId, gameType, createdAt])
+}
+
+// ====================================================
+// 5. БОНУСЫ И ОТЫГРЫШ (GAMING LOGIC)
+// ====================================================
+
+model Bonus {
+  id              Int           @id @default(autoincrement())
+  name            String        @unique
+  description     String
+  // Требуемый вейджер (например, 40.0)
+  wageringMultiplier Float       
+  // Максимальная сумма бонуса
+  maxBonusAmount  Decimal       @db.Decimal(30, 18)
+  
+  userBonuses     UserBonus[]
+}
+
+model UserBonus {
+  id              Int           @id @default(autoincrement())
+  
+  userId          Int
+  user            User          @relation(fields: [userId], references: [id])
+  
+  bonusId         Int
+  bonus           Bonus         @relation(fields: [bonusId], references: [id])
+  
+  tokenId         Int
+  token           CryptoToken   @relation(fields: [tokenId], references: [id])
+  
+  grantedAmount   Decimal       @db.Decimal(30, 18)
+  requiredWager   Decimal       @db.Decimal(30, 18)
+  wageredAmount   Decimal       @default(0.0) @db.Decimal(30, 18)
+  
+  isActive        Boolean       @default(true)
+  isCompleted     Boolean       @default(false)
+  
+  createdAt       DateTime      @default(now())
+  expiresAt       DateTime?
+  
+  @@unique([userId, bonusId, tokenId])
+}
+
+// ====================================================
+// 6. ТАБЛИЦА ЛИДЕРОВ (LEADERBOARD)
+// ====================================================
+
+model LeaderboardEntry {
+  id            Int       @id @default(autoincrement())
+  
+  userId        Int       
+  user          User      @relation(fields: [userId], references: [id])
+  
+  tokenId       Int?      
+  token         CryptoToken? @relation(fields: [tokenId], references: [id])
+  
+  metric        String    // "Max_Win", "Total_Wagered" и т.д.
+  score         Decimal   @db.Decimal(30, 18)
+  period        String    // "Daily", "Weekly", "AllTime"
+  
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([userId, metric, period, tokenId])
+  // Индекс для быстрого получения рейтинга
+  @@index([metric, period, score(sort: Desc)])
+}
+
+// ====================================================
+// 7. РЕФЕРАЛЬНАЯ СИСТЕМА (REFERRAL TRANSACTIONS)
+// ====================================================
+
+model ReferralTransaction {
+  id              Int                 @id @default(autoincrement())
+  
+  // Кто получил комиссию (реферер)
+  referrerId      Int
+  referrer        User                @relation(fields: [referrerId], references: [id])
+
+  // Кто совершил действие (реферал)
+  refereeId       Int
+  referee         User                @relation("RefereeActions", fields: [refereeId], references: [id])
+
+  tokenId         Int
+  token           CryptoToken         @relation(fields: [tokenId], references: [id])
+
+  eventType       ReferralEventType   
+  
+  amount          Decimal             @db.Decimal(30, 18) 
+  
+  // ID ставки или транзакции, за которую начислена комиссия (для аудита)
+  sourceEntityId  Int                 
+  sourceEntityType String             // Например, "Bet" или "Transaction"
+  
+  createdAt       DateTime            @default(now())
+  
+  @@index([referrerId, createdAt]) 
+}
+
+// ====================================================
+// 8. ОДНОРАЗОВЫЕ ТОКЕНЫ (ONE-TIME AUTHS)
+// ====================================================
+model OneTimeToken {
+  id              Int      @id @default(autoincrement())
+  
+  token           String   @unique
+  
+  // К какому пользователю относится
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  
+  // Время истечения (очень короткое)
+  expiresAt       DateTime 
+  
+  // Был ли токен использован (для предотвращения повторного использования)
+  used            Boolean  @default(false)
+  
+  @@index([token, expiresAt])
+}

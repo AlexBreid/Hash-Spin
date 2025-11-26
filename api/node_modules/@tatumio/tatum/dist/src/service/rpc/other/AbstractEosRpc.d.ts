@@ -1,0 +1,32 @@
+import { PostI } from '../../../dto/PostI';
+import { AbiBinToJson, AbiJsonToBin, AccountName, BlockNum, BlockNumOrId, EosRpcSuite, GetAccountByAuthorizers, GetActivatedProtocolFeatures, GetCode, GetCurrencyBalance, GetCurrencyStats, GetKVTableRows, GetProducers, GetRequiredKeys, GetTableByScope, GetTableRows, PushTransaction, Transaction } from '../../../dto/rpc/EosRpcSuite';
+export declare abstract class AbstractEosRpc implements EosRpcSuite {
+    protected abstract post<T>(post: PostI): Promise<T>;
+    abstract destroy(): void;
+    abstract getRpcNodeUrl(): string;
+    private sendPost;
+    abiBinToJson(body: AbiBinToJson): Promise<any>;
+    abiJsonToBin(body: AbiJsonToBin): Promise<any>;
+    getAbi(body: AccountName): Promise<any>;
+    getAccount(body: AccountName): Promise<any>;
+    getAccountsByAuthorizers(body: GetAccountByAuthorizers): Promise<any>;
+    getActivatedProtocolFeatures(body: GetActivatedProtocolFeatures): Promise<any>;
+    getBlock(body: BlockNumOrId): Promise<any>;
+    getBlockHeaderState(body: BlockNumOrId): Promise<any>;
+    getBlockInfo(body: BlockNum): Promise<any>;
+    getCode(body: GetCode): Promise<any>;
+    getCurrencyBalance(body: GetCurrencyBalance): Promise<any>;
+    getCurrencyStats(body: GetCurrencyStats): Promise<any>;
+    getInfo(): Promise<any>;
+    getKvTableRows(body: GetKVTableRows): Promise<any>;
+    getProducers(body: GetProducers): Promise<any>;
+    getRawAbi(body: AccountName): Promise<any>;
+    getRawCodeAndAbi(body: AccountName): Promise<any>;
+    getRequiredKeys(body: GetRequiredKeys): Promise<any>;
+    getScheduledTransaction(body: GetProducers): Promise<any>;
+    getTableByScope(body: GetTableByScope): Promise<any>;
+    getTableRows(body: GetTableRows): Promise<any>;
+    pushTransaction(body: PushTransaction): Promise<any>;
+    pushTransactions(body: Transaction[]): Promise<any>;
+    sendTransaction(body: PushTransaction): Promise<any>;
+}

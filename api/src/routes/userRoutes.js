@@ -1,9 +1,12 @@
-
+// src/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// ====================================
+// ПОЛУЧЕНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
+// ====================================
 router.get('/profile', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
@@ -18,28 +21,37 @@ router.get('/profile', authenticateToken, async (req, res) => {
           lastName: true,
           photoUrl: true,
           createdAt: true,
-        }
+        },
       }),
+      // Считаем все ставки
       prisma.bet.count({ where: { userId } }),
+      // Агрегируем чистый выигрыш по всем ставкам
       prisma.bet.aggregate({
         _sum: { netAmount: true },
-        where: { userId }
-      })
+        where: { userId },
+      }),
     ]);
 
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
     }
 
-    // 🔧 ИСПРАВЛЕНО: безопасное преобразование Decimal → number
-    const rawNet = totalScoreAggregate._sum.netAmount; // Decimal или null
+    // Безопасное преобразование Decimal → number
+    const rawNet = totalScoreAggregate._sum.netAmount;
     const totalScore = rawNet ? parseFloat(rawNet.toString()) : 0;
 
     const level = 1 + Math.floor(totalGames / 10);
     const vipLevel =
-      level >= 100 ? 'Бриллиант' :
-      level >= 50  ? 'Платина' :
-      level >= 10  ? 'Золото' : 'Бронза';
+      level >= 100
+        ? 'Бриллиант'
+        : level >= 50
+        ? 'Платина'
+        : level >= 10
+        ? 'Золото'
+        : 'Бронза';
 
     const userData = {
       id: user.id.toString(),
@@ -54,10 +66,17 @@ router.get('/profile', authenticateToken, async (req, res) => {
       createdAt: user.createdAt.toISOString(),
     };
 
-    res.json(userData);
+    // ✅ ПРАВИЛЬНЫЙ ФОРМАТ ОТВЕТА
+    res.json({
+      success: true,
+      data: userData,
+    });
   } catch (error) {
     console.error('❌ Error fetching user profile:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
   }
 });
 

@@ -54,10 +54,16 @@
       outDir: 'build',
     },
     server: {
-      allowedHosts: [
-        'bullheadedly-mobilizable-paulene.ngrok-free.dev' // <-- твой ngrok-домен
-      ],
-      port: 3000,
-      open: true,
-    },
+    port: 5173, // Порт для фронтенда
+    host: true, // Слушаем на всех интерфейсах
+    strictPort: true, // Если порт занят - не используем другой
+    proxy: {
+      // Опционально: проксировать API запросы через Vite
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
   });

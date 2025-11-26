@@ -1,87 +1,241 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Button } from '../ui/button';
-import { Card } from '../ui/card';
-import { Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from "react";
+import { useFetch } from "../../hooks/useDynamicApi";
+import { useAuth } from "../../context/AuthContext";
+import { Button } from "../ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
+import { Loader2, User, Crown, BarChart2, Calendar, Star, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 
-const API_BASE_URL = 'https://bullheadedly-mobilizable-paulene.ngrok-free.dev'; // ← без пробелов!
+interface UserProfile {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string | null;
+  photoUrl: string | null;
+  vipLevel: string;
+  level: number;
+  totalScore: number;
+  totalGames: number;
+  createdAt: string;
+}
 
 export function AccountPage() {
-  const [debugInfo, setDebugInfo] = useState<string>('');
-  const [rawData, setRawData] = useState<any>(null);
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  
+  // ✅ Флаг чтобы загрузить только один раз
+  const hasLoadedRef = useRef(false);
 
+  const { data, loading, error, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
+
+  // Загружаем профиль ОДИН РАЗ при монтировании
   useEffect(() => {
-    const fetchData = async () => {
-      setDebugInfo('🔍 Начинаю загрузку профиля...');
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      fetchProfile().catch(err => {
+        console.error('Ошибка загрузки профиля:', err);
+      });
+    }
+  }, []); // Пустой массив зависимостей - только один раз!
 
-      const token = localStorage.getItem('casino_jwt_token');Ы
-      if (!token) {
-        setDebugInfo('❌ Токен отсутствует. Перенаправление на /login...');
-        setTimeout(() => navigate('/login'), 2000);
-        return;
-      }
+  // Обновляем profileData когда пришли данные
+  useEffect(() => {
+    if (data) {
+      setProfileData(data as UserProfile);
+    }
+  }, [data]);
 
-      setDebugInfo(`📡 Отправляю запрос к: ${API_BASE_URL}/api/v1/user/profile`);
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api/v1/user/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000,
-        });
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("ru-RU", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
-        setRawData(response.data);
-        setDebugInfo('✅ Успех! Данные получены. Рендерим профиль...');
-        // Если дойдём сюда — значит, данные есть → можно рендерить
-      } catch (err: any) {
-        let msg = '💥 Ошибка при запросе:\n';
-        if (err.code === 'ECONNABORTED') {
-          msg += 'Таймаут запроса (сервер не ответил за 10 сек)';
-        } else if (err.response) {
-          msg += `Статус: ${err.response.status}\n`;
-          msg += `Ответ: ${JSON.stringify(err.response.data, null, 2)}`;
-        } else if (err.request) {
-          msg += 'Нет ответа от сервера (возможно, CORS или ngrok недоступен)';
-        } else {
-          msg += err.message || String(err);
-        }
-        setDebugInfo(msg);
-        console.error(err);
-      }
-    };
+  // *** РЕНДЕР ПРОФИЛЯ ***
+  if (profileData) {
+    const { username, firstName, lastName, vipLevel, level, totalScore, totalGames, createdAt, photoUrl } =
+      profileData;
 
-    fetchData();
-  }, [navigate]);
+    const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
+    const levelProgress = Math.min((level % 10) * 10, 100);
 
-  // ПОКА НЕ БУДЕМ РЕНДЕРИТЬ ПРОФИЛЬ — СНАЧАЛА УБЕДИМСЯ, ЧТО ВСЁ РАБОТАЕТ
-  if (rawData) {
     return (
-      <div className="p-4 bg-background text-foreground min-h-screen">
-        <h2 className="text-2xl font-bold mb-4">✅ Профиль загружен!</h2>
-        <pre className="bg-card p-4 rounded text-sm overflow-auto">
-          {JSON.stringify(rawData, null, 2)}
-        </pre>
-        <Button onClick={() => window.location.reload()} className="mt-4">
-          Обновить
-        </Button>
+      <div className="p-6 bg-background text-foreground min-h-screen flex flex-col items-center pt-10">
+        <Card className="w-full max-w-md shadow-xl border rounded-2xl overflow-hidden">
+          <CardHeader className="text-center bg-primary text-primary-foreground p-8">
+            {photoUrl ? (
+              <motion.img
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3 }}
+                src={photoUrl}
+                className="w-28 h-28 rounded-full mx-auto mb-4 object-cover border-4 border-white shadow-md"
+                alt="User"
+                style={{ display: 'block' }}
+              />
+            ) : (
+              <User className="w-16 h-16 mx-auto mb-3" />
+            )}
+
+            <CardTitle className="text-3xl font-bold">{fullName}</CardTitle>
+            <p className="text-sm opacity-90">@{username}</p>
+          </CardHeader>
+
+          <CardContent className="p-6 space-y-5">
+            {/* VIP LEVEL */}
+            <motion.div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+              }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Crown style={{ width: '20px', height: '20px', color: '#fbbf24', marginRight: '12px' }} />
+                <span style={{ fontWeight: '600', color: '#e5e7eb' }}>VIP уровень</span>
+              </div>
+              <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{vipLevel || "Нет"}</span>
+            </motion.div>
+
+            {/* LEVEL */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                padding: '16px',
+                borderRadius: '12px',
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <BarChart2 style={{ width: '20px', height: '20px', color: '#60a5fa', marginRight: '8px' }} />
+                  <span style={{ fontWeight: '500', fontSize: '14px', color: '#e5e7eb' }}>Уровень</span>
+                </div>
+                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#e5e7eb' }}>{level}</span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ width: '100%', height: '12px', backgroundColor: '#374151', borderRadius: '9999px', overflow: 'hidden' }}>
+                <motion.div
+                  style={{ height: '100%', backgroundColor: '#3b82f6' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${levelProgress}%` }}
+                  transition={{ duration: 0.7 }}
+                />
+              </div>
+            </motion.div>
+
+            {/* TOTAL SCORE */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Star style={{ width: '20px', height: '20px', color: '#fbbf24', marginRight: '8px' }} />
+                <span style={{ fontWeight: '500', color: '#e5e7eb' }}>Очки</span>
+              </div>
+              <span style={{ fontSize: '20px', fontWeight: '600', color: '#10b981' }}>
+                {totalScore.toLocaleString("ru-RU")}
+              </span>
+            </motion.div>
+
+            {/* TOTAL GAMES */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontSize: '20px', marginRight: '8px' }}>🎲</span>
+                <span style={{ fontWeight: '500', color: '#e5e7eb' }}>Всего игр</span>
+              </div>
+              <span style={{ fontSize: '18px', fontWeight: '600', color: '#e5e7eb' }}>{totalGames}</span>
+            </motion.div>
+
+            {/* CREATED AT */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px', color: '#9ca3af', borderTop: '1px solid #374151', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Calendar style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                <span>Аккаунт создан:</span>
+              </div>
+              <span>{formatDate(createdAt)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* BUTTONS */}
+        <div className="mt-8 w-full max-w-md space-y-4">
+          <Button onClick={handleLogout} variant="destructive" className="w-full flex items-center gap-2">
+            <LogOut className="w-5 h-5" /> Выйти
+          </Button>
+        </div>
       </div>
     );
   }
 
+  // --- LOADING / ERROR ---
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 text-foreground">
-      <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
-      <p className="text-center text-muted-foreground whitespace-pre-wrap">
-        {debugInfo}
-      </p>
-      <Button
-        onClick={() => window.location.reload()}
-        className="mt-6"
-        variant="outline"
-      >
-        Повторить
-      </Button>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+      {loading && (
+        <>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Загрузка профиля...</p>
+        </>
+      )}
+
+      {error && (
+        <>
+          <p className="text-red-600 mb-4 font-semibold">Ошибка: {error}</p>
+          <Button 
+            onClick={() => {
+              hasLoadedRef.current = false;
+              fetchProfile();
+            }}
+          >
+            Повторить
+          </Button>
+        </>
+      )}
+
+      {!loading && !error && !profileData && (
+        <>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Инициализация...</p>
+        </>
+      )}
     </div>
   );
 }
