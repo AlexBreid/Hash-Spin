@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-11-22T17:09:02.445Z",
+  "timestamp": "2025-11-28T12:01:35.728Z",
   "baseUrl": "http://localhost:4000",
-  "totalEndpoints": 19,
+  "totalEndpoints": 29,
   "endpoints": {
     "AUTH_POST_login-with-token": {
       "path": "/login-with-token",
@@ -10,6 +10,46 @@
     },
     "AUTH_POST_login-with-credentials": {
       "path": "/login-with-credentials",
+      "method": "POST"
+    },
+    "BALANCE_GET_balance_get-balances": {
+      "path": "/api/v1/balance/get-balances",
+      "method": "GET"
+    },
+    "BALANCE_POST_balance_update-balance": {
+      "path": "/api/v1/balance/update-balance",
+      "method": "POST"
+    },
+    "BALANCE_GET_balance_balance_": {
+      "path": "/api/v1/balance/balance/:tokenId",
+      "method": "GET"
+    },
+    "CRASH_POST_crash_start-round": {
+      "path": "/api/v1/crash/start-round",
+      "method": "POST"
+    },
+    "CRASH_POST_crash_create-bet": {
+      "path": "/api/v1/crash/create-bet",
+      "method": "POST"
+    },
+    "CRASH_POST_crash_cashout-result": {
+      "path": "/api/v1/crash/cashout-result",
+      "method": "POST"
+    },
+    "CRASH_GET_crash_history": {
+      "path": "/api/v1/crash/history",
+      "method": "GET"
+    },
+    "CRASH_GET_crash_stats": {
+      "path": "/api/v1/crash/stats",
+      "method": "GET"
+    },
+    "CRASH_GET_crash_leaderboard": {
+      "path": "/api/v1/crash/leaderboard",
+      "method": "GET"
+    },
+    "CRASH_POST_crash_verify-bet": {
+      "path": "/api/v1/crash/verify-bet",
       "method": "POST"
     },
     "DEPOSIT_POST_create-address": {

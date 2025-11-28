@@ -2,7 +2,7 @@ import { GameCard } from '../GameCard';
 import { GameSlider } from '../GameSlider';
 import { Button } from '../ui/button';
 import { ChevronRight, Star, Zap, Gift } from 'lucide-react';
-
+import { useNavigate } from 'react-router-dom'; // 🆕
 interface Game {
   id: string;
   title: string;
@@ -65,8 +65,15 @@ const popularGames: Game[] = [
 ];
 
 export function HomePage() {
+   const navigate = useNavigate(); // 🆕
+  
   const handleGameClick = (gameId: string) => {
-    console.log('Запуск игры:', gameId);
+    // Если это Краш или Турбо Краш
+    if (gameId === '2' || gameId === '6') {
+      navigate('/crash'); // 🆕 Переход на страницу игры
+    } else {
+      console.log('Запуск игры:', gameId);
+    }
   };
 
   return (

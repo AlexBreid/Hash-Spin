@@ -4,6 +4,9 @@ import { AppInitializer } from './components/AppInitializer';
 import { useAuth } from './context/AuthContext';
 import { TopNavigation } from './components/TopNavigation';
 import { BottomNavigation } from './components/BottomNavigation';
+import { useLocation } from 'react-router-dom';
+
+// Импортируем все страницы
 import { HomePage } from './components/pages/HomePage';
 import { AccountPage } from './components/pages/AccountPage';
 import { RecordsPage } from './components/pages/RecordsPage';
@@ -11,46 +14,54 @@ import { ReferralsPage } from './components/pages/ReferralsPage';
 import { SettingsPage } from './components/pages/SettingsPage';
 import { SupportPage } from './components/pages/SupportPage';
 import { LoginPage } from './components/pages/LoginPage';
+import { CrashGame } from './components/pages/CrashGame'; // 🆕
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 
-// Определяем страницы, которые требуют авторизации
-const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support'];
+const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash'];
 
-/**
- * Внутренний компонент (внутри AuthProvider и AppInitializer), 
- * который содержит всю логику навигации и рендеринга страниц.
- */
 function AppContent() {
-    // navigate используется здесь для перенаправления после выхода из системы
     const navigate = useNavigate();
-    // Хук useAuth() теперь безопасен, так как AppContent находится внутри AuthProvider
-    const { isAuthenticated, loading } = useAuth(); 
+    const location = useLocation();
+    const { isAuthenticated, loading } = useAuth();
     
-    const [currentPage, setCurrentPage] = useState('home');
+    // 🆕 Определяем текущую страницу из URL
+    const getCurrentPageFromURL = () => {
+        const path = location.pathname.toLowerCase();
+        if (path === '/' || path === '/home') return 'home';
+        if (path === '/crash') return 'crash'; // 🆕
+        if (path === '/records') return 'records';
+        if (path === '/referrals') return 'referrals';
+        if (path === '/account') return 'account';
+        if (path === '/settings') return 'settings';
+        if (path === '/support') return 'support';
+        if (path === '/login') return 'login';
+        return 'home';
+    };
+
+    const [currentPage, setCurrentPage] = useState(getCurrentPageFromURL());
     const [isDarkMode, setIsDarkMode] = useState(true);
 
-    // Логика перенаправления при загрузке/авторизации
+    // 🆕 Синхронизируем currentPage с URL
+    useEffect(() => {
+        setCurrentPage(getCurrentPageFromURL());
+    }, [location.pathname]);
+
     useEffect(() => {
         if (loading) {
             return;
         }
 
-        // Если не авторизован - идем на login через роутер
         if (!isAuthenticated && currentPage !== 'login') {
-            navigate('/login'); 
+            navigate('/login');
             setCurrentPage('login');
         }
 
-        // Если авторизован и на login - идем на home
-        // Эта логика сработает СРАЗУ ПОСЛЕ вызова login() в LoginPage
         if (isAuthenticated && currentPage === 'login') {
             setCurrentPage('home');
-            // navigate('/') здесь не нужен, т.к. onLoginSuccess из LoginPage уже это делает
         }
     }, [isAuthenticated, loading, currentPage, navigate]);
 
-    // Применение темной темы
     useEffect(() => {
         if (isDarkMode) {
             document.documentElement.classList.add('dark');
@@ -60,11 +71,12 @@ function AppContent() {
     }, [isDarkMode]);
 
     const handlePageChange = (page: string) => {
-        // Если не авторизован, но пытается перейти на защищенную страницу
         if (!isAuthenticated && AUTH_REQUIRED_PAGES.includes(page)) {
             navigate('/login');
             setCurrentPage('login');
         } else {
+            // 🆕 Навигируем по URL вместо состояния
+            navigate(`/${page === 'home' ? '' : page}`);
             setCurrentPage(page);
         }
     };
@@ -77,14 +89,17 @@ function AppContent() {
         handlePageChange('account');
     };
 
-    // Функция, которая рендерит нужный компонент страницы
     const renderCurrentPage = () => {
         switch (currentPage) {
             case 'login':
-                // После успешного входа используем navigate, чтобы обновить URL
-                return <LoginPage onLoginSuccess={() => navigate('/')} />; 
+                return <LoginPage onLoginSuccess={() => {
+                    navigate('/');
+                    setCurrentPage('home');
+                }} />;
             case 'home':
                 return <HomePage />;
+            case 'crash': // 🆕
+                return <CrashGame />;
             case 'records':
                 return <RecordsPage />;
             case 'referrals':
@@ -102,13 +117,16 @@ function AppContent() {
             case 'support':
                 return <SupportPage />;
             default:
-                return isAuthenticated ? <HomePage /> : <LoginPage onLoginSuccess={() => navigate('/')} />;
+                return isAuthenticated ? <HomePage /> : <LoginPage onLoginSuccess={() => {
+                    navigate('/');
+                    setCurrentPage('home');
+                }} />;
         }
     };
 
     const isAuthPage = currentPage === 'login';
+    const isCrashPage = currentPage === 'crash'; // 🆕
 
-    // Показываем загрузку пока проверяется авторизация
     if (loading) {
         return (
             <div className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto flex items-center justify-center">
@@ -122,24 +140,23 @@ function AppContent() {
             className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
             style={{ height: '850px' }}
         >
-            {!isAuthPage && <TopNavigation onProfileClick={handleProfileClick} />}
+            {!isAuthPage && !isCrashPage && <TopNavigation onProfileClick={handleProfileClick} />}
 
-            <main className={isAuthPage ? 'h-full' : 'h-[calc(850px-140px)] overflow-y-auto'}>
+            <main className={
+                isCrashPage ? 'h-full overflow-hidden' : // 🆕 Полный размер для Crash
+                isAuthPage ? 'h-full' : 
+                'h-[calc(850px-140px)] overflow-y-auto'
+            }>
                 {renderCurrentPage()}
             </main>
 
-            {!isAuthPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+            {!isAuthPage && !isCrashPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
 
             <Toaster />
         </div>
     );
 }
 
-/**
- * Главный AppLayout компонент. 
- * Оборачивает AppContent в AuthProvider и AppInitializer.
- * Это тот компонент, который импортируется в main.jsx.
- */
 export default function AppLayout() {
     return (
         <AuthProvider>
