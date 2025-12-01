@@ -3,197 +3,141 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 
+function getStartDate(period) {
+  const now = new Date();
+  switch (period) {
+    case 'today':
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    case 'this-week': {
+      const day = now.getDay();
+      const start = new Date(now);
+      start.setDate(now.getDate() - day);
+      start.setHours(0, 0, 0, 0);
+      return start;
+    }
+    case 'this-month':
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    case 'all-time':
+      return new Date('2000-01-01');
+    default:
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+}
+
 // ====================================
-// ПОЛУЧИТЬ ТАБЛИЦУ ЛИДЕРОВ
+// GET /api/v1/leaderboard — ТОП САМЫХ БОЛЬШИХ ВЫИГРЫШЕЙ В CRASH
 // ====================================
 router.get('/api/v1/leaderboard', async (req, res) => {
   try {
-    const { period = 'this-month', game = 'all-games', limit = 100 } = req.query;
+    const { period = 'all-time', game = 'crash', limit = 50 } = req.query;
 
-    // Определяем дату для фильтрации
-    let startDate = new Date();
-    switch (period) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'this-week':
-        const day = startDate.getDay();
-        startDate.setDate(startDate.getDate() - day);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'this-month':
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'all-time':
-        startDate = new Date('2000-01-01');
-        break;
-      default:
-        startDate.setDate(1);
+    if (game !== 'crash') {
+      return res.status(400).json({ success: false, error: 'Only "crash" game is supported for now' });
     }
 
-    // Получаем топ игроков по сумме net-amount ставок
-    const leaderboardData = await prisma.bet.groupBy({
-      by: ['userId'],
-      _sum: {
-        netAmount: true,
-      },
-      _count: {
-        id: true, // Количество ставок
-      },
+    const startDate = getStartDate(period);
+
+    const bigWins = await prisma.crashBet.findMany({
       where: {
-        createdAt: {
-          gte: startDate,
+        createdAt: { gte: startDate },
+        result: 'won',
+        winnings: { gt: '0' },
+      },
+      orderBy: { winnings: 'desc' },
+      take: parseInt(limit, 10) || 50,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            photoUrl: true,
+          },
         },
-        // Если нужно фильтровать по игре
-        ...(game !== 'all-games' && { gameType: game.toUpperCase() }),
-      },
-      orderBy: {
-        _sum: {
-          netAmount: 'desc',
+        token: {
+          select: {
+            symbol: true,
+          },
         },
       },
-      take: parseInt(limit),
     });
 
-    // Получаем информацию о пользователях
-    const userIds = leaderboardData.map(entry => entry.userId);
-    const users = await prisma.user.findMany({
-      where: {
-        id: { in: userIds },
-      },
-      select: {
-        id: true,
-        username: true,
-        firstName: true,
-        photoUrl: true,
-      },
-    });
-
-    // Объединяем данные
-    const leaderboard = leaderboardData.map((entry, index) => {
-      const user = users.find(u => u.id === entry.userId);
-      const totalScore = entry._sum.netAmount ? parseFloat(entry._sum.netAmount.toString()) : 0;
-
-      return {
-        id: user?.id.toString() || '',
-        username: user?.username || user?.firstName || 'Anonymous',
-        avatar: (user?.username || user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: Math.max(0, totalScore), // Минимум 0
-        games: 'Все игры',
-        rank: index + 1,
-        gamesCount: entry._count.id,
-        photoUrl: user?.photoUrl || null,
-      };
-    });
+    const leaderboard = bigWins.map((bet, index) => ({
+      id: bet.id.toString(),
+      username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+      avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+      score: parseFloat(bet.winnings.toString()),
+      tokenSymbol: bet.token?.symbol || '???',
+      gameType: 'crash',
+      createdAt: bet.createdAt,
+      rank: index + 1,
+    }));
 
     res.json({
       success: true,
-      data: {
+      data: { // ← КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
         leaderboard,
         period,
         game,
         total: leaderboard.length,
-        generatedAt: new Date().toISOString(),
-      },
+      }
     });
   } catch (error) {
-    console.error('❌ Error fetching leaderboard:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
+    console.error('❌ Error fetching crash big wins:', error);
+    res.status(500).json({ success: false, error: 'Failed to load big wins' });
   }
 });
 
 // ====================================
-// ПОЛУЧИТЬ ТОП-3 ИГРОКОВ
+// GET /api/v1/leaderboard/top3 — ТОП-3 В CRASH
 // ====================================
 router.get('/api/v1/leaderboard/top3', async (req, res) => {
   try {
-    const { period = 'this-month' } = req.query;
+    const { period = 'all-time' } = req.query;
+    const startDate = getStartDate(period);
 
-    // Определяем дату для фильтрации
-    let startDate = new Date();
-    switch (period) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'this-week':
-        const day = startDate.getDay();
-        startDate.setDate(startDate.getDate() - day);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'this-month':
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'all-time':
-        startDate = new Date('2000-01-01');
-        break;
-      default:
-        startDate.setDate(1);
-    }
-
-    // Получаем топ-3
-    const topThree = await prisma.bet.groupBy({
-      by: ['userId'],
-      _sum: {
-        netAmount: true,
-      },
-      _count: {
-        id: true,
-      },
+    const topWins = await prisma.crashBet.findMany({
       where: {
-        createdAt: {
-          gte: startDate,
-        },
+        createdAt: { gte: startDate },
+        result: 'won',
+        winnings: { gt: '0' },
       },
-      orderBy: {
-        _sum: {
-          netAmount: 'desc',
-        },
-      },
+      orderBy: { winnings: 'desc' },
       take: 3,
-    });
-
-    const userIds = topThree.map(entry => entry.userId);
-    const users = await prisma.user.findMany({
-      where: {
-        id: { in: userIds },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            photoUrl: true,
+          },
+        },
+        token: {
+          select: {
+            symbol: true,
+          },
+        },
       },
-      select: {
-        id: true,
-        username: true,
-        firstName: true,
-        photoUrl: true,
-      },
     });
 
-    const topThreeData = topThree.map((entry, index) => {
-      const user = users.find(u => u.id === entry.userId);
-      const totalScore = entry._sum.netAmount ? parseFloat(entry._sum.netAmount.toString()) : 0;
-
-      return {
-        id: user?.id.toString() || '',
-        username: user?.username || user?.firstName || 'Anonymous',
-        avatar: (user?.username || user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: Math.max(0, totalScore),
-        rank: index + 1,
-        photoUrl: user?.photoUrl || null,
-      };
-    });
+    const topThree = topWins.map((bet, index) => ({
+      id: bet.id.toString(),
+      username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+      avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+      score: parseFloat(bet.winnings.toString()),
+      tokenSymbol: bet.token?.symbol || '???',
+      createdAt: bet.createdAt,
+      rank: index + 1,
+    }));
 
     res.json({
       success: true,
-      data: topThreeData,
+      data: topThree // ← И ЭТО ИСПРАВЛЕНИЕ
     });
   } catch (error) {
-    console.error('❌ Error fetching top 3:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
+    console.error('❌ Error fetching top 3 crash wins:', error);
+    res.status(500).json({ success: false, error: 'Failed to load top wins' });
   }
 });
 

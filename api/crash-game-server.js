@@ -18,18 +18,27 @@ const io = socketIo(server, {
   },
 });
 
+// ========================
+// КОНФИГУРАЦИЯ
+// ========================
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+const API_VERSION = '/api/v1';
 const SERVER_SECRET = process.env.GAME_SERVER_SECRET || 'your-secret-key';
 const PORT = process.env.GAME_SERVER_PORT || 5000;
 
-// ========================
-// СОСТОЯНИЕ ИГРЫ
-// ========================
+const log = {
+  info: (msg, data = '') => console.log(`ℹ️ [${new Date().toLocaleTimeString()}] ${msg}`, data),
+  success: (msg, data = '') => console.log(`✅ [${new Date().toLocaleTimeString()}] ${msg}`, data),
+  error: (msg, data = '') => console.error(`❌ [${new Date().toLocaleTimeString()}] ${msg}`, data),
+};
 
+// ========================
+// ИГРОВАЯ КОМНАТА
+// ========================
 class GameRoom {
   constructor() {
     this.gameId = uuidv4();
-    this.status = 'waiting'; // waiting, in_progress, crashed
+    this.status = 'waiting';
     this.players = new Map();
     this.startTime = null;
     this.crashPoint = null;
@@ -47,44 +56,24 @@ class GameRoom {
     };
   }
 
-  // 🔴 ИСПРАВЛЕНО: Корректная генерация Crash Point из хеша
- generateCrashPoint() {
+  generateCrashPoint() {
     const combined = this.roundKeys.serverSeed + this.roundKeys.clientSeed;
     const hash = crypto.createHash('sha256').update(combined).digest('hex');
-
     const hex = hash.substring(0, 13);
     const hmac = parseInt(hex, 16);
-    const MAX_HEX_VALUE = 0x10000000000000; // 2^52
-    let U = hmac / MAX_HEX_VALUE; // U in [0, 1)
+    const MAX_HEX_VALUE = 0x10000000000000;
+    let U = hmac / MAX_HEX_VALUE;
 
-    // 1. ВВЕДЕНИЕ ХАУСКАУНТА (House Edge) 
-    // Для реального казино (RTP 97-99%):
-    const HOUSE_EDGE_RTP_PERCENT = 94; // 97% RTP (3% House Edge)
-    const SAFE_MAX = 100 / (100 + (100 - HOUSE_EDGE_RTP_PERCENT)); // 100 / 103 ≈ 0.9708
+    const HOUSE_EDGE_RTP_PERCENT = 92;
+    const SAFE_MAX = 100 / (100 + (100 - HOUSE_EDGE_RTP_PERCENT));
 
-    // Проверяем, попадает ли U в невыигрышный диапазон (от 0.9708 до 1.00)
-    // Если U больше максимального выигрышного шанса
-    if (U >= SAFE_MAX) { 
-        return 1.00; // Мгновенное падение, не даем выигрыша
-    }
+    if (U >= SAFE_MAX) return 1.0;
+    U = U / SAFE_MAX;
+    if (U === 0) U = 1 / MAX_HEX_VALUE;
 
-    // 2. Нормализация U и применение формулы
-    // Нормализуем U, чтобы оно снова было в диапазоне [0, 1)
-    U = U / SAFE_MAX; 
-
-    // Защита от Math.log(0)
-    if (U === 0) { 
-        U = 1 / MAX_HEX_VALUE;
-    }
-    
-    // Формула для Crash: X = 100 / (100 - U * 100)
-    // Чтобы получить экспоненциальное распределение с заданным Хаускаунтом.
-    const final_crash = 100 / (100 - U * 100); 
-
-    // Используем Math.max для гарантии 1.01x
-    const crashPoint = Math.max(1.01, parseFloat(final_crash.toFixed(2)));
-    return crashPoint;
-}
+    const final_crash = 100 / (100 - U * 100);
+    return Math.max(1.01, parseFloat(final_crash.toFixed(2)));
+  }
 
   async startRound() {
     this.gameId = uuidv4();
@@ -100,20 +89,20 @@ class GameRoom {
     this.multiplier = 1.0;
 
     this.players.forEach(p => (p.cashed_out = false));
-    
-    // 🟢 НОВОЕ: Сохраняем информацию о новом раунде в БД
-    await this.saveRoundInfoToBackend();
 
-    console.log(`🎮 Раунд начат: ${this.gameId}, Crash: ${this.crashPoint}x`);
+    try {
+      await this.saveRoundInfoToBackend();
+      log.success(`Раунд начат: ${this.gameId}, Crash: ${this.crashPoint}x`);
+    } catch (error) {
+      log.error(`Ошибка сохранения раунда: ${error.message}`);
+    }
 
-    // Отправляем всем что раунд начался
     io.to('crash-room').emit('roundStarted', {
       gameId: this.gameId,
       serverSeedHash: this.roundKeys.serverSeedHash,
       clientSeed: this.roundKeys.clientSeed,
     });
 
-    // Game loop
     this.gameLoopInterval = setInterval(() => {
       const elapsed = (Date.now() - this.startTime) / 1000;
       this.multiplier = Math.pow(1.1, elapsed);
@@ -147,8 +136,11 @@ class GameRoom {
       }
     });
 
-    // 🟢 ИСПРАВЛЕНО: Финализируем результаты раунда
-    await this.finalizeRoundResults(losers, winners);
+    try {
+      await this.finalizeRoundResults(losers, winners);
+    } catch (error) {
+      log.error(`Ошибка финализации: ${error.message}`);
+    }
 
     io.to('crash-room').emit('gameCrashed', {
       crashPoint: this.crashPoint,
@@ -162,7 +154,6 @@ class GameRoom {
       losersCount: losers.length,
     });
 
-    // Таймер до следующего раунда
     setTimeout(() => {
       this.status = 'waiting';
       this.countdownTimer = 5;
@@ -184,62 +175,96 @@ class GameRoom {
     }, 1000);
   }
 
-  // 🟢 НОВОЕ: Сохранение метаданных раунда в начале
   async saveRoundInfoToBackend() {
     try {
-        await axios.post(
-            `${BACKEND_URL}/api/v1/crash/start-round`,
-            { 
-                gameId: this.gameId,
-                crashPoint: this.crashPoint,
-                serverSeedHash: this.roundKeys.serverSeedHash,
-                clientSeed: this.roundKeys.clientSeed,
-            },
-            {
-                headers: { 'X-Server-Secret': SERVER_SECRET },
-            }
-        );
+      const url = `${BACKEND_URL}${API_VERSION}/crash/start-round`;
+
+      const response = await axios.post(
+        url,
+        {
+          gameId: this.gameId,
+          crashPoint: this.crashPoint,
+          serverSeedHash: this.roundKeys.serverSeedHash,
+          clientSeed: this.roundKeys.clientSeed,
+        },
+        {
+          headers: { 'X-Server-Secret': SERVER_SECRET },
+          timeout: 5000,
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Unknown error');
+      }
+
+      return response.data.data.roundId;
     } catch (error) {
-        console.error('❌ Ошибка сохранения информации о раунде:', error.message);
+      log.error(`Ошибка сохранения раунда: ${error.message}`);
+      throw error;
     }
   }
 
-  // 🟢 ПЕРЕИМЕНОВАНО: Финализация результатов и зачисление выигрышей
   async finalizeRoundResults(losers, winners) {
     try {
-      // 1. Отправляем результаты на backend для каждого игрока
+      log.info(`📤 Финализирую результаты для ${this.players.size} игроков`);
+
       for (const player of this.players.values()) {
+        // 🔑 КРИТИЧНО: Проверяем что betId существует!
+        if (!player.betId) {
+          log.error(`❌ Нет betId для player ${player.userId}!`);
+          continue;
+        }
+
         const isWinner = winners.find(w => w.userId === player.userId);
 
-        // 2. Обновляем статус ставки в БД и зачисляем выигрыш (для победителей)
-        await axios.post(
-          `${BACKEND_URL}/api/v1/crash/cashout-result`,
-          {
+        try {
+          const url = `${BACKEND_URL}${API_VERSION}/crash/cashout-result`;
+
+          const payload = {
             userId: player.userId,
             tokenId: player.tokenId,
-            betId: player.betId, // Используем сохраненный betId
+            betId: player.betId,
             winnings: isWinner ? parseFloat(player.winnings) : 0,
             exitMultiplier: isWinner ? player.multiplier : null,
             gameId: this.gameId,
             result: isWinner ? 'won' : 'lost',
-          },
-          {
-            headers: {
-              'X-Server-Secret': SERVER_SECRET,
-            },
-          }
-        );
+          };
 
-        console.log(
-          `${isWinner ? '✅' : '❌'} User ${player.userId}: ${
-            isWinner
-              ? `Won ${player.winnings} on ${player.multiplier}x`
-              : 'Lost bet'
-          }`
-        );
+          log.info(`📤 Отправляю результат ${player.userName}:`, JSON.stringify(payload));
+
+          const response = await axios.post(
+            url,
+            payload,
+            {
+              headers: {
+                'X-Server-Secret': SERVER_SECRET,
+                'Content-Type': 'application/json'
+              },
+              timeout: 5000,
+            }
+          );
+
+          if (response.data.success) {
+            log.success(
+              `${isWinner ? '💰' : '😢'} ${player.userName}: ${
+                isWinner
+                  ? `+${player.winnings} на ${player.multiplier}x`
+                  : 'потеря ставки'
+              }`
+            );
+          } else {
+            log.error(`Server error for ${player.userId}: ${response.data.error}`);
+          }
+        } catch (error) {
+          log.error(`Ошибка для ${player.userId}: ${error.message}`);
+          if (error.response?.data) {
+            log.error(`Response:`, JSON.stringify(error.response.data));
+          }
+        }
       }
     } catch (error) {
-      console.error('❌ Ошибка сохранения результатов раунда:', error.message);
+      log.error(`Ошибка в finalize: ${error.message}`);
+      throw error;
     }
   }
 }
@@ -249,14 +274,17 @@ let gameRoom = new GameRoom();
 // ========================
 // WebSocket СОБЫТИЯ
 // ========================
-
 io.on('connection', socket => {
-  console.log(`👤 Новое подключение: ${socket.id}`);
+  log.info(`Новое подключение: ${socket.id}`);
 
   socket.on('joinGame', data => {
     const { userId, userName } = data;
-    // ... (остальной код joinGame без изменений)
-    
+
+    if (!userId || !userName) {
+      socket.emit('error', 'Missing userId or userName');
+      return;
+    }
+
     socket.join('crash-room');
 
     gameRoom.players.set(socket.id, {
@@ -269,10 +297,10 @@ io.on('connection', socket => {
       winnings: 0,
       cashed_out: false,
       result: null,
-      betId: null, // Инициализируем betId
+      betId: null,
     });
 
-    console.log(`👥 Всего: ${gameRoom.players.size} игроков`);
+    log.info(`${userName} присоединился. Всего: ${gameRoom.players.size}`);
 
     socket.emit('gameStatus', {
       status: gameRoom.status,
@@ -289,47 +317,84 @@ io.on('connection', socket => {
   });
 
   socket.on('placeBet', async data => {
-    const { amount, tokenId } = data;
+    const { amount, tokenId, token } = data;
     const player = gameRoom.players.get(socket.id);
 
     if (!player) {
-      socket.emit('error', 'Игрок не найден');
+      socket.emit('error', 'Player not found');
       return;
     }
 
     if (gameRoom.status !== 'waiting') {
-      socket.emit('error', 'Раунд уже начался');
+      socket.emit('error', 'Round already started');
       return;
     }
 
-    // Проверяем баланс на backend'е (снимаем средства)
+    if (!amount || amount <= 0 || !tokenId) {
+      socket.emit('error', 'Invalid bet parameters');
+      return;
+    }
+
     try {
-      const response = await axios.post(
-        `${BACKEND_URL}/api/v1/crash/verify-bet`,
+      if (!token) {
+        socket.emit('error', 'Authentication token required');
+        log.error(`Нет токена для user ${player.userId}`);
+        return;
+      }
+
+      // 1️⃣ Верифицируем
+      const verifyUrl = `${BACKEND_URL}${API_VERSION}/crash/verify-bet`;
+      log.info(`📤 Проверяю ставку для user ${player.userId}...`);
+
+      const verifyResponse = await axios.post(
+        verifyUrl,
         { amount, tokenId },
         {
           headers: {
-            Authorization: `Bearer ${socket.handshake.auth.token || ''}`,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
+          timeout: 5000,
         }
       );
 
-      if (!response.data.success) {
-        socket.emit('error', 'Недостаточно средств');
+      if (!verifyResponse.data.success) {
+        socket.emit('error', verifyResponse.data.error || 'Insufficient balance');
         return;
       }
-      
-      // 🟢 НОВОЕ: Создаем запись ставки в БД и получаем betId
-      const betCreationResponse = await axios.post(
-          `${BACKEND_URL}/api/v1/crash/create-bet`,
-          { userId: player.userId, gameId: gameRoom.gameId, amount, tokenId },
-          { headers: { 'X-Server-Secret': SERVER_SECRET } }
+
+      // 2️⃣ Создаем ставку
+      const createBetUrl = `${BACKEND_URL}${API_VERSION}/crash/create-bet`;
+      log.info(`📤 Создаю ставку: user=${player.userId}, amount=${amount}, tokenId=${tokenId}`);
+
+      const createBetResponse = await axios.post(
+        createBetUrl,
+        {
+          userId: player.userId,
+          gameId: gameRoom.gameId,
+          amount,
+          tokenId,
+        },
+        {
+          headers: { 
+            'X-Server-Secret': SERVER_SECRET,
+            'Content-Type': 'application/json'
+          },
+          timeout: 5000,
+        }
       );
-      
-      // Сохраняем ставку и ее ID из БД в памяти игрока
+
+      if (!createBetResponse.data.success) {
+        socket.emit('error', 'Failed to create bet');
+        return;
+      }
+
+      // 3️⃣ Сохраняем в памяти
       player.bet = amount;
       player.tokenId = tokenId;
-      player.betId = betCreationResponse.data.data.betId; // 💡 Ключевой момент!
+      player.betId = createBetResponse.data.data.betId;
+
+      log.success(`Ставка принята: betId=${player.betId}, tokenId=${player.tokenId}`);
 
       socket.emit('betPlaced', {
         bet: amount,
@@ -337,37 +402,35 @@ io.on('connection', socket => {
       });
 
       io.to('crash-room').emit('betsUpdated', {
-        activePlayersCount: Array.from(gameRoom.players.values()).filter(
-          p => p.bet > 0
-        ).length,
+        activePlayersCount: Array.from(gameRoom.players.values()).filter(p => p.bet > 0).length,
       });
     } catch (error) {
-      console.error('❌ Ошибка проверки баланса или создания ставки:', error.message);
-      socket.emit('error', 'Ошибка при обработке ставки');
+      log.error(`Ошибка ставки: ${error.message}`);
+      if (error.response?.data) {
+        log.error(`Response:`, JSON.stringify(error.response.data));
+      }
+      socket.emit('error', error.response?.data?.error || 'Error processing bet');
     }
   });
 
   socket.on('cashout', () => {
     const player = gameRoom.players.get(socket.id);
 
-    // ... (остальной код cashout без изменений)
-
     if (!player) {
-      socket.emit('error', 'Игрок не найден');
+      socket.emit('error', 'Player not found');
       return;
     }
 
     if (gameRoom.status !== 'in_progress') {
-      socket.emit('error', 'Раунд не в процессе');
+      socket.emit('error', 'Round not in progress');
       return;
     }
 
     if (player.cashed_out) {
-      socket.emit('error', 'Вы уже вышли');
+      socket.emit('error', 'Already cashed out');
       return;
     }
 
-    // Успешный кэшаут
     player.cashed_out = true;
     player.multiplier = gameRoom.multiplier;
     player.winnings = player.bet * gameRoom.multiplier;
@@ -383,15 +446,14 @@ io.on('connection', socket => {
       winnings: player.winnings,
     });
 
-    console.log(`💰 ${player.userName} вышел на ${gameRoom.multiplier}x`);
+    log.success(`💰 ${player.userName} вышел на ${gameRoom.multiplier}x с ${player.winnings}`);
   });
 
   socket.on('disconnect', () => {
     const player = gameRoom.players.get(socket.id);
     if (player) {
-      console.log(`👋 ${player.userName} отключился`);
+      log.info(`${player.userName} отключился`);
       gameRoom.players.delete(socket.id);
-
       io.to('crash-room').emit('playerJoined', {
         playersCount: gameRoom.players.size,
       });
@@ -400,9 +462,8 @@ io.on('connection', socket => {
 });
 
 // ========================
-// HTTP ENDPOINTS
+// HTTP
 // ========================
-
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -417,15 +478,12 @@ app.get('/health', (req, res) => {
 });
 
 // ========================
-// ЗАПУСК СЕРВЕРА
+// ЗАПУСК
 // ========================
-
 server.listen(PORT, () => {
-  console.log(`🚀 Crash Game Server запущен на порту ${PORT}`);
-  console.log(`📍 Backend URL: ${BACKEND_URL}`);
-  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
+  log.success(`🚀 Game Server на порту ${PORT}`);
+  log.info(`📍 Backend: ${BACKEND_URL}${API_VERSION}`);
 
-  // Начинаем первый раунд через 5 сек
   setTimeout(() => {
     gameRoom.startRound();
   }, 5000);

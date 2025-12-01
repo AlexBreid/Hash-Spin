@@ -14,22 +14,25 @@ import { ReferralsPage } from './components/pages/ReferralsPage';
 import { SettingsPage } from './components/pages/SettingsPage';
 import { SupportPage } from './components/pages/SupportPage';
 import { LoginPage } from './components/pages/LoginPage';
-import { CrashGame } from './components/pages/CrashGame'; // 🆕
+import { CrashGame } from './components/pages/CrashGame';
+import { WithdrawPage } from './components/pages/WithdrawPage';
+import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 
-const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash'];
+const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper'];
 
 function AppContent() {
     const navigate = useNavigate();
     const location = useLocation();
     const { isAuthenticated, loading } = useAuth();
     
-    // 🆕 Определяем текущую страницу из URL
     const getCurrentPageFromURL = () => {
         const path = location.pathname.toLowerCase();
         if (path === '/' || path === '/home') return 'home';
-        if (path === '/crash') return 'crash'; // 🆕
+        if (path === '/crash') return 'crash';
+        if (path === '/minesweeper') return 'minesweeper';
+        if (path === '/withdraw') return 'withdraw';
         if (path === '/records') return 'records';
         if (path === '/referrals') return 'referrals';
         if (path === '/account') return 'account';
@@ -42,7 +45,6 @@ function AppContent() {
     const [currentPage, setCurrentPage] = useState(getCurrentPageFromURL());
     const [isDarkMode, setIsDarkMode] = useState(true);
 
-    // 🆕 Синхронизируем currentPage с URL
     useEffect(() => {
         setCurrentPage(getCurrentPageFromURL());
     }, [location.pathname]);
@@ -53,11 +55,14 @@ function AppContent() {
         }
 
         if (!isAuthenticated && currentPage !== 'login') {
+            console.log('❌ Не аутентифицирован, редирект на login');
             navigate('/login');
             setCurrentPage('login');
         }
 
         if (isAuthenticated && currentPage === 'login') {
+            console.log('✅ Аутентифицирован, перенаправление на home');
+            navigate('/');
             setCurrentPage('home');
         }
     }, [isAuthenticated, loading, currentPage, navigate]);
@@ -75,7 +80,6 @@ function AppContent() {
             navigate('/login');
             setCurrentPage('login');
         } else {
-            // 🆕 Навигируем по URL вместо состояния
             navigate(`/${page === 'home' ? '' : page}`);
             setCurrentPage(page);
         }
@@ -98,8 +102,12 @@ function AppContent() {
                 }} />;
             case 'home':
                 return <HomePage />;
-            case 'crash': // 🆕
+            case 'crash':
                 return <CrashGame />;
+            case 'minesweeper':
+                return <MinesweeperPage onBack={() => handlePageChange('home')} />;
+            case 'withdraw':
+                return <WithdrawPage />;
             case 'records':
                 return <RecordsPage />;
             case 'referrals':
@@ -125,7 +133,9 @@ function AppContent() {
     };
 
     const isAuthPage = currentPage === 'login';
-    const isCrashPage = currentPage === 'crash'; // 🆕
+    const isCrashPage = currentPage === 'crash';
+    const isMinesweeperPage = currentPage === 'minesweeper';
+    const isWithdrawPage = currentPage === 'withdraw';
 
     if (loading) {
         return (
@@ -140,17 +150,19 @@ function AppContent() {
             className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
             style={{ height: '850px' }}
         >
-            {!isAuthPage && !isCrashPage && <TopNavigation onProfileClick={handleProfileClick} />}
+            {!isAuthPage && !isCrashPage && !isMinesweeperPage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main className={
-                isCrashPage ? 'h-full overflow-hidden' : // 🆕 Полный размер для Crash
+                isCrashPage ? 'h-full overflow-hidden' :
+                isMinesweeperPage ? 'h-full overflow-hidden' :
+                isWithdrawPage ? 'h-[calc(850px-70px)] overflow-y-auto' :
                 isAuthPage ? 'h-full' : 
                 'h-[calc(850px-140px)] overflow-y-auto'
             }>
                 {renderCurrentPage()}
             </main>
 
-            {!isAuthPage && !isCrashPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+            {!isAuthPage && !isCrashPage && !isMinesweeperPage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
 
             <Toaster />
         </div>

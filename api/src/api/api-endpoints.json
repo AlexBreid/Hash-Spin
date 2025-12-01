@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-11-28T12:01:35.728Z",
+  "timestamp": "2025-11-30T15:40:19.078Z",
   "baseUrl": "http://localhost:4000",
-  "totalEndpoints": 29,
+  "totalEndpoints": 32,
   "endpoints": {
     "AUTH_POST_login-with-token": {
       "path": "/login-with-token",
@@ -68,21 +68,33 @@
       "path": "/api/v1/leaderboard/top3",
       "method": "GET"
     },
+    "MINESWEEPER_GET_minesweeper_difficulties": {
+      "path": "/api/v1/minesweeper/difficulties",
+      "method": "GET"
+    },
+    "MINESWEEPER_POST_minesweeper_start": {
+      "path": "/api/v1/minesweeper/start",
+      "method": "POST"
+    },
+    "MINESWEEPER_POST_minesweeper_reveal": {
+      "path": "/api/v1/minesweeper/reveal",
+      "method": "POST"
+    },
+    "MINESWEEPER_GET_minesweeper_history": {
+      "path": "/api/v1/minesweeper/history",
+      "method": "GET"
+    },
+    "MINESWEEPER_POST_minesweeper_cashout": {
+      "path": "/api/v1/minesweeper/cashout",
+      "method": "POST"
+    },
     "REFERRAL_GET_referral_stats": {
       "path": "/api/v1/referral/stats",
       "method": "GET"
     },
-    "REFERRAL_GET_referral_history": {
-      "path": "/api/v1/referral/history",
-      "method": "GET"
-    },
-    "REFERRAL_POST_referral_claim-bonus": {
-      "path": "/api/v1/referral/claim-bonus",
+    "REFERRAL_POST_referral_link-referrer": {
+      "path": "/api/v1/referral/link-referrer",
       "method": "POST"
-    },
-    "REFERRAL_GET_referral_referee_": {
-      "path": "/api/v1/referral/referee/:refereeId",
-      "method": "GET"
     },
     "USER_GET_profile": {
       "path": "/profile",

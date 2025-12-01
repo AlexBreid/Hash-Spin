@@ -3,9 +3,10 @@ import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Loader2, User, Crown, BarChart2, Calendar, Star, LogOut } from "lucide-react";
+import { Loader2, User, Crown, BarChart2, Calendar, Star, LogOut, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+
 
 interface UserProfile {
   id: string;
@@ -20,36 +21,56 @@ interface UserProfile {
   createdAt: string;
 }
 
+interface BalanceData {
+  tokenId: number;
+  symbol: string;
+  amount: number;
+  type: string;
+}
+
 export function AccountPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [balances, setBalances] = useState<BalanceData[]>([]);
   
-  // ✅ Флаг чтобы загрузить только один раз
   const hasLoadedRef = useRef(false);
 
   const { data, loading, error, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
+  const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
-  // Загружаем профиль ОДИН РАЗ при монтировании
+  // 🔄 Загружаем профиль и баланс ОДИН РАЗ при монтировании
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      fetchProfile().catch(err => {
-        console.error('Ошибка загрузки профиля:', err);
-      });
+      fetchProfile().catch(err => console.error('❌ Ошибка профиля:', err));
+      fetchBalance().catch(err => console.error('❌ Ошибка баланса:', err));
     }
-  }, []); // Пустой массив зависимостей - только один раз!
+  }, []);
 
-  // Обновляем profileData когда пришли данные
+  // 📊 Обновляем данные профиля
   useEffect(() => {
     if (data) {
       setProfileData(data as UserProfile);
     }
   }, [data]);
 
+  // 💰 Обновляем баланс
+  useEffect(() => {
+    if (balanceData && balanceData.success && Array.isArray(balanceData.data)) {
+      console.log('✅ Баланс загружен:', balanceData.data);
+      setBalances(balanceData.data);
+    }
+  }, [balanceData]);
+
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  // 💳 Перейти на страницу вывода
+  const handleNavigateWithdraw = () => {
+    navigate("/withdraw");
   };
 
   const formatDate = (iso: string) =>
@@ -130,7 +151,6 @@ export function AccountPage() {
                 <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#e5e7eb' }}>{level}</span>
               </div>
 
-              {/* Progress bar */}
               <div style={{ width: '100%', height: '12px', backgroundColor: '#374151', borderRadius: '9999px', overflow: 'hidden' }}>
                 <motion.div
                   style={{ height: '100%', backgroundColor: '#3b82f6' }}
@@ -197,7 +217,34 @@ export function AccountPage() {
         </Card>
 
         {/* BUTTONS */}
-        <div className="mt-8 w-full max-w-md space-y-4">
+        <div className="mt-8 w-full max-w-md space-y-3">
+          {/* Кнопка вывода - красивая */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleNavigateWithdraw}
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.3s ease',
+            }}
+          >
+            <Send size={20} /> Вывести средства
+          </motion.div>
+
+          {/* Кнопка выхода */}
           <Button onClick={handleLogout} variant="destructive" className="w-full flex items-center gap-2">
             <LogOut className="w-5 h-5" /> Выйти
           </Button>
@@ -223,9 +270,10 @@ export function AccountPage() {
             onClick={() => {
               hasLoadedRef.current = false;
               fetchProfile();
+              fetchBalance();
             }}
           >
-            Повторить
+            Повторить                                                                                                         
           </Button>
         </>
       )}

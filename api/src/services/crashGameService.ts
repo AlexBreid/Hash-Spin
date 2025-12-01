@@ -1,4 +1,3 @@
-// src/services/crashGameService.ts
 import io, { Socket } from 'socket.io-client';
 
 const GAME_SERVER_URL = import.meta.env.VITE_GAME_SERVER_URL || 'http://localhost:5000';
@@ -32,15 +31,21 @@ export interface LiveEvent {
 class CrashGameService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
+  private authToken: string | null = null;  // 🔑 ДОБАВЛЕНО: Хранение токена
 
-  async connect(userId: number, userName: string): Promise<void> {
+  async connect(userId: number, userName: string, authToken: string): Promise<void> {  // 🔑 ДОБАВЛЕНО: authToken параметр
     return new Promise((resolve, reject) => {
       try {
+        this.authToken = authToken;  // 🔑 СОХРАНЯЕМ ТОКЕН
+
         this.socket = io(GAME_SERVER_URL, {
           reconnection: true,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           reconnectionAttempts: 5,
+          auth: {  // 🔑 ДОБАВЛЕНО: Отправляем токен при подключении
+            token: authToken
+          }
         });
 
         this.socket.on('connect', () => {
@@ -73,7 +78,6 @@ class CrashGameService {
   private setupEventListeners(): void {
     if (!this.socket) return;
 
-    // Все события связаны с игровым состоянием
     this.socket.on('gameStatus', (data: CrashGameState) => {
       this.emit('gameStatus', data);
     });
@@ -111,10 +115,16 @@ class CrashGameService {
     });
   }
 
-  // Методы для размещения ставок и кэшаута
+  // 🔑 ИСПРАВЛЕНО: Методы для размещения ставок и кэшаута
   async placeBet(amount: number, tokenId: number): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit('placeBet', { amount, tokenId });
+    
+    // 🔑 ДОБАВЛЕНО: Отправляем токен вместе с ставкой
+    this.socket.emit('placeBet', { 
+      amount, 
+      tokenId,
+      token: this.authToken  // 🔑 ПЕРЕДАЕМ ТОКЕН!
+    });
   }
 
   async cashout(): Promise<void> {

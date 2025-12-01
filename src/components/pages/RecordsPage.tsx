@@ -164,7 +164,7 @@ export function RecordsPage() {
                 </Avatar>
                 <div className="text-center">
                   <p className="text-sm font-bold">{topThree[1].username}</p>
-                  <p className="text-xs text-muted-foreground">{topThree[1].score.toLocaleString()} очков</p>
+                  <p className="text-xs text-muted-foreground">{topThree[1].score.toLocaleString()} USDT</p>
                 </div>
                 <div className="w-16 h-14 bg-gradient-to-t from-gray-400 to-gray-300 rounded-t-2xl mt-3 flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg">2</span>
@@ -183,7 +183,7 @@ export function RecordsPage() {
                 </Avatar>
                 <div className="text-center">
                   <p className="text-sm font-bold">{topThree[0].username}</p>
-                  <p className="text-xs text-muted-foreground">{topThree[0].score.toLocaleString()} очков</p>
+                  <p className="text-xs text-muted-foreground">{topThree[0].score.toLocaleString()} USDT</p>
                 </div>
                 <div className="w-18 h-18 bg-gradient-to-t from-yellow-500 to-yellow-400 rounded-t-2xl mt-3 flex items-center justify-center shadow-xl">
                   <span className="text-white font-bold text-xl">1</span>
@@ -201,7 +201,7 @@ export function RecordsPage() {
                 </Avatar>
                 <div className="text-center">
                   <p className="text-sm font-bold">{topThree[2].username}</p>
-                  <p className="text-xs text-muted-foreground">{topThree[2].score.toLocaleString()} очков</p>
+                  <p className="text-xs text-muted-foreground">{topThree[2].score.toLocaleString()} USDT</p>
                 </div>
                 <div className="w-16 h-12 bg-gradient-to-t from-amber-600 to-amber-500 rounded-t-2xl mt-3 flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg">3</span>
@@ -241,7 +241,7 @@ export function RecordsPage() {
                 </div>
 
                 <div className="text-right">
-                  <p className="font-bold text-lg text-success">{player.score.toLocaleString()} очков</p>
+                  <p className="font-bold text-lg text-success">{player.score.toLocaleString()} USDT</p>
                 </div>
               </div>
             ))

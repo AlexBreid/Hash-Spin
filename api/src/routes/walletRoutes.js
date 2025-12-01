@@ -51,7 +51,6 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
   try {
     console.log('📋 Запрос списка доступных токенов');
 
-    // Получаем все токены из БД
     const tokens = await prisma.cryptoToken.findMany({
       select: {
         id: true,
@@ -89,6 +88,7 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
     });
   }
 });
+
 /**
  * ⭐ НОВЫЙ ENDPOINT: Создать адрес пополнения через Tatum (TRON/TRC20)
  * POST /api/v1/wallet/deposit/create-address
@@ -100,7 +100,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
 
     console.log('📍 Получены данные:', { amount, currency, userId });
 
-    // Валидация
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
@@ -119,21 +118,9 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
 
     console.log(`📍 Создание TRON адреса пополнения для пользователя ${userId}...`);
 
-    // 1️⃣ Тестируем подключение к Tatum
-    const isConnected = await tatumService.testConnection();
-    if (!isConnected) {
-      return res.status(500).json({
-        success: false,
-        message: 'Ошибка подключения к сервису платежей. Попробуйте позже.',
-      });
-    }
-
-    // 2️⃣ Создаем адрес в Tatum (TRON)
     const addressData = await tatumService.createDepositAddress(userId);
-
     console.log(`✅ TRON адрес создан: ${addressData.address}`);
 
-    // 3️⃣ Получаем токен из БД (ищем USDT TRC20)
     const token = await prisma.cryptoToken.findFirst({
       where: {
         symbol: 'USDT',
@@ -149,7 +136,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
       });
     }
 
-    // 4️⃣ Сохраняем платеж в БД
     const transaction = await prisma.transaction.create({
       data: {
         userId,
@@ -158,16 +144,14 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
         status: 'PENDING',
         amount: parseFloat(amount),
         walletAddress: addressData.address,
-        txHash: '', // Будет установлен когда придет платеж
+        txHash: null,
       },
     });
 
     console.log(`✅ Платеж создан: ID ${transaction.id}`);
 
-    // 5️⃣ Получаем информацию о сети
     const networkInfo = tatumService.getNetworkInfo();
 
-    // 6️⃣ Возвращаем ответ фронтенду
     res.json({
       success: true,
       data: {
@@ -192,7 +176,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
     });
   } catch (error) {
     console.error('❌ Ошибка создания адреса:', error.message);
-    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: error.message || 'Не удалось создать адрес пополнения',
@@ -209,7 +192,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
     const { transactionId } = req.params;
     const userId = req.user.userId;
 
-    // Находим транзакцию
     const transaction = await prisma.transaction.findUnique({
       where: { id: parseInt(transactionId) },
       include: {
@@ -226,7 +208,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
       });
     }
 
-    // Проверяем что это платеж пользователя
     if (transaction.userId !== userId) {
       return res.status(403).json({
         success: false,
@@ -234,7 +215,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
       });
     }
 
-    // Если уже завершен
     if (transaction.status === 'COMPLETED') {
       return res.json({
         success: true,
@@ -248,7 +228,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
       });
     }
 
-    // Проверяем баланс адреса в Tatum
     try {
       const balanceData = await tatumService.getAddressBalance(transaction.walletAddress);
 
@@ -284,7 +263,7 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
 });
 
 /**
- * ⭐ НОВЫЙ ENDPOINT: Вебхук от Tatum (автоматическое пополнение)
+ * 🎁 ОБНОВЛЕННЫЙ WEBHOOK: Автоматическое пополнение + начисление реферальных бонусов
  * POST /api/v1/wallet/webhook/deposit
  */
 router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
@@ -367,6 +346,76 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
 
     console.log(`💰 Баланс пополнен: ${value} ${token?.symbol} для пользователя ${transaction.userId}`);
 
+    // 5️⃣ 🎁 НОВОЕ: Начисляем бонус рефереру если он есть
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: transaction.userId },
+        select: {
+          referredById: true,
+          referrer: {
+            select: { id: true, username: true },
+          },
+        },
+      });
+
+      if (user?.referrer) {
+        const bonusPercentage = 10;
+        const bonusAmount = (parseFloat(value) * bonusPercentage) / 100;
+
+        console.log(`🎁 Начисляю бонус рефереру: ${bonusAmount} ${token?.symbol}`);
+
+        // Получаем или создаем баланс реферера
+        let referrerBalance = await prisma.balance.findUnique({
+          where: {
+            userId_tokenId_type: {
+              userId: user.referrer.id,
+              tokenId: transaction.tokenId,
+              type: 'MAIN',
+            },
+          },
+        });
+
+        if (!referrerBalance) {
+          referrerBalance = await prisma.balance.create({
+            data: {
+              userId: user.referrer.id,
+              tokenId: transaction.tokenId,
+              type: 'MAIN',
+              amount: bonusAmount,
+            },
+          });
+        } else {
+          referrerBalance = await prisma.balance.update({
+            where: { id: referrerBalance.id },
+            data: {
+              amount: {
+                increment: bonusAmount,
+              },
+            },
+          });
+        }
+
+        // Записываем транзакцию реферального вознаграждения
+        await prisma.referralTransaction.create({
+          data: {
+            referrerId: user.referrer.id,
+            refereeId: transaction.userId,
+            tokenId: transaction.tokenId,
+            eventType: 'DEPOSIT_BONUS',
+            amount: bonusAmount,
+            sourceEntityId: transaction.id,
+            sourceEntityType: 'Transaction',
+          },
+        });
+
+        console.log(`✅ Бонус ${bonusAmount} ${token?.symbol} начислен рефереру ${user.referrer.username}`);
+      } else {
+        console.log(`ℹ️ Пользователь ${transaction.userId} не имеет реферера`);
+      }
+    } catch (referralError) {
+      console.error('⚠️ Ошибка при начислении реферального бонуса:', referralError.message);
+    }
+
     res.json({
       success: true,
       message: 'Balance topped up',
@@ -396,7 +445,6 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
       });
     }
 
-    // Проверяем что токен существует
     const token = await prisma.cryptoToken.findUnique({
       where: { id: tokenId },
     });
@@ -408,7 +456,6 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
       });
     }
 
-    // Создаем или обновляем баланс
     let balance = await prisma.balance.findUnique({
       where: {
         userId_tokenId_type: {
@@ -439,7 +486,6 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
       });
     }
 
-    // Создаем запись транзакции
     await prisma.transaction.create({
       data: {
         userId,
@@ -485,7 +531,6 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       });
     }
 
-    // Проверяем что у пользователя есть достаточно средств
     const balance = await prisma.balance.findUnique({
       where: {
         userId_tokenId_type: {
@@ -503,7 +548,6 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       });
     }
 
-    // Обновляем баланс
     const newBalance = await prisma.balance.update({
       where: { id: balance.id },
       data: {
@@ -513,7 +557,6 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       },
     });
 
-    // Создаем запись транзакции (PENDING)
     await prisma.transaction.create({
       data: {
         userId,
