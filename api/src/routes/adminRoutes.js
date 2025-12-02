@@ -1,0 +1,402 @@
+// routes/adminRoutes.js
+const express = require('express');
+const router = express.Router();
+const prisma = require('../../prismaClient');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// ====================================
+// MIDDLEWARE: Проверка админ-токена
+// ====================================
+const requireAdminAuth = async (req, res, next) => {
+    try {
+        // Проверяем JWT токен в заголовке
+        const token = req.headers.authorization?.split(' ')[1];
+        
+        if (!token) {
+            return res.status(401).json({ error: 'Token required' });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Проверяем что пользователь админ
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.userId }
+        });
+
+        if (!user || !user.isAdmin) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        req.user = user;
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+// ====================================
+// 📊 СТАТИСТИКА
+// ====================================
+
+router.get('/stats', requireAdminAuth, async (req, res) => {
+    try {
+        const totalUsers = await prisma.user.count();
+        const blockedUsers = await prisma.user.count({ where: { isBlocked: true } });
+        const totalAdmins = await prisma.user.count({ where: { isAdmin: true } });
+        const activeToday = await prisma.user.count({
+            where: {
+                createdAt: {
+                    gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+
+        const totalDeposits = await prisma.transaction.aggregate({
+            where: { type: 'DEPOSIT', status: 'COMPLETED' },
+            _sum: { amount: true }
+        });
+
+        const totalWithdrawals = await prisma.transaction.aggregate({
+            where: { type: 'WITHDRAW', status: 'COMPLETED' },
+            _sum: { amount: true }
+        });
+
+        const pendingWithdrawals = await prisma.transaction.count({
+            where: { type: 'WITHDRAW', status: 'PENDING' }
+        });
+
+        res.json({
+            totalUsers,
+            activeToday,
+            blockedUsers,
+            totalAdmins,
+            totalDeposits: totalDeposits._sum.amount || 0,
+            totalWithdrawals: totalWithdrawals._sum.amount || 0,
+            pendingWithdrawals,
+            timestamp: new Date()
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ====================================
+// 👥 УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ
+// ====================================
+
+// Получить список пользователей
+router.get('/users', requireAdminAuth, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const users = await prisma.user.findMany({
+            include: {
+                balances: { include: { token: true } },
+                transactions: { orderBy: { createdAt: 'desc' }, take: 3 }
+            },
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const total = await prisma.user.count();
+
+        res.json({
+            users,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Получить юзера по ID
+router.get('/users/:id', requireAdminAuth, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: parseInt(req.params.id) },
+            include: {
+                balances: { include: { token: true } },
+                transactions: { orderBy: { createdAt: 'desc' }, take: 50 },
+                referrals: true,
+                bonuses: { include: { bonus: true, token: true } }
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Заблокировать пользователя
+router.post('/users/:id/block', requireAdminAuth, async (req, res) => {
+    try {
+        const user = await prisma.user.update({
+            where: { id: parseInt(req.params.id) },
+            data: { isBlocked: true }
+        });
+
+        console.log(`👮 Admin ${req.user.id} blocked user ${user.id}`);
+
+        res.json({ ok: true, message: `User ${user.id} blocked`, user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Разблокировать пользователя
+router.post('/users/:id/unblock', requireAdminAuth, async (req, res) => {
+    try {
+        const user = await prisma.user.update({
+            where: { id: parseInt(req.params.id) },
+            data: { isBlocked: false }
+        });
+
+        console.log(`👮 Admin ${req.user.id} unblocked user ${user.id}`);
+
+        res.json({ ok: true, message: `User ${user.id} unblocked`, user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Выдать админ-статус
+router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
+    try {
+        const user = await prisma.user.update({
+            where: { id: parseInt(req.params.id) },
+            data: { isAdmin: true }
+        });
+
+        console.log(`👑 Admin ${req.user.id} promoted user ${user.id} to admin`);
+
+        res.json({ ok: true, message: `User ${user.id} is now admin`, user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Снять админ-статус
+router.post('/users/:id/remove-admin', requireAdminAuth, async (req, res) => {
+    try {
+        const user = await prisma.user.update({
+            where: { id: parseInt(req.params.id) },
+            data: { isAdmin: false }
+        });
+
+        console.log(`👑 Admin ${req.user.id} demoted user ${user.id}`);
+
+        res.json({ ok: true, message: `User ${user.id} is no longer admin`, user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ====================================
+// 💳 УПРАВЛЕНИЕ ПЛАТЕЖАМИ
+// ====================================
+
+// Получить все транзакции
+router.get('/transactions', requireAdminAuth, async (req, res) => {
+    try {
+        const type = req.query.type; // DEPOSIT, WITHDRAW
+        const status = req.query.status; // PENDING, COMPLETED, FAILED
+        const limit = parseInt(req.query.limit) || 50;
+
+        const where = {};
+        if (type) where.type = type;
+        if (status) where.status = status;
+
+        const transactions = await prisma.transaction.findMany({
+            where,
+            include: { user: true, token: true },
+            orderBy: { createdAt: 'desc' },
+            take: limit
+        });
+
+        res.json(transactions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Одобрить вывод
+router.post('/transactions/:id/approve', requireAdminAuth, async (req, res) => {
+    try {
+        const transaction = await prisma.transaction.update({
+            where: { id: parseInt(req.params.id) },
+            data: { status: 'COMPLETED' }
+        });
+
+        console.log(`✅ Admin ${req.user.id} approved withdrawal ${transaction.id}`);
+
+        res.json({ ok: true, message: 'Withdrawal approved', transaction });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Отклонить вывод (вернуть деньги)
+router.post('/transactions/:id/reject', requireAdminAuth, async (req, res) => {
+    try {
+        const transaction = await prisma.transaction.findUnique({
+            where: { id: parseInt(req.params.id) }
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'Transaction not found' });
+        }
+
+        // Возвращаем деньги на баланс
+        const balance = await prisma.balance.findFirst({
+            where: {
+                userId: transaction.userId,
+                tokenId: transaction.tokenId
+            }
+        });
+
+        if (balance) {
+            await prisma.balance.update({
+                where: { id: balance.id },
+                data: { amount: balance.amount + transaction.amount }
+            });
+        }
+
+        // Помечаем транзакцию как FAILED
+        await prisma.transaction.update({
+            where: { id: parseInt(req.params.id) },
+            data: { status: 'FAILED' }
+        });
+
+        console.log(`❌ Admin ${req.user.id} rejected withdrawal ${transaction.id}`);
+
+        res.json({ ok: true, message: 'Withdrawal rejected and funds returned' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ====================================
+// 🔔 ЛОГИ ВЕБ-ХУКОВ
+// ====================================
+
+router.get('/webhook-logs', requireAdminAuth, async (req, res) => {
+    try {
+        const logs = await prisma.transaction.findMany({
+            where: { type: 'DEPOSIT' },
+            include: { user: true, token: true },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        });
+
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ====================================
+// ⚙️ СИСТЕМНЫЕ НАСТРОЙКИ
+// ====================================
+
+router.get('/settings', requireAdminAuth, async (req, res) => {
+    try {
+        res.json({
+            minDeposit: 10,
+            maxDeposit: 10000,
+            minWithdraw: 10,
+            maxWithdraw: 5000,
+            depositFee: 0,
+            withdrawFee: 2.5,
+            webhookStatus: 'active',
+            botStatus: 'online'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ====================================
+// 📤 РУЧНОЕ ПОПОЛНЕНИЕ (Только суперадмин)
+// ====================================
+
+router.post('/manual-deposit', requireAdminAuth, async (req, res) => {
+    try {
+        // Проверяем что это суперадмин (например, ID 1)
+        if (req.user.id !== 1) {
+            return res.status(403).json({ error: 'Only super admin can do this' });
+        }
+
+        const { userId, amount, tokenSymbol = 'USDT' } = req.body;
+
+        if (!userId || !amount) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const token = await prisma.cryptoToken.findUnique({
+            where: { symbol: tokenSymbol }
+        });
+
+        if (!token) {
+            return res.status(400).json({ error: 'Token not found' });
+        }
+
+        const balance = await prisma.balance.findFirst({
+            where: {
+                userId,
+                tokenId: token.id,
+                type: 'MAIN'
+            }
+        });
+
+        if (balance) {
+            await prisma.balance.update({
+                where: { id: balance.id },
+                data: { amount: balance.amount + amount }
+            });
+        } else {
+            await prisma.balance.create({
+                data: {
+                    userId,
+                    tokenId: token.id,
+                    amount,
+                    type: 'MAIN'
+                }
+            });
+        }
+
+        // Создаём транзакцию
+        await prisma.transaction.create({
+            data: {
+                userId,
+                tokenId: token.id,
+                type: 'DEPOSIT',
+                status: 'COMPLETED',
+                amount,
+                walletAddress: 'ADMIN_MANUAL'
+            }
+        });
+
+        console.log(`💳 Admin ${req.user.id} manually deposited $${amount} to user ${userId}`);
+
+        res.json({ ok: true, message: `$${amount} added to user ${userId}` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = router;

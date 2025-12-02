@@ -1,9 +1,49 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-11-30T15:40:19.078Z",
+  "timestamp": "2025-12-02T21:38:02.190Z",
   "baseUrl": "http://localhost:4000",
-  "totalEndpoints": 32,
+  "totalEndpoints": 42,
   "endpoints": {
+    "ADMIN_GET_stats": {
+      "path": "/stats",
+      "method": "GET"
+    },
+    "ADMIN_GET_users": {
+      "path": "/users",
+      "method": "GET"
+    },
+    "ADMIN_GET_users_": {
+      "path": "/users/:id",
+      "method": "GET"
+    },
+    "ADMIN_POST_users_": {
+      "path": "/users/:id/unblock",
+      "method": "POST"
+    },
+    "ADMIN_POST_users_-admin": {
+      "path": "/users/:id/remove-admin",
+      "method": "POST"
+    },
+    "ADMIN_GET_transactions": {
+      "path": "/transactions",
+      "method": "GET"
+    },
+    "ADMIN_POST_transactions_": {
+      "path": "/transactions/:id/reject",
+      "method": "POST"
+    },
+    "ADMIN_GET_webhook-logs": {
+      "path": "/webhook-logs",
+      "method": "GET"
+    },
+    "ADMIN_GET_settings": {
+      "path": "/settings",
+      "method": "GET"
+    },
+    "ADMIN_POST_manual-deposit": {
+      "path": "/manual-deposit",
+      "method": "POST"
+    },
     "AUTH_POST_login-with-token": {
       "path": "/login-with-token",
       "method": "POST"
