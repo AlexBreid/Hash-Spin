@@ -50,9 +50,9 @@
       },
     },
     build: {
-      target: 'esnext',
-      outDir: 'build',
-    },
+    target: 'esnext',
+    outDir: 'dist', // ← Было 'build', стало 'dist'
+  },
     server: {
     port: 5173, // Порт для фронтенда
     host: true, // Слушаем на всех интерфейсах
