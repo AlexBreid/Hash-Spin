@@ -11,8 +11,8 @@ const RouteLoader = require('./src/utils/routeLoader');
 
 // ========== КОНФИГУРАЦИЯ ==========
 const app = express();
-const PORT = process.env.API_PORT || process.env.PORT || 4000;
-const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
+const PORT = process.env.API_PORT || process.env.PORT || 8000;
+const API_BASE_URL = process.env.API_BASE_URL ;
 
 // ========== ИНИЦИАЛИЗАЦИЯ ROUTE LOADER ==========
 const routesDir = path.join(__dirname, 'src/routes');

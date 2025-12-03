@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL;
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 

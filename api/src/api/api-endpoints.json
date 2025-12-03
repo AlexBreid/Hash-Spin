@@ -1,7 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-12-03T02:20:19.873Z",
-  "baseUrl": "http://localhost:4000",
+  "timestamp": "2025-12-03T03:00:09.844Z",
   "totalEndpoints": 42,
   "endpoints": {
     "ADMIN_GET_stats": {
