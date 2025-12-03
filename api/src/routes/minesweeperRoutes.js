@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
-const minesweeperService = require('../services/minesweeperservice');
+const minesweeperService = require('../services/MinesweeperService');
 
 /**
  * 🎮 GET все сложности
