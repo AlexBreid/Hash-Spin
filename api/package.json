@@ -11,7 +11,8 @@
     "start:game": "node crash-game-server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "build": "echo skipping build"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
