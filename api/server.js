@@ -25,6 +25,7 @@ routeLoader.printRoutes();
 
 // ========== MIDDLEWARE (CORS & HEADERS) ==========
 const allowedOrigins = [
+    'https://safarix.vercel.app',
     'http://localhost:5173',
     'http://localhost:3000',
     'https://hash-spin.vercel.app',
