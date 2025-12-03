@@ -215,40 +215,6 @@ export function AccountPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* BUTTONS */}
-        <div className="mt-8 w-full max-w-md space-y-3">
-          {/* Кнопка вывода - красивая */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleNavigateWithdraw}
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
-              border: 'none',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            <Send size={20} /> Вывести средства
-          </motion.div>
-
-          {/* Кнопка выхода */}
-          <Button onClick={handleLogout} variant="destructive" className="w-full flex items-center gap-2">
-            <LogOut className="w-5 h-5" /> Выйти
-          </Button>
-        </div>
       </div>
     );
   }

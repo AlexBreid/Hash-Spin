@@ -191,36 +191,6 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           }
           
 
-          {/* Deposit Button - ОТКРЫВАЕТ МОДАЛ */}
-          <Button
-            onClick={handleDepositClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '8px 12px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563eb';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#3b82f6';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            Пополнить
-          </Button>
-
           {/* Profile Button */}
           <button
             onClick={onProfileClick}
