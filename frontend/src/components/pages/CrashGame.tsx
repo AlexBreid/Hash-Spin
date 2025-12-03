@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { crashGameService, CrashGameState, LiveEvent } from '../../services/crashGameService';
+import { crashGameService } from '../../services/crashGameService';
+import type { CrashGameState, LiveEvent } from '../../services/crashGameService';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../hooks/useBalance';
 import { Zap, TrendingUp, Users, ArrowLeft, History, Timer, Flame, DollarSign, RefreshCw } from 'lucide-react';

@@ -256,7 +256,6 @@ bot.start(async (ctx) => {
     const username = ctx.from.username;
 
     try {
-        // Проверяем блокировку
         let user = await prisma.user.findUnique({ where: { telegramId } });
 
         if (user && user.isBlocked) {
@@ -265,16 +264,16 @@ bot.start(async (ctx) => {
         }
 
         let isNewUser = false;
+        let rawPassword = null; // ← объявляем здесь
 
         if (!user) {
-            // Регистрация нового пользователя
-            const { user: newUser, rawPassword } = await registerNewUser(ctx.from);
+            const { user: newUser, rawPassword: pwd } = await registerNewUser(ctx.from);
             user = newUser;
+            rawPassword = pwd; // ← сохраняем
             isNewUser = true;
         }
 
-        // Общий рекламный слоган для ВСЕХ
-        const commonSlogan = `🎰 *Добро пожаловать в SafariX — Казино будущего!* 🌍
+        const commonSlogan = `🎰 *Добро пожаложовать в SafariX — Казино будущего!* 🌍
 
 🚀 Здесь каждый спин — шаг к выигрышу!  
 💎 Крипто-ставки без границ  
@@ -283,7 +282,6 @@ bot.start(async (ctx) => {
 
 🔥 *Играй. Выигрывай. Наслаждайся.*`;
 
-        // Дополнительный блок для новых пользователей
         const credentialsBlock = isNewUser
             ? `\n\n✨ *Ваши данные для входа:*\n` +
               `🔑 Логин: \`${username ? `@${username}` : `ID: ${user.id}`}\`\n` +
@@ -293,7 +291,6 @@ bot.start(async (ctx) => {
 
         const fullMessage = commonSlogan + credentialsBlock;
 
-        // Отправляем картинку со слоганом ВСЕМ
         try {
             if (fs.existsSync(WELCOME_IMAGE_PATH)) {
                 await ctx.replyWithPhoto(
@@ -308,7 +305,6 @@ bot.start(async (ctx) => {
             await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
         }
 
-        // Отправляем меню
         const menu = user.isAdmin ? getAdminMenuKeyboard() : getMainMenuKeyboard();
         await ctx.reply('📋 *Выберите действие:*', menu);
 
