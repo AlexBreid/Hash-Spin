@@ -21,7 +21,7 @@ export function WithdrawPage() {
   const [step, setStep] = useState<WithdrawStep>('FORM');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
   const [formData, setFormData] = useState({
     amount: '',
     walletAddress: '',

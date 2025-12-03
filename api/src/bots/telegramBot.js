@@ -530,7 +530,7 @@ bot.start(async (ctx) => {
             switch (text) {
                 case '🎰 Казино':
                     const oneTimeToken = await generateOneTimeToken(user.id);
-                    const authUrl = `${FRONTEND_URL}/auth?token=${oneTimeToken}`;
+                    const authUrl = `${FRONTEND_URL}/login?token=${oneTimeToken}`;
                     const isHttps = FRONTEND_URL.startsWith('https://');
 
                     if (isHttps) {
