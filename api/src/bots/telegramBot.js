@@ -635,58 +635,80 @@ bot.start(async (ctx) => {
             await ctx.reply('❌ Произошла ошибка. Попробуйте еще раз.');
         }
     });
-
+    const waitingForDeposit = new Map();
     // ====================================
     // CALLBACK КНОПКИ
     // ====================================
-    bot.action(/deposit_(\d+|custom)/, async (ctx) => {
-        const action = ctx.match[0];
-        const user = await prisma.user.findUnique({ 
-            where: { telegramId: ctx.from.id.toString() } 
-        });
+    // Обработчик кастомного пополнения (кнопка "Другая сумма")
+    bot.action("deposit_custom", async (ctx) => {
+        const user = await prisma.user.findUnique({
+            where: { telegramId: ctx.from.id.toString() }
+        });
 
-        if (!user) return;
+        if (!user) return;
 
-        let amount = 0;
+        waitingForDeposit.set(user.id, true);
 
-        if (action === 'deposit_10') amount = 10;
-        else if (action === 'deposit_50') amount = 50;
-        else if (action === 'deposit_100') amount = 100;
-        else if (action === 'deposit_500') amount = 500;
-        else if (action === 'deposit_custom') {
-            // Если нажата "Другая сумма", то пока что просто отвечаем.
-            // В реальном приложении здесь должна быть логика ожидания следующего сообщения с суммой.
-            await ctx.reply('Введите сумму в USDT, которую хотите пополнить. (Например: 25.5)');
-            await ctx.answerCbQuery();
-            return;
-        }
+        await ctx.reply(
+            "Введите сумму в USDT, которую хотите пополнить.\nНапример: 15.25"
+        );
 
-        const invoice = await cryptoPayAPI.createInvoice(
-            amount,
-            'USDT',
-            `Пополнение казино User #${user.id}`,
-            user.id
-        );
+        await ctx.answerCbQuery();
+    });
 
-        if (invoice) {
-            await ctx.editMessageText(
-                `✅ *Инвойс создан*\n\nСумма: ${amount} USDT\nID: ${invoice.invoice_id}\n\nНажмите "Оплатить" для перехода к боту Crypto Pay.`,
-                {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '💳 Оплатить', url: invoice.bot_invoice_url }],
-                            [{ text: '✅ Проверить статус', callback_data: `check_invoice_${invoice.invoice_id}` }]
-                        ]
-                    },
-                    parse_mode: 'Markdown'
-                }
-            );
-        } else {
-            await ctx.reply('❌ Ошибка при создании инвойса.');
-        }
 
-        await ctx.answerCbQuery();
-    });
+    // ====================================
+    // ПРИНИМАЕМ ЛЮБОЙ ТЕКСТ — ЕСЛИ ЖДЕМ СУММУ
+    // ====================================
+    bot.on("text", async (ctx) => {
+        const telegramId = ctx.from.id.toString();
+        const user = await prisma.user.findUnique({ where: { telegramId } });
+        const text = ctx.message.text.trim();
+
+        if (!user) return;
+
+        // Проверяем — ожидаем ли сумму
+        if (!waitingForDeposit.get(user.id)) {
+            return; // обычный текст не трогаем
+        }
+
+        // Пробуем число
+        const amount = Number(text);
+
+        if (isNaN(amount) || amount <= 0) {
+            await ctx.reply("❌ Введите корректную сумму. Пример: 10.5");
+            return;
+        }
+
+        // Больше не ждем сумму
+        waitingForDeposit.delete(user.id);
+
+        // Создаём инвойс
+        const invoice = await cryptoPayAPI.createInvoice(
+            amount,
+            "USDT",
+            `Пополнение казино User #${user.id}`,
+            user.id
+        );
+
+        if (!invoice) {
+            await ctx.reply("❌ Ошибка при создании инвойса.");
+            return;
+        }
+
+        await ctx.reply(
+            `✅ *Инвойс создан*\n\nСумма: ${amount} USDT\nID: ${invoice.invoice_id}\n\nПерейдите к оплате:`,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
+                        [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }]
+                    ]
+                },
+                parse_mode: "Markdown"
+            }
+        );
+    });
     
     // Новая функция для проверки статуса инвойса
     bot.action(/check_invoice_(\d+)/, async (ctx) => {
