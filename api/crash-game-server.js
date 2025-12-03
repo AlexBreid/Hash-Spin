@@ -11,8 +11,8 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      process.env.FRONTEND_URL_ALT || 'http://localhost:3000',
+      process.env.FRONTEND_URL,
+      process.env.FRONTEND_URL_ALT,
     ],
     credentials: true,
   },
