@@ -23,7 +23,8 @@ const io = socketIo(server, {
 // ========================
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 const API_VERSION = '/api/v1';
-const SERVER_SECRET = process.env.GAME_SERVER_SECRET || 'your-secret-key';
+const SERVER_SECRET = process.env.GAME_SERVER_SECRET;
+log.info('Loaded Server Secret (first 5 chars):', SERVER_SECRET ? SERVER_SECRET.substring(0, 5) + '...' : '❌ NOT LOADED');
 const PORT = process.env.GAME_SERVER_PORT || 5000;
 
 const log = {
