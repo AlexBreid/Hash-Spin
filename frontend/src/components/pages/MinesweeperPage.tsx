@@ -45,6 +45,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { execute: cashOut } = useFetch('MINESWEEPER_POST_minesweeper_cashout', 'POST');
   const { execute: getBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
+  // 🔹 ФУНКЦИЯ: расчёт максимального множителя
+  const calculateMaxMultiplier = useCallback((minesCount: number): number => {
+    const totalCells = 6 * 6; // 36 клеток
+    return minesCount > 0 ? parseFloat((totalCells / minesCount).toFixed(2)) : 0;
+  }, []);
+
   useEffect(() => {
     if (step === 'REVEAL_BOARD') {
       const timer = setTimeout(() => {
@@ -162,7 +168,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       if (result.status === 'WON') {
         setGameStatus('WON');
         setWinAmount(result.winAmount);
-        // Обновляем сетку на полное раскрытое поле
         if (result.fullGrid) {
           setGrid(result.fullGrid);
         }
@@ -170,7 +175,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         toast.success(`🎉 Вы открыли всё поле! Выигрыш: ${result.winAmount} USDT`);
       } else if (result.status === 'LOST') {
         setGameStatus('LOST');
-        // Обновляем сетку на полное раскрытое поле
         if (result.fullGrid) {
           setGrid(result.fullGrid);
         }
@@ -196,7 +200,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
       setGameStatus('CASHED_OUT');
       setWinAmount(result.winAmount);
-      // Обновляем сетку на полное раскрытое поле
       if (result.fullGrid) {
         setGrid(result.fullGrid);
       }
@@ -207,10 +210,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [gameId, cashOut]);
 
+  // 🔹 ОБНОВЛЕНО: вместо ✅ → 💰
   const getCellContent = (cell?: GridCell) => {
     if (!cell || !cell.revealed) return '';
     if (cell.isMine) return '💣';
-    return '✅';
+    return '💰';
   };
 
   const resetGame = useCallback(() => {
@@ -381,6 +385,22 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           border-radius: 8px;
           border: 1px solid rgba(59, 130, 246, 0.3);
         }
+
+        /* 🔹 СТИЛЬ ДЛЯ ПОЛЯ СТАВКИ — ЗЕЛЁНАЯ РАМКА */
+        .bet-input {
+          border: 2px solid #10b981 !important;
+          background: rgba(16, 185, 129, 0.1) !important;
+          color: white !important;
+          border-radius: 10px !important;
+          padding: 8px 12px !important;
+          font-size: 1rem !important;
+        }
+        .bet-input:focus {
+          border-color: #34d399 !important;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
+          outline: none !important;
+        }
+
         button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
@@ -425,7 +445,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                     <span>Загрузка...</span>
                   </div>
                 ) : (
-                  difficulties.map((diff, idx) => (
+                  difficulties.map((diff) => (
                     <button
                       key={diff.id}
                       onClick={() => setSelectedDifficulty(diff)}
@@ -441,6 +461,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                           <p className="text-sm text-gray-400">
                             💣 {diff.minesCount} мин • 🎯 6×6 поле
                           </p>
+                          {/* 🔹 ОТОБРАЖЕНИЕ МАКС. МНОЖИТЕЛЯ */}
+                          <p className="text-xs text-green-400 mt-1">
+                            Макс. ×{calculateMaxMultiplier(diff.minesCount).toFixed(2)}
+                          </p>
                         </div>
                         <Trophy
                           size={24}
@@ -454,6 +478,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
               <div className="mb-6">
                 <label className="block text-sm text-gray-300 mb-2">Ставка (USDT)</label>
+                {/* 🔹 ПРИМЕНЕНИЕ КЛАССА ДЛЯ ЗЕЛЁНОЙ РАМКИ */}
                 <Input
                   type="number"
                   min="1"
@@ -461,7 +486,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
                   placeholder="10"
-                  className="rounded-lg bg-gray-700 border-gray-600 text-white"
+                  className="bet-input w-full"
                 />
               </div>
 
