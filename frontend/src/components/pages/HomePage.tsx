@@ -15,13 +15,13 @@ const featuredGames: Game[] = [
   {
     id: '1',
     title: 'Сапёр',
-    image: 'https://images.unsplash.com/photo-1758620316764-dca1a0a1d9ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaW5lc3dlZXBlciUyMGdhbWV8ZW58MXx8fHwxNzU5NjY1NTAzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+    image: '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp',
     category: 'Логика'
   },
   {
     id: '2',
     title: 'Краш',
-    image: 'https://images.unsplash.com/photo-1639825752750-5061ded5503b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjcmFzaCUyMGdhbWUlMjBjaGFydHxlbnwxfHx8fDE3NTk2NjU1MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+    image: '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp',
     category: 'Ставки'
   },
 ];
