@@ -10,7 +10,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 
-const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-02_22-50-50.jpg');
+const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
 
 if (!BOT_TOKEN) {
     console.error('❌ TELEGRAM_BOT_TOKEN is not set. Bot cannot run.');
