@@ -295,6 +295,125 @@ if (!BOT_TOKEN) {
             await ctx.reply("Произошла ошибка. Попробуйте позже.");
         }
     });
+        // ====================================
+    // АДМИН КОМАНДЫ
+    // ====================================
+    bot.command('approve_withdraw', async (ctx) => {
+    try {
+        const parts = ctx.message.text.trim().split(/\s+/);
+        const withdrawalId = parts[1] ? parseInt(parts[1], 10) : null;
+
+        if (!withdrawalId || isNaN(withdrawalId)) {
+        return await ctx.reply('❌ Использование: /approve_withdraw <ID_заявки>');
+        }
+
+        const admin = await prisma.user.findUnique({
+        where: { telegramId: ctx.from.id.toString() }
+        });
+
+        if (!admin || !admin.isAdmin) {
+        return await ctx.reply('🚫 Эта команда доступна только администраторам.');
+        }
+
+        const withdrawal = await prisma.transaction.findUnique({
+        where: { id: withdrawalId },
+        include: { user: true }
+        });
+
+        if (!withdrawal) {
+        return await ctx.reply(`❌ Заявка #${withdrawalId} не найдена.`);
+        }
+
+        if (withdrawal.type !== 'WITHDRAW') {
+        return await ctx.reply(`❌ Запись #${withdrawalId} — не вывод.`);
+        }
+
+        if (withdrawal.status !== 'PENDING') {
+        return await ctx.reply(`❌ Заявка #${withdrawalId} уже обработана. Статус: ${withdrawal.status}`);
+        }
+
+        const txHash = 'TX_' + Date.now();
+
+        // 🔥 ИСПРАВЛЕНО: добавлен `data:`
+        await prisma.transaction.update({
+        where: { id: withdrawalId },
+        data: { status: 'COMPLETED', txHash }
+        });
+
+        // Уведомление пользователю
+        if (withdrawal.user?.telegramId) {
+        await bot.telegram.sendMessage(
+            withdrawal.user.telegramId,
+            `✅ Вывод на ${withdrawal.amount} USDT выполнен!\nАдрес: ${withdrawal.walletAddress}\nTX: \`${txHash}\``,
+            { parse_mode: 'Markdown' }
+        );
+        }
+
+        await ctx.reply(`✅ Заявка #${withdrawalId} успешно подтверждена!`);
+    } catch (error) {
+        console.error('❌ Ошибка при подтверждении вывода:', error);
+        await ctx.reply('💥 Произошла внутренняя ошибка. Проверьте логи сервера.');
+    }
+    });
+
+    bot.command('set_worker', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+            const userId = parseInt(ctx.message.text.split(' ')[1]);
+            if (!userId) {
+                await ctx.reply('Использование: /set_worker <user_id>');
+                return;
+            }
+            await referralService.setUserAsWorker(userId);
+            await ctx.reply(`✅ Пользователь ${userId} теперь ВОРКЕР (40% комиссия)`);
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
+
+    bot.command('remove_worker', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+            const userId = parseInt(ctx.message.text.split(' ')[1]);
+            if (!userId) {
+                await ctx.reply('Использование: /remove_worker <user_id>');
+                return;
+            }
+            await prisma.user.update({ where: { id: userId }, data: { referrerType: 'REGULAR' } });
+            await ctx.reply(`✅ Пользователь ${userId} теперь обычный (30% комиссия)`);
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
+
+    bot.command('payout_all', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+            await ctx.reply('⏳ Выплачиваю комиссии...');
+            const result = await referralService.processAllPendingCommissions();
+            await ctx.reply(
+                `✅ *Выплата завершена*\n\n` +
+                `📊 Обработано: ${result.processed}\n` +
+                `✅ Успешно: ${result.success}\n` +
+                `💰 Выплачено: ${result.totalPaid.toFixed(4)} USDT`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
 
     bot.on('message', async (ctx) => {
         if (!ctx.message?.text) return;
@@ -611,125 +730,6 @@ if (!BOT_TOKEN) {
         }
     });
 
-    // ====================================
-    // АДМИН КОМАНДЫ
-    // ====================================
-bot.command('approve_withdraw', async (ctx) => {
-  try {
-    const parts = ctx.message.text.trim().split(/\s+/);
-    const withdrawalId = parts[1] ? parseInt(parts[1], 10) : null;
-
-    if (!withdrawalId || isNaN(withdrawalId)) {
-      return await ctx.reply('❌ Использование: /approve_withdraw <ID_заявки>');
-    }
-
-    const admin = await prisma.user.findUnique({
-      where: { telegramId: ctx.from.id.toString() }
-    });
-
-    if (!admin || !admin.isAdmin) {
-      return await ctx.reply('🚫 Эта команда доступна только администраторам.');
-    }
-
-    const withdrawal = await prisma.transaction.findUnique({
-      where: { id: withdrawalId },
-      include: { user: true }
-    });
-
-    if (!withdrawal) {
-      return await ctx.reply(`❌ Заявка #${withdrawalId} не найдена.`);
-    }
-
-    if (withdrawal.type !== 'WITHDRAW') {
-      return await ctx.reply(`❌ Запись #${withdrawalId} — не вывод.`);
-    }
-
-    if (withdrawal.status !== 'PENDING') {
-      return await ctx.reply(`❌ Заявка #${withdrawalId} уже обработана. Статус: ${withdrawal.status}`);
-    }
-
-    const txHash = 'TX_' + Date.now();
-
-    // 🔥 ИСПРАВЛЕНО: добавлен `data:`
-    await prisma.transaction.update({
-      where: { id: withdrawalId },
-      data: { status: 'COMPLETED', txHash }
-    });
-
-    // Уведомление пользователю
-    if (withdrawal.user?.telegramId) {
-      await bot.telegram.sendMessage(
-        withdrawal.user.telegramId,
-        `✅ Вывод на ${withdrawal.amount} USDT выполнен!\nАдрес: ${withdrawal.walletAddress}\nTX: \`${txHash}\``,
-        { parse_mode: 'Markdown' }
-      );
-    }
-
-    await ctx.reply(`✅ Заявка #${withdrawalId} успешно подтверждена!`);
-  } catch (error) {
-    console.error('❌ Ошибка при подтверждении вывода:', error);
-    await ctx.reply('💥 Произошла внутренняя ошибка. Проверьте логи сервера.');
-  }
-});
-
-    bot.command('set_worker', async (ctx) => {
-        try {
-            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!admin?.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-            const userId = parseInt(ctx.message.text.split(' ')[1]);
-            if (!userId) {
-                await ctx.reply('Использование: /set_worker <user_id>');
-                return;
-            }
-            await referralService.setUserAsWorker(userId);
-            await ctx.reply(`✅ Пользователь ${userId} теперь ВОРКЕР (40% комиссия)`);
-        } catch (error) {
-            await ctx.reply('❌ Ошибка');
-        }
-    });
-
-    bot.command('remove_worker', async (ctx) => {
-        try {
-            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!admin?.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-            const userId = parseInt(ctx.message.text.split(' ')[1]);
-            if (!userId) {
-                await ctx.reply('Использование: /remove_worker <user_id>');
-                return;
-            }
-            await prisma.user.update({ where: { id: userId }, data: { referrerType: 'REGULAR' } });
-            await ctx.reply(`✅ Пользователь ${userId} теперь обычный (30% комиссия)`);
-        } catch (error) {
-            await ctx.reply('❌ Ошибка');
-        }
-    });
-
-    bot.command('payout_all', async (ctx) => {
-        try {
-            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!admin?.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-            await ctx.reply('⏳ Выплачиваю комиссии...');
-            const result = await referralService.processAllPendingCommissions();
-            await ctx.reply(
-                `✅ *Выплата завершена*\n\n` +
-                `📊 Обработано: ${result.processed}\n` +
-                `✅ Успешно: ${result.success}\n` +
-                `💰 Выплачено: ${result.totalPaid.toFixed(4)} USDT`,
-                { parse_mode: 'Markdown' }
-            );
-        } catch (error) {
-            await ctx.reply('❌ Ошибка');
-        }
-    });
 
     // ====================================
     // CALLBACKS
