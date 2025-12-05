@@ -514,9 +514,148 @@ if (!BOT_TOKEN) {
         }
     });
 
-    // ====================================
-    // АДМИН-КОМАНДЫ
-    // ====================================
+// ====================================
+// АДМИН-КОМАНДЫ
+// ====================================
+
+bot.command('withdraw', async (ctx) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    if (!user) {
+      await ctx.reply('Сначала зарегистрируйтесь через /start');
+      return;
+    }
+
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    const amount = parseFloat(args[1]);
+    const walletAddress = args[2];
+
+    if (!amount || !walletAddress) {
+      await ctx.reply('Использование: /withdraw <сумма> <адрес>\nПример: /withdraw 10 TGx5a...cB2');
+      return;
+    }
+
+    if (amount < 1) {
+      await ctx.reply('Минимальная сумма вывода: 1 USDT');
+      return;
+    }
+
+    // Проверяем баланс
+    const balance = await getUserBalance(user.id);
+    if (balance < amount) {
+      await ctx.reply(`❌ Недостаточно средств. Баланс: ${balance.toFixed(2)} USDT`);
+      return;
+    }
+
+    // Получаем ID токена USDT (лучше не хардкодить)
+    const usdtToken = await prisma.cryptoToken.findFirst({ where: { symbol: 'USDT' } });
+    if (!usdtToken) {
+      await ctx.reply('❌ Валюта USDT не настроена.');
+      return;
+    }
+
+    // Создаём заявку на вывод
+    const withdrawal = await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        tokenId: usdtToken.id,
+        type: 'WITHDRAW',
+        status: 'PENDING',
+        amount: amount.toString(),
+        walletAddress: walletAddress,
+        txHash: null
+      }
+    });
+
+    // Списываем средства
+    await prisma.balance.update({
+      where: {
+        userId_tokenId_type: { userId: user.id, tokenId: usdtToken.id, type: 'MAIN' }
+      },
+      data: { amount: { decrement: amount } }
+    });
+
+    await ctx.reply(
+      `✅ Заявка на вывод создана!\n\nСумма: ${amount} USDT\nАдрес: \`${walletAddress}\`\n\nОжидайте обработки администратором.`,
+      { parse_mode: 'Markdown' }
+    );
+
+    // Уведомление админу
+    const admins = await prisma.user.findMany({ where: { isAdmin: true } });
+    for (const admin of admins) {
+      if (admin.telegramId) {
+        await bot.telegram.sendMessage(
+          admin.telegramId,
+          `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\nПользователь: ${user.id}\nСумма: ${amount} USDT\nАдрес: ${walletAddress}\n\nКоманда: /approve_withdraw ${withdrawal.id}`
+        );
+      }
+    }
+
+  } catch (error) {
+    console.error('Withdraw error:', error);
+    await ctx.reply('❌ Ошибка при создании заявки. Обратитесь в поддержку.');
+  }
+});
+
+bot.command('approve_withdraw', async (ctx) => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    if (!admin?.isAdmin) {
+      await ctx.reply('Только для админов');
+      return;
+    }
+
+    const withdrawalId = parseInt(ctx.message.text.split(' ')[1]);
+    if (!withdrawalId) {
+      await ctx.reply('Использование: /approve_withdraw <id>');
+      return;
+    }
+
+    const withdrawal = await prisma.transaction.findUnique({
+      where: { id: withdrawalId }
+    });
+
+    if (!withdrawal || withdrawal.status !== 'PENDING') {
+      await ctx.reply('Заявка не найдена или уже обработана');
+      return;
+    }
+
+    // ⚠️ Здесь вы должны вручную отправить USDT с вашего кошелька
+    // ИЛИ вызвать ваш внешний сервис вывода
+    // Пример: const txHash = await myWallet.send(withdrawal.walletAddress, withdrawal.amount);
+
+    // После отправки — обновите статус (здесь временный фейковый хеш)
+    const fakeTxHash = 'TX_' + Date.now(); // ЗАМЕНИТЕ на реальный хеш транзакции
+
+    await prisma.transaction.update({
+      where: { id: withdrawalId },
+      data: { status: 'COMPLETED', txHash: fakeTxHash } // ← ОБЯЗАТЕЛЬНО "data:"
+    });
+
+    // Уведомить пользователя
+    const user = await prisma.user.findUnique({
+      where: { id: withdrawal.userId },
+      select: { telegramId: true }
+    });
+    if (user?.telegramId) {
+      await bot.telegram.sendMessage(
+        user.telegramId,
+        `✅ Вывод успешно обработан!\nСумма: ${withdrawal.amount} USDT\nАдрес: ${withdrawal.walletAddress}\nTX: \`${fakeTxHash}\``,
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    await ctx.reply('✅ Вывод подтверждён!');
+
+  } catch (error) {
+    console.error('Approve withdraw error:', error);
+    await ctx.reply('❌ Ошибка подтверждения');
+  }
+});
     bot.command('set_worker', async (ctx) => {
         try {
             const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
