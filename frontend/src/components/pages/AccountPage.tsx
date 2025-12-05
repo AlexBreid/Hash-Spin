@@ -7,7 +7,7 @@ import { Loader2, User, Crown, BarChart2, Calendar, Star, LogOut, Send } from "l
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
-
+// --- ИНТЕРФЕЙСЫ ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ ---
 interface UserProfile {
   id: string;
   username: string;
@@ -27,13 +27,14 @@ interface BalanceData {
   amount: number;
   type: string;
 }
+// ------------------------------------------
 
 export function AccountPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [balances, setBalances] = useState<BalanceData[]>([]);
-  
+
   const hasLoadedRef = useRef(false);
 
   const { data, loading, error, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
@@ -77,155 +78,202 @@ export function AccountPage() {
     new Date(iso).toLocaleDateString("ru-RU", {
       year: "numeric",
       month: "long",
-      day: "numeric",
-    });
+    }); // Изменено на формат "месяц год" для "Игрок с января 2025"
 
-  // *** РЕНДЕР ПРОФИЛЯ ***
+  // *** РЕНДЕР ПРОФИЛЯ (ПЕРЕДЕЛАННЫЙ ДИЗАЙН) ***
   if (profileData) {
     const { username, firstName, lastName, vipLevel, level, totalScore, totalGames, createdAt, photoUrl } =
       profileData;
 
     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
-    const levelProgress = Math.min((level % 10) * 10, 100);
 
+    // Эмуляция стиля из изображения
+    const mainBg = '#0b1320';
+    const cardBg = '#141c2c';
+    const profileCardBg = 'linear-gradient(145deg, #1b273d, #0d1624)'; // Фон для блока с профилем и уровнем
+    const levelBoxBg = 'linear-gradient(135deg, #2a4060, #1a2a40)'; // Фон для блока "Уровень игрока"
+    const levelBorder = 'linear-gradient(90deg, #10b981, #3b82f6)'; // Градиент для рамки уровня
+    const achievementButtonBg = '#10b981'; // Зеленый для кнопки "Достижения"
+    const ratingButtonBg = '#374151'; // Темно-синий для кнопки "Рейтинг"
+    const statBoxBg = '#103030'; // Фон для нижних статистических карточек
+
+    // Эмуляция инициалов (АИ) для заглушки
+    const getInitials = (fName: string, lName: string | null) => {
+        const first = fName ? fName[0] : '';
+        const last = lName ? lName[0] : '';
+        return (first + last).toUpperCase().substring(0, 2) || username.substring(0, 2).toUpperCase();
+    };
+    const initials = getInitials(firstName || "", lastName);
+    const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+    
     return (
-      <div className="p-6 bg-background text-foreground min-h-screen flex flex-col items-center pt-10">
-        <Card className="w-full max-w-md shadow-xl border rounded-2xl overflow-hidden">
-          <CardHeader className="text-center bg-primary text-primary-foreground p-8">
-            {photoUrl ? (
-              <motion.img
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3 }}
-                src={photoUrl}
-                className="w-28 h-28 rounded-full mx-auto mb-4 object-cover border-4 border-white shadow-md"
-                alt="User"
-                style={{ display: 'block' }}
-              />
-            ) : (
-              <User className="w-16 h-16 mx-auto mb-3" />
-            )}
-
-            <CardTitle className="text-3xl font-bold">{fullName}</CardTitle>
-            <p className="text-sm opacity-90">@{username}</p>
-          </CardHeader>
-
-          <CardContent className="p-6 space-y-5">
-            {/* VIP LEVEL */}
-            <motion.div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                borderRadius: '12px',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-              }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Crown style={{ width: '20px', height: '20px', color: '#fbbf24', marginRight: '12px' }} />
-                <span style={{ fontWeight: '600', color: '#e5e7eb' }}>VIP уровень</span>
-              </div>
-              <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{vipLevel || "Нет"}</span>
-            </motion.div>
-
-            {/* LEVEL */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                padding: '16px',
-                borderRadius: '12px',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <BarChart2 style={{ width: '20px', height: '20px', color: '#60a5fa', marginRight: '8px' }} />
-                  <span style={{ fontWeight: '500', fontSize: '14px', color: '#e5e7eb' }}>Уровень</span>
+      <div className="p-4 sm:p-6 text-foreground min-h-screen flex flex-col items-center" style={{ backgroundColor: mainBg }}>
+        <Card className="w-full max-w-md shadow-2xl border-none rounded-2xl overflow-hidden" style={{ backgroundColor: cardBg }}>
+          
+          {/* Блок Профиля и Уровня */}
+          <div style={{ padding: '24px', background: profileCardBg }}>
+            
+            {/* Аватар, Имя, Статус */}
+            <div className="flex items-center space-x-4 mb-6">
+                <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+                    boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+                }}>
+                    {photoUrl ? (
+                        <motion.img
+                            src={photoUrl}
+                            className="w-full h-full rounded-full object-cover"
+                            alt="User"
+                        />
+                    ) : initials}
                 </div>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#e5e7eb' }}>{level}</span>
-              </div>
-
-              <div style={{ width: '100%', height: '12px', backgroundColor: '#374151', borderRadius: '9999px', overflow: 'hidden' }}>
-                <motion.div
-                  style={{ height: '100%', backgroundColor: '#3b82f6' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${levelProgress}%` }}
-                  transition={{ duration: 0.7 }}
-                />
-              </div>
-            </motion.div>
-
-            {/* TOTAL SCORE */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                borderRadius: '12px',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Star style={{ width: '20px', height: '20px', color: '#fbbf24', marginRight: '8px' }} />
-                <span style={{ fontWeight: '500', color: '#e5e7eb' }}>Очки</span>
-              </div>
-              <span style={{ fontSize: '20px', fontWeight: '600', color: '#10b981' }}>
-                {totalScore.toLocaleString("ru-RU")}
-              </span>
-            </motion.div>
-
-            {/* TOTAL GAMES */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                borderRadius: '12px',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontSize: '20px', marginRight: '8px' }}>🎲</span>
-                <span style={{ fontWeight: '500', color: '#e5e7eb' }}>Всего игр</span>
-              </div>
-              <span style={{ fontSize: '18px', fontWeight: '600', color: '#e5e7eb' }}>{totalGames}</span>
-            </motion.div>
-
-            {/* CREATED AT */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px', color: '#9ca3af', borderTop: '1px solid #374151', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Calendar style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                <span>Аккаунт создан:</span>
-              </div>
-              <span>{formatDate(createdAt)}</span>
+                <div>
+                    <CardTitle className="text-xl font-bold" style={{ color: '#fff' }}>
+                        {fullName || username}
+                    </CardTitle>
+                    <div className="flex items-center text-sm mt-1" style={{ color: '#fcd34d' }}>
+                        <Star className="w-4 h-4 mr-1" />
+                        <span>{vipLevel || "Нет"} статус</span>
+                    </div>
+                    <p className="text-xs" style={{ color: '#9ca3af' }}>
+                        Игрок с {dateJoined}
+                    </p>
+                </div>
             </div>
+
+            {/* Уровень игрока (Большой центральный блок) */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              style={{
+                background: levelBoxBg,
+                borderRadius: '16px',
+                padding: '16px',
+                textAlign: 'center',
+                border: '2px solid transparent',
+                backgroundImage: `${levelBorder}, ${levelBoxBg}`, // Градиентная рамка
+                backgroundClip: 'padding-box, border-box',
+                backgroundOrigin: 'border-box',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              <p className="text-sm font-medium mb-1" style={{ color: '#e5e7eb' }}>
+                <Crown className="w-4 h-4 inline-block mr-1 text-yellow-400" /> Уровень игрока
+              </p>
+              <div className="text-6xl font-extrabold" style={{ color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                {level}
+              </div>
+            </motion.div>
+            
+            {/* Кнопки Достижения и Рейтинг */}
+            <div className="flex justify-between mt-6 space-x-4">
+                <Button 
+                    className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: achievementButtonBg, padding: '12px 10px' }}
+                    onClick={() => console.log('Переход к Достижениям')} // Заменить на реальную логику
+                >
+                    Достижения
+                </Button>
+                <Button 
+                    className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: ratingButtonBg, padding: '12px 10px' }}
+                    onClick={() => console.log('Переход к Рейтингу')} // Заменить на реальную логику
+                >
+                    Рейтинг
+                </Button>
+            </div>
+            
+          </div>
+
+          {/* Нижние статистические карточки */}
+          <CardContent className="p-4 sm:p-6 pt-4 grid grid-cols-2 gap-4">
+            
+            {/* Общий счёт */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                background: statBoxBg,
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+              }}
+            >
+              <div className="flex items-center mb-1 text-sm" style={{ color: '#10b981' }}>
+                <BarChart2 className="w-4 h-4 mr-1" />
+                Общий счёт
+              </div>
+              <p className="text-3xl font-extrabold" style={{ color: '#fff' }}>
+                {totalScore.toLocaleString("ru-RU")}
+              </p>
+            </motion.div>
+
+            {/* Игр сыграно */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              style={{
+                background: statBoxBg,
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+              }}
+            >
+              <div className="flex items-center mb-1 text-sm" style={{ color: '#60a5fa' }}>
+                <Calendar className="w-4 h-4 mr-1" />
+                Игр сыграно
+              </div>
+              <p className="text-3xl font-extrabold" style={{ color: '#fff' }}>
+                {totalGames}
+              </p>
+            </motion.div>
+
+            {/* Дополнительный контент (например, кнопки выхода, баланс) */}
+            <div className="col-span-2 pt-4 border-t border-gray-700/50 flex justify-between space-x-2">
+                <Button
+                    onClick={handleNavigateWithdraw}
+                    className="flex-1"
+                    variant="outline"
+                    style={{ borderColor: '#3b82f6', color: '#3b82f6', background: 'transparent' }}
+                >
+                    <Send className="w-4 h-4 mr-2" />
+                    Вывод
+                </Button>
+                <Button
+                    onClick={handleLogout}
+                    className="flex-1"
+                    variant="destructive"
+                    style={{ background: '#dc2626' }}
+                >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Выход
+                </Button>
+            </div>
+
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  // --- LOADING / ERROR ---
+  // --- LOADING / ERROR (ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ) ---
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4" style={{ backgroundColor: mainBg }}>
       {loading && (
         <>
-          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Загрузка профиля...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: '#3b82f6' }} />
+          <p className="text-muted-foreground" style={{ color: '#9ca3af' }}>Загрузка профиля...</p>
         </>
       )}
 
@@ -239,15 +287,15 @@ export function AccountPage() {
               fetchBalance();
             }}
           >
-            Повторить                                                                                                         
+            Повторить
           </Button>
         </>
       )}
 
       {!loading && !error && !profileData && (
         <>
-          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Инициализация...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: '#3b82f6' }} />
+          <p className="text-muted-foreground" style={{ color: '#9ca3af' }}>Инициализация...</p>
         </>
       )}
     </div>
