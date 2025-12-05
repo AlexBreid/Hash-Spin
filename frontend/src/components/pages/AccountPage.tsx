@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
@@ -40,6 +41,20 @@ export function AccountPage() {
   const { data, loading, error, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
   const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
+  // =======================================================
+  // 💡 ИСПРАВЛЕНИЕ: Переменные стилей вынесены в начало
+  // =======================================================
+  const mainBg = '#0b1320';
+  const cardBg = '#141c2c';
+  const profileCardBg = 'linear-gradient(145deg, #1b273d, #0d1624)';
+  const levelBoxBg = 'linear-gradient(135deg, #2a4060, #1a2a40)';
+  const levelBorder = 'linear-gradient(90deg, #10b981, #3b82f6)';
+  const achievementButtonBg = '#10b981';
+  const ratingButtonBg = '#374151';
+  const statBoxBg = '#103030';
+  // =======================================================
+
+
   // 🔄 Загружаем профиль и баланс ОДИН РАЗ при монтировании
   useEffect(() => {
     if (!hasLoadedRef.current) {
@@ -78,24 +93,14 @@ export function AccountPage() {
     new Date(iso).toLocaleDateString("ru-RU", {
       year: "numeric",
       month: "long",
-    }); // Изменено на формат "месяц год" для "Игрок с января 2025"
+    });
 
-  // *** РЕНДЕР ПРОФИЛЯ (ПЕРЕДЕЛАННЫЙ ДИЗАЙН) ***
+  // *** РЕНДЕР ПРОФИЛЯ ***
   if (profileData) {
     const { username, firstName, lastName, vipLevel, level, totalScore, totalGames, createdAt, photoUrl } =
       profileData;
 
     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
-
-    // Эмуляция стиля из изображения
-    const mainBg = '#0b1320';
-    const cardBg = '#141c2c';
-    const profileCardBg = 'linear-gradient(145deg, #1b273d, #0d1624)'; // Фон для блока с профилем и уровнем
-    const levelBoxBg = 'linear-gradient(135deg, #2a4060, #1a2a40)'; // Фон для блока "Уровень игрока"
-    const levelBorder = 'linear-gradient(90deg, #10b981, #3b82f6)'; // Градиент для рамки уровня
-    const achievementButtonBg = '#10b981'; // Зеленый для кнопки "Достижения"
-    const ratingButtonBg = '#374151'; // Темно-синий для кнопки "Рейтинг"
-    const statBoxBg = '#103030'; // Фон для нижних статистических карточек
 
     // Эмуляция инициалов (АИ) для заглушки
     const getInitials = (fName: string, lName: string | null) => {
@@ -161,7 +166,7 @@ export function AccountPage() {
                 padding: '16px',
                 textAlign: 'center',
                 border: '2px solid transparent',
-                backgroundImage: `${levelBorder}, ${levelBoxBg}`, // Градиентная рамка
+                backgroundImage: `${levelBorder}, ${levelBoxBg}`,
                 backgroundClip: 'padding-box, border-box',
                 backgroundOrigin: 'border-box',
                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
@@ -180,14 +185,14 @@ export function AccountPage() {
                 <Button 
                     className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: achievementButtonBg, padding: '12px 10px' }}
-                    onClick={() => console.log('Переход к Достижениям')} // Заменить на реальную логику
+                    onClick={() => navigate("/achievements")} // Пример: Добавил navigate
                 >
                     Достижения
                 </Button>
                 <Button 
                     className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: ratingButtonBg, padding: '12px 10px' }}
-                    onClick={() => console.log('Переход к Рейтингу')} // Заменить на реальную логику
+                    onClick={() => navigate("/rating")} // Пример: Добавил navigate
                 >
                     Рейтинг
                 </Button>
@@ -240,7 +245,7 @@ export function AccountPage() {
               </p>
             </motion.div>
 
-            {/* Дополнительный контент (например, кнопки выхода, баланс) */}
+            {/* Дополнительный контент (кнопки выхода, баланс) */}
             <div className="col-span-2 pt-4 border-t border-gray-700/50 flex justify-between space-x-2">
                 <Button
                     onClick={handleNavigateWithdraw}
@@ -267,7 +272,8 @@ export function AccountPage() {
       </div>
     );
   }
-  // --- LOADING / ERROR (ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ) ---
+
+  // --- LOADING / ERROR (Используют mainBg, который теперь доступен) ---
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4" style={{ backgroundColor: mainBg }}>
       {loading && (
