@@ -180,24 +180,6 @@ export function AccountPage() {
               </div>
             </motion.div>
             
-            {/* Кнопки Достижения и Рейтинг */}
-            <div className="flex justify-between mt-6 space-x-4">
-                <Button 
-                    className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: achievementButtonBg, padding: '12px 10px' }}
-                    onClick={() => navigate("/achievements")} // Пример: Добавил navigate
-                >
-                    Достижения
-                </Button>
-                <Button 
-                    className="flex-1 text-white font-semibold rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: ratingButtonBg, padding: '12px 10px' }}
-                    onClick={() => navigate("/rating")} // Пример: Добавил navigate
-                >
-                    Рейтинг
-                </Button>
-            </div>
-            
           </div>
 
           {/* Нижние статистические карточки */}
@@ -244,28 +226,6 @@ export function AccountPage() {
                 {totalGames}
               </p>
             </motion.div>
-
-            {/* Дополнительный контент (кнопки выхода, баланс) */}
-            <div className="col-span-2 pt-4 border-t border-gray-700/50 flex justify-between space-x-2">
-                <Button
-                    onClick={handleNavigateWithdraw}
-                    className="flex-1"
-                    variant="outline"
-                    style={{ borderColor: '#3b82f6', color: '#3b82f6', background: 'transparent' }}
-                >
-                    <Send className="w-4 h-4 mr-2" />
-                    Вывод
-                </Button>
-                <Button
-                    onClick={handleLogout}
-                    className="flex-1"
-                    variant="destructive"
-                    style={{ background: '#dc2626' }}
-                >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Выход
-                </Button>
-            </div>
 
           </CardContent>
         </Card>
