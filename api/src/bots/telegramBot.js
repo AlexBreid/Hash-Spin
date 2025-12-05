@@ -2,6 +2,7 @@ const { Telegraf } = require('telegraf');
 const axios = require('axios');
 const prisma = require('../../prismaClient');
 const { registerNewUser, generateOneTimeToken } = require('../services/authService');
+const referralService = require('../../services/ReferralService');
 const fs = require('fs');
 const path = require('path');
 
@@ -21,14 +22,13 @@ if (!BOT_TOKEN) {
     // ====================================
     // МЕНЮ КНОПОК
     // ====================================
-
     const getMainMenuKeyboard = () => ({
         reply_markup: {
             keyboard: [
-                [{ text: '🎰 Казино', callback_data: 'open_casino' }],
-                [{ text: '💰 Пополнить', callback_data: 'deposit' }, { text: '💸 Вывести', callback_data: 'withdraw' }],
-                [{ text: '💎 VIP Статус', callback_data: 'vip_status' }, { text: '⚙️ Настройки', callback_data: 'settings' }],
-                [{ text: '❓ Помощь', callback_data: 'help' }]
+                [{ text: '🎰 Казино' }],
+                [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
+                [{ text: '👥 Рефералы' }, { text: '⚙️ Настройки' }],
+                [{ text: '❓ Помощь' }]
             ],
             resize_keyboard: true,
             one_time_keyboard: false
@@ -38,11 +38,11 @@ if (!BOT_TOKEN) {
     const getAdminMenuKeyboard = () => ({
         reply_markup: {
             keyboard: [
-                [{ text: '🎰 Казино', callback_data: 'open_casino' }],
-                [{ text: '💰 Пополнить', callback_data: 'deposit' }, { text: '💸 Вывести', callback_data: 'withdraw' }],
-                [{ text: '📊 АДМИН ПАНЕЛЬ', callback_data: 'admin_panel' }, { text: '⚙️ Настройки', callback_data: 'settings' }],
-                [{ text: '👥 Управление', callback_data: 'admin_users' }, { text: '💳 Платежи', callback_data: 'admin_payments' }],
-                [{ text: '❓ Помощь', callback_data: 'help' }]
+                [{ text: '🎰 Казино' }],
+                [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
+                [{ text: '📊 АДМИН ПАНЕЛЬ' }, { text: '⚙️ Настройки' }],
+                [{ text: '👥 Рефералы' }, { text: '💳 Платежи' }],
+                [{ text: '❓ Помощь' }]
             ],
             resize_keyboard: true,
             one_time_keyboard: false
@@ -56,29 +56,6 @@ if (!BOT_TOKEN) {
             ]
         }
     });
-
-    // ====================================
-    // ПРОВЕРКА АДМИН-СТАТУСА И БЛОКИРОВКИ
-    // ====================================
-    async function isAdmin(userId) {
-        try {
-            const user = await prisma.user.findUnique({ where: { id: userId } });
-            return user?.isAdmin || false;
-        } catch (error) {
-            console.error('❌ Error checking admin status:', error);
-            return false;
-        }
-    }
-
-    async function isBlocked(userId) {
-        try {
-            const user = await prisma.user.findUnique({ where: { id: userId } });
-            return user?.isBlocked || false;
-        } catch (error) {
-            console.error('❌ Error checking blocked status:', error);
-            return false;
-        }
-    }
 
     // ====================================
     // CRYPTO PAY API
@@ -107,10 +84,8 @@ if (!BOT_TOKEN) {
                 if (response.data.ok) {
                     console.log(`✅ Invoice created: ${response.data.result.invoice_id}`);
                     return response.data.result;
-                } else {
-                    console.error('❌ Invoice creation failed:', response.data.error);
-                    return null;
                 }
+                return null;
             } catch (error) {
                 console.error('❌ Crypto Pay API error:', error.response?.data || error.message);
                 return null;
@@ -131,116 +106,86 @@ if (!BOT_TOKEN) {
                 console.error('❌ Get Invoices error:', error.message);
                 return null;
             }
-        },
-
-        async transfer(userId, amount, spendingId, asset) {
-            try {
-                const response = await axios.post(
-                    `${CRYPTO_PAY_API}/transfer`,
-                    {
-                        user_id: userId,
-                        asset,
-                        amount: amount.toString(),
-                        spend_id: spendingId
-                    },
-                    {
-                        headers: {
-                            'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-
-                if (response.data.ok) {
-                    console.log(`✅ Transfer successful: ${response.data.result.transfer_id}`);
-                    return response.data.result;
-                } else {
-                    console.error('❌ Transfer failed:', response.data);
-                    return null;
-                }
-            } catch (error) {
-                console.error('❌ Transfer error:', error.message);
-                return null;
-            }
         }
     };
 
     // ====================================
-    // БАЛАНС И ОБНОВЛЕНИЕ
+    // БАЛАНС
     // ====================================
     async function getUserBalance(userId, tokenSymbol = 'USDT') {
         try {
             const balance = await prisma.balance.findFirst({
-                where: {
-                    userId,
-                    token: { symbol: tokenSymbol }
-                },
-                include: { token: true }
+                where: { userId, token: { symbol: tokenSymbol }, type: 'MAIN' }
             });
-            return balance ? balance.amount : 0;
+            return balance ? parseFloat(balance.amount.toString()) : 0;
         } catch (error) {
-            console.error('❌ Error getting balance:', error);
             return 0;
         }
     }
 
-    async function updateBalance(userId, tokenSymbol, amount, type = 'MAIN') {
+    async function getBonusBalance(userId, tokenSymbol = 'USDT') {
         try {
-            const token = await prisma.cryptoToken.findUnique({ where: { symbol: tokenSymbol } });
-            if (!token) {
-                console.error(`❌ Token not found: ${tokenSymbol}`);
-                return false;
-            }
-
             const balance = await prisma.balance.findFirst({
-                where: { userId, tokenId: token.id, type }
+                where: { userId, token: { symbol: tokenSymbol }, type: 'BONUS' }
             });
-
-            if (balance) {
-                await prisma.balance.update({
-                    where: { id: balance.id },
-                    data: { amount: balance.amount + amount }
-                });
-            } else {
-                await prisma.balance.create({
-                    data: { userId, tokenId: token.id, type, amount }
-                });
-            }
-            return true;
+            return balance ? parseFloat(balance.amount.toString()) : 0;
         } catch (error) {
-            console.error('❌ Error updating balance:', error);
-            return false;
+            return 0;
         }
     }
 
-    // ====================================
-    // ХРАНИЛИЩЕ ОЖИДАНИЯ СУММЫ (в памяти)
-    // ====================================
+    // Хранилище ожидания суммы
     const waitingForDeposit = new Map();
 
     // ====================================
-    // КОМАНДА /start
+    // КОМАНДА /start С РЕФЕРАЛЬНОЙ ССЫЛКОЙ
     // ====================================
     bot.start(async (ctx) => {
         const telegramId = ctx.from.id.toString();
-        const username = ctx.from.username;
 
         try {
             let user = await prisma.user.findUnique({ where: { telegramId } });
 
             if (user && user.isBlocked) {
-                await ctx.reply('🚫 Ваш аккаунт заблокирован. Обратитесь в поддержку.');
+                await ctx.reply('🚫 Ваш аккаунт заблокирован.');
                 return;
             }
 
             let isNewUser = false;
             let rawPassword = null;
+            let referralApplied = false;
+
+            // Извлекаем реферальный код из deep link: /start ref_ABC123
+            const startPayload = ctx.startPayload;
+            let referralCode = null;
+            
+            if (startPayload && startPayload.startsWith('ref_')) {
+                referralCode = startPayload.replace('ref_', '');
+                console.log(`🔗 [BOT] Referral code detected: ${referralCode}`);
+            }
 
             if (!user) {
                 const { user: newUser, rawPassword: pwd } = await registerNewUser(ctx.from);
                 user = newUser;
                 rawPassword = pwd;
                 isNewUser = true;
+
+                // Привязываем реферера
+                if (referralCode) {
+                    const referrer = await prisma.user.findUnique({
+                        where: { referralCode },
+                        select: { id: true, username: true }
+                    });
+
+                    if (referrer && referrer.id !== user.id) {
+                        await prisma.user.update({
+                            where: { id: user.id },
+                            data: { referredById: referrer.id }
+                        });
+                        referralApplied = true;
+                        console.log(`✅ [BOT] User ${user.id} linked to referrer ${referrer.id}`);
+                    }
+                }
             }
 
             const commonSlogan = `🎰 *Добро пожаловать в SafariX — Казино будущего!* 🌍
@@ -252,12 +197,19 @@ if (!BOT_TOKEN) {
 
 🔥 *Играй. Выигрывай. Наслаждайся.*`;
 
-            const credentialsBlock = isNewUser
-                ? `\n\n✨ *Ваши данные для входа:*\n` +
-                  `🔑 Логин: \`${username ? `@${username}` : `ID: ${user.id}`}\`\n` +
-                  `🔐 Пароль: \`${rawPassword}\`\n\n` +
-                  `⚠️ *Сохраните пароль! Он показывается только один раз.*`
-                : '';
+            let credentialsBlock = '';
+            
+            if (isNewUser) {
+                const username = ctx.from.username;
+                credentialsBlock = `\n\n✨ *Ваши данные для входа:*\n` +
+                    `🔑 Логин: \`${username ? `@${username}` : `ID: ${user.id}`}\`\n` +
+                    `🔐 Пароль: \`${rawPassword}\`\n\n` +
+                    `⚠️ *Сохраните пароль! Он показывается только один раз.*`;
+                
+                if (referralApplied) {
+                    credentialsBlock += `\n\n🎁 *Бонус активирован!*\nПри первом депозите получите +100% на бонусный баланс!`;
+                }
+            }
 
             const fullMessage = commonSlogan + credentialsBlock;
 
@@ -268,177 +220,25 @@ if (!BOT_TOKEN) {
                         { caption: fullMessage, parse_mode: 'Markdown' }
                     );
                 } else {
-                    throw new Error('Image not found');
+                    await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
                 }
             } catch (imageError) {
-                console.warn('⚠️ Could not send image:', imageError.message);
                 await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
             }
 
             const menu = user.isAdmin ? getAdminMenuKeyboard() : getMainMenuKeyboard();
             await ctx.reply('📋 *Выберите действие:*', menu);
         } catch (error) {
-            console.error("❌ Error in /start command:", error);
+            console.error("❌ Error in /start:", error);
             await ctx.reply("Произошла ошибка. Попробуйте позже.");
         }
     });
 
     // ====================================
-    // АДМИН-КОМАНДЫ
-    // ====================================
-    bot.command('admin', async (ctx) => {
-        try {
-            const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!user) {
-                await ctx.reply('Пожалуйста, сначала нажмите /start');
-                return;
-            }
-            if (!user.isAdmin) {
-                await ctx.reply('🚫 У вас нет доступа к админ-панели. Вы не администратор.');
-                return;
-            }
-            await ctx.reply(
-                `👑 *АДМИН ПАНЕЛЬ*\n\n` +
-                `Доступные команды:\n\n` +
-                `/admin_stats - Статистика\n` +
-                `/admin_blocks - Заблокированные пользователи\n` +
-                `/block_user <id> - Заблокировать пользователя\n` +
-                `/unblock_user <id> - Разблокировать пользователя\n` +
-                `/admin_webhook - Логи веб-хуков\n` +
-                `/admin_help - Справка`,
-                { parse_mode: 'Markdown' }
-            );
-        } catch (error) {
-            console.error('Error in /admin command:', error);
-            await ctx.reply('Ошибка при получении админ-панели.');
-        }
-    });
-
-    bot.command('admin_stats', async (ctx) => {
-        try {
-            const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!user || !user.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-
-            const totalUsers = await prisma.user.count();
-            const blockedUsers = await prisma.user.count({ where: { isBlocked: true } });
-            const totalAdmins = await prisma.user.count({ where: { isAdmin: true } });
-
-            const totalDeposits = await prisma.transaction.aggregate({
-                where: { type: 'DEPOSIT', status: 'COMPLETED' },
-                _sum: { amount: true }
-            });
-
-            const totalWithdrawals = await prisma.transaction.aggregate({
-                where: { type: 'WITHDRAW', status: 'COMPLETED' },
-                _sum: { amount: true }
-            });
-
-            const pendingWithdrawals = await prisma.transaction.count({
-                where: { type: 'WITHDRAW', status: 'PENDING' }
-            });
-
-            await ctx.reply(
-                `📊 *СТАТИСТИКА*\n\n` +
-                `👥 Всего пользователей: ${totalUsers}\n` +
-                `👑 Администраторов: ${totalAdmins}\n` +
-                `🚫 Заблокирован: ${blockedUsers}\n\n` +
-                `💰 Всего пополнений: $${totalDeposits._sum.amount || 0}\n` +
-                `💸 Всего выводов: $${totalWithdrawals._sum.amount || 0}\n` +
-                `⏳ Ожидают вывода: ${pendingWithdrawals}`,
-                { parse_mode: 'Markdown' }
-            );
-        } catch (error) {
-            console.error('Error in /admin_stats:', error);
-            await ctx.reply('❌ Ошибка при получении статистики.');
-        }
-    });
-
-    bot.command('admin_blocks', async (ctx) => {
-        try {
-            const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!user || !user.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-
-            const blockedUsers = await prisma.user.findMany({ where: { isBlocked: true }, take: 20 });
-
-            if (blockedUsers.length === 0) {
-                await ctx.reply('✅ Нет заблокированных пользователей.');
-                return;
-            }
-
-            let message = '🚫 *ЗАБЛОКИРОВАННЫЕ ПОЛЬЗОВАТЕЛИ*\n\n';
-            blockedUsers.forEach((u, i) => {
-                message += `${i + 1}. ID: \`${u.id}\` | @${u.username || 'unknown'}\n`;
-            });
-
-            await ctx.reply(message, { parse_mode: 'Markdown' });
-        } catch (error) {
-            console.error('Error in /admin_blocks:', error);
-            await ctx.reply('❌ Ошибка при получении списка.');
-        }
-    });
-
-    bot.command('block_user', async (ctx) => {
-        try {
-            const adminUser = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!adminUser || !adminUser.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-
-            const args = ctx.message.text.split(' ');
-            const userId = parseInt(args[1]);
-
-            if (!userId) {
-                await ctx.reply('Использование: /block_user <user_id>');
-                return;
-            }
-
-            await prisma.user.update({ where: { id: userId }, data: { isBlocked: true } });
-            await ctx.reply(`✅ Пользователь \`${userId}\` заблокирован.`, { parse_mode: 'Markdown' });
-            console.log(`👮 Admin ${adminUser.id} blocked user ${userId}`);
-        } catch (error) {
-            console.error('Error in /block_user:', error);
-            await ctx.reply('❌ Ошибка при блокировке.');
-        }
-    });
-
-    bot.command('unblock_user', async (ctx) => {
-        try {
-            const adminUser = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!adminUser || !adminUser.isAdmin) {
-                await ctx.reply('🚫 Только для администраторов.');
-                return;
-            }
-
-            const args = ctx.message.text.split(' ');
-            const userId = parseInt(args[1]);
-
-            if (!userId) {
-                await ctx.reply('Использование: /unblock_user <user_id>');
-                return;
-            }
-
-            await prisma.user.update({ where: { id: userId }, data: { isBlocked: false } });
-            await ctx.reply(`✅ Пользователь \`${userId}\` разблокирован.`, { parse_mode: 'Markdown' });
-            console.log(`👮 Admin ${adminUser.id} unblocked user ${userId}`);
-        } catch (error) {
-            console.error('Error in /unblock_user:', error);
-            await ctx.reply('❌ Ошибка при разблокировке.');
-        }
-    });
-
-    // ====================================
-    // ОСНОВНОЙ ОБРАБОТЧИК СООБЩЕНИЙ (КНОПКИ + КАСТОМНЫЙ ВВОД)
+    // ОСНОВНОЙ ОБРАБОТЧИК СООБЩЕНИЙ
     // ====================================
     bot.on('message', async (ctx) => {
-        // Игнорируем не-текстовые сообщения (фото, стикеры и т.д.)
-        if (!ctx.message || !ctx.message.text) return;
+        if (!ctx.message?.text) return;
 
         const text = ctx.message.text.trim();
         if (!text) return;
@@ -456,7 +256,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // 🔥 ОБРАБОТКА КАСТОМНОЙ СУММЫ ПОПОЛНЕНИЯ
+            // Обработка кастомной суммы пополнения
             if (waitingForDeposit.has(user.id)) {
                 const amount = Number(text);
                 if (isNaN(amount) || amount <= 0) {
@@ -466,12 +266,7 @@ if (!BOT_TOKEN) {
 
                 waitingForDeposit.delete(user.id);
 
-                const invoice = await cryptoPayAPI.createInvoice(
-                    amount,
-                    "USDT",
-                    `Пополнение казино User #${user.id}`,
-                    user.id
-                );
+                const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
 
                 if (!invoice) {
                     await ctx.reply("❌ Ошибка при создании инвойса.");
@@ -479,7 +274,7 @@ if (!BOT_TOKEN) {
                 }
 
                 await ctx.reply(
-                    `✅ *Инвойс создан*\n\nСумма: ${amount} USDT\nID: ${invoice.invoice_id}\n\nПерейдите к оплате:`,
+                    `✅ *Инвойс создан*\n\nСумма: ${amount} USDT\nID: ${invoice.invoice_id}`,
                     {
                         reply_markup: {
                             inline_keyboard: [
@@ -490,10 +285,10 @@ if (!BOT_TOKEN) {
                         parse_mode: "Markdown"
                     }
                 );
-                return; // ⚠️ не продолжаем обработку как обычное сообщение
+                return;
             }
 
-            // 👇 ОБРАБОТКА ОБЫЧНЫХ КНОПОК
+            // Обработка кнопок меню
             switch (text) {
                 case '🎰 Казино':
                     const oneTimeToken = await generateOneTimeToken(user.id);
@@ -522,9 +317,81 @@ if (!BOT_TOKEN) {
                     break;
 
                 case '💸 Вывести':
-                    const balance = await getUserBalance(user.id, 'USDT');
+                    const balance = await getUserBalance(user.id);
+                    const bonusBalance = await getBonusBalance(user.id);
+                    
+                    let withdrawMsg = `💸 *Вывод средств*\n\n💰 Основной: ${balance.toFixed(2)} USDT\n`;
+                    
+                    if (bonusBalance > 0) {
+                        const wagerProgress = await referralService.getWagerProgress(user.id);
+                        withdrawMsg += `🎁 Бонусный: ${bonusBalance.toFixed(2)} USDT\n`;
+                        if (wagerProgress) {
+                            withdrawMsg += `📊 Отыгрыш: ${wagerProgress.progress}%\n`;
+                        }
+                        withdrawMsg += `\n⚠️ _Бонус недоступен для вывода до отыгрыша_`;
+                    }
+                    
+                    withdrawMsg += `\n\nДля вывода: \`/withdraw <сумма> <адрес>\``;
+                    await ctx.reply(withdrawMsg, { parse_mode: 'Markdown' });
+                    break;
+
+                case '👥 Рефералы':
+                    const stats = await referralService.getReferrerStats(user.id);
+                    const userInfo = await prisma.user.findUnique({
+                        where: { id: user.id },
+                        select: { referralCode: true, referrerType: true }
+                    });
+                    
+                    const referralLink = `https://t.me/${ctx.botInfo.username}?start=ref_${userInfo.referralCode}`;
+                    const typeEmoji = userInfo.referrerType === 'WORKER' ? '👷' : '👤';
+                    
+                    let refMsg = `${typeEmoji} *Реферальная программа*\n\n` +
+                        `🔗 Ваша ссылка:\n\`${referralLink}\`\n\n` +
+                        `📊 *Статистика:*\n` +
+                        `👥 Рефералов: ${stats.referralsCount}\n` +
+                        `💰 Оборот: ${stats.totalTurnover.toFixed(2)} USDT\n` +
+                        `✅ Выплачено: ${stats.totalCommissionPaid.toFixed(4)} USDT\n` +
+                        `⏳ Накоплено: ${stats.potentialCommission} USDT\n\n` +
+                        `💎 Ваша комиссия: *${stats.commissionRate}%*\n\n` +
+                        `ℹ️ *Как работает:*\n` +
+                        `• Друг получает +100% к депозиту\n` +
+                        `• Вы получаете ${stats.commissionRate}% от прибыли казино`;
+                    
+                    await ctx.reply(refMsg, {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '📋 Мои рефералы', callback_data: 'my_referrals' }],
+                                [{ text: '💰 Получить комиссию', callback_data: 'claim_commission' }]
+                            ]
+                        },
+                        parse_mode: 'Markdown'
+                    });
+                    break;
+
+                case '⚙️ Настройки':
+                    const userBal = await getUserBalance(user.id);
+                    const userBonus = await getBonusBalance(user.id);
+                    const badges = [];
+                    if (user.isAdmin) badges.push('👑 АДМИН');
+                    if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
+                    
                     await ctx.reply(
-                        `💸 *Вывод средств*\n\n💰 Ваш баланс: ${balance} USDT\n\nДля вывода введите команду: \`/withdraw <сумма> <адрес>\``,
+                        `⚙️ *Настройки*\n\n` +
+                        `👤 ${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
+                        `💰 Основной: ${userBal.toFixed(2)} USDT\n` +
+                        `🎁 Бонусный: ${userBonus.toFixed(2)} USDT` +
+                        (badges.length ? `\n${badges.join(' | ')}` : ''),
+                        { parse_mode: 'Markdown' }
+                    );
+                    break;
+
+                case '❓ Помощь':
+                    await ctx.reply(
+                        `❓ *Справка*\n\n` +
+                        `💬 Поддержка: @support_casino\n\n` +
+                        `*Команды:*\n` +
+                        `/balance - Баланс\n` +
+                        `/bonus - Статус бонуса`,
                         { parse_mode: 'Markdown' }
                     );
                     break;
@@ -534,215 +401,316 @@ if (!BOT_TOKEN) {
                         await ctx.reply('🚫 Только для администраторов.');
                         return;
                     }
-                    // Эмулируем команду /admin
                     await ctx.reply(
                         `👑 *АДМИН ПАНЕЛЬ*\n\n` +
-                        `Доступные команды:\n\n` +
                         `/admin_stats - Статистика\n` +
-                        `/admin_blocks - Заблокированные пользователи\n` +
-                        `/block_user <id> - Заблокировать пользователя\n` +
-                        `/unblock_user <id> - Разблокировать пользователя\n` +
-                        `/admin_webhook - Логи веб-хуков\n` +
-                        `/admin_help - Справка`,
-                        { parse_mode: 'Markdown' }
-                    );
-                    break;
-
-                case '👥 Управление':
-                    if (!user.isAdmin) {
-                        await ctx.reply('🚫 Только для администраторов.');
-                        return;
-                    }
-                    await ctx.reply(
-                        `👥 *Управление пользователями*\n\n` +
-                        `Используйте команды:\n` +
-                        `/admin_blocks - Показать заблокированных\n` +
-                        `/block_user <id> - Заблокировать пользователя\n` +
-                        `/unblock_user <id> - Разблокировать пользователя`,
-                        { parse_mode: 'Markdown' }
-                    );
-                    break;
-
-                case '💳 Платежи':
-                    if (!user.isAdmin) {
-                        await ctx.reply('🚫 Только для администраторов.');
-                        return;
-                    }
-                    const pending = await prisma.transaction.count({
-                        where: { type: 'WITHDRAW', status: 'PENDING' }
-                    });
-                    await ctx.reply(`💳 *Платежи*\n\nОжидают обработки: ${pending}\n\nДля обработки: \`/admin_withdrawals\``, { parse_mode: 'Markdown' });
-                    break;
-
-                case '⚙️ Настройки':
-                    const userBalance = await getUserBalance(user.id, 'USDT');
-                    const adminBadge = user.isAdmin ? '\n👑 Статус: АДМИНИСТРАТОР' : '';
-                    await ctx.reply(
-                        `⚙️ *Ваши настройки*\n\n` +
-                        `👤 Ник: ${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
-                        `💰 Баланс: ${userBalance} USDT${adminBadge}`,
-                        { parse_mode: 'Markdown' }
-                    );
-                    break;
-
-                case '❓ Помощь':
-                    await ctx.reply(
-                        `❓ *Справка и поддержка*\n\n` +
-                        `💬 Телеграм: @support_casino\n` +
-                        `📧 Email: support@casinox.io`,
+                        `/set_worker <id> - Сделать воркером\n` +
+                        `/remove_worker <id> - Убрать воркера\n` +
+                        `/payout_all - Выплатить комиссии\n` +
+                        `/block_user <id> - Заблокировать\n` +
+                        `/unblock_user <id> - Разблокировать`,
                         { parse_mode: 'Markdown' }
                     );
                     break;
 
                 default:
-                    // Если не команда и не кнопка — показываем меню
                     if (!text.startsWith('/')) {
                         const menu = user.isAdmin ? getAdminMenuKeyboard() : getMainMenuKeyboard();
-                        await ctx.reply('📋 *Выберите действие из меню:*', menu);
+                        await ctx.reply('📋 *Выберите действие:*', menu);
                     }
-                    // Команды (/withdraw и др.) будут обработаны отдельно, если вы их добавите
                     break;
             }
         } catch (error) {
             console.error('Error handling message:', error);
-            await ctx.reply('❌ Произошла ошибка. Попробуйте еще раз.');
+            await ctx.reply('❌ Ошибка. Попробуйте еще раз.');
         }
     });
 
     // ====================================
-    // CALLBACK-ОБРАБОТЧИКИ
+    // АДМИН-КОМАНДЫ
+    // ====================================
+    bot.command('set_worker', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+
+            const userId = parseInt(ctx.message.text.split(' ')[1]);
+            if (!userId) {
+                await ctx.reply('Использование: /set_worker <user_id>');
+                return;
+            }
+
+            await referralService.setUserAsWorker(userId);
+            await ctx.reply(`✅ Пользователь ${userId} теперь ВОРКЕР (40% комиссия)`);
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
+
+    bot.command('remove_worker', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+
+            const userId = parseInt(ctx.message.text.split(' ')[1]);
+            if (!userId) {
+                await ctx.reply('Использование: /remove_worker <user_id>');
+                return;
+            }
+
+            await prisma.user.update({ where: { id: userId }, data: { referrerType: 'REGULAR' } });
+            await ctx.reply(`✅ Пользователь ${userId} теперь обычный (30% комиссия)`);
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
+
+    bot.command('payout_all', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                await ctx.reply('🚫 Только для администраторов.');
+                return;
+            }
+
+            await ctx.reply('⏳ Выплачиваю комиссии...');
+            const result = await referralService.processAllPendingCommissions();
+            
+            await ctx.reply(
+                `✅ *Выплата завершена*\n\n` +
+                `📊 Обработано: ${result.processed}\n` +
+                `✅ Успешно: ${result.success}\n` +
+                `💰 Выплачено: ${result.totalPaid.toFixed(4)} USDT`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply('❌ Ошибка');
+        }
+    });
+
+    // ====================================
+    // CALLBACK HANDLERS
     // ====================================
     bot.action('deposit_custom', async (ctx) => {
         const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
         if (!user) return;
-
         waitingForDeposit.set(user.id, true);
-        await ctx.reply("Введите сумму в USDT, которую хотите пополнить.\nНапример: 15.25");
+        await ctx.reply("Введите сумму в USDT (пример: 15.25)");
+        await ctx.answerCbQuery();
+    });
+
+    bot.action(/deposit_(\d+)/, async (ctx) => {
+        const amount = parseInt(ctx.match[1]);
+        const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+        if (!user) return;
+
+        const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
+        if (!invoice) {
+            await ctx.reply("❌ Ошибка создания инвойса.");
+            return await ctx.answerCbQuery();
+        }
+
+        await ctx.reply(
+            `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
+                        [{ text: "🔄 Проверить", callback_data: `check_invoice_${invoice.invoice_id}` }]
+                    ]
+                },
+                parse_mode: "Markdown"
+            }
+        );
         await ctx.answerCbQuery();
     });
 
     bot.action(/check_invoice_(\d+)/, async (ctx) => {
         const invoiceId = ctx.match[1];
-        await ctx.answerCbQuery('Проверяем статус...');
+        await ctx.answerCbQuery('Проверяем...');
 
-        const invoicesResult = await cryptoPayAPI.getInvoices([parseInt(invoiceId)]);
-
-        if (invoicesResult?.invoices?.length > 0) {
-            const invoice = invoicesResult.invoices[0];
-            const status = invoice.status;
-            const amount = invoice.amount;
-            const userId = parseInt(invoice.payload);
-
-            if (status === 'paid') {
-                const existingTransaction = await prisma.transaction.findFirst({
-                    where: { externalId: invoiceId.toString(), type: 'DEPOSIT', status: 'COMPLETED' }
-                });
-
-                if (!existingTransaction) {
-                    await prisma.transaction.create({
-                        data: {
-                            userId,
-                            type: 'DEPOSIT',
-                            status: 'COMPLETED',
-                            amount,
-                            currency: invoice.asset,
-                            externalId: invoiceId.toString(),
-                        }
-                    });
-                    await updateBalance(userId, invoice.asset, amount);
-                    await ctx.editMessageText(
-                        `✅ *Оплата прошла успешно!* 🎉\n\nСумма: ${amount} ${invoice.asset} зачислена на Ваш баланс.`,
-                        { parse_mode: 'Markdown' }
-                    );
-                } else {
-                    await ctx.editMessageText(
-                        `✅ *Оплата уже зачислена.* 🎉\n\nСумма: ${amount} ${invoice.asset} была зачислена ранее.`,
-                        { parse_mode: 'Markdown' }
-                    );
-                }
-            } else if (status === 'active') {
-                await ctx.reply(`⏳ Инвойс #${invoiceId} еще не оплачен.`, {
+        const result = await cryptoPayAPI.getInvoices([parseInt(invoiceId)]);
+        if (result?.invoices?.length > 0) {
+            const invoice = result.invoices[0];
+            if (invoice.status === 'paid') {
+                await ctx.editMessageText(`✅ *Оплачено!* Средства зачислены.`, { parse_mode: 'Markdown' });
+            } else if (invoice.status === 'active') {
+                await ctx.reply(`⏳ Ожидает оплаты`, {
                     reply_markup: {
                         inline_keyboard: [
                             [{ text: '💳 Оплатить', url: invoice.bot_invoice_url }],
-                            [{ text: '✅ Проверить статус', callback_data: `check_invoice_${invoiceId}` }]
+                            [{ text: '🔄 Проверить', callback_data: `check_invoice_${invoiceId}` }]
                         ]
                     }
                 });
-            } else if (status === 'expired') {
-                await ctx.editMessageText('❌ Срок действия инвойса истек. Попробуйте создать новый.', { parse_mode: 'Markdown' });
             } else {
-                await ctx.editMessageText(`⚠️ Статус инвойса #${invoiceId}: ${status}.`, { parse_mode: 'Markdown' });
+                await ctx.editMessageText(`❌ Инвойс истек`, { parse_mode: 'Markdown' });
             }
+        }
+    });
+
+    bot.action('my_referrals', async (ctx) => {
+        const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+        if (!user) return;
+
+        const referrals = await prisma.user.findMany({
+            where: { referredById: user.id },
+            select: { id: true, username: true, firstName: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        });
+
+        if (referrals.length === 0) {
+            await ctx.reply('У вас пока нет рефералов.');
+            return await ctx.answerCbQuery();
+        }
+
+        let msg = '👥 *Ваши рефералы:*\n\n';
+        referrals.forEach((r, i) => {
+            const name = r.username ? `@${r.username}` : r.firstName || `User #${r.id}`;
+            msg += `${i + 1}. ${name}\n`;
+        });
+
+        await ctx.reply(msg, { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    });
+
+    bot.action('claim_commission', async (ctx) => {
+        const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+        if (!user) return;
+        await ctx.answerCbQuery('Обрабатываю...');
+
+        const stats = await prisma.referralStats.findMany({
+            where: { referrerId: user.id, turnoverSinceLastPayout: { gt: 0 } }
+        });
+
+        if (stats.length === 0) {
+            await ctx.reply('⚠️ Нет накопленной комиссии.');
+            return;
+        }
+
+        let totalPaid = 0;
+        for (const stat of stats) {
+            try {
+                const result = await referralService.payoutReferrerCommission(stat.referrerId, stat.refereeId, stat.tokenId);
+                if (result) totalPaid += result.commission;
+            } catch (e) {}
+        }
+
+        if (totalPaid > 0) {
+            await ctx.reply(`✅ Выплачено ${totalPaid.toFixed(4)} USDT`);
         } else {
-            await ctx.reply('❌ Не удалось получить информацию об инвойсе.');
+            await ctx.reply('⚠️ Минимальная сумма не достигнута.');
         }
     });
 
     // ====================================
-    // ЭКСПОРТ
+    // WEBHOOK HANDLER
+    // ====================================
+    const handleCryptoPayWebhook = async (req, res) => {
+        try {
+            const updates = req.body.updates || [req.body];
+            
+            for (const update of updates) {
+                const invoice = update.payload || update;
+                const invoiceId = String(invoice.invoice_id);
+                const status = invoice.status;
+                const userId = Number(invoice.payload);
+                const amount = Number(invoice.amount);
+                const asset = invoice.asset;
+
+                if (isNaN(userId) || userId <= 0) continue;
+
+                if (status === 'paid') {
+                    // Проверяем дубликат
+                    const existing = await prisma.transaction.findFirst({
+                        where: { txHash: invoiceId, type: 'DEPOSIT', status: 'COMPLETED' }
+                    });
+                    if (existing) continue;
+
+                    const token = await prisma.cryptoToken.findUnique({ where: { symbol: asset } });
+                    if (!token) continue;
+
+                    // Создаём транзакцию и зачисляем
+                    await prisma.transaction.create({
+                        data: {
+                            userId,
+                            tokenId: token.id,
+                            type: 'DEPOSIT',
+                            status: 'COMPLETED',
+                            amount: amount.toString(),
+                            txHash: invoiceId
+                        }
+                    });
+
+                    await prisma.balance.upsert({
+                        where: { userId_tokenId_type: { userId, tokenId: token.id, type: 'MAIN' } },
+                        create: { userId, tokenId: token.id, type: 'MAIN', amount: amount.toString() },
+                        update: { amount: { increment: amount } }
+                    });
+
+                    console.log(`✅ [WEBHOOK] Deposit ${amount} ${asset} to user ${userId}`);
+
+                    // 🎁 РЕФЕРАЛЬНЫЙ БОНУС
+                    if (asset === 'USDT') {
+                        try {
+                            const bonusResult = await referralService.grantDepositBonus(userId, amount, token.id);
+                            
+                            if (bonusResult) {
+                                const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
+                                if (user?.telegramId) {
+                                    await bot.telegram.sendMessage(
+                                        user.telegramId,
+                                        `🎉 *Бонус активирован!*\n\n` +
+                                        `+${bonusResult.bonusAmount} USDT на бонусный баланс\n` +
+                                        `📊 Отыграйте ${bonusResult.requiredWager} USDT для вывода\n` +
+                                        `⏳ Действует 7 дней`,
+                                        { parse_mode: 'Markdown' }
+                                    );
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Bonus error:', e.message);
+                        }
+                    }
+
+                    // Уведомление о депозите
+                    try {
+                        const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
+                        if (user?.telegramId) {
+                            await bot.telegram.sendMessage(
+                                user.telegramId,
+                                `🎉 *Пополнение успешно!*\n\n${amount} ${asset} зачислено! 🚀`,
+                                { parse_mode: 'Markdown' }
+                            );
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            res.status(200).send('OK');
+        } catch (error) {
+            console.error('❌ Webhook error:', error);
+            res.status(500).send('Error');
+        }
+    };
+
+    // ====================================
+    // EXPORT
     // ====================================
     module.exports = {
         start: () => {
             bot.launch();
-            console.log('🤖 Telegram Bot started.');
+            console.log('🤖 Telegram Bot started with Referral System.');
         },
         botInstance: bot,
         cryptoPayAPI,
-        handleCryptoPayWebhook: async (req, res) => {
-            try {
-                const updates = req.body.updates;
-                if (!updates || updates.length === 0) {
-                    return res.status(200).send('No updates');
-                }
-
-                console.log(`Webhook received ${updates.length} updates.`);
-                for (const update of updates) {
-                    const invoice = update.payload;
-                    const invoiceId = invoice.invoice_id.toString();
-                    const status = invoice.status;
-                    const userId = parseInt(invoice.payload);
-                    const amount = parseFloat(invoice.amount);
-                    const asset = invoice.asset;
-
-                    if (status === 'paid') {
-                        const existingTransaction = await prisma.transaction.findFirst({
-                            where: { externalId: invoiceId, type: 'DEPOSIT', status: 'COMPLETED' }
-                        });
-
-                        if (!existingTransaction) {
-                            await prisma.transaction.create({
-                                data: {
-                                    userId,
-                                    type: 'DEPOSIT',
-                                    status: 'COMPLETED',
-                                    amount,
-                                    currency: asset,
-                                    externalId: invoiceId,
-                                }
-                            });
-                            await updateBalance(userId, asset, amount);
-
-                            await bot.telegram.sendMessage(
-                                userId,
-                                `🎉 *Пополнение успешно!*\n\n${amount} ${asset} зачислено на Ваш баланс. Начинаем игру! 🚀`,
-                                { parse_mode: 'Markdown' }
-                            );
-                            console.log(`Deposit processed for user ${userId}, amount ${amount} ${asset}.`);
-                        }
-                    } else if (status === 'expired') {
-                        await bot.telegram.sendMessage(
-                            userId,
-                            `❌ *Инвойс истек*\n\nИнвойс #${invoiceId} на сумму ${amount} ${asset} истек.`,
-                            { parse_mode: 'Markdown' }
-                        );
-                    }
-                }
-                res.status(200).send('OK');
-            } catch (error) {
-                console.error('❌ Crypto Pay Webhook error:', error);
-                res.status(500).send('Internal Server Error');
-            }
-        }
+        handleCryptoPayWebhook
     };
 }

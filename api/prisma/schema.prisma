@@ -31,6 +31,7 @@ model CryptoToken {
     leaderboard         LeaderboardEntry[]
     userBonuses         UserBonus[]
     referralCommissions ReferralTransaction[]
+    referralStats       ReferralStats[]
 }
 
 enum GameType {
@@ -48,6 +49,8 @@ enum TransactionType {
     BONUS
     REFUND
     TRANSFER
+    REFERRAL_COMMISSION
+    BONUS_TO_MAIN
 }
 
 enum TransactionStatus {
@@ -64,6 +67,12 @@ enum BalanceType {
 enum ReferralEventType {
     BET_COMMISSION
     DEPOSIT_BONUS
+}
+
+// 🆕 Тип реферера (обычный или воркер)
+enum ReferrerType {
+    REGULAR
+    WORKER
 }
 
 // ====================================================
@@ -90,6 +99,9 @@ model User {
     referredById        Int?               
     referrer            User?              @relation("UserReferrals", fields: [referredById], references: [id])
     referrals           User[]             @relation("UserReferrals") 
+    
+    // 🆕 Тип реферера (обычный 30% или воркер 40%)
+    referrerType        ReferrerType       @default(REGULAR)
 
     // Связи
     crashBets           CrashBet[]         @relation("CrashBets")
@@ -103,7 +115,12 @@ model User {
     bonuses             UserBonus[]
     commissions         ReferralTransaction[] 
     referralActions     ReferralTransaction[] @relation("RefereeActions")
-    authTokens          OneTimeToken[] 
+    authTokens          OneTimeToken[]
+    
+    // 🆕 Статистика рефералов (как реферер)
+    referralStatsAsReferrer  ReferralStats[] @relation("ReferrerStats")
+    // 🆕 Статистика рефералов (как реферал)
+    referralStatsAsReferee   ReferralStats[] @relation("RefereeStats")
 }
 
 // ====================================================
@@ -194,6 +211,9 @@ model Bonus {
     wageringMultiplier   Float       
     maxBonusAmount       Decimal     @db.Decimal(30, 18)
     
+    // 🆕 Процент бонуса к депозиту (100 = +100%)
+    depositBonusPercent  Float       @default(0)
+    
     userBonuses          UserBonus[]
 }
 
@@ -215,6 +235,9 @@ model UserBonus {
     
     isActive        Boolean   @default(true)
     isCompleted     Boolean   @default(false)
+    
+    // 🆕 ID реферера который привёл этого пользователя (для отслеживания)
+    referrerId      Int?
     
     createdAt       DateTime  @default(now())
     expiresAt       DateTime?
@@ -274,8 +297,52 @@ model ReferralTransaction {
 }
 
 // ====================================================
-// 8. ОДНОРАЗОВЫЕ ТОКЕНЫ (ONE-TIME AUTHS)
+// 🆕 8. СТАТИСТИКА РЕФЕРАЛОВ (АККУМУЛИРОВАННЫЙ ОБОРОТ)
 // ====================================================
+
+model ReferralStats {
+    id                      Int       @id @default(autoincrement())
+    
+    // Реферер (кто получает комиссию)
+    referrerId              Int
+    referrer                User      @relation("ReferrerStats", fields: [referrerId], references: [id])
+    
+    // Реферал (кто играет)
+    refereeId               Int
+    referee                 User      @relation("RefereeStats", fields: [refereeId], references: [id])
+    
+    // Токен
+    tokenId                 Int
+    token                   CryptoToken @relation(fields: [tokenId], references: [id])
+    
+    // Общий оборот реферала
+    totalTurnover           Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // Оборот с последней выплаты (обнуляется после выплаты комиссии)
+    turnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // Общая сумма выплаченных комиссий
+    totalCommissionPaid     Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // Дата последней выплаты
+    lastPayoutAt            DateTime?
+    
+    createdAt               DateTime  @default(now())
+    updatedAt               DateTime  @updatedAt
+    
+    // Уникальная комбинация: один реферер + один реферал + один токен
+    @@unique([referrerId, refereeId, tokenId])
+    
+    // Индексы для быстрого поиска
+    @@index([referrerId])
+    @@index([refereeId])
+    @@index([turnoverSinceLastPayout])
+}
+
+// ====================================================
+// 9. ОДНОРАЗОВЫЕ ТОКЕНЫ (ONE-TIME AUTHS)
+// ====================================================
+
 model OneTimeToken {
     id              Int      @id @default(autoincrement())
     
@@ -294,8 +361,9 @@ model OneTimeToken {
 }
 
 // ====================================================
-// 9. CRASH GAME SPECIFIC MODELS
+// 10. CRASH GAME SPECIFIC MODELS
 // ====================================================
+
 model CrashRound {
     id                Int          @id @default(autoincrement())
     
@@ -369,7 +437,7 @@ model CrashTransaction {
 }
 
 // ====================================================
-// 10. MINESWEEPER GAME MODELS
+// 11. MINESWEEPER GAME MODELS
 // ====================================================
 
 model MinesweeperDifficulty {

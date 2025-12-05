@@ -3,6 +3,9 @@ const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// 🆕 Импорт хелпера реферальной системы
+const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./helpers/gameReferralHelper');
+
 // 🔍 Проверка Server Secret
 const verifyGameServerSecret = (req, res) => {
   const serverSecret = req.headers['x-server-secret'];
@@ -92,10 +95,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
   // 🔍 Валидация
   if (!userId || !gameId || amount === undefined || !tokenId) {
     console.log(`❌ [CREATE-BET] Отсутствуют обязательные поля`);
-    console.log(`   userId: ${!!userId}`);
-    console.log(`   gameId: ${!!gameId}`);
-    console.log(`   amount: ${amount !== undefined}`);
-    console.log(`   tokenId: ${!!tokenId}`);
     return res.status(400).json({ 
       success: false, 
       error: 'Missing fields',
@@ -131,10 +130,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 
       if (!token) {
         console.log(`❌ [CREATE-BET] Токен не найден: ID=${tokenId}`);
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Token not found' 
-        });
+        return res.status(400).json({ success: false, error: 'Token not found' });
       }
       console.log(`✅ [CREATE-BET] Токен найден: ${token.symbol}`);
 
@@ -146,59 +142,23 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 
       if (!user) {
         console.log(`❌ [CREATE-BET] Пользователь не найден: ID=${userId}`);
-        return res.status(400).json({ 
-          success: false, 
-          error: 'User not found' 
-        });
+        return res.status(400).json({ success: false, error: 'User not found' });
       }
       console.log(`✅ [CREATE-BET] Пользователь найден: ${user.username}`);
 
-      // 4️⃣ Получить ВСЕ балансы пользователя
-      console.log(`🔍 [CREATE-BET] Получаю ВСЕ балансы пользователя...`);
-      const allBalances = await prisma.balance.findMany({
-        where: { userId },
-        include: { token: true }
-      });
-
-      console.log(`✅ [CREATE-BET] Найдено ${allBalances.length} балансов:`);
-      allBalances.forEach(bal => {
-        console.log(`   - ${bal.token.symbol} (ID=${bal.tokenId}): ${bal.amount} [${bal.type}]`);
-      });
-
-      // 5️⃣ Найти баланс для конкретного токена
-      console.log(`🔍 [CREATE-BET] Ищу баланс для tokenId=${tokenId}, type=MAIN`);
-      const balance = await prisma.balance.findUnique({
-        where: {
-          userId_tokenId_type: {
-            userId,
-            tokenId,
-            type: 'MAIN'
-          }
-        }
-      });
-
-      if (!balance) {
-        console.log(`❌ [CREATE-BET] Баланс не найден`);
+      // 🆕 4️⃣ Списываем через хелпер (BONUS приоритет, потом MAIN)
+      const deductResult = await deductBetFromBalance(userId, betAmount, tokenId);
+      
+      if (!deductResult.success) {
+        console.log(`❌ [CREATE-BET] ${deductResult.error}`);
         return res.status(400).json({ 
           success: false, 
-          error: 'Balance not found',
-          availableTokens: allBalances.map(b => b.tokenId)
+          error: deductResult.error || 'Insufficient balance'
         });
       }
+      console.log(`✅ [CREATE-BET] Списано ${betAmount} с ${deductResult.balanceType}`);
 
-      const currentBalance = parseFloat(balance.amount);
-      console.log(`✅ [CREATE-BET] Баланс найден: ${currentBalance}`);
-
-      if (currentBalance < betAmount) {
-        console.log(`❌ [CREATE-BET] Недостаточно средств: need=${betAmount}, have=${currentBalance}`);
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Insufficient balance',
-          details: { required: betAmount, available: currentBalance }
-        });
-      }
-
-      // 6️⃣ Создать ставку
+      // 5️⃣ Создать ставку
       console.log(`📝 [CREATE-BET] Создаю ставку для userId=${userId}`);
       const newBet = await prisma.crashBet.create({
         data: {
@@ -213,19 +173,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       });
       console.log(`✅ [CREATE-BET] Ставка создана: ID=${newBet.id}`);
 
-      // 7️⃣ Снять деньги
-      console.log(`💳 [CREATE-BET] Снимаю ${betAmount} с баланса`);
-      await prisma.balance.update({
-        where: { id: balance.id },
-        data: {
-          amount: {
-            decrement: betAmount
-          }
-        }
-      });
-      console.log(`✅ [CREATE-BET] Баланс обновлен`);
-
-      // 8️⃣ Логировать транзакцию
+      // 6️⃣ Логировать транзакцию
       await prisma.crashTransaction.create({
         data: {
           userId,
@@ -237,28 +185,28 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       });
       console.log(`✅ [CREATE-BET] Транзакция залогирована`);
 
-      // 9️⃣ Обновить раунд
+      // 7️⃣ Обновить раунд
       await prisma.crashRound.update({
         where: { id: round.id },
         data: {
           totalPlayers: { increment: 1 },
-          totalWagered: {
-            increment: betAmount
-          }
+          totalWagered: { increment: betAmount }
         }
       });
       console.log(`✅ [CREATE-BET] Раунд обновлен`);
 
       console.log(`✅ [CREATE-BET] УСПЕХ: betId=${newBet.id}`);
-      res.json({ success: true, data: { betId: newBet.id } });
+      res.json({ 
+        success: true, 
+        data: { 
+          betId: newBet.id,
+          balanceType: deductResult.balanceType
+        } 
+      });
     } catch (error) {
       console.error('❌ [CREATE-BET] Ошибка:', error.message);
       console.error('📋 Stack:', error.stack);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to create bet', 
-        details: error.message 
-      });
+      res.status(500).json({ success: false, error: 'Failed to create bet', details: error.message });
     }
   })();
 });
@@ -272,7 +220,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
   const verified = verifyGameServerSecret(req, res);
   if (verified !== true) return;
 
-  const { userId, tokenId, betId, winnings, exitMultiplier, gameId, result } = req.body;
+  const { userId, tokenId, betId, winnings, exitMultiplier, gameId, result, balanceType } = req.body;
 
   console.log('📨 [CASHOUT-RESULT] Данные:', JSON.stringify(req.body));
 
@@ -319,42 +267,14 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
       console.log(`✅ [CASHOUT-RESULT] Ставка обновлена`);
 
-      // Если выиграл
+      // 🆕 Если выиграл - используем creditWinnings
       if (winningsAmount > 0 && result === 'won') {
         console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount}`);
+        
+        const targetBalance = balanceType || 'MAIN';
+        await creditWinnings(userId, winningsAmount, tokenId, targetBalance);
 
-        let balance = await prisma.balance.findUnique({
-          where: {
-            userId_tokenId_type: {
-              userId,
-              tokenId,
-              type: 'MAIN'
-            }
-          }
-        });
-
-        if (!balance) {
-          console.log(`⚠️ [CASHOUT-RESULT] Баланс не найден, создаю новый`);
-          balance = await prisma.balance.create({
-            data: {
-              userId,
-              tokenId,
-              type: 'MAIN',
-              amount: winningsAmount.toString()
-            }
-          });
-        } else {
-          balance = await prisma.balance.update({
-            where: { id: balance.id },
-            data: {
-              amount: {
-                increment: winningsAmount
-              }
-            }
-          });
-        }
-
-        console.log(`✅ [CASHOUT-RESULT] Баланс обновлен`);
+        console.log(`✅ [CASHOUT-RESULT] Баланс ${targetBalance} обновлен`);
 
         await prisma.crashTransaction.create({
           data: {
@@ -468,162 +388,38 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const { amount, tokenId } = req.body;
 
-    console.log(`\n🔍 [VERIFY-BET] Проверяю баланс`);
-    console.log(`   userId: ${userId}`);
-    console.log(`   amount: ${amount}`);
-    console.log(`   tokenId: ${tokenId}`);
+    console.log(`\n🔍 [VERIFY-BET] userId=${userId}, amount=${amount}, tokenId=${tokenId}`);
 
-    // ✅ Валидация входных данных
-    if (!amount || amount <= 0) {
-      console.log(`❌ [VERIFY-BET] Неправильная сумма: ${amount}`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid amount',
-        details: { amount }
-      });
+    if (!amount || amount <= 0 || !tokenId) {
+      return res.status(400).json({ success: false, error: 'Invalid parameters' });
     }
 
-    if (!tokenId || tokenId <= 0) {
-      console.log(`❌ [VERIFY-BET] Неправильный tokenId: ${tokenId}`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid tokenId',
-        details: { tokenId }
-      });
-    }
-
-    // ✅ Проверяем существование токена
-    console.log(`🔍 [VERIFY-BET] Проверяю токен ID=${tokenId}`);
-    const token = await prisma.cryptoToken.findUnique({
-      where: { id: tokenId }
-    });
-
-    if (!token) {
-      console.log(`❌ [VERIFY-BET] Токен не найден: ID=${tokenId}`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Token not found',
-        details: { tokenId }
-      });
-    }
-    console.log(`✅ [VERIFY-BET] Токен найден: ${token.symbol} (${token.name})`);
-
-    // ✅ Проверяем существование пользователя
-    console.log(`🔍 [VERIFY-BET] Проверяю пользователя ID=${userId}`);
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user) {
-      console.log(`❌ [VERIFY-BET] Пользователь не найден: ID=${userId}`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User not found',
-        details: { userId }
-      });
-    }
-    console.log(`✅ [VERIFY-BET] Пользователь найден: ${user.username || user.firstName}`);
-
-    // ✅ ГЛАВНОЕ: Получаем ВСЕ балансы пользователя
-    console.log(`🔍 [VERIFY-BET] Получаю ВСЕ балансы пользователя ${userId}...`);
-    const allBalances = await prisma.balance.findMany({
-      where: { userId },
-      include: { token: true }
-    });
-
-    console.log(`✅ [VERIFY-BET] Найдено ${allBalances.length} балансов:`);
-    allBalances.forEach(bal => {
-      console.log(`   - ${bal.token.symbol} (ID=${bal.tokenId}): ${bal.amount} [${bal.type}]`);
-    });
-
-    // ✅ Ищем баланс для конкретного токена
-    console.log(`🔍 [VERIFY-BET] Ищу баланс для userId=${userId}, tokenId=${tokenId}, type=MAIN`);
-    
-    const balance = await prisma.balance.findUnique({
-      where: {
-        userId_tokenId_type: {
-          userId,
-          tokenId,
-          type: 'MAIN'
-        }
-      },
-      include: { token: true }
-    });
-
-    if (!balance) {
-      console.log(`❌ [VERIFY-BET] Баланс не найден для этого токена`);
-      console.log(`   Возможные причины:`);
-      console.log(`   1. tokenId ${tokenId} неправильный`);
-      console.log(`   2. Баланс для этого токена еще не создан`);
-      console.log(`   3. Баланс существует но с другим type (не MAIN)`);
-      
-      // Проверяем есть ли вообще какой-то баланс для этого токена
-      const anyBalance = await prisma.balance.findMany({
-        where: { userId, tokenId },
-        include: { token: true }
-      });
-
-      if (anyBalance.length > 0) {
-        console.log(`⚠️ [VERIFY-BET] Найдены балансы с другими type:`);
-        anyBalance.forEach(bal => {
-          console.log(`   - type=${bal.type}: ${bal.amount}`);
-        });
-      }
-
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Balance not found for this token',
-        details: {
-          userId,
-          tokenId,
-          availableTokens: allBalances.map(b => ({
-            tokenId: b.tokenId,
-            symbol: b.token.symbol,
-            amount: b.amount,
-            type: b.type
-          }))
-        }
-      });
-    }
-
-    const availableBalance = parseFloat(balance.amount);
+    // 🆕 Получаем оба баланса
+    const balances = await getUserBalances(userId, tokenId);
     const requiredAmount = parseFloat(amount);
 
-    console.log(`✅ [VERIFY-BET] Баланс найден: ${balance.token.symbol}`);
-    console.log(`   Доступно: ${availableBalance}`);
-    console.log(`   Требуется: ${requiredAmount}`);
+    console.log(`✅ [VERIFY-BET] MAIN=${balances.main}, BONUS=${balances.bonus}`);
 
-    // ✅ Проверяем достаточность средств
-    if (availableBalance < requiredAmount) {
-      console.log(`❌ [VERIFY-BET] Недостаточно средств`);
+    if (balances.total < requiredAmount) {
       return res.status(400).json({ 
         success: false, 
         error: 'Insufficient balance',
-        details: {
-          available: availableBalance,
-          required: requiredAmount,
-          token: balance.token.symbol
-        }
+        details: { available: balances.total, required: requiredAmount }
       });
     }
 
-    console.log(`✅ [VERIFY-BET] Баланс достаточен, принимаю ставку`);
     res.json({ 
       success: true, 
       data: { 
-        available: balance.amount,
-        token: balance.token.symbol
+        available: balances.total,
+        main: balances.main,
+        bonus: balances.bonus
       }
     });
 
   } catch (error) {
     console.error('❌ [VERIFY-BET] ОШИБКА:', error.message);
-    console.error('📋 Stack:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to verify bet',
-      details: error.message
-    });
+    res.status(500).json({ success: false, error: 'Failed to verify bet' });
   }
 });
 

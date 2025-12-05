@@ -4,6 +4,9 @@ const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const minesweeperService = require('../services/MinesweeperService');
 
+// 🆕 Импорт хелпера реферальной системы
+const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./helpers/gameReferralHelper');
+
 /**
  * 🎮 GET все сложности
  * GET /api/v1/minesweeper/difficulties
@@ -59,7 +62,7 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
   try {
     const userId = req.user.userId;
     const { difficultyId, betAmount, tokenId } = req.body;
-    const DEFAULT_TOKEN_ID = 2; // ID основной валюты (USDT)
+    const DEFAULT_TOKEN_ID = tokenId || 2; // ID основной валюты (USDT)
     
     console.log('🎮 Начинаю игру сапёра: пользователь', userId, 'ставка', betAmount);
 
@@ -71,33 +74,17 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
       });
     }
 
-    // Проверяем баланс
-    const balance = await prisma.balance.findUnique({
-      where: {
-        userId_tokenId_type: {
-          userId, 
-          tokenId: DEFAULT_TOKEN_ID, 
-          type: 'MAIN',
-        },
-      },
-    });
-
-    if (!balance || balance.amount < betAmount) {
+    // 🆕 Списываем через хелпер (BONUS приоритет, потом MAIN)
+    const deductResult = await deductBetFromBalance(userId, parseFloat(betAmount), DEFAULT_TOKEN_ID);
+    
+    if (!deductResult.success) {
+      console.log(`❌ [MINESWEEPER] ${deductResult.error}`);
       return res.status(400).json({
         success: false,
-        message: 'Недостаточно средств',
+        message: deductResult.error || 'Недостаточно средств',
       });
     }
-
-    // Снимаем ставку
-    await prisma.balance.update({
-      where: { id: balance.id },
-      data: {
-        amount: {
-          decrement: betAmount,
-        },
-      },
-    });
+    console.log(`✅ [MINESWEEPER] Списано ${betAmount} с ${deductResult.balanceType}`);
 
     // Создаём игру (мины генерируются ВНУТРИ сервиса)
     const gameData = await minesweeperService.createGame(
@@ -109,7 +96,10 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
 
     res.json({
       success: true,
-      data: gameData,
+      data: {
+        ...gameData,
+        balanceType: deductResult.balanceType
+      },
     });
   } catch (error) {
     console.error('❌ Ошибка создания игры:', error.message);
@@ -124,13 +114,6 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
  * 🎮 POST открыть клетку
  * POST /api/v1/minesweeper/reveal
  * Body: { gameId: 1, x: 0, y: 0 }
- * 
- * ⚠️ ВСЯ ЛОГИКА ОТКРЫТИЯ НА СЕРВЕРЕ!
- * Фронт отправляет только координаты, сервер:
- * 1. Восстанавливает полное поле из БД
- * 2. Проверяет есть ли там мина
- * 3. Открывает клетку
- * 4. Отправляет только безопасную информацию обратно
  */
 router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) => {
   try {
@@ -208,12 +191,12 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
 /**
  * 💰 POST кэшаут (забрать выигрыш)
  * POST /api/v1/minesweeper/cashout
- * Body: { gameId: 1 }
+ * Body: { gameId: 1, balanceType: 'MAIN' }
  */
 router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { gameId } = req.body;
+    const { gameId, balanceType } = req.body;
 
     console.log(`💸 Кэшаут: игра ${gameId}, пользователь ${userId}`);
 
@@ -224,7 +207,27 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       });
     }
 
+    // Получаем игру для токена
+    const game = await prisma.minesweeperGame.findUnique({
+      where: { id: gameId },
+      select: { tokenId: true, userId: true }
+    });
+
+    if (!game || game.userId !== userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Игра не найдена или не ваша',
+      });
+    }
+
     const result = await minesweeperService.cashOutGame(gameId, userId);
+
+    // 🆕 Зачисляем выигрыш через хелпер
+    if (result.winAmount && result.winAmount > 0) {
+      const targetBalance = balanceType || 'MAIN';
+      await creditWinnings(userId, result.winAmount, game.tokenId, targetBalance);
+      console.log(`✅ [MINESWEEPER] Выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+    }
 
     res.json({
       success: true,
@@ -235,6 +238,30 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
     res.status(400).json({
       success: false,
       message: error.message || 'Ошибка кэшаута',
+    });
+  }
+});
+
+/**
+ * 🆕 GET баланс (оба типа)
+ * GET /api/v1/minesweeper/balance
+ */
+router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const tokenId = parseInt(req.query.tokenId) || 2;
+
+    const balances = await getUserBalances(userId, tokenId);
+
+    res.json({
+      success: true,
+      data: balances
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения баланса:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения баланса',
     });
   }
 });

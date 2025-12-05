@@ -1,7 +1,12 @@
+/**
+ * 🔗 Referral Routes - API реферальной системы
+ */
+
 const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const referralService = require('../services/ReferralService');
 
 /**
  * 📊 GET реферальную статистику пользователя
@@ -11,52 +16,92 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`📊 Загружаю статистику для пользователя ${userId}`);
+    console.log(`📊 [REFERRAL API] Загружаю статистику для пользователя ${userId}`);
 
-    // Получаем пользователя с информацией о рефереру
+    // Получаем полную статистику через сервис
+    const stats = await referralService.getReferrerStats(userId);
+
+    // Получаем пользователя с информацией о реферере
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         referralCode: true,
         referredById: true,
+        referrerType: true,
         referrer: {
-          select: {
-            username: true,
-          },
-        },
-      },
+          select: { username: true }
+        }
+      }
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Пользователь не найден',
+        message: 'Пользователь не найден'
       });
     }
-
-    // Считаем количество рефералов (друзей, которые ввели наш код)
-    const referralsCount = await prisma.user.count({
-      where: { referredById: userId },
-    });
-
-    console.log(`✅ Пользователь имеет ${referralsCount} рефералов`);
 
     res.json({
       success: true,
       data: {
+        // Моя рефералка
         myReferralCode: user.referralCode,
-        myRefeersCount: referralsCount,
+        referrerType: user.referrerType,
+        commissionRate: stats.commissionRate,
+        
+        // Мои рефералы
+        myReferralsCount: stats.referralsCount,
+        
+        // Статистика заработка
+        totalTurnover: stats.totalTurnover,
+        totalCommissionPaid: stats.totalCommissionPaid,
+        pendingTurnover: stats.pendingTurnover,
+        potentialCommission: stats.potentialCommission,
+        
+        // Был ли я приглашен
         referredByCode: user.referredById ? true : false,
-        referrerUsername: user.referrer?.username || null,
-        bonusPercentage: 10, // 10% от пополнений рефералов
-      },
+        referrerUsername: user.referrer?.username || null
+      }
     });
   } catch (error) {
-    console.error('❌ Ошибка получения статистики:', error.message);
+    console.error('❌ [REFERRAL API] Ошибка получения статистики:', error.message);
     res.status(500).json({
       success: false,
-      message: 'Ошибка получения статистики',
+      message: 'Ошибка получения статистики'
+    });
+  }
+});
+
+/**
+ * 📊 GET прогресс отыгрыша бонуса
+ * GET /api/v1/referral/wager-progress
+ */
+router.get('/api/v1/referral/wager-progress', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log(`📊 [REFERRAL API] Загружаю прогресс отыгрыша для ${userId}`);
+
+    const progress = await referralService.getWagerProgress(userId);
+
+    if (!progress) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Нет активных бонусов для отыгрыша'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: progress
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка получения прогресса:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения прогресса отыгрыша'
     });
   }
 });
@@ -71,49 +116,49 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
     const userId = req.user.userId;
     const { referralCode } = req.body;
 
-    console.log(`🔗 Попытка привязать код ${referralCode} для пользователя ${userId}`);
+    console.log(`🔗 [REFERRAL API] Попытка привязать код ${referralCode} для пользователя ${userId}`);
 
     // Валидация
     if (!referralCode || referralCode.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Реферальный код не может быть пустым',
+        message: 'Реферальный код не может быть пустым'
       });
     }
 
     // Получаем текущего пользователя
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, referredById: true, username: true },
+      select: { id: true, referredById: true, username: true }
     });
 
     if (!currentUser) {
       return res.status(404).json({
         success: false,
-        message: 'Текущий пользователь не найден',
+        message: 'Текущий пользователь не найден'
       });
     }
 
     // 🔴 КРИТИЧЕСКАЯ ПРОВЕРКА: пользователь уже привязан к рефереру
     if (currentUser.referredById !== null) {
-      console.warn(`⚠️ Пользователь ${userId} уже привязан к рефереру с ID ${currentUser.referredById}`);
+      console.warn(`⚠️ [REFERRAL API] Пользователь ${userId} уже привязан к рефереру с ID ${currentUser.referredById}`);
       return res.status(400).json({
         success: false,
-        message: 'Вы уже использовали реферальный код. Один код можно ввести только один раз!',
+        message: 'Вы уже использовали реферальный код. Один код можно ввести только один раз!'
       });
     }
 
-    // Ищем реферера по коду (referralCode)
+    // Ищем реферера по коду
     const referrer = await prisma.user.findUnique({
       where: { referralCode: referralCode.trim() },
-      select: { id: true, username: true },
+      select: { id: true, username: true, referrerType: true }
     });
 
     if (!referrer) {
-      console.warn(`⚠️ Реферер с кодом "${referralCode}" не найден`);
+      console.warn(`⚠️ [REFERRAL API] Реферер с кодом "${referralCode}" не найден`);
       return res.status(404).json({
         success: false,
-        message: 'Реферальный код не найден. Проверьте правильность кода.',
+        message: 'Реферальный код не найден. Проверьте правильность кода.'
       });
     }
 
@@ -121,34 +166,387 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
     if (referrer.id === userId) {
       return res.status(400).json({
         success: false,
-        message: 'Нельзя использовать свой собственный реферальный код',
+        message: 'Нельзя использовать свой собственный реферальный код'
       });
     }
 
     // ✅ Привязываем пользователя к рефереру
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where: { id: userId },
-      data: { referredById: referrer.id },
-      select: { id: true, referredById: true },
+      data: { referredById: referrer.id }
     });
 
-    console.log(`✅ Пользователь ${userId} (${currentUser.username}) привязан к рефереру ${referrer.id} (${referrer.username})`);
+    console.log(`✅ [REFERRAL API] Пользователь ${userId} привязан к рефереру ${referrer.id} (${referrer.username})`);
 
     res.json({
       success: true,
-      message: 'Реферальный код успешно привязан!',
+      message: 'Реферальный код успешно привязан! При первом депозите вы получите +100% бонус!',
       data: {
         referrerUsername: referrer.username,
         referrerId: referrer.id,
-      },
+        bonusInfo: {
+          depositBonus: '100%',
+          wageringRequirement: '10x'
+        }
+      }
     });
   } catch (error) {
-    console.error('❌ Ошибка привязки реферального кода:', error.message);
-    console.error('Stack:', error.stack);
+    console.error('❌ [REFERRAL API] Ошибка привязки реферального кода:', error.message);
     res.status(500).json({
       success: false,
-      message: 'Ошибка привязки реферального кода',
-      error: error.message,
+      message: 'Ошибка привязки реферального кода'
+    });
+  }
+});
+
+/**
+ * 📋 GET список моих рефералов
+ * GET /api/v1/referral/my-referrals
+ */
+router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    console.log(`📋 [REFERRAL API] Загружаю рефералов для ${userId}`);
+
+    // Получаем рефералов
+    const referrals = await prisma.user.findMany({
+      where: { referredById: userId },
+      select: {
+        id: true,
+        username: true,
+        firstName: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset
+    });
+
+    // Получаем статистику по каждому рефералу
+    const referralsWithStats = await Promise.all(
+      referrals.map(async (ref) => {
+        const stats = await prisma.referralStats.findUnique({
+          where: {
+            referrerId_refereeId_tokenId: {
+              referrerId: userId,
+              refereeId: ref.id,
+              tokenId: 2 // USDT
+            }
+          }
+        });
+
+        return {
+          id: ref.id,
+          username: ref.username || `User #${ref.id}`,
+          firstName: ref.firstName,
+          joinedAt: ref.createdAt,
+          totalTurnover: parseFloat(stats?.totalTurnover?.toString() || '0'),
+          commissionEarned: parseFloat(stats?.totalCommissionPaid?.toString() || '0')
+        };
+      })
+    );
+
+    const totalCount = await prisma.user.count({
+      where: { referredById: userId }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        referrals: referralsWithStats,
+        pagination: {
+          total: totalCount,
+          limit,
+          offset
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка получения рефералов:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения списка рефералов'
+    });
+  }
+});
+
+/**
+ * 💰 POST запросить выплату комиссии (ручная)
+ * POST /api/v1/referral/claim-commission
+ */
+router.post('/api/v1/referral/claim-commission', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log(`💰 [REFERRAL API] Запрос выплаты комиссии от ${userId}`);
+
+    // Получаем всех рефералов пользователя
+    const stats = await prisma.referralStats.findMany({
+      where: { 
+        referrerId: userId,
+        turnoverSinceLastPayout: { gt: 0 }
+      }
+    });
+
+    if (stats.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Нет накопленной комиссии для выплаты'
+      });
+    }
+
+    let totalPaid = 0;
+    const results = [];
+
+    for (const stat of stats) {
+      try {
+        const result = await referralService.payoutReferrerCommission(
+          stat.referrerId,
+          stat.refereeId,
+          stat.tokenId
+        );
+
+        if (result) {
+          totalPaid += result.commission;
+          results.push({
+            refereeId: stat.refereeId,
+            commission: result.commission,
+            turnover: result.turnover
+          });
+        }
+      } catch (error) {
+        console.error(`⚠️ [REFERRAL API] Ошибка выплаты для реферала ${stat.refereeId}:`, error.message);
+      }
+    }
+
+    if (totalPaid === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Минимальная сумма для выплаты не достигнута'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Выплачено ${totalPaid.toFixed(4)} USDT`,
+      data: {
+        totalPaid,
+        details: results
+      }
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка выплаты комиссии:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка выплаты комиссии'
+    });
+  }
+});
+
+// ====================================
+// ADMIN ROUTES
+// ====================================
+
+/**
+ * 👷 POST установить пользователя как воркера (ADMIN)
+ * POST /api/v1/admin/referral/set-worker
+ * Body: { userId: 123 }
+ */
+router.post('/api/v1/admin/referral/set-worker', authenticateToken, async (req, res) => {
+  try {
+    // Проверяем админ
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAdmin: true }
+    });
+
+    if (!admin?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ запрещён'
+      });
+    }
+
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId обязателен'
+      });
+    }
+
+    const user = await referralService.setUserAsWorker(userId);
+
+    res.json({
+      success: true,
+      message: `Пользователь ${userId} установлен как WORKER (40% комиссия)`,
+      data: {
+        userId: user.id,
+        username: user.username,
+        referrerType: user.referrerType
+      }
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка установки воркера:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка установки воркера'
+    });
+  }
+});
+
+/**
+ * 👷 POST убрать статус воркера (ADMIN)
+ * POST /api/v1/admin/referral/remove-worker
+ * Body: { userId: 123 }
+ */
+router.post('/api/v1/admin/referral/remove-worker', authenticateToken, async (req, res) => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAdmin: true }
+    });
+
+    if (!admin?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ запрещён'
+      });
+    }
+
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId обязателен'
+      });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { referrerType: 'REGULAR' }
+    });
+
+    res.json({
+      success: true,
+      message: `Пользователь ${userId} теперь REGULAR (30% комиссия)`,
+      data: {
+        userId: user.id,
+        username: user.username,
+        referrerType: user.referrerType
+      }
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка удаления воркера:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка удаления воркера'
+    });
+  }
+});
+
+/**
+ * 📊 GET общая статистика реферальной системы (ADMIN)
+ * GET /api/v1/admin/referral/global-stats
+ */
+router.get('/api/v1/admin/referral/global-stats', authenticateToken, async (req, res) => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAdmin: true }
+    });
+
+    if (!admin?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ запрещён'
+      });
+    }
+
+    // Общая статистика
+    const totalReferrals = await prisma.user.count({
+      where: { referredById: { not: null } }
+    });
+
+    const totalWorkers = await prisma.user.count({
+      where: { referrerType: 'WORKER' }
+    });
+
+    const totalReferrers = await prisma.user.count({
+      where: {
+        referrals: { some: {} }
+      }
+    });
+
+    const statsAgg = await prisma.referralStats.aggregate({
+      _sum: {
+        totalTurnover: true,
+        totalCommissionPaid: true
+      }
+    });
+
+    const activeBonuses = await prisma.userBonus.count({
+      where: {
+        isActive: true,
+        isCompleted: false
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalReferrals,
+        totalReferrers,
+        totalWorkers,
+        activeBonuses,
+        totalTurnover: parseFloat(statsAgg._sum.totalTurnover?.toString() || '0'),
+        totalCommissionPaid: parseFloat(statsAgg._sum.totalCommissionPaid?.toString() || '0')
+      }
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка получения глобальной статистики:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения статистики'
+    });
+  }
+});
+
+/**
+ * 🔄 POST принудительно выплатить все комиссии (ADMIN)
+ * POST /api/v1/admin/referral/payout-all
+ */
+router.post('/api/v1/admin/referral/payout-all', authenticateToken, async (req, res) => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAdmin: true }
+    });
+
+    if (!admin?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ запрещён'
+      });
+    }
+
+    const result = await referralService.processAllPendingCommissions();
+
+    res.json({
+      success: true,
+      message: `Обработано ${result.processed} записей, выплачено ${result.totalPaid.toFixed(4)}`,
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ [REFERRAL API] Ошибка массовой выплаты:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка массовой выплаты'
     });
   }
 });
