@@ -532,26 +532,68 @@ if (!BOT_TOKEN) {
     });
 
     bot.action(/check_invoice_(\d+)/, async (ctx) => {
-        const invoiceId = ctx.match[1];
-        await ctx.answerCbQuery('Проверяем...');
+        try {
+            const invoiceIdStr = ctx.match[1];
+            const invoiceId = parseInt(invoiceIdStr, 10);
 
-        const result = await cryptoPayAPI.getInvoices([parseInt(invoiceId)]);
-        if (result?.invoices?.length > 0) {
-            const invoice = result.invoices[0];
-            if (invoice.status === 'paid') {
-                await ctx.editMessageText(`✅ *Оплачено!* Средства зачислены.`, { parse_mode: 'Markdown' });
-            } else if (invoice.status === 'active') {
-                await ctx.reply(`⏳ Ожидает оплаты`, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '💳 Оплатить', url: invoice.bot_invoice_url }],
-                            [{ text: '🔄 Проверить', callback_data: `check_invoice_${invoiceId}` }]
-                        ]
-                    }
-                });
-            } else {
-                await ctx.editMessageText(`❌ Инвойс истек`, { parse_mode: 'Markdown' });
+            if (isNaN(invoiceId)) {
+                console.warn(`[CHECK] Invalid invoice ID: ${invoiceIdStr}`);
+                await ctx.answerCbQuery('❌ Некорректный ID инвойса');
+                return;
             }
+
+            await ctx.answerCbQuery('🔍 Проверяем статус...');
+
+            console.log(`[CHECK] Fetching status for invoice ${invoiceId}`);
+            const result = await cryptoPayAPI.getInvoices([invoiceId]);
+
+            if (!result) {
+                console.error(`[CHECK] Failed to fetch invoice ${invoiceId}`);
+                await ctx.reply('❌ Не удалось получить статус. Попробуйте позже.');
+                return;
+            }
+
+            if (!result.invoices || result.invoices.length === 0) {
+                console.warn(`[CHECK] Invoice ${invoiceId} not found in API response`);
+                await ctx.reply('ℹ️ Инвойс не найден.');
+                return;
+            }
+
+            const invoice = result.invoices[0];
+            console.log(`[CHECK] Invoice ${invoiceId} status: ${invoice.status}`);
+
+            if (invoice.status === 'paid') {
+                try {
+                    await ctx.editMessageText(`✅ *Оплачено!* Средства зачислены.`, { parse_mode: 'Markdown' });
+                } catch (e) {
+                    if (e.description?.includes('message is not modified')) {
+                        // Игнорируем, если сообщение уже обновлено
+                        console.log('[CHECK] Message already updated (likely by webhook)');
+                    } else {
+                        console.error('[CHECK] Edit message error:', e.message);
+                        await ctx.reply('✅ Оплата подтверждена! Средства зачислены.');
+                    }
+                }
+            } else if (invoice.status === 'active') {
+                await ctx.reply(
+                    `⏳ Инвойс ожидает оплаты`,
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '💳 Оплатить', url: invoice.bot_invoice_url }],
+                                [{ text: '🔄 Проверить снова', callback_data: `check_invoice_${invoiceId}` }]
+                            ]
+                        }
+                    }
+                );
+            } else {
+                // expired, canceled, etc.
+                await ctx.editMessageText(`❌ Инвойс ${invoice.status}`, { parse_mode: 'Markdown' });
+            }
+        } catch (error) {
+            console.error('[CHECK] Unexpected error:', error);
+            await ctx.answerCbQuery('⚠️ Ошибка при проверке');
+            await ctx.reply('⚠️ Произошла ошибка. Обратитесь в поддержку.');
         }
     });
 
