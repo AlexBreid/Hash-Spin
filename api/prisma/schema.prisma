@@ -482,7 +482,19 @@ model MinesweeperGame {
     @@index([userId, createdAt])
     @@index([status])
 }
+model PendingDeposit {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  invoiceId String   @unique
+  amount    Float
+  asset     String   @default("USDT")
+  status    String   @default("pending") // pending | processed | expired | canceled
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([userId])
+  @@index([status, createdAt])
+}
 model MinesweeperBet {
     id              Int                 @id @default(autoincrement())
     
