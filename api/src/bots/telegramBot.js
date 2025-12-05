@@ -12,7 +12,96 @@ const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 
 const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
+// ====================================
+// Автоматическая проверка инвойса через 3 минуты
+// ====================================
+async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USDT') {
+    await prisma.pendingDeposit.upsert({
+        where: { invoiceId: invoiceId.toString() },
+        create: {
+            userId,
+            invoiceId: invoiceId.toString(),
+            amount,
+            asset,
+            status: 'pending'
+        },
+        update: { status: 'pending', updatedAt: new Date() }
+    });
 
+    setTimeout(async () => {
+        try {
+            const response = await axios.get(`${CRYPTO_PAY_API}/getInvoices`, {
+                headers: { 'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN },
+                params: { invoiceIds: invoiceId }
+            });
+
+            if (!response.data?.ok || !response.data.result?.invoices?.length) return;
+
+            const invoice = response.data.result.invoices[0];
+            if (invoice.status !== 'paid') {
+                await prisma.pendingDeposit.update({
+                    where: { invoiceId: invoiceId.toString() },
+                    data: { status: invoice.status }
+                });
+                return;
+            }
+
+            const existingTx = await prisma.transaction.findFirst({
+                where: { txHash: invoiceId.toString(), type: 'DEPOSIT' }
+            });
+            if (existingTx) return;
+
+            const token = await prisma.cryptoToken.findUnique({ where: { symbol: asset } });
+            if (!token) return;
+
+            // Зачисление
+            await prisma.transaction.create({
+                data: {
+                    userId,
+                    tokenId: token.id,
+                    type: 'DEPOSIT',
+                    status: 'COMPLETED',
+                    amount: amount.toString(),
+                    txHash: invoiceId.toString()
+                }
+            });
+
+            await prisma.balance.upsert({
+                where: {
+                    userId_tokenId_type: { userId, tokenId: token.id, type: 'MAIN' }
+                },
+                create: { userId, tokenId: token.id, type: 'MAIN', amount: amount.toString() },
+                update: { amount: { increment: amount } }
+            });
+
+            // Бонус
+            if (asset === 'USDT') {
+                try {
+                    await referralService.grantDepositBonus(userId, amount, token.id);
+                } catch (e) {}
+            }
+
+            await prisma.pendingDeposit.update({
+                where: { invoiceId: invoiceId.toString() },
+                data: { status: 'processed' }
+            });
+
+            // Уведомление
+            try {
+                const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
+                if (user?.telegramId) {
+                    await bot.telegram.sendMessage(
+                        user.telegramId,
+                        `✅ *Пополнение на ${amount} ${asset} зачислено!*`,
+                        { parse_mode: 'Markdown' }
+                    );
+                }
+            } catch (e) {}
+        } catch (error) {
+            console.error(`[TIMER] Ошибка при проверке инвойса ${invoiceId}:`, error.message);
+        }
+    }, 3 * 60 * 1000);
+}
 if (!BOT_TOKEN) {
     console.error('❌ TELEGRAM_BOT_TOKEN is not set. Bot cannot run.');
     module.exports = { start: () => {} };
@@ -272,7 +361,7 @@ if (!BOT_TOKEN) {
                     await ctx.reply("❌ Ошибка при создании инвойса.");
                     return;
                 }
-
+                scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
                 await ctx.reply(
                     `✅ *Инвойс создан*\n\nСумма: ${amount} USDT\nID: ${invoice.invoice_id}`,
                     {
@@ -515,7 +604,7 @@ if (!BOT_TOKEN) {
             await ctx.reply("❌ Ошибка создания инвойса.");
             return await ctx.answerCbQuery();
         }
-
+        scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
         await ctx.reply(
             `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
             {
