@@ -2,7 +2,7 @@ const { Telegraf } = require('telegraf');
 const axios = require('axios');
 const prisma = require('../../prismaClient');
 const { registerNewUser, generateOneTimeToken } = require('../services/authService');
-const referralService = require('../../services/ReferralService');
+const referralService = require('../services/ReferralService');
 const fs = require('fs');
 const path = require('path');
 
