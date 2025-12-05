@@ -35,9 +35,8 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
                 params: { invoiceIds: invoiceId }
             });
 
-            if (!response.data?.ok || !response.data.result?.invoices?.length) return;
-
-            const invoice = response.data.result.invoices[0];
+            if (!response.data?.ok || !response.data.result?.items?.length) return;
+            const invoice = response.data.result.items[0]; // ← items
             if (invoice.status !== 'paid') {
                 await prisma.pendingDeposit.update({
                     where: { invoiceId: invoiceId.toString() },
@@ -642,13 +641,12 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            if (!result.invoices || result.invoices.length === 0) {
+            if (!result?.items?.length) {
                 console.warn(`[CHECK] Invoice ${invoiceId} not found in API response`);
                 await ctx.reply('ℹ️ Инвойс не найден.');
                 return;
             }
-
-            const invoice = result.invoices[0];
+            const invoice = result.items[0]; // ← items, не invoices!
             console.log(`[CHECK] Invoice ${invoiceId} status: ${invoice.status}`);
 
             if (invoice.status === 'paid') {
