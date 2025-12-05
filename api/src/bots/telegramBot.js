@@ -187,7 +187,7 @@ if (!BOT_TOKEN) {
                     `${CRYPTO_PAY_API}/getInvoices`,
                     {
                         headers: { 'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN },
-                        params: { invoice_ids: invoiceIds.join(',') }
+                        params: { invoiceIds: invoiceIds.join(',') }
                     }
                 );
                 return response.data.ok ? response.data.result : null;
