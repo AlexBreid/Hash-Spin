@@ -1,7 +1,7 @@
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
 const prisma = require('../../prismaClient');
-const { registerNewuser, generateOneTimeToken } = require('../services/authService');
+const { registerNewUser, generateOneTimeToken } = require('../services/authService');
 const referralService = require('../services/ReferralService');
 const fs = require('fs');
 const path = require('path');
@@ -16,9 +16,9 @@ const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_1
 // ====================================
 // ВРЕМЕННЫЕ ХРАНИЛИЩА СОСТОЯНИЙ
 // ====================================
-const waitingForDeposit = new Map();            // userId → true
-const waitingForWithdrawAmount = new Map();    // userId → true (ожидаем сумму)
-const waitingForWithdrawAddress = new Map();   // userId → amount (ожидаем адрес)
+const waitingForDeposit = new Map();
+const waitingForWithdrawAmount = new Map();
+const waitingForWithdrawAddress = new Map();
 
 // ====================================
 // Автоматическая проверка инвойса через 3 минуты
@@ -54,7 +54,7 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
             }
 
             const existingTx = await prisma.transaction.findFirst({
-                where: { txHash: invoiceId.toString(), type: 'DEPOSIT' }
+                where: { txHash: invoiceId.toString(), type: 'DEPOSIT', status: 'COMPLETED' }
             });
             if (existingTx) return;
 
@@ -118,6 +118,7 @@ if (!BOT_TOKEN) {
             keyboard: [
                 [{ text: '🎰 Казино' }],
                 [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
+                [{ text: '📥 Мои выводы' }],
                 [{ text: '👥 Рефералы' }, { text: '⚙️ Настройки' }],
                 [{ text: '❓ Помощь' }]
             ],
@@ -200,17 +201,6 @@ if (!BOT_TOKEN) {
         try {
             const balance = await prisma.balance.findFirst({
                 where: { userId, token: { symbol: tokenSymbol }, type: 'MAIN' }
-            });
-            return balance ? parseFloat(balance.amount.toString()) : 0;
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async function getBonusBalance(userId, tokenSymbol = 'USDT') {
-        try {
-            const balance = await prisma.balance.findFirst({
-                where: { userId, token: { symbol: tokenSymbol }, type: 'BONUS' }
             });
             return balance ? parseFloat(balance.amount.toString()) : 0;
         } catch (error) {
@@ -322,7 +312,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === ШАГ 1: ожидаем сумму для custom вывода ===
+            // === ШАГ: ожидаем сумму для custom вывода ===
             if (waitingForWithdrawAmount.has(user.id)) {
                 const amount = parseFloat(text);
                 const balance = await getUserBalance(user.id);
@@ -336,7 +326,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === ШАГ 2: ожидаем адрес кошелька ===
+            // === ШАГ: ожидаем адрес ===
             if (waitingForWithdrawAddress.has(user.id)) {
                 const amount = waitingForWithdrawAddress.get(user.id);
                 const walletAddress = text.trim();
@@ -394,7 +384,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === Обработка пополнения (осталась без изменений) ===
+            // === Пополнение ===
             if (waitingForDeposit.has(user.id)) {
                 const amount = Number(text);
                 if (isNaN(amount) || amount <= 0) {
@@ -423,7 +413,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === Основное меню ===
+            // === МЕНЮ ===
             switch (text) {
                 case '🎰 Казино':
                     const oneTimeToken = await generateOneTimeToken(user.id);
@@ -473,6 +463,51 @@ if (!BOT_TOKEN) {
                     );
                     break;
 
+                case '📥 Мои выводы':
+                    const userTx = await prisma.transaction.findMany({
+                        where: {
+                            userId: user.id,
+                            type: 'WITHDRAW'
+                        },
+                        orderBy: { createdAt: 'desc' },
+                        take: 5,
+                        select: {
+                            id: true,
+                            amount: true,
+                            status: true,
+                            walletAddress: true,
+                            createdAt: true
+                        }
+                    });
+
+                    if (userTx.length === 0) {
+                        await ctx.reply('У вас пока нет заявок на вывод.');
+                        return;
+                    }
+
+                    let msg = `📥 *Ваши последние заявки на вывод:*\n\n`;
+                    for (const tx of userTx) {
+                        const statusEmoji = 
+                            tx.status === 'PENDING' ? '⏳' :
+                            tx.status === 'COMPLETED' ? '✅' :
+                            '❌';
+                        const statusText = 
+                            tx.status === 'PENDING' ? 'В обработке' :
+                            tx.status === 'COMPLETED' ? 'Выполнен' :
+                            'Отклонён';
+
+                        const addr = tx.walletAddress || '—';
+                        const shortAddr = addr.length > 10 ? `${addr.slice(0,6)}...${addr.slice(-4)}` : addr;
+
+                        msg += `${statusEmoji} *${tx.amount} USDT*\n` +
+                               `Адрес: \`${shortAddr}\`\n` +
+                               `Статус: ${statusText}\n` +
+                               `ID: #${tx.id}\n\n`;
+                    }
+
+                    await ctx.reply(msg, { parse_mode: 'Markdown' });
+                    break;
+
                 case '👥 Рефералы':
                     const stats = await referralService.getReferrerStats(user.id);
                     const userInfo = await prisma.user.findUnique({
@@ -505,15 +540,13 @@ if (!BOT_TOKEN) {
 
                 case '⚙️ Настройки':
                     const userBal = await getUserBalance(user.id);
-                    const userBonus = await getBonusBalance(user.id);
                     const badges = [];
                     if (user.isAdmin) badges.push('👑 АДМИН');
                     if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
                     await ctx.reply(
                         `⚙️ *Настройки*\n\n` +
                         `👤 ${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
-                        `💰 Основной: ${userBal.toFixed(2)} USDT\n` +
-                        `🎁 Бонусный: ${userBonus.toFixed(2)} USDT` +
+                        `💰 Основной: ${userBal.toFixed(2)} USDT` +
                         (badges.length ? `\n${badges.join(' | ')}` : ''),
                         { parse_mode: 'Markdown' }
                     );
@@ -527,6 +560,24 @@ if (!BOT_TOKEN) {
                         `/balance - Баланс\n` +
                         `/bonus - Статус бонуса`,
                         { parse_mode: 'Markdown' }
+                    );
+                    break;
+
+                case '💳 Платежи':
+                    if (!user.isAdmin) {
+                        await ctx.reply('🚫 Только для администраторов.');
+                        return;
+                    }
+                    await ctx.reply(
+                        `Выберите тип платежей:`,
+                        {
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [{ text: '📤 Выводы в обработке', callback_data: 'pending_withdraws_0' }],
+                                    [{ text: '📥 Все депозиты', callback_data: 'all_deposits_0' }]
+                                ]
+                            }
+                        }
                     );
                     break;
 
@@ -561,9 +612,8 @@ if (!BOT_TOKEN) {
     });
 
     // ====================================
-    // АДМИН-КОМАНДЫ (остались без изменений, кроме удаления /withdraw)
+    // АДМИН КОМАНДЫ
     // ====================================
-
     bot.command('approve_withdraw', async (ctx) => {
         try {
             const admin = await prisma.user.findUnique({
@@ -606,6 +656,7 @@ if (!BOT_TOKEN) {
                     { parse_mode: 'Markdown' }
                 );
             }
+
             await ctx.reply('✅ Вывод подтверждён!');
         } catch (error) {
             console.error('Approve withdraw error:', error);
@@ -673,7 +724,7 @@ if (!BOT_TOKEN) {
     });
 
     // ====================================
-    // CALLBACK HANDLERS
+    // CALLBACKS
     // ====================================
     bot.action('deposit_custom', async (ctx) => {
         const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
@@ -753,7 +804,6 @@ if (!BOT_TOKEN) {
         }
     });
 
-    // === НОВЫЕ CALLBACK-ОБРАБОТЧИКИ ДЛЯ ВЫВОДА ===
     bot.action(/withdraw_(\d+)/, async (ctx) => {
         const amount = parseFloat(ctx.match[1]);
         const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
@@ -778,6 +828,53 @@ if (!BOT_TOKEN) {
             `Введите сумму вывода (минимум 1 USDT, максимум ${balance.toFixed(2)}):`
         );
         waitingForWithdrawAmount.set(user.id, true);
+    });
+
+    bot.action(/pending_withdraws_(\d+)/, async (ctx) => {
+        const page = parseInt(ctx.match[1]);
+        const take = 50;
+        const skip = page * take;
+
+        const totalPending = await prisma.transaction.count({
+            where: { type: 'WITHDRAW', status: 'PENDING' }
+        });
+
+        const withdrawals = await prisma.transaction.findMany({
+            where: { type: 'WITHDRAW', status: 'PENDING' },
+            include: {
+                user: { select: { id: true, username: true, telegramId: true } }
+            },
+            orderBy: { createdAt: 'asc' },
+            skip,
+            take
+        });
+
+        if (withdrawals.length === 0) {
+            await ctx.editMessageText('Нет заявок на вывод в обработке.');
+            return;
+        }
+
+        let msg = `📤 *Заявки на вывод (в обработке)*\nСтраница ${page + 1}\nВсего: ${totalPending}\n\n`;
+        for (const w of withdrawals) {
+            const name = w.user.username ? `@${w.user.username}` : `User #${w.user.id}`;
+            msg += `ID: #${w.id}\n` +
+                   `Сумма: ${w.amount} USDT\n` +
+                   `Адрес: \`${w.walletAddress}\`\n` +
+                   `Пользователь: ${name}\n\n`;
+        }
+
+        const buttons = [];
+        if (page > 0) {
+            buttons.push({ text: '⬅️ Назад', callback_data: `pending_withdraws_${page - 1}` });
+        }
+        if ((page + 1) * take < totalPending) {
+            buttons.push({ text: 'Вперёд ➡️', callback_data: `pending_withdraws_${page + 1}` });
+        }
+
+        await ctx.editMessageText(msg, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: buttons.length ? [buttons] : [] }
+        });
     });
 
     bot.action('my_referrals', async (ctx) => {
@@ -806,13 +903,16 @@ if (!BOT_TOKEN) {
         const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
         if (!user) return;
         await ctx.answerCbQuery('Обрабатываю...');
+
         const stats = await prisma.referralStats.findMany({
             where: { referrerId: user.id, turnoverSinceLastPayout: { gt: 0 } }
         });
+
         if (stats.length === 0) {
             await ctx.reply('⚠️ Нет накопленной комиссии.');
             return;
         }
+
         let totalPaid = 0;
         for (const stat of stats) {
             try {
@@ -820,6 +920,7 @@ if (!BOT_TOKEN) {
                 if (result) totalPaid += result.commission;
             } catch (e) {}
         }
+
         if (totalPaid > 0) {
             await ctx.reply(`✅ Выплачено ${totalPaid.toFixed(4)} USDT`);
         } else {
