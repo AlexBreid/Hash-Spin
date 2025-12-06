@@ -471,10 +471,11 @@ export function CrashGame() {
                       Размер ставки
                     </label>
                     <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
                           $
                         </span>
+                      <div className="flex-1 relative">
+                        
                         <input
                           type="number"
                           inputMode="decimal"
