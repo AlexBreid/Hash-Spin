@@ -295,65 +295,64 @@ if (!BOT_TOKEN) {
             await ctx.reply("Произошла ошибка. Попробуйте позже.");
         }
     });
-        // ====================================
+
+    // ====================================
     // АДМИН КОМАНДЫ
     // ====================================
     bot.command('approve_withdraw', async (ctx) => {
-    try {
-        const parts = ctx.message.text.trim().split(/\s+/);
-        const withdrawalId = parts[1] ? parseInt(parts[1], 10) : null;
+        try {
+            const parts = ctx.message.text.trim().split(/\s+/);
+            const withdrawalId = parts[1] ? parseInt(parts[1], 10) : null;
 
-        if (!withdrawalId || isNaN(withdrawalId)) {
-        return await ctx.reply('❌ Использование: /approve_withdraw <ID_заявки>');
+            if (!withdrawalId || isNaN(withdrawalId)) {
+                return await ctx.reply('❌ Использование: /approve_withdraw <ID_заявки>');
+            }
+
+            const admin = await prisma.user.findUnique({
+                where: { telegramId: ctx.from.id.toString() }
+            });
+
+            if (!admin || !admin.isAdmin) {
+                return await ctx.reply('🚫 Эта команда доступна только администраторам.');
+            }
+
+            const withdrawal = await prisma.transaction.findUnique({
+                where: { id: withdrawalId },
+                include: { user: true }
+            });
+
+            if (!withdrawal) {
+                return await ctx.reply(`❌ Заявка #${withdrawalId} не найдена.`);
+            }
+
+            if (withdrawal.type !== 'WITHDRAW') {
+                return await ctx.reply(`❌ Запись #${withdrawalId} — не вывод.`);
+            }
+
+            if (withdrawal.status !== 'PENDING') {
+                return await ctx.reply(`❌ Заявка #${withdrawalId} уже обработана. Статус: ${withdrawal.status}`);
+            }
+
+            const txHash = 'TX_' + Date.now();
+
+            await prisma.transaction.update({
+                where: { id: withdrawalId },
+                data: { status: 'COMPLETED', txHash }
+            });
+
+            if (withdrawal.user?.telegramId) {
+                await bot.telegram.sendMessage(
+                    withdrawal.user.telegramId,
+                    `✅ Вывод на ${withdrawal.amount} USDT выполнен!\nАдрес: ${withdrawal.walletAddress}\nTX: \`${txHash}\``,
+                    { parse_mode: 'Markdown' }
+                );
+            }
+
+            await ctx.reply(`✅ Заявка #${withdrawalId} успешно подтверждена!`);
+        } catch (error) {
+            console.error('❌ Ошибка при подтверждении вывода:', error);
+            await ctx.reply('💥 Произошла внутренняя ошибка. Проверьте логи сервера.');
         }
-
-        const admin = await prisma.user.findUnique({
-        where: { telegramId: ctx.from.id.toString() }
-        });
-
-        if (!admin || !admin.isAdmin) {
-        return await ctx.reply('🚫 Эта команда доступна только администраторам.');
-        }
-
-        const withdrawal = await prisma.transaction.findUnique({
-        where: { id: withdrawalId },
-        include: { user: true }
-        });
-
-        if (!withdrawal) {
-        return await ctx.reply(`❌ Заявка #${withdrawalId} не найдена.`);
-        }
-
-        if (withdrawal.type !== 'WITHDRAW') {
-        return await ctx.reply(`❌ Запись #${withdrawalId} — не вывод.`);
-        }
-
-        if (withdrawal.status !== 'PENDING') {
-        return await ctx.reply(`❌ Заявка #${withdrawalId} уже обработана. Статус: ${withdrawal.status}`);
-        }
-
-        const txHash = 'TX_' + Date.now();
-
-        // 🔥 ИСПРАВЛЕНО: добавлен `data:`
-        await prisma.transaction.update({
-        where: { id: withdrawalId },
-        data: { status: 'COMPLETED', txHash }
-        });
-
-        // Уведомление пользователю
-        if (withdrawal.user?.telegramId) {
-        await bot.telegram.sendMessage(
-            withdrawal.user.telegramId,
-            `✅ Вывод на ${withdrawal.amount} USDT выполнен!\nАдрес: ${withdrawal.walletAddress}\nTX: \`${txHash}\``,
-            { parse_mode: 'Markdown' }
-        );
-        }
-
-        await ctx.reply(`✅ Заявка #${withdrawalId} успешно подтверждена!`);
-    } catch (error) {
-        console.error('❌ Ошибка при подтверждении вывода:', error);
-        await ctx.reply('💥 Произошла внутренняя ошибка. Проверьте логи сервера.');
-    }
     });
 
     bot.command('set_worker', async (ctx) => {
@@ -415,6 +414,155 @@ if (!BOT_TOKEN) {
         }
     });
 
+    // ====================================
+    // ADMIN_STATS ✅ ДОБАВЛЕНО
+    // ====================================
+    bot.command('admin_stats', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                return await ctx.reply('🚫 Только для администраторов.');
+            }
+
+            const totalUsers = await prisma.user.count();
+            const totalTransactions = await prisma.transaction.count();
+            const totalDeposits = await prisma.transaction.aggregate({
+                where: { type: 'DEPOSIT', status: 'COMPLETED' },
+                _sum: { amount: true }
+            });
+            const totalWithdrawals = await prisma.transaction.aggregate({
+                where: { type: 'WITHDRAW', status: 'COMPLETED' },
+                _sum: { amount: true }
+            });
+            const pendingWithdrawals = await prisma.transaction.count({
+                where: { type: 'WITHDRAW', status: 'PENDING' }
+            });
+            const totalGames = await prisma.crashRound.count();
+            const totalBets = await prisma.crashBet.count();
+
+            const statsMsg = `👑 *СТАТИСТИКА СИСТЕМЫ*\n\n` +
+                `👥 Всего пользователей: ${totalUsers}\n` +
+                `💰 Всего депозитов: ${parseFloat(totalDeposits._sum.amount || 0).toFixed(2)} USDT\n` +
+                `💸 Всего выводов: ${parseFloat(totalWithdrawals._sum.amount || 0).toFixed(2)} USDT\n` +
+                `⏳ На обработке: ${pendingWithdrawals} заявок\n\n` +
+                `🎰 *ИГРЫ*\n` +
+                `🎮 Раундов: ${totalGames}\n` +
+                `🎲 Ставок: ${totalBets}\n` +
+                `📊 Всего транзакций: ${totalTransactions}`;
+
+            await ctx.reply(statsMsg, { parse_mode: 'Markdown' });
+        } catch (error) {
+            console.error('❌ Error in admin_stats:', error);
+            await ctx.reply('❌ Ошибка при получении статистики.');
+        }
+    });
+
+    // ====================================
+    // BLOCK_USER ✅ ДОБАВЛЕНО
+    // ====================================
+    bot.command('block_user', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                return await ctx.reply('🚫 Только для администраторов.');
+            }
+
+            const parts = ctx.message.text.trim().split(/\s+/);
+            const userIdOrTgId = parts[1];
+
+            if (!userIdOrTgId) {
+                return await ctx.reply('❌ Использование: /block_user <user_id или telegram_id>');
+            }
+
+            let user;
+            if (!isNaN(userIdOrTgId)) {
+                user = await prisma.user.findFirst({
+                    where: {
+                        OR: [
+                            { id: parseInt(userIdOrTgId, 10) },
+                            { telegramId: userIdOrTgId }
+                        ]
+                    }
+                });
+            } else {
+                user = await prisma.user.findUnique({ where: { username: userIdOrTgId.replace('@', '') } });
+            }
+
+            if (!user) {
+                return await ctx.reply(`❌ Пользователь не найден.`);
+            }
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { isBlocked: true }
+            });
+
+            if (user.telegramId) {
+                try {
+                    await bot.telegram.sendMessage(user.telegramId, '🚫 Ваш аккаунт заблокирован администратором.');
+                } catch (e) {}
+            }
+
+            await ctx.reply(`✅ Пользователь ${user.username || user.id} заблокирован.`);
+        } catch (error) {
+            console.error('❌ Error in block_user:', error);
+            await ctx.reply('❌ Ошибка при блокировке пользователя.');
+        }
+    });
+
+    // ====================================
+    // UNBLOCK_USER ✅ ДОБАВЛЕНО
+    // ====================================
+    bot.command('unblock_user', async (ctx) => {
+        try {
+            const admin = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!admin?.isAdmin) {
+                return await ctx.reply('🚫 Только для администраторов.');
+            }
+
+            const parts = ctx.message.text.trim().split(/\s+/);
+            const userIdOrTgId = parts[1];
+
+            if (!userIdOrTgId) {
+                return await ctx.reply('❌ Использование: /unblock_user <user_id или telegram_id>');
+            }
+
+            let user;
+            if (!isNaN(userIdOrTgId)) {
+                user = await prisma.user.findFirst({
+                    where: {
+                        OR: [
+                            { id: parseInt(userIdOrTgId, 10) },
+                            { telegramId: userIdOrTgId }
+                        ]
+                    }
+                });
+            } else {
+                user = await prisma.user.findUnique({ where: { username: userIdOrTgId.replace('@', '') } });
+            }
+
+            if (!user) {
+                return await ctx.reply(`❌ Пользователь не найден.`);
+            }
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { isBlocked: false }
+            });
+
+            if (user.telegramId) {
+                try {
+                    await bot.telegram.sendMessage(user.telegramId, '✅ Ваш аккаунт разблокирован.');
+                } catch (e) {}
+            }
+
+            await ctx.reply(`✅ Пользователь ${user.username || user.id} разблокирован.`);
+        } catch (error) {
+            console.error('❌ Error in unblock_user:', error);
+            await ctx.reply('❌ Ошибка при разблокировке пользователя.');
+        }
+    });
+
     bot.on('message', async (ctx) => {
         if (!ctx.message?.text) return;
         const text = ctx.message.text.trim();
@@ -431,7 +579,6 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === ШАГ: ожидаем сумму для custom вывода ===
             if (waitingForWithdrawAmount.has(user.id)) {
                 const amount = parseFloat(text);
                 const balance = await getUserBalance(user.id);
@@ -445,7 +592,6 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === ШАГ: ожидаем адрес ===
             if (waitingForWithdrawAddress.has(user.id)) {
                 const amount = waitingForWithdrawAddress.get(user.id);
                 const walletAddress = text.trim();
@@ -503,7 +649,6 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === Пополнение ===
             if (waitingForDeposit.has(user.id)) {
                 const amount = Number(text);
                 if (isNaN(amount) || amount <= 0) {
@@ -532,7 +677,6 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // === МЕНЮ ===
             switch (text) {
                 case '🎰 Казино':
                     const oneTimeToken = await generateOneTimeToken(user.id);
@@ -729,7 +873,6 @@ if (!BOT_TOKEN) {
             await ctx.reply('❌ Ошибка. Попробуйте еще раз.');
         }
     });
-
 
     // ====================================
     // CALLBACKS
@@ -1011,7 +1154,7 @@ if (!BOT_TOKEN) {
     module.exports = {
         start: () => {
             bot.launch();
-            console.log('🤖 Telegram Bot started with Referral System.');
+            console.log('🤖 Telegram Bot started with Referral System and Admin Commands.');
         },
         botInstance: bot,
         cryptoPayAPI,
