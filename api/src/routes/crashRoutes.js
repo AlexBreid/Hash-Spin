@@ -62,8 +62,7 @@ router.post('/api/v1/crash/start-round', (req, res) => {
           serverSeedHash: serverSeedHash || '',
           clientSeed: clientSeed || '',
           totalWagered: '0',
-          totalPayouts: '0',
-          status: 'IN_PROGRESS'
+          totalPayouts: '0'
         }
       });
 
@@ -259,7 +258,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         console.log(`❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
       }
 
-      // ✅ Обновляем статус раунда
+      // ✅ Обновляем раунд с выплатами
       const round = await prisma.crashRound.findUnique({
         where: { id: bet.roundId }
       });
@@ -268,7 +267,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         await prisma.crashRound.update({
           where: { id: round.id },
           data: {
-            status: 'COMPLETED',
             totalPayouts: { increment: winningsAmount }
           }
         });
@@ -409,10 +407,6 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     console.log(`📊 [CRASH-HISTORY] Получаю последние крахи...`);
 
     const crashes = await prisma.crashRound.findMany({
-      where: {
-        status: { in: ['COMPLETED', 'CRASHED'] },
-        crashPoint: { not: null }
-      },
       select: {
         id: true,
         gameId: true,
@@ -455,10 +449,6 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
     console.log(`📈 [CRASH-STATS] Получаю статистику...`);
 
     const crashes = await prisma.crashRound.findMany({
-      where: {
-        status: { in: ['COMPLETED', 'CRASHED'] },
-        crashPoint: { not: null }
-      },
       select: { crashPoint: true },
       orderBy: { createdAt: 'desc' },
       take: 100,
