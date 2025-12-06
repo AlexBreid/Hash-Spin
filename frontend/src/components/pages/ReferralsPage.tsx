@@ -241,17 +241,8 @@ export function ReferralsPage() {
           <h3 className="font-bold text-lg mb-4">💰 Что ты получаешь за рефералов?</h3>
           <div className="space-y-3">
             <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
-              <p className="font-semibold text-sm">🎯 Обычный реферер (30% комиссия)</p>
-              <p className="text-xs text-muted-foreground mt-1">30% от прибыли казино от твоих рефералов</p>
-              <p className="text-xs text-primary mt-2">📊 Пример: Если рефе потерял 100 USDT в казино, ты получишь до 3 USDT</p>
+              <p className="text-xs text-muted-foreground mt-1">30% оборота от твоих рефералов</p>
             </div>
-            {stats?.referrerType === 'WORKER' && (
-              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg border-2 border-green-500">
-                <p className="font-semibold text-sm">👷 Ты ВОРКЕР (5% от профита)</p>
-                <p className="text-xs text-muted-foreground mt-1">5% от чистой прибыли казино от всех твоих рефералов</p>
-                <p className="text-xs text-green-600 mt-2">⭐ Поздравляем! Ты получил статус воркера!</p>
-              </div>
-            )}
           </div>
         </Card>
       </motion.div>
