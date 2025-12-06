@@ -66,7 +66,7 @@ router.post('/api/v1/crash/start-round', (req, res) => {
         }
       });
 
-      console.log(`✅ [START-ROUND] Раунд создан: ${gameId} с крашем ${crashPoint}x`);
+
 
       res.json({ success: true, data: { roundId: newRound.id } });
     } catch (error) {
@@ -241,8 +241,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         
         const targetBalance = balanceType || 'MAIN';
         await creditWinnings(userId, winningsAmount, tokenId, targetBalance);
-
-        console.log(`✅ [CASHOUT-RESULT] Баланс ${targetBalance} обновлен`);
 
         await prisma.crashTransaction.create({
           data: {
@@ -425,7 +423,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
       timestamp: crash.createdAt,
     }));
 
-    console.log(`✅ [CRASH-HISTORY] Найдено ${formattedCrashes.length} крашей`);
+
 
     res.json({
       success: true,
@@ -487,7 +485,6 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
       extreme: crashPoints.filter(x => x >= 20).length,
     };
 
-    console.log(`✅ [CRASH-STATS] avg=${average.toFixed(2)}, max=${highest.toFixed(2)}`);
 
     res.json({
       success: true,

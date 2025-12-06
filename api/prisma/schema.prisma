@@ -69,7 +69,6 @@ enum ReferralEventType {
     DEPOSIT_BONUS
 }
 
-// 🆕 Тип реферера (обычный или воркер)
 enum ReferrerType {
     REGULAR
     WORKER
@@ -100,7 +99,6 @@ model User {
     referrer            User?              @relation("UserReferrals", fields: [referredById], references: [id])
     referrals           User[]             @relation("UserReferrals") 
     
-    // 🆕 Тип реферера (обычный 30% или воркер 40%)
     referrerType        ReferrerType       @default(REGULAR)
 
     // Связи
@@ -117,9 +115,7 @@ model User {
     referralActions     ReferralTransaction[] @relation("RefereeActions")
     authTokens          OneTimeToken[]
     
-    // 🆕 Статистика рефералов (как реферер)
     referralStatsAsReferrer  ReferralStats[] @relation("ReferrerStats")
-    // 🆕 Статистика рефералов (как реферал)
     referralStatsAsReferee   ReferralStats[] @relation("RefereeStats")
 }
 
@@ -211,7 +207,6 @@ model Bonus {
     wageringMultiplier   Float       
     maxBonusAmount       Decimal     @db.Decimal(30, 18)
     
-    // 🆕 Процент бонуса к депозиту (100 = +100%)
     depositBonusPercent  Float       @default(0)
     
     userBonuses          UserBonus[]
@@ -236,7 +231,6 @@ model UserBonus {
     isActive        Boolean   @default(true)
     isCompleted     Boolean   @default(false)
     
-    // 🆕 ID реферера который привёл этого пользователя (для отслеживания)
     referrerId      Int?
     
     createdAt       DateTime  @default(now())
@@ -320,6 +314,12 @@ model ReferralStats {
     
     // Оборот с последней выплаты (обнуляется после выплаты комиссии)
     turnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // ✅ НОВОЕ: Казино выиграло (потери игроков) - для расчета профита воркеров
+    totalLosses             Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // ✅ НОВОЕ: Игроки выиграли (убытки казино)
+    totalWinnings           Decimal   @default(0) @db.Decimal(30, 18)
     
     // Общая сумма выплаченных комиссий
     totalCommissionPaid     Decimal   @default(0) @db.Decimal(30, 18)
@@ -482,19 +482,21 @@ model MinesweeperGame {
     @@index([userId, createdAt])
     @@index([status])
 }
+
 model PendingDeposit {
   id        Int      @id @default(autoincrement())
   userId    Int
   invoiceId String   @unique
   amount    Float
   asset     String   @default("USDT")
-  status    String   @default("pending") // pending | processed | expired | canceled
+  status    String   @default("pending")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status, createdAt])
 }
+
 model MinesweeperBet {
     id              Int                 @id @default(autoincrement())
     
