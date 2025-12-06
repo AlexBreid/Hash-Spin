@@ -3,7 +3,7 @@ import { crashGameService } from '../../services/crashGameService';
 import type { CrashGameState, LiveEvent } from '../../services/crashGameService';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../hooks/useBalance';
-import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw } from 'lucide-react';
+import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,8 +16,9 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 );
 
 const MAX_WAIT_TIME = 10;
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// ✅ НОВОЕ: Отслеживание крашей
+// ✅ Интерфейс для краша
 interface CrashHistory {
   id: string;
   crashPoint: number;
@@ -45,15 +46,68 @@ export function CrashGame() {
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
   
-  // ✅ НОВОЕ: История крашей вместо live events
+  // ✅ История крашей
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
+  const [crashHistoryLoading, setCrashHistoryLoading] = useState(true);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
 
   // ================================
-  // 1️⃣ ПОДКЛЮЧЕНИЕ
+  // 🔄 ЗАГРУЗКА ИСТОРИИ КРАШЕЙ ИЗ БД
+  // ================================
+  const fetchCrashHistory = useCallback(async () => {
+    try {
+      setCrashHistoryLoading(true);
+      
+      console.log(`📊 Загружаю историю крашей из БД...`);
+      
+      // ✅ Пытаемся загрузить из нового endpoint'а для крашей
+      const response = await fetch(`${API_BASE_URL}/api/v1/crash/last-crashes`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log(`✅ Загружено ${data.data.length} крашей из БД`);
+        
+        // Преобразуем timestamp в Date объект
+        const formattedHistory = data.data.map((crash: any) => ({
+          id: crash.id || crash.gameId,
+          crashPoint: parseFloat(crash.crashPoint.toString()),
+          timestamp: new Date(crash.timestamp),
+        }));
+        
+        // Сортируем по времени (новые первыми)
+        const sortedHistory = formattedHistory.sort(
+          (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+        );
+        
+        setCrashHistory(sortedHistory.slice(0, 10));
+      } else {
+        throw new Error(data.error || 'Ошибка загрузки');
+      }
+    } catch (error) {
+      console.error('❌ Ошибка загрузки истории крашей:', error);
+      // Не выводим ошибку - это не критично, история может быть пустой
+      // toast.error('❌ Не удалось загрузить историю крашей');
+      setCrashHistory([]);
+    } finally {
+      setCrashHistoryLoading(false);
+    }
+  }, []);
+
+  // ================================
+  // 1️⃣ ПОДКЛЮЧЕНИЕ И ЗАГРУЗКА ИСТОРИИ
   // ================================
   useEffect(() => {
     if (!user || !token) {
@@ -67,6 +121,9 @@ export function CrashGame() {
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         toast.success('🚀 Подключено к Crash серверу!');
         await fetchBalances();
+        
+        // ✅ НОВОЕ: Загружаем историю крашей при подключении
+        await fetchCrashHistory();
       } catch (error) {
         console.error('Connection error:', error);
         toast.error('❌ Ошибка подключения к серверу');
@@ -77,7 +134,7 @@ export function CrashGame() {
 
     connect();
     return () => crashGameService.disconnect();
-  }, [user, token, navigate, fetchBalances]);
+  }, [user, token, navigate, fetchBalances, fetchCrashHistory]);
 
   // ================================
   // 2️⃣ ЛОГИКА ИГРЫ
@@ -98,17 +155,17 @@ export function CrashGame() {
       setGameState((prev) => ({ ...prev, status: 'crashed', crashPoint: data.crashPoint }));
       setCanCashout(false);
       
-      // ✅ НОВОЕ: Добавляем краш в историю
+      // ✅ НОВОЕ: Добавляем краш в локальную историю (для мгновенного обновления UI)
       setCrashHistory((prev) => {
         const newHistory = [
           {
-            id: Math.random().toString(),
+            id: data.gameId || Math.random().toString(),
             crashPoint: data.crashPoint,
             timestamp: new Date(),
           },
           ...prev,
         ];
-        // Храним только последние 10 крашей
+        // Храним только последние 10 крашей локально
         return newHistory.slice(0, 10);
       });
 
@@ -133,7 +190,6 @@ export function CrashGame() {
       setBetPlaced(false);
       setCanCashout(false);
       
-      // Обновляем баланс после выигрыша
       setTimeout(() => fetchBalances(), 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
     };
@@ -448,13 +504,13 @@ export function CrashGame() {
               {/* УПРАВЛЕНИЕ */}
               <GlassCard className="p-4 lg:p-6">
                 <div className="space-y-3">
-                  {/* INPUT СТАВКИ - ИСПРАВЛЕНО */}
+                  {/* INPUT СТАВКИ */}
                   <div>
                     <label className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 block">
                       Размер ставки
                     </label>
                     <div className="flex gap-2">
-                      {/* ✅ ИСПРАВЛЕНО: Контейнер с $ */}
+                      {/* Контейнер с $ */}
                       <div className="flex-1 relative flex items-center">
                         <span className="absolute left-3 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
                           $
@@ -531,23 +587,40 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ПРАВАЯ ЧАСТЬ - ТОЛЬКО CRASH HISTORY */}
+            {/* ПРАВАЯ ЧАСТЬ - CRASH HISTORY */}
             <div className="lg:col-span-1">
-              {/* ✅ CRASH HISTORY - ПОСЛЕДНИЕ 10 КРАШЕЙ */}
+              {/* CRASH HISTORY */}
               <GlassCard className="flex flex-col h-[550px] lg:h-[600px]">
                 <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
                   <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
                   <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАХИ</span>
                   <span className="ml-auto text-xs text-gray-500">{crashHistory.length}/10</span>
+                  {/* ✅ Кнопка обновления истории */}
+                  <button
+                    onClick={() => fetchCrashHistory()}
+                    disabled={crashHistoryLoading}
+                    className="ml-2 p-1 hover:bg-white/20 rounded transition-all disabled:opacity-50"
+                    title="Обновить историю"
+                  >
+                    {crashHistoryLoading ? (
+                      <Loader className="w-4 h-4 animate-spin text-emerald-400" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 text-emerald-400" />
+                    )}
+                  </button>
                 </div>
                 
                 <div 
                   ref={crashHistoryRef}
                   className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2"
                 >
-                  {crashHistory.length > 0 ? (
+                  {crashHistoryLoading ? (
+                    <div className="text-center py-16 text-gray-500 text-xs flex flex-col items-center gap-2">
+                      <Loader className="w-6 h-6 animate-spin text-emerald-400" />
+                      Загрузка крашей...
+                    </div>
+                  ) : crashHistory.length > 0 ? (
                     crashHistory.map((crash) => {
-                      // ✅ Цветовая градация в зависимости от значения краша
                       let bgColor = 'bg-black/40 border-white/10';
                       let crashColor = 'text-gray-300';
                       
@@ -598,19 +671,16 @@ export function CrashGame() {
       </div>
 
       <style>{`
-        /* Scrollbar styles */
         div::-webkit-scrollbar { width: 6px; }
         div::-webkit-scrollbar-track { background: transparent; }
         div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 6px; }
         div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
         
-        /* Firefox scrollbar */
         div {
           scrollbar-color: rgba(34, 197, 94, 0.3) transparent;
           scrollbar-width: thin;
         }
         
-        /* Remove number input spinners */
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
           -webkit-appearance: none;

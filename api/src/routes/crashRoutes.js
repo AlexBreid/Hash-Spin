@@ -28,12 +28,8 @@ const verifyGameServerSecret = (req, res) => {
 // POST /api/v1/crash/start-round
 // ===================================
 router.post('/api/v1/crash/start-round', (req, res) => {
-
-  
   const verified = verifyGameServerSecret(req, res);
   if (verified !== true) return;
-
-  
 
   if (!req.body.gameId || req.body.crashPoint === undefined) {
     console.log('❌ [START-ROUND] Отсутствуют обязательные поля');
@@ -66,10 +62,12 @@ router.post('/api/v1/crash/start-round', (req, res) => {
           serverSeedHash: serverSeedHash || '',
           clientSeed: clientSeed || '',
           totalWagered: '0',
-          totalPayouts: '0'
+          totalPayouts: '0',
+          status: 'IN_PROGRESS'
         }
       });
 
+      console.log(`✅ [START-ROUND] Раунд создан: ${gameId} с крашем ${crashPoint}x`);
 
       res.json({ success: true, data: { roundId: newRound.id } });
     } catch (error) {
@@ -83,15 +81,11 @@ router.post('/api/v1/crash/start-round', (req, res) => {
 // POST /api/v1/crash/create-bet
 // ===================================
 router.post('/api/v1/crash/create-bet', (req, res) => {
-
-  
   const verified = verifyGameServerSecret(req, res);
   if (verified !== true) return;
 
   const { userId, gameId, amount, tokenId } = req.body;
 
-
-  // 🔍 Валидация
   if (!userId || !gameId || amount === undefined || !tokenId) {
     console.log(`❌ [CREATE-BET] Отсутствуют обязательные поля`);
     return res.status(400).json({ 
@@ -109,7 +103,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 
   (async () => {
     try {
-      // 1️⃣ Найти раунд
       const round = await prisma.crashRound.findUnique({
         where: { gameId }
       });
@@ -136,7 +129,8 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         console.log(`❌ [CREATE-BET] Пользователь не найден: ID=${userId}`);
         return res.status(400).json({ success: false, error: 'User not found' });
       }
-      // 🆕 4️⃣ Списываем через хелпер (BONUS приоритет, потом MAIN)
+
+      // 🆕 Списываем через хелпер (BONUS приоритет, потом MAIN)
       const deductResult = await deductBetFromBalance(userId, betAmount, tokenId);
       
       if (!deductResult.success) {
@@ -146,6 +140,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
           error: deductResult.error || 'Insufficient balance'
         });
       }
+
       const newBet = await prisma.crashBet.create({
         data: {
           userId,
@@ -157,7 +152,8 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
           result: 'pending'
         }
       });
-      // 6️⃣ Логировать транзакцию
+
+      // Логировать транзакцию
       await prisma.crashTransaction.create({
         data: {
           userId,
@@ -167,7 +163,8 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
           type: 'bet_placed'
         }
       });
-      // 7️⃣ Обновить раунд
+
+      // Обновить раунд
       await prisma.crashRound.update({
         where: { id: round.id },
         data: {
@@ -175,6 +172,9 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
           totalWagered: { increment: betAmount }
         }
       });
+
+      console.log(`✅ [CREATE-BET] Ставка создана: ${newBet.id}, сумма: ${betAmount}`);
+
       res.json({ 
         success: true, 
         data: { 
@@ -194,7 +194,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 // POST /api/v1/crash/cashout-result
 // ===================================
 router.post('/api/v1/crash/cashout-result', (req, res) => {
-
   const verified = verifyGameServerSecret(req, res);
   if (verified !== true) return;
 
@@ -236,7 +235,8 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
           exitMultiplier: exitMultiplier ? parseFloat(exitMultiplier).toString() : null
         }
       });
-      // 🆕 Если выиграл - используем creditWinnings
+
+      // Если выиграл - используем creditWinnings
       if (winningsAmount > 0 && result === 'won') {
         console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount}`);
         
@@ -257,6 +257,21 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
       } else {
         console.log(`❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
+      }
+
+      // ✅ Обновляем статус раунда
+      const round = await prisma.crashRound.findUnique({
+        where: { id: bet.roundId }
+      });
+
+      if (round) {
+        await prisma.crashRound.update({
+          where: { id: round.id },
+          data: {
+            status: 'COMPLETED',
+            totalPayouts: { increment: winningsAmount }
+          }
+        });
       }
 
       res.json({ success: true, data: { status: 'finalized' } });
@@ -382,6 +397,125 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('❌ [VERIFY-BET] ОШИБКА:', error.message);
     res.status(500).json({ success: false, error: 'Failed to verify bet' });
+  }
+});
+
+// ===================================
+// ✅ НОВОЕ: GET /api/v1/crash/last-crashes
+// Получить последние 10 крашей из БД
+// ===================================
+router.get('/api/v1/crash/last-crashes', async (req, res) => {
+  try {
+    console.log(`📊 [CRASH-HISTORY] Получаю последние крахи...`);
+
+    const crashes = await prisma.crashRound.findMany({
+      where: {
+        status: { in: ['COMPLETED', 'CRASHED'] },
+        crashPoint: { not: null }
+      },
+      select: {
+        id: true,
+        gameId: true,
+        crashPoint: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10,
+    });
+
+    const formattedCrashes = crashes.map(crash => ({
+      id: crash.gameId,
+      crashPoint: parseFloat(crash.crashPoint.toString()),
+      timestamp: crash.createdAt,
+    }));
+
+    console.log(`✅ [CRASH-HISTORY] Найдено ${formattedCrashes.length} крашей`);
+
+    res.json({
+      success: true,
+      data: formattedCrashes,
+    });
+  } catch (error) {
+    console.error('❌ [CRASH-HISTORY] Ошибка:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка получения истории крашей'
+    });
+  }
+});
+
+// ===================================
+// ✅ НОВОЕ: GET /api/v1/crash/statistics
+// Статистика по крашам
+// ===================================
+router.get('/api/v1/crash/statistics', async (req, res) => {
+  try {
+    console.log(`📈 [CRASH-STATS] Получаю статистику...`);
+
+    const crashes = await prisma.crashRound.findMany({
+      where: {
+        status: { in: ['COMPLETED', 'CRASHED'] },
+        crashPoint: { not: null }
+      },
+      select: { crashPoint: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    if (crashes.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          count: 0,
+          average: 0,
+          highest: 0,
+          lowest: 0,
+          median: 0,
+          distribution: { low: 0, medium: 0, high: 0, veryHigh: 0, extreme: 0 }
+        },
+      });
+    }
+
+    const crashPoints = crashes.map(c => parseFloat(c.crashPoint.toString()));
+    const count = crashPoints.length;
+    const average = crashPoints.reduce((a, b) => a + b, 0) / count;
+    const highest = Math.max(...crashPoints);
+    const lowest = Math.min(...crashPoints);
+    
+    const sorted = [...crashPoints].sort((a, b) => a - b);
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+
+    const distribution = {
+      low: crashPoints.filter(x => x < 2).length,
+      medium: crashPoints.filter(x => x >= 2 && x < 5).length,
+      high: crashPoints.filter(x => x >= 5 && x < 10).length,
+      veryHigh: crashPoints.filter(x => x >= 10 && x < 20).length,
+      extreme: crashPoints.filter(x => x >= 20).length,
+    };
+
+    console.log(`✅ [CRASH-STATS] avg=${average.toFixed(2)}, max=${highest.toFixed(2)}`);
+
+    res.json({
+      success: true,
+      data: {
+        count,
+        average: parseFloat(average.toFixed(2)),
+        highest: parseFloat(highest.toFixed(2)),
+        lowest: parseFloat(lowest.toFixed(2)),
+        median: parseFloat(median.toFixed(2)),
+        distribution,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [CRASH-STATS] Ошибка:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка получения статистики'
+    });
   }
 });
 
