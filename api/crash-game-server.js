@@ -33,6 +33,60 @@ const log = {
   error: (msg, data = '') => console.error(`❌ [${new Date().toLocaleTimeString()}] ${msg}`, data),
 };
 log.info('Loaded Server Secret (first 5 chars):', SERVER_SECRET ? SERVER_SECRET.substring(0, 5) + '...' : '❌ NOT LOADED');
+
+// ========================
+// РАСПРЕДЕЛЕНИЕ ВЕРОЯТНОСТЕЙ
+// ========================
+/**
+ * ✅ НОВОЕ: Формула вероятности выпадения crash point'ов
+ * 
+ * Требования:
+ * - 1.00x до 2.00x: 75% вероятности
+ * - 2.00x до 15.00x: 15% вероятности
+ * - 15.00x до 30.00x: 4% вероятности
+ * - выше 30.00x: 1% вероятности (очень редко)
+ * - остальное: 5% (для безопасности)
+ * 
+ * @param {number} randomValue - Случайное число от 0 до 1
+ * @returns {number} crash point (например 1.5, 5.2, 20.1)
+ */
+function calculateCrashPointFromRandom(randomValue) {
+  // randomValue: 0.0 <= x < 1.0
+
+  if (randomValue < 0.75) {
+    // 75% шанс: 1.00x до 2.00x
+    // Распределение: линейное от 1.0 до 2.0
+    const normalized = randomValue / 0.75;  // 0.0 to 1.0
+    const crashPoint = 1.0 + (normalized * 1.0);  // 1.0 to 2.0
+    return parseFloat(crashPoint.toFixed(2));
+  } 
+  else if (randomValue < 0.90) {
+    // 15% шанс: 2.00x до 15.00x
+    const normalized = (randomValue - 0.75) / 0.15;  // 0.0 to 1.0
+    // Используем экспоненциальное распределение для более реалистичного ощущения
+    const crashPoint = 2.0 + (Math.pow(normalized, 1.5) * 13.0);  // 2.0 to 15.0
+    return parseFloat(crashPoint.toFixed(2));
+  }
+  else if (randomValue < 0.94) {
+    // 4% шанс: 15.00x до 30.00x
+    const normalized = (randomValue - 0.90) / 0.04;  // 0.0 to 1.0
+    const crashPoint = 15.0 + (Math.pow(normalized, 2.0) * 15.0);  // 15.0 to 30.0
+    return parseFloat(crashPoint.toFixed(2));
+  }
+  else if (randomValue < 0.95) {
+    // 1% шанс: выше 30.00x (до 100.00x максимум)
+    const normalized = (randomValue - 0.94) / 0.01;  // 0.0 to 1.0
+    const crashPoint = 30.0 + (Math.pow(normalized, 0.5) * 70.0);  // 30.0 to 100.0
+    return parseFloat(Math.min(crashPoint, 100.0).toFixed(2));
+  }
+  else {
+    // 5% запас на случай ошибок: случайное значение от 1.5 до 3.0
+    const normalized = (randomValue - 0.95) / 0.05;
+    const crashPoint = 1.5 + (normalized * 1.5);
+    return parseFloat(crashPoint.toFixed(2));
+  }
+}
+
 // ========================
 // ИГРОВАЯ КОМНАТА
 // ========================
@@ -57,23 +111,27 @@ class GameRoom {
     };
   }
 
+  /**
+   * ✅ ИСПРАВЛЕНО: Новая формула для генерации crash point'а
+   * Использует пользовательское распределение вероятностей
+   */
   generateCrashPoint() {
+    // Генерируем хеш из server seed + client seed (как раньше)
     const combined = this.roundKeys.serverSeed + this.roundKeys.clientSeed;
     const hash = crypto.createHash('sha256').update(combined).digest('hex');
+    
+    // Берем первые 13 символов hex'а и преобразуем в число от 0 до 1
     const hex = hash.substring(0, 13);
     const hmac = parseInt(hex, 16);
-    const MAX_HEX_VALUE = 0x10000000000000;
-    let U = hmac / MAX_HEX_VALUE;
+    const MAX_HEX_VALUE = 0x10000000000000;  // 2^52
+    let randomValue = hmac / MAX_HEX_VALUE;  // 0.0 <= randomValue < 1.0
 
-    const HOUSE_EDGE_RTP_PERCENT = 92;
-    const SAFE_MAX = 100 / (100 + (100 - HOUSE_EDGE_RTP_PERCENT));
+    // ✅ ИСПОЛЬЗУЕМ НОВУЮ ФОРМУЛУ ВЕРОЯТНОСТЕЙ
+    const crashPoint = calculateCrashPointFromRandom(randomValue);
 
-    if (U >= SAFE_MAX) return 1.0;
-    U = U / SAFE_MAX;
-    if (U === 0) U = 1 / MAX_HEX_VALUE;
+    log.info(`🎲 Генерирую crash point: randomValue=${randomValue.toFixed(4)}, crashPoint=${crashPoint}x`);
 
-    const final_crash = 100 / (100 - U * 100);
-    return Math.max(1.01, parseFloat(final_crash.toFixed(2)));
+    return crashPoint;
   }
 
   async startRound() {
