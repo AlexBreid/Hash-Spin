@@ -472,8 +472,7 @@ export function CrashGame() {
                     </label>
                     <div className="flex gap-2">
                       <div className="flex-1 relative">
-                        {/* ЕДИНСТВЕННЫЙ знак доллара */}
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-base pointer-events-none">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
                           $
                         </span>
                         <input
@@ -489,7 +488,7 @@ export function CrashGame() {
                           min="0"
                           step="0.01"
                           disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
+                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-10 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
                           placeholder="0.00"
                         />
                       </div>
