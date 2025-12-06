@@ -461,31 +461,32 @@ export function CrashGame() {
 
               {/* УПРАВЛЕНИЕ */}
               <GlassCard className="p-4 lg:p-6">
-                <div className="flex flex-col lg:flex-row gap-4 items-end">
-                  <div className="flex-1 w-full">
+                <div className="space-y-3 lg:space-y-0">
+                  <div>
                     <label className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 block">
                       Ставка
                     </label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400 z-10" />
                       <input
                         type="number"
                         value={inputBet}
                         onChange={(e) => setInputBet(e.target.value)}
                         disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                        className="w-full bg-white/5 border border-white/20 rounded-xl py-3 pl-10 pr-4 text-lg lg:text-xl font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50"
+                        className="w-full bg-white/5 border border-white/20 rounded-xl py-3 pl-10 pr-20 text-lg lg:text-xl font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50"
+                        placeholder="0.00"
                       />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 z-10">
                         <button
                           onClick={() => setInputBet((prev) => Math.max(1, parseFloat(prev) / 2).toFixed(2))}
-                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all"
+                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all whitespace-nowrap"
                           disabled={betPlaced || gameState.status !== 'waiting'}
                         >
                           ÷2
                         </button>
                         <button
                           onClick={() => setInputBet((prev) => (parseFloat(prev) * 2).toFixed(2))}
-                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all"
+                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all whitespace-nowrap"
                           disabled={betPlaced || gameState.status !== 'waiting'}
                         >
                           ×2
@@ -494,41 +495,73 @@ export function CrashGame() {
                     </div>
                   </div>
 
-                  {canCashout ? (
-                    <button
-                      onClick={handleCashout}
-                      disabled={isLoading}
-                      className="w-full lg:w-auto px-6 lg:px-8 h-12 lg:h-14 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-sm lg:text-base"
-                    >
-                      <Zap className="w-4 h-4 lg:w-5 lg:h-5" />
-                      ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
-                    </button>
-                  ) : betPlaced ? (
-                    <div className="w-full lg:w-auto px-6 lg:px-8 h-12 lg:h-14 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center animate-pulse text-sm lg:text-base">
-                      СТАВКА: ${currentBet.toFixed(2)}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handlePlaceBet}
-                      disabled={gameState.status !== 'waiting' || isLoading}
-                      className={`w-full lg:w-auto px-6 lg:px-8 h-12 lg:h-14 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-sm lg:text-base ${
-                        gameState.status === 'waiting' && !isLoading
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
-                          : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
-                      }`}
-                    >
-                      {isLoading ? 'ЗАГРУЗКА...' : 'ПОСТАВИТЬ'}
-                    </button>
-                  )}
+                  <div className="hidden lg:block">
+                    {canCashout ? (
+                      <button
+                        onClick={handleCashout}
+                        disabled={isLoading}
+                        className="w-full px-8 h-14 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-sm lg:text-base"
+                      >
+                        <Zap className="w-5 h-5" />
+                        ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
+                      </button>
+                    ) : betPlaced ? (
+                      <div className="w-full px-8 h-14 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center animate-pulse text-base">
+                        СТАВКА: ${currentBet.toFixed(2)}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handlePlaceBet}
+                        disabled={gameState.status !== 'waiting' || isLoading}
+                        className={`w-full px-8 h-14 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-base ${
+                          gameState.status === 'waiting' && !isLoading
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
+                            : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
+                        }`}
+                      >
+                        {isLoading ? 'ЗАГРУЗКА...' : 'ПОСТАВИТЬ'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* МОБИЛЬНАЯ ВЕРСИЯ КНОПОК */}
+                  <div className="lg:hidden flex gap-2">
+                    {canCashout ? (
+                      <button
+                        onClick={handleCashout}
+                        disabled={isLoading}
+                        className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-xs"
+                      >
+                        <Zap className="w-4 h-4" />
+                        ЗАБРАТЬ
+                      </button>
+                    ) : betPlaced ? (
+                      <div className="flex-1 h-12 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center animate-pulse text-xs">
+                        ${currentBet.toFixed(2)}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handlePlaceBet}
+                        disabled={gameState.status !== 'waiting' || isLoading}
+                        className={`flex-1 h-12 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-xs ${
+                          gameState.status === 'waiting' && !isLoading
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
+                            : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
+                        }`}
+                      >
+                        {isLoading ? 'ЗАГРУЗКА' : 'ПОСТАВИТЬ'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </GlassCard>
             </div>
 
             {/* ПРАВАЯ ЧАСТЬ - LIVE FEED И ИСТОРИЯ */}
-            <div className="lg:col-span-1 flex flex-col gap-6">
+            <div className="lg:col-span-1 flex flex-col gap-6 h-full">
               {/* LIVE FEED */}
-              <GlassCard className="flex flex-col min-h-[300px] lg:min-h-[400px]">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md">
+              <GlassCard className="flex flex-col min-h-[200px] lg:max-h-[350px]">
+                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md z-10">
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
                   <span className="text-sm lg:text-base">LIVE FEED</span>
                   <span className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -537,18 +570,22 @@ export function CrashGame() {
                   ref={eventContainerRef}
                   className="flex-1 overflow-y-auto p-3 space-y-2"
                 >
-                  {liveEvents.map((ev) => (
-                    <div key={ev.id} className="text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/5">
-                      <span className="text-gray-500 font-mono text-[10px]">{ev.timestamp.toLocaleTimeString()}</span>
-                      <span className="block mt-1 text-gray-200 text-xs">{ev.message}</span>
-                    </div>
-                  ))}
+                  {liveEvents.length > 0 ? (
+                    liveEvents.map((ev) => (
+                      <div key={ev.id} className="text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/5">
+                        <span className="text-gray-500 font-mono text-[10px]">{ev.timestamp.toLocaleTimeString()}</span>
+                        <span className="block mt-1 text-gray-200 text-xs">{ev.message}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-xs">Нет событий</div>
+                  )}
                 </div>
               </GlassCard>
 
               {/* ИСТОРИЯ */}
-              <GlassCard className="flex flex-col min-h-[250px] lg:min-h-[300px]">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md">
+              <GlassCard className="flex flex-col min-h-[200px] lg:max-h-[350px]">
+                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md z-10">
                   <History className="w-5 h-5 text-indigo-400" />
                   <span className="text-sm lg:text-base">ИСТОРИЯ</span>
                 </div>
@@ -556,17 +593,21 @@ export function CrashGame() {
                   ref={historyContainerRef}
                   className="flex-1 overflow-y-auto p-3 space-y-2"
                 >
-                  {history.slice(0, 10).map((h, i) => (
-                    <div key={i} className="text-xs p-2 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-all">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">${h.bet.toFixed(2)}</span>
-                        <span className={h.result === 'won' ? 'text-emerald-400 font-bold text-xs' : 'text-red-400 text-xs'}>
-                          {h.result === 'won' ? `+$${(h.winnings - h.bet).toFixed(2)}` : `-$${h.bet}`}
-                        </span>
+                  {history.length > 0 ? (
+                    history.slice(0, 10).map((h, i) => (
+                      <div key={i} className="text-xs p-2 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-all">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">${h.bet.toFixed(2)}</span>
+                          <span className={h.result === 'won' ? 'text-emerald-400 font-bold text-xs' : 'text-red-400 text-xs'}>
+                            {h.result === 'won' ? `+$${(h.winnings - h.bet).toFixed(2)}` : `-$${h.bet}`}
+                          </span>
+                        </div>
+                        <span className="text-gray-500 text-[10px]">{h.multiplier?.toFixed(2)}x</span>
                       </div>
-                      <span className="text-gray-500 text-[10px]">{h.multiplier?.toFixed(2)}x</span>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-xs">История пуста</div>
+                  )}
                 </div>
               </GlassCard>
             </div>
