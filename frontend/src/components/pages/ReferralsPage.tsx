@@ -1,7 +1,7 @@
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
-import { Users, Gift, Copy, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Users, Gift, Copy, CheckCircle, AlertCircle, Loader, TrendingUp, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +14,11 @@ interface ReferralStats {
   referredByCode?: string;
   referrerUsername?: string;
   bonusPercentage: number;
+  referrerType?: string;
+  commissionRate?: number;
+  totalTurnover?: number;
+  totalCommissionPaid?: number;
+  pendingTurnover?: number;
 }
 
 export function ReferralsPage() {
@@ -150,7 +155,7 @@ export function ReferralsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold mb-2">🎁 Реферальная программа</h1>
-        <p className="text-muted-foreground">Введите реферальный код друга и получайте {stats?.bonusPercentage}% бонуса к ВАШИМ пополнениям</p>
+        <p className="text-muted-foreground">Приглашайте друзей и зарабатывайте на их игре</p>
       </div>
 
       {/* Ваш реферальный код */}
@@ -181,7 +186,7 @@ export function ReferralsPage() {
           </div>
 
           <p className="text-xs text-muted-foreground mt-3">
-            📤 Поделитесь этим кодом с друзьями. Они получат {stats?.bonusPercentage}% бонуса к своим пополнениям!
+            📤 Поделитесь этим кодом с друзьями и получайте {stats?.commissionRate}% комиссии от их потерь!
           </p>
         </Card>
       </motion.div>
@@ -191,22 +196,101 @@ export function ReferralsPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+        className="grid grid-cols-2 gap-3"
       >
-        <Card className="p-5 bg-gradient-to-br from-success/20 to-success/5 border-success/30">
-          <div className="flex items-center gap-3 mb-3">
-            <Users className="w-5 h-5 text-success" />
-            <span className="text-muted-foreground">Активных рефералов</span>
+        <Card className="p-4 bg-gradient-to-br from-success/20 to-success/5 border-success/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-4 h-4 text-success" />
+            <span className="text-xs text-muted-foreground">Рефералов</span>
           </div>
-          <p className="text-3xl font-bold text-success">{stats?.myRefeersCount || 0}</p>
+          <p className="text-2xl font-bold text-success">{stats?.myRefeersCount || 0}</p>
+        </Card>
+
+        <Card className="p-4 bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" />
+            <span className="text-xs text-muted-foreground">Оборот</span>
+          </div>
+          <p className="text-2xl font-bold text-blue-600">${(stats?.totalTurnover || 0).toFixed(0)}</p>
+        </Card>
+
+        <Card className="p-4 bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Award className="w-4 h-4 text-green-600" />
+            <span className="text-xs text-muted-foreground">Выплачено</span>
+          </div>
+          <p className="text-2xl font-bold text-green-600">${(stats?.totalCommissionPaid || 0).toFixed(2)}</p>
+        </Card>
+
+        <Card className="p-4 bg-gradient-to-br from-orange-500/20 to-orange-500/5 border-orange-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Gift className="w-4 h-4 text-orange-600" />
+            <span className="text-xs text-muted-foreground">Ставка</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-600">{stats?.commissionRate}%</p>
         </Card>
       </motion.div>
+
+      {/* Что ты получаешь за рефералов */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card className="p-5 bg-gradient-to-br from-blue-50 to-blue-5 dark:from-blue-950/30 dark:to-blue-900/10 border-blue-200 dark:border-blue-800">
+          <h3 className="font-bold text-lg mb-4">💰 Что ты получаешь за рефералов?</h3>
+          <div className="space-y-3">
+            <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+              <p className="font-semibold text-sm">🎯 Обычный реферер (30% комиссия)</p>
+              <p className="text-xs text-muted-foreground mt-1">30% от прибыли казино от твоих рефералов</p>
+              <p className="text-xs text-primary mt-2">📊 Пример: Если рефе потерял 100 USDT в казино, ты получишь до 3 USDT</p>
+            </div>
+            {stats?.referrerType === 'WORKER' && (
+              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg border-2 border-green-500">
+                <p className="font-semibold text-sm">👷 Ты ВОРКЕР (5% от профита)</p>
+                <p className="text-xs text-muted-foreground mt-1">5% от чистой прибыли казино от всех твоих рефералов</p>
+                <p className="text-xs text-green-600 mt-2">⭐ Поздравляем! Ты получил статус воркера!</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Что ты получаешь введя реферала */}
+      {!stats?.referredByCode && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="p-5 bg-gradient-to-br from-purple-50 to-purple-5 dark:from-purple-950/30 dark:to-purple-900/10 border-purple-200 dark:border-purple-800">
+            <h3 className="font-bold text-lg mb-4">🎁 Что ты получишь введя реферала?</h3>
+            <div className="space-y-3">
+              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg border-2 border-yellow-500">
+                <p className="font-semibold text-sm">💎 Приветственный бонус</p>
+                <p className="text-sm font-bold text-yellow-600 mt-2">+100% к твоему первому пополнению</p>
+                <p className="text-xs text-muted-foreground mt-1">📈 Пример: Пополнил 10 USDT → получишь 10 USDT бонусом</p>
+              </div>
+              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <p className="font-semibold text-sm">📊 Требования на вывод</p>
+                <p className="text-xs text-muted-foreground mt-1">Отыграй бонус в 10x перед выводом</p>
+                <p className="text-xs text-muted-foreground mt-1">Пример: 10 USDT бонуса → отыграй 100 USDT в играх</p>
+              </div>
+              <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <p className="font-semibold text-sm">⏰ Срок действия</p>
+                <p className="text-xs text-muted-foreground mt-1">Бонус действует 7 дней с момента активации</p>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Раздел: Введите реферальный код */}
       {!stats?.referredByCode ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.4 }}
         >
           <Card className="p-5 bg-gradient-to-br from-accent/20 to-accent/5 border-accent/30">
             <div className="flex items-center gap-3 mb-4">
@@ -216,7 +300,7 @@ export function ReferralsPage() {
 
             <form onSubmit={handleLinkReferrer} className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Если вас пригласил друг, введите его реферальный код и получайте {stats?.bonusPercentage}% бонуса к его пополнениям!
+                Если вас пригласил друг, введите его реферальный код и получайте +100% к первому пополнению!
               </p>
 
               <Input
@@ -253,7 +337,7 @@ export function ReferralsPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.4 }}
         >
           <Card className="p-5 bg-gradient-to-br from-success/20 to-success/5 border-success/30">
             <div className="flex items-center gap-3 mb-3">
@@ -267,7 +351,7 @@ export function ReferralsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground mt-3">
-              ✅ Вы получаете {stats?.bonusPercentage}% бонуса к ВАШИМ пополнениям
+              ✅ Вы получите +100% бонус к первому пополнению!
             </p>
           </Card>
         </motion.div>
@@ -277,7 +361,7 @@ export function ReferralsPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.5 }}
       >
         <Card className="p-5">
           <h3 className="font-bold text-lg mb-5">📚 Как работает реферальная система</h3>
@@ -287,8 +371,8 @@ export function ReferralsPage() {
                 1
               </div>
               <div>
-                <p className="font-semibold">Получите код от друга</p>
-                <p className="text-sm text-muted-foreground">Попросите реферальный код у своего друга</p>
+                <p className="font-semibold">Поделись своим кодом</p>
+                <p className="text-sm text-muted-foreground">Отправь реферальный код своему другу</p>
               </div>
             </div>
 
@@ -297,8 +381,8 @@ export function ReferralsPage() {
                 2
               </div>
               <div>
-                <p className="font-semibold">Введите код</p>
-                <p className="text-sm text-muted-foreground">На странице реферралов или при регистрации</p>
+                <p className="font-semibold">Друг регистрируется</p>
+                <p className="text-sm text-muted-foreground">Друг использует твой код при регистрации</p>
               </div>
             </div>
 
@@ -307,23 +391,49 @@ export function ReferralsPage() {
                 3
               </div>
               <div>
-                <p className="font-semibold">Получайте бонусы</p>
-                <p className="text-sm text-muted-foreground">{stats?.bonusPercentage}% к ВАШИМ пополнениям — автоматически!</p>
+                <p className="font-semibold">Получайте выплаты</p>
+                <p className="text-sm text-muted-foreground">{stats?.commissionRate}% комиссии от его потерь — автоматически!</p>
               </div>
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {/* Условия */}
+      {/* Полные условия */}
       <Card className="p-5 bg-muted/50">
-        <h3 className="font-bold mb-3">📋 Условия</h3>
-        <ul className="text-sm space-y-2 text-muted-foreground">
-          <li>✓ Реферальный код вводится один раз</li>
-          <li>✓ Бонус зачисляется автоматически при пополнении реферала</li>
-          <li>✓ Бонус начисляется на ваш основной баланс</li>
-          <li>✓ Нет лимита на количество рефералов</li>
-        </ul>
+        <h3 className="font-bold mb-4">📋 Полные условия реферальной программы</h3>
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="font-semibold mb-2">✅ Для реферера (пригласивший):</p>
+            <ul className="space-y-1 text-muted-foreground ml-4">
+              <li>• Получай {stats?.commissionRate}% комиссии от прибыли казино от своих рефералов</li>
+              <li>• При привлечении 10+ активных рефералов можешь получить статус ВОРКЕР (5% профита)</li>
+              <li>• Комиссия выплачивается автоматически при достижении минимума (100 USDT оборота)</li>
+              <li>• Нет лимита на количество приглашенных людей</li>
+              <li>• Реферальная ссылка уникальна и не изменяется</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold mb-2">🎁 Для реферала (приглашённый):</p>
+            <ul className="space-y-1 text-muted-foreground ml-4">
+              <li>• Получи +100% к первому пополнению в виде бонуса</li>
+              <li>• Максимум 10,000 USDT бонуса за одно пополнение</li>
+              <li>• Отыграй бонус в 10x перед выводом</li>
+              <li>• Бонус автоматически переводится в основной баланс после выполнения условий</li>
+              <li>• Действует 7 дней с момента активации</li>
+              <li>• Код вводится один раз и не может быть изменен</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold mb-2">🔒 Общие правила:</p>
+            <ul className="space-y-1 text-muted-foreground ml-4">
+              <li>• Минимум 100 USDT оборота для выплаты комиссии</li>
+              <li>• Минимум 1 USDT для вывода комиссии</li>
+              <li>• Выплаты производятся на основной баланс</li>
+              <li>• Система прозрачна и работает в реальном времени</li>
+            </ul>
+          </div>
+        </div>
       </Card>
     </div>
   );
