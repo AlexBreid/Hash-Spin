@@ -914,8 +914,12 @@ if (!BOT_TOKEN) {
 
         // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР?
         if (user.referredById) {
-            // ЕСТЬ РЕФЕРЕР - СПРАШИВАЕМ ИСПОЛЬЗОВАТЬ БОНУС
-            await ctx.editMessageText(
+            // ЕСТЬ РЕФЕРЕР - УДАЛЯЕМ СТАРОЕ СООБЩЕНИЕ И ОТПРАВЛЯЕМ НОВОЕ
+            try {
+                await ctx.deleteMessage();
+            } catch (e) {}
+            
+            await ctx.reply(
                 `💰 *Пополнение на ${amount} USDT*\n\n` +
                 `🎁 Использовать бонус?`,
                 {
@@ -936,6 +940,11 @@ if (!BOT_TOKEN) {
                 return await ctx.answerCbQuery();
             }
             scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+            
+            try {
+                await ctx.deleteMessage();
+            } catch (e) {}
+            
             await ctx.reply(
                 `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
                 {
