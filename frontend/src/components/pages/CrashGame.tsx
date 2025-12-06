@@ -471,11 +471,11 @@ export function CrashGame() {
                       Размер ставки
                     </label>
                     <div className="flex gap-2">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
+                      {/* Контейнер с $ и input */}
+                      <div className="flex-1 relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
                           $
                         </span>
-                      <div className="flex-1 relative">
-                        
                         <input
                           type="number"
                           inputMode="decimal"
@@ -489,12 +489,12 @@ export function CrashGame() {
                           min="0"
                           step="0.01"
                           disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-10 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
+                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
                           placeholder="0.00"
                         />
                       </div>
 
-                      {/* КНОПКИ */}
+                      {/* КНОПКИ — без изменений */}
                       <button
                         onClick={() => setInputBet((prev) => Math.max(1, parseFloat(prev) / 2).toFixed(2))}
                         className="px-2 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold"
