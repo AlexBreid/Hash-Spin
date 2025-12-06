@@ -42,7 +42,6 @@ export function CrashGame() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventContainerRef = useRef<HTMLDivElement>(null);
-  const historyContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
 
   // ================================
@@ -125,17 +124,21 @@ export function CrashGame() {
       const multiplier = parseFloat(data.multiplier.toString());
       const profit = winAmount - currentBet;
 
-      setHistory((prev) => [
-        {
-          crash: gameState.crashPoint,
-          multiplier,
-          bet: currentBet,
-          winnings: winAmount,
-          result: 'won',
-          timestamp: new Date(),
-        },
-        ...prev,
-      ]);
+      setHistory((prev) => {
+        const newHistory = [
+          {
+            crash: gameState.crashPoint,
+            multiplier,
+            bet: currentBet,
+            winnings: winAmount,
+            result: 'won',
+            timestamp: new Date(),
+          },
+          ...prev,
+        ];
+        // Хранить только последние 10 ставок
+        return newHistory.slice(0, 10);
+      });
 
       addLiveEvent('cashout', `🤑 ВЫИГРЫШ: +$${profit.toFixed(2)} (${multiplier}x)`);
       setBetPlaced(false);
@@ -461,95 +464,70 @@ export function CrashGame() {
 
               {/* УПРАВЛЕНИЕ */}
               <GlassCard className="p-4 lg:p-6">
-                <div className="space-y-3 lg:space-y-0">
+                <div className="space-y-3">
+                  {/* INPUT СТАВКИ */}
                   <div>
                     <label className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 block">
-                      Ставка
+                      Размер ставки
                     </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400 z-10" />
-                      <input
-                        type="number"
-                        value={inputBet}
-                        onChange={(e) => setInputBet(e.target.value)}
-                        disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                        className="w-full bg-white/5 border border-white/20 rounded-xl py-3 pl-10 pr-20 text-lg lg:text-xl font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50"
-                        placeholder="0.00"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 z-10">
-                        <button
-                          onClick={() => setInputBet((prev) => Math.max(1, parseFloat(prev) / 2).toFixed(2))}
-                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all whitespace-nowrap"
-                          disabled={betPlaced || gameState.status !== 'waiting'}
-                        >
-                          ÷2
-                        </button>
-                        <button
-                          onClick={() => setInputBet((prev) => (parseFloat(prev) * 2).toFixed(2))}
-                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-300 transition-all whitespace-nowrap"
-                          disabled={betPlaced || gameState.status !== 'waiting'}
-                        >
-                          ×2
-                        </button>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10 pointer-events-none" />
+                        <input
+                          type="number"
+                          value={inputBet}
+                          onChange={(e) => setInputBet(e.target.value)}
+                          disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
+                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50"
+                          placeholder="0.00"
+                        />
                       </div>
+                      <button
+                        onClick={() => setInputBet((prev) => Math.max(1, parseFloat(prev) / 2).toFixed(2))}
+                        className="px-2 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold"
+                        disabled={betPlaced || gameState.status !== 'waiting'}
+                        title="Разделить на 2"
+                      >
+                        ÷2
+                      </button>
+                      <button
+                        onClick={() => setInputBet((prev) => (parseFloat(prev) * 2).toFixed(2))}
+                        className="px-2 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold"
+                        disabled={betPlaced || gameState.status !== 'waiting'}
+                        title="Умножить на 2"
+                      >
+                        ×2
+                      </button>
                     </div>
                   </div>
 
-                  <div className="hidden lg:block">
+                  {/* КНОПКА ДЕЙСТВИЯ */}
+                  <div>
                     {canCashout ? (
                       <button
                         onClick={handleCashout}
                         disabled={isLoading}
-                        className="w-full px-8 h-14 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-sm lg:text-base"
+                        className="w-full px-4 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-sm lg:text-base"
                       >
-                        <Zap className="w-5 h-5" />
-                        ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
+                        <Zap className="w-4 h-4 lg:w-5 lg:h-5" />
+                        <span className="hidden sm:inline">ЗАБРАТЬ ${potentialWinnings.toFixed(2)}</span>
+                        <span className="sm:hidden">ЗАБРАТЬ</span>
                       </button>
                     ) : betPlaced ? (
-                      <div className="w-full px-8 h-14 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center animate-pulse text-base">
-                        СТАВКА: ${currentBet.toFixed(2)}
+                      <div className="w-full px-4 lg:px-8 py-3 lg:py-4 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center text-sm lg:text-base animate-pulse">
+                        🎲 СТАВКА: ${currentBet.toFixed(2)}
                       </div>
                     ) : (
                       <button
                         onClick={handlePlaceBet}
                         disabled={gameState.status !== 'waiting' || isLoading}
-                        className={`w-full px-8 h-14 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-base ${
+                        className={`w-full px-4 lg:px-8 py-3 lg:py-4 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-sm lg:text-base ${
                           gameState.status === 'waiting' && !isLoading
                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
                             : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
                         }`}
                       >
                         {isLoading ? 'ЗАГРУЗКА...' : 'ПОСТАВИТЬ'}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* МОБИЛЬНАЯ ВЕРСИЯ КНОПОК */}
-                  <div className="lg:hidden flex gap-2">
-                    {canCashout ? (
-                      <button
-                        onClick={handleCashout}
-                        disabled={isLoading}
-                        className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-xs"
-                      >
-                        <Zap className="w-4 h-4" />
-                        ЗАБРАТЬ
-                      </button>
-                    ) : betPlaced ? (
-                      <div className="flex-1 h-12 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center animate-pulse text-xs">
-                        ${currentBet.toFixed(2)}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handlePlaceBet}
-                        disabled={gameState.status !== 'waiting' || isLoading}
-                        className={`flex-1 h-12 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-xs ${
-                          gameState.status === 'waiting' && !isLoading
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
-                            : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
-                        }`}
-                      >
-                        {isLoading ? 'ЗАГРУЗКА' : 'ПОСТАВИТЬ'}
                       </button>
                     )}
                   </div>
@@ -560,21 +538,21 @@ export function CrashGame() {
             {/* ПРАВАЯ ЧАСТЬ - LIVE FEED И ИСТОРИЯ */}
             <div className="lg:col-span-1 flex flex-col gap-6 h-full">
               {/* LIVE FEED */}
-              <GlassCard className="flex flex-col min-h-[200px] lg:max-h-[350px]">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md z-10">
-                  <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm lg:text-base">LIVE FEED</span>
+              <GlassCard className="flex flex-col h-[250px] lg:h-[280px]">
+                <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
+                  <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
+                  <span className="text-xs lg:text-sm">LIVE FEED</span>
                   <span className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 </div>
                 <div 
                   ref={eventContainerRef}
-                  className="flex-1 overflow-y-auto p-3 space-y-2"
+                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-1 lg:space-y-2"
                 >
                   {liveEvents.length > 0 ? (
                     liveEvents.map((ev) => (
-                      <div key={ev.id} className="text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/5">
-                        <span className="text-gray-500 font-mono text-[10px]">{ev.timestamp.toLocaleTimeString()}</span>
-                        <span className="block mt-1 text-gray-200 text-xs">{ev.message}</span>
+                      <div key={ev.id} className="text-xs px-2 lg:px-3 py-1 lg:py-2 rounded-lg bg-black/40 border border-white/10">
+                        <span className="text-gray-500 font-mono text-[9px] lg:text-[10px]">{ev.timestamp.toLocaleTimeString()}</span>
+                        <span className="block mt-0.5 text-gray-200 text-xs lg:text-sm leading-tight">{ev.message}</span>
                       </div>
                     ))
                   ) : (
@@ -584,25 +562,25 @@ export function CrashGame() {
               </GlassCard>
 
               {/* ИСТОРИЯ */}
-              <GlassCard className="flex flex-col min-h-[200px] lg:max-h-[350px]">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/40 backdrop-blur-md z-10">
-                  <History className="w-5 h-5 text-indigo-400" />
-                  <span className="text-sm lg:text-base">ИСТОРИЯ</span>
+              <GlassCard className="flex flex-col h-[250px] lg:h-[280px]">
+                <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
+                  <History className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-400" />
+                  <span className="text-xs lg:text-sm">ИСТОРИЯ</span>
+                  <span className="ml-auto text-xs text-gray-500">{history.length}/10</span>
                 </div>
                 <div 
-                  ref={historyContainerRef}
-                  className="flex-1 overflow-y-auto p-3 space-y-2"
+                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-1 lg:space-y-2"
                 >
                   {history.length > 0 ? (
-                    history.slice(0, 10).map((h, i) => (
-                      <div key={i} className="text-xs p-2 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-all">
+                    history.map((h, i) => (
+                      <div key={i} className="text-xs p-2 rounded-lg bg-black/40 border border-white/10 hover:border-white/20 transition-all">
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400">${h.bet.toFixed(2)}</span>
+                          <span className="text-gray-400 font-mono text-[10px]">${h.bet.toFixed(2)}</span>
                           <span className={h.result === 'won' ? 'text-emerald-400 font-bold text-xs' : 'text-red-400 text-xs'}>
                             {h.result === 'won' ? `+$${(h.winnings - h.bet).toFixed(2)}` : `-$${h.bet}`}
                           </span>
                         </div>
-                        <span className="text-gray-500 text-[10px]">{h.multiplier?.toFixed(2)}x</span>
+                        <span className="text-gray-500 text-[10px] block mt-0.5">{h.multiplier?.toFixed(2)}x</span>
                       </div>
                     ))
                   ) : (
