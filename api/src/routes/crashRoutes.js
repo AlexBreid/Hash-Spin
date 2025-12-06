@@ -10,7 +10,7 @@ const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./hel
 const verifyGameServerSecret = (req, res) => {
   const serverSecret = req.headers['x-server-secret'];
   const expectedSecret = process.env.GAME_SERVER_SECRET;
-
+  
   if (!expectedSecret) {
     console.error('⚠️ GAME_SERVER_SECRET не установлен в .env');
     return res.status(500).json({ success: false, error: 'Server misconfigured' });

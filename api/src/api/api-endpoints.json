@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-12-03T03:00:09.844Z",
-  "totalEndpoints": 42,
+  "timestamp": "2025-12-06T18:47:28.713Z",
+  "totalEndpoints": 52,
   "endpoints": {
     "ADMIN_GET_stats": {
       "path": "/stats",
@@ -91,6 +91,14 @@
       "path": "/api/v1/crash/verify-bet",
       "method": "POST"
     },
+    "CRASH_GET_crash_last-crashes": {
+      "path": "/api/v1/crash/last-crashes",
+      "method": "GET"
+    },
+    "CRASH_GET_crash_statistics": {
+      "path": "/api/v1/crash/statistics",
+      "method": "GET"
+    },
     "DEPOSIT_POST_create-address": {
       "path": "/create-address",
       "method": "POST"
@@ -127,12 +135,44 @@
       "path": "/api/v1/minesweeper/cashout",
       "method": "POST"
     },
+    "MINESWEEPER_GET_minesweeper_balance": {
+      "path": "/api/v1/minesweeper/balance",
+      "method": "GET"
+    },
     "REFERRAL_GET_referral_stats": {
       "path": "/api/v1/referral/stats",
       "method": "GET"
     },
+    "REFERRAL_GET_referral_wager-progress": {
+      "path": "/api/v1/referral/wager-progress",
+      "method": "GET"
+    },
     "REFERRAL_POST_referral_link-referrer": {
       "path": "/api/v1/referral/link-referrer",
+      "method": "POST"
+    },
+    "REFERRAL_GET_referral_my-referrals": {
+      "path": "/api/v1/referral/my-referrals",
+      "method": "GET"
+    },
+    "REFERRAL_POST_referral_claim-commission": {
+      "path": "/api/v1/referral/claim-commission",
+      "method": "POST"
+    },
+    "REFERRAL_POST_admin_referral_set-worker": {
+      "path": "/api/v1/admin/referral/set-worker",
+      "method": "POST"
+    },
+    "REFERRAL_POST_admin_referral_remove-worker": {
+      "path": "/api/v1/admin/referral/remove-worker",
+      "method": "POST"
+    },
+    "REFERRAL_GET_admin_referral_global-stats": {
+      "path": "/api/v1/admin/referral/global-stats",
+      "method": "GET"
+    },
+    "REFERRAL_POST_admin_referral_payout-all": {
+      "path": "/api/v1/admin/referral/payout-all",
       "method": "POST"
     },
     "USER_GET_profile": {
