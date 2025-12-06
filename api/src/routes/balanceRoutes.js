@@ -6,17 +6,29 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 /**
  * GET /api/v1/balance/get-balances
  * Получить все балансы текущего пользователя
+ * 
+ * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
  */
 router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
+    const userId = req.user.userId;
 
     console.log(`📊 Получаю балансы для пользователя ${userId}`);
+
+    // Проверка что userId существует
+    if (!userId) {
+      console.error('❌ userId не найден в req.user');
+      return res.status(401).json({
+        success: false,
+        error: 'Неверная аутентификация',
+      });
+    }
 
     // Получаем все балансы пользователя
     const balances = await prisma.balance.findMany({
       where: {
-        userId: userId,
+        userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО ФИЛЬТРУЕТСЯ!
       },
       include: {
         token: true,
@@ -26,7 +38,7 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
       },
     });
 
-    console.log(`✅ Найдено ${balances.length} балансов`);
+    console.log(`✅ Найдено ${balances.length} балансов для пользователя ${userId}`);
 
     res.json({
       success: true,
@@ -54,6 +66,8 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
  * POST /api/v1/balance/update-balance
  * Обновить баланс пользователя
  * 
+ * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
+ * 
  * Body:
  * {
  *   tokenId: number,
@@ -64,8 +78,18 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
  */
 router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
+    const userId = req.user.userId;
     const { tokenId, amount, type = 'MAIN', operation = 'add' } = req.body;
+
+    // Проверка что userId существует
+    if (!userId) {
+      console.error('❌ userId не найден в req.user');
+      return res.status(401).json({
+        success: false,
+        error: 'Неверная аутентификация',
+      });
+    }
 
     // Валидация
     if (!tokenId || !amount || amount <= 0) {
@@ -90,7 +114,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     let balance = await prisma.balance.findUnique({
       where: {
         userId_tokenId_type: {
-          userId: userId,
+          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
           tokenId: tokenId,
           type: type,
         },
@@ -98,10 +122,10 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     });
 
     if (!balance) {
-      console.log(`📝 Баланс не найден, создаю новый...`);
+      console.log(`📝 Баланс не найден, создаю новый для пользователя ${userId}...`);
       balance = await prisma.balance.create({
         data: {
-          userId: userId,
+          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
           tokenId: tokenId,
           type: type,
           amount: operation === 'add' ? amount : 0,
@@ -119,6 +143,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
         
         // Проверяем, чтобы баланс не стал отрицательным
         if (newAmount < 0) {
+          console.warn(`⚠️ Попытка получить отрицательный баланс для пользователя ${userId}`);
           return res.status(400).json({
             success: false,
             error: 'Недостаточно средств',
@@ -127,7 +152,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       }
 
       console.log(
-        `🔄 Обновляю баланс: ${currentAmount} → ${newAmount}`
+        `🔄 Обновляю баланс пользователя ${userId}: ${currentAmount} → ${newAmount}`
       );
 
       balance = await prisma.balance.update({
@@ -138,7 +163,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       });
     }
 
-    console.log(`✅ Баланс обновлён успешно`);
+    console.log(`✅ Баланс пользователя ${userId} обновлён успешно`);
 
     res.json({
       success: true,
@@ -164,17 +189,31 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
 /**
  * GET /api/v1/balance/balance/:tokenId
  * Получить баланс конкретного токена
+ * 
+ * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
  */
 router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
+    const userId = req.user.userId;
     const tokenId = parseInt(req.params.tokenId);
     const type = req.query.type || 'MAIN';
+
+    // Проверка что userId существует
+    if (!userId) {
+      console.error('❌ userId не найден в req.user');
+      return res.status(401).json({
+        success: false,
+        error: 'Неверная аутентификация',
+      });
+    }
+
+    console.log(`💵 Получаю баланс токена ${tokenId} для пользователя ${userId}`);
 
     const balance = await prisma.balance.findUnique({
       where: {
         userId_tokenId_type: {
-          userId: userId,
+          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
           tokenId: tokenId,
           type: type,
         },
@@ -182,6 +221,7 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
     });
 
     if (!balance) {
+      console.log(`⚠️ Баланс не найден, возвращаю 0 для пользователя ${userId}`);
       return res.json({
         success: true,
         data: {
@@ -192,6 +232,8 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
         },
       });
     }
+
+    console.log(`✅ Баланс найден: ${balance.amount}`);
 
     res.json({
       success: true,
