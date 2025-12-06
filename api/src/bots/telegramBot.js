@@ -965,8 +965,8 @@ if (!BOT_TOKEN) {
 
         const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", description, user.id);
         if (!invoice) {
-            await ctx.reply("❌ Ошибка создания инвойса.");
-            return await ctx.answerCbQuery();
+            await ctx.answerCbQuery("❌ Ошибка создания инвойса.");
+            return;
         }
 
         scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
@@ -975,7 +975,13 @@ if (!BOT_TOKEN) {
             ? `\n\n🎁 *С БОНУСОМ:*\n• +${amount} USDT бонуса\n• Отыграй в 10x\n• Действует 7 дней`
             : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
 
-        await ctx.editMessageText(
+        try {
+            // Удаляем старое сообщение
+            await ctx.deleteMessage();
+        } catch (e) {}
+
+        // Отправляем новое сообщение
+        await ctx.reply(
             `✅ *Инвойс создан*\n\nСумма: ${amount} USDT${bonusText}`,
             {
                 reply_markup: {
