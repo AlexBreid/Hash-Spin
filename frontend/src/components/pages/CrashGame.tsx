@@ -3,7 +3,7 @@ import { crashGameService } from '../../services/crashGameService';
 import type { CrashGameState, LiveEvent } from '../../services/crashGameService';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../hooks/useBalance';
-import { Zap, TrendingUp, Users, ArrowLeft, History, Timer, Flame, DollarSign, RefreshCw } from 'lucide-react';
+import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,6 +16,13 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 );
 
 const MAX_WAIT_TIME = 10;
+
+// ✅ НОВОЕ: Отслеживание крашей
+interface CrashHistory {
+  id: string;
+  crashPoint: number;
+  timestamp: Date;
+}
 
 export function CrashGame() {
   const navigate = useNavigate();
@@ -37,15 +44,16 @@ export function CrashGame() {
   const [canCashout, setCanCashout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  
+  // ✅ НОВОЕ: История крашей вместо live events
+  const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
+  const crashHistoryRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const eventContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
 
   // ================================
-  // 1️⃣ ПОДКЛЮЧЕНИЕ (ИСПРАВЛЕНО)
+  // 1️⃣ ПОДКЛЮЧЕНИЕ
   // ================================
   useEffect(() => {
     if (!user || !token) {
@@ -58,7 +66,6 @@ export function CrashGame() {
         setIsLoading(true);
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         toast.success('🚀 Подключено к Crash серверу!');
-        // Сразу после подключения обновляем баланс
         await fetchBalances();
       } catch (error) {
         console.error('Connection error:', error);
@@ -76,19 +83,6 @@ export function CrashGame() {
   // 2️⃣ ЛОГИКА ИГРЫ
   // ================================
   useEffect(() => {
-    const addLiveEvent = (type: LiveEvent['type'], message: string) => {
-      const event: LiveEvent = {
-        id: Math.random().toString(),
-        type,
-        message,
-        timestamp: new Date(),
-      };
-      setLiveEvents((prev) => [event, ...prev.slice(0, 19)]);
-      if (eventContainerRef.current) {
-        setTimeout(() => eventContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-      }
-    };
-
     const handleGameStatus = (data: CrashGameState) => {
       setGameState(data);
       if (data.status === 'waiting') setCanCashout(false);
@@ -103,9 +97,22 @@ export function CrashGame() {
     const handleGameCrashed = (data: any) => {
       setGameState((prev) => ({ ...prev, status: 'crashed', crashPoint: data.crashPoint }));
       setCanCashout(false);
-      addLiveEvent('crash', `💥 КРАХ @ ${data.crashPoint}x`);
+      
+      // ✅ НОВОЕ: Добавляем краш в историю
+      setCrashHistory((prev) => {
+        const newHistory = [
+          {
+            id: Math.random().toString(),
+            crashPoint: data.crashPoint,
+            timestamp: new Date(),
+          },
+          ...prev,
+        ];
+        // Храним только последние 10 крашей
+        return newHistory.slice(0, 10);
+      });
+
       if (betPlaced) {
-        addLiveEvent('crash', `💔 Ставка потеряна: $${currentBet.toFixed(2)}`);
         setBetPlaced(false);
       }
     };
@@ -116,7 +123,6 @@ export function CrashGame() {
       setBetPlaced(true);
       setCurrentBet(data.bet);
       setCanCashout(false);
-      addLiveEvent('bet', `🎲 Ставка: $${parseFloat(data.bet).toFixed(2)}`);
     };
 
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
@@ -124,33 +130,12 @@ export function CrashGame() {
       const multiplier = parseFloat(data.multiplier.toString());
       const profit = winAmount - currentBet;
 
-      setHistory((prev) => {
-        const newHistory = [
-          {
-            crash: gameState.crashPoint,
-            multiplier,
-            bet: currentBet,
-            winnings: winAmount,
-            result: 'won',
-            timestamp: new Date(),
-          },
-          ...prev,
-        ];
-        // Хранить только последние 10 ставок
-        return newHistory.slice(0, 10);
-      });
-
-      addLiveEvent('cashout', `🤑 ВЫИГРЫШ: +$${profit.toFixed(2)} (${multiplier}x)`);
       setBetPlaced(false);
       setCanCashout(false);
       
       // Обновляем баланс после выигрыша
       setTimeout(() => fetchBalances(), 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
-    };
-
-    const handlePlayerCashedOut = (data: any) => {
-      addLiveEvent('cashout', `👤 ${data.userName}: ${data.multiplier}x`);
     };
 
     const handleCountdownUpdate = (data: { seconds: number }) => {
@@ -167,7 +152,6 @@ export function CrashGame() {
     crashGameService.on('playerJoined', handlePlayerJoined);
     crashGameService.on('betPlaced', handleBetPlaced);
     crashGameService.on('cashoutSuccess', handleCashoutSuccess);
-    crashGameService.on('playerCashedOut', handlePlayerCashedOut);
     crashGameService.on('countdownUpdate', handleCountdownUpdate);
     crashGameService.on('error', handleError);
 
@@ -178,11 +162,10 @@ export function CrashGame() {
       crashGameService.off('playerJoined', handlePlayerJoined);
       crashGameService.off('betPlaced', handleBetPlaced);
       crashGameService.off('cashoutSuccess', handleCashoutSuccess);
-      crashGameService.off('playerCashedOut', handlePlayerCashedOut);
       crashGameService.off('countdownUpdate', handleCountdownUpdate);
       crashGameService.off('error', handleError);
     };
-  }, [betPlaced, currentBet, gameState.crashPoint, fetchBalances]);
+  }, [betPlaced, currentBet, fetchBalances]);
 
   // ================================
   // 3️⃣ CANVAS ОТРИСОВКА
@@ -404,7 +387,7 @@ export function CrashGame() {
 
         {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto p-4 lg:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-max lg:auto-rows-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ЛЕВАЯ ЧАСТЬ - CANVAS И УПРАВЛЕНИЕ */}
             <div className="lg:col-span-2 flex flex-col gap-6">
               {/* CANVAS */}
@@ -465,15 +448,15 @@ export function CrashGame() {
               {/* УПРАВЛЕНИЕ */}
               <GlassCard className="p-4 lg:p-6">
                 <div className="space-y-3">
-                  {/* INPUT СТАВКИ */}
+                  {/* INPUT СТАВКИ - ИСПРАВЛЕНО */}
                   <div>
                     <label className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 block">
                       Размер ставки
                     </label>
                     <div className="flex gap-2">
-                      {/* Контейнер с $ и input */}
-                      <div className="flex-1 relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
+                      {/* ✅ ИСПРАВЛЕНО: Контейнер с $ */}
+                      <div className="flex-1 relative flex items-center">
+                        <span className="absolute left-3 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
                           $
                         </span>
                         <input
@@ -489,23 +472,23 @@ export function CrashGame() {
                           min="0"
                           step="0.01"
                           disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-2 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
+                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
                           placeholder="0.00"
                         />
                       </div>
 
-                      {/* КНОПКИ — без изменений */}
+                      {/* КНОПКИ ÷2 и ×2 */}
                       <button
-                        onClick={() => setInputBet((prev) => Math.max(1, parseFloat(prev) / 2).toFixed(2))}
-                        className="px-2 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold"
+                        onClick={() => setInputBet((prev) => Math.max(0.01, parseFloat(prev || '0') / 2).toFixed(2))}
+                        className="px-3 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold flex-shrink-0"
                         disabled={betPlaced || gameState.status !== 'waiting'}
                         title="Разделить на 2"
                       >
                         ÷2
                       </button>
                       <button
-                        onClick={() => setInputBet((prev) => (parseFloat(prev) * 2).toFixed(2))}
-                        className="px-2 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold"
+                        onClick={() => setInputBet((prev) => (parseFloat(prev || '0') * 2).toFixed(2))}
+                        className="px-3 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold flex-shrink-0"
                         disabled={betPlaced || gameState.status !== 'waiting'}
                         title="Умножить на 2"
                       >
@@ -548,56 +531,64 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ПРАВАЯ ЧАСТЬ - LIVE FEED И ИСТОРИЯ */}
-            <div className="lg:col-span-1 flex flex-col gap-6 h-full">
-              {/* LIVE FEED */}
-              <GlassCard className="flex flex-col h-[250px] lg:h-[280px]">
+            {/* ПРАВАЯ ЧАСТЬ - ТОЛЬКО CRASH HISTORY */}
+            <div className="lg:col-span-1">
+              {/* ✅ CRASH HISTORY - ПОСЛЕДНИЕ 10 КРАШЕЙ */}
+              <GlassCard className="flex flex-col h-[550px] lg:h-[600px]">
                 <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
                   <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
-                  <span className="text-xs lg:text-sm">LIVE FEED</span>
-                  <span className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАХИ</span>
+                  <span className="ml-auto text-xs text-gray-500">{crashHistory.length}/10</span>
                 </div>
+                
                 <div 
-                  ref={eventContainerRef}
-                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-1 lg:space-y-2"
+                  ref={crashHistoryRef}
+                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2"
                 >
-                  {liveEvents.length > 0 ? (
-                    liveEvents.map((ev) => (
-                      <div key={ev.id} className="text-xs px-2 lg:px-3 py-1 lg:py-2 rounded-lg bg-black/40 border border-white/10">
-                        <span className="text-gray-500 font-mono text-[9px] lg:text-[10px]">{ev.timestamp.toLocaleTimeString()}</span>
-                        <span className="block mt-0.5 text-gray-200 text-xs lg:text-sm leading-tight">{ev.message}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500 text-xs">Нет событий</div>
-                  )}
-                </div>
-              </GlassCard>
+                  {crashHistory.length > 0 ? (
+                    crashHistory.map((crash) => {
+                      // ✅ Цветовая градация в зависимости от значения краша
+                      let bgColor = 'bg-black/40 border-white/10';
+                      let crashColor = 'text-gray-300';
+                      
+                      if (crash.crashPoint < 2) {
+                        bgColor = 'bg-red-950/30 border-red-500/30';
+                        crashColor = 'text-red-400';
+                      } else if (crash.crashPoint < 5) {
+                        bgColor = 'bg-orange-950/30 border-orange-500/30';
+                        crashColor = 'text-orange-400';
+                      } else if (crash.crashPoint < 10) {
+                        bgColor = 'bg-yellow-950/30 border-yellow-500/30';
+                        crashColor = 'text-yellow-400';
+                      } else if (crash.crashPoint < 20) {
+                        bgColor = 'bg-emerald-950/30 border-emerald-500/30';
+                        crashColor = 'text-emerald-400';
+                      } else {
+                        bgColor = 'bg-purple-950/30 border-purple-500/30';
+                        crashColor = 'text-purple-400';
+                      }
 
-              {/* ИСТОРИЯ */}
-              <GlassCard className="flex flex-col h-[250px] lg:h-[280px]">
-                <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
-                  <History className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-400" />
-                  <span className="text-xs lg:text-sm">ИСТОРИЯ</span>
-                  <span className="ml-auto text-xs text-gray-500">{history.length}/10</span>
-                </div>
-                <div 
-                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-1 lg:space-y-2"
-                >
-                  {history.length > 0 ? (
-                    history.map((h, i) => (
-                      <div key={i} className="text-xs p-2 rounded-lg bg-black/40 border border-white/10 hover:border-white/20 transition-all">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400 font-mono text-[10px]">${h.bet.toFixed(2)}</span>
-                          <span className={h.result === 'won' ? 'text-emerald-400 font-bold text-xs' : 'text-red-400 text-xs'}>
-                            {h.result === 'won' ? `+$${(h.winnings - h.bet).toFixed(2)}` : `-$${h.bet}`}
-                          </span>
+                      return (
+                        <div 
+                          key={crash.id} 
+                          className={`p-3 lg:p-4 rounded-lg border transition-all hover:border-white/30 ${bgColor}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-2xl lg:text-3xl font-black font-mono ${crashColor}`}>
+                              {crash.crashPoint.toFixed(2)}x
+                            </span>
+                            <span className="text-[10px] lg:text-xs text-gray-500 font-mono">
+                              {crash.timestamp.toLocaleTimeString()}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-gray-500 text-[10px] block mt-0.5">{h.multiplier?.toFixed(2)}x</span>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <div className="text-center py-8 text-gray-500 text-xs">История пуста</div>
+                    <div className="text-center py-16 text-gray-500 text-xs">
+                      <div className="text-4xl mb-2">📊</div>
+                      Крахи появятся здесь
+                    </div>
                   )}
                 </div>
               </GlassCard>
@@ -617,6 +608,17 @@ export function CrashGame() {
         div {
           scrollbar-color: rgba(34, 197, 94, 0.3) transparent;
           scrollbar-width: thin;
+        }
+        
+        /* Remove number input spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        
+        input[type="number"] {
+          -moz-appearance: textfield;
         }
         
         @keyframes gradient { 0% { background-position: 0%; } 100% { background-position: 100%; } }

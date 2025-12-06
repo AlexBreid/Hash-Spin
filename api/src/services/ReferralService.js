@@ -7,10 +7,12 @@ const CONFIG = {
   WAGERING_MULTIPLIER: 10,           // x10 для отыгрыша
   BONUS_EXPIRY_DAYS: 7,              // Бонус сгорает через 7 дней
   
-  // Комиссия реферера
+  // Комиссия обычных рефералов (по старой формуле)
   HOUSE_EDGE: 0.03,                  // 3% преимущество казино
-  REGULAR_COMMISSION_RATE: 0.30,     // 30% для обычных
-  WORKER_COMMISSION_RATE: 0.40,      // 40% для воркеров
+  REGULAR_COMMISSION_RATE: 0.30,     // 30% от дохода казино
+  
+  // ✅ НОВОЕ: Комиссия воркеров (5% от чистого профита)
+  WORKER_PROFIT_SHARE: 0.05,         // 5% от профита
   
   // Оптимизация
   MIN_TURNOVER_FOR_PAYOUT: 100,      // Минимальный оборот для выплаты комиссии
@@ -148,7 +150,9 @@ class ReferralService {
           tokenId,
           totalTurnover: '0',
           turnoverSinceLastPayout: '0',
-          totalCommissionPaid: '0'
+          totalCommissionPaid: '0',
+          totalLosses: '0',  // ✅ ДОБАВЛЕНО: Отслеживаем проигрыши для расчета профита
+          totalWinnings: '0' // ✅ ДОБАВЛЕНО: Отслеживаем выигрыши
         },
         update: {} // Ничего не обновляем, просто убеждаемся что запись есть
       });
@@ -345,7 +349,9 @@ class ReferralService {
           tokenId,
           totalTurnover: betAmount.toString(),
           turnoverSinceLastPayout: betAmount.toString(),
-          totalCommissionPaid: '0'
+          totalCommissionPaid: '0',
+          totalLosses: '0',
+          totalWinnings: '0'
         },
         update: {
           totalTurnover: { increment: betAmount },
@@ -359,8 +365,68 @@ class ReferralService {
   }
   
   /**
+   * 📊 Обновить результат ставки (выигрыш/проигрыш) для расчета профита
+   * Вызывается после завершения раунда
+   * 
+   * @param {number} userId - ID игрока
+   * @param {number} betAmount - Размер ставки
+   * @param {number} resultAmount - Результат (выигрыш или 0 если проигрыш)
+   * @param {number} tokenId - ID токена
+   */
+  async recordGameResult(userId, betAmount, resultAmount, tokenId) {
+    try {
+      // Находим реферера
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { referredById: true }
+      });
+      
+      if (!user?.referredById) {
+        return; // Нет реферера
+      }
+      
+      // Рассчитываем потерю/прибыль для казино
+      // Если игрок выиграл resultAmount, казино потеряло (resultAmount - betAmount)
+      // Если игрок проиграл, казино выиграло betAmount
+      const casinoProfit = betAmount - resultAmount;  // Положительно если казино выиграло
+      
+      // Обновляем статистику
+      const stats = await prisma.referralStats.findUnique({
+        where: {
+          referrerId_refereeId_tokenId: {
+            referrerId: user.referredById,
+            refereeId: userId,
+            tokenId
+          }
+        }
+      });
+      
+      if (stats) {
+        const currentLosses = parseFloat(stats.totalLosses?.toString() || '0');
+        const currentWinnings = parseFloat(stats.totalWinnings?.toString() || '0');
+        
+        await prisma.referralStats.update({
+          where: { id: stats.id },
+          data: {
+            totalLosses: (currentLosses + (casinoProfit > 0 ? casinoProfit : 0)).toString(),
+            totalWinnings: (currentWinnings + (casinoProfit < 0 ? Math.abs(casinoProfit) : 0)).toString()
+          }
+        });
+        
+        console.log(`📊 [PROFIT] User ${userId}: bet=${betAmount}, result=${resultAmount}, casinoProfit=${casinoProfit}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ [REFERRAL] Ошибка записи результата:`, error);
+    }
+  }
+  
+  /**
    * 💸 Рассчитать и выплатить комиссию рефереру
-   * Формула: Commission = (HouseEdge × Turnover / 2) × Rate
+   * 
+   * ✅ НОВАЯ СИСТЕМА:
+   * - Обычные рефералы: 30% от дохода казино (старая формула)
+   * - Воркеры: 5% от чистого профита (turnover - losses)
    * 
    * @param {number} referrerId - ID реферера
    * @param {number} refereeId - ID реферала
@@ -368,7 +434,7 @@ class ReferralService {
    */
   async payoutReferrerCommission(referrerId, refereeId, tokenId) {
     try {
-      // 1. Получаем статистику
+      // 1. Получаем статистику и информацию о рефереке
       const stats = await prisma.referralStats.findUnique({
         where: {
           referrerId_refereeId_tokenId: { referrerId, refereeId, tokenId }
@@ -386,27 +452,54 @@ class ReferralService {
         return null;
       }
       
-      // 2. Определяем процент комиссии
+      // 2. Определяем тип реферера и рассчитываем комиссию
       const referrer = await prisma.user.findUnique({
         where: { id: referrerId },
         select: { referrerType: true }
       });
       
-      const commissionRate = referrer?.referrerType === 'WORKER' 
-        ? CONFIG.WORKER_COMMISSION_RATE 
-        : CONFIG.REGULAR_COMMISSION_RATE;
+      let commission = 0;
+      let calculationDetails = {};
       
-      // 3. Рассчитываем комиссию: (HouseEdge × Turnover / 2) × Rate
-      const commission = (CONFIG.HOUSE_EDGE * turnover / 2) * commissionRate;
+      if (referrer?.referrerType === 'WORKER') {
+        // ✅ ВОРКЕР: 5% от чистого профита
+        const losses = parseFloat(stats.totalLosses?.toString() || '0');
+        
+        // Чистый профит = деньги потеряные игроками (казино выиграло)
+        const netProfit = losses;
+        commission = netProfit * CONFIG.WORKER_PROFIT_SHARE;
+        
+        calculationDetails = {
+          type: 'WORKER',
+          turnover,
+          losses: netProfit,  // Чистый профит казино
+          rate: CONFIG.WORKER_PROFIT_SHARE * 100,
+          commission
+        };
+        
+        console.log(`💸 [COMMISSION-WORKER] Воркер ${referrerId} от реферала ${refereeId}: losses=${netProfit}, rate=5%, commission=${commission}`);
+      } 
+      else {
+        // 🔵 ОБЫЧНЫЙ РЕФЕРАЛ: 30% от дохода казино
+        commission = (CONFIG.HOUSE_EDGE * turnover / 2) * CONFIG.REGULAR_COMMISSION_RATE;
+        
+        calculationDetails = {
+          type: 'REGULAR',
+          turnover,
+          rate: CONFIG.REGULAR_COMMISSION_RATE * 100,
+          houseEdge: CONFIG.HOUSE_EDGE,
+          commission
+        };
+        
+        console.log(`💸 [COMMISSION-REGULAR] Реферер ${referrerId}: turnover=${turnover}, rate=30%, commission=${commission}`);
+      }
       
       if (commission < CONFIG.MIN_COMMISSION_PAYOUT) {
         console.log(`⚠️ [COMMISSION] Комиссия ${commission} меньше минимума ${CONFIG.MIN_COMMISSION_PAYOUT}`);
         return null;
       }
       
-      console.log(`💸 [COMMISSION] Реферер ${referrerId}: turnover=${turnover}, rate=${commissionRate * 100}%, commission=${commission}`);
-      
-      // 4. Выплачиваем комиссию
+      // 3. Выплачиваем комиссию
       await prisma.$transaction([
         // Обновляем статистику
         prisma.referralStats.update({
@@ -456,12 +549,11 @@ class ReferralService {
         })
       ]);
       
-      console.log(`✅ [COMMISSION] Выплачено ${commission} рефереру ${referrerId}`);
+      console.log(`✅ [COMMISSION] Выплачено ${commission} ${referrer?.referrerType === 'WORKER' ? 'воркеру' : 'рефереру'} ${referrerId}`);
       
       return {
         commission,
-        turnover,
-        rate: commissionRate * 100
+        ...calculationDetails
       };
       
     } catch (error) {
@@ -490,6 +582,8 @@ class ReferralService {
       
       let totalPaid = 0;
       let successCount = 0;
+      let workerCount = 0;
+      let regularCount = 0;
       
       for (const stats of pendingStats) {
         try {
@@ -502,18 +596,28 @@ class ReferralService {
           if (result) {
             totalPaid += result.commission;
             successCount++;
+            
+            if (result.type === 'WORKER') {
+              workerCount++;
+            } else {
+              regularCount++;
+            }
           }
         } catch (error) {
           console.error(`❌ [COMMISSION] Ошибка для пары ${stats.referrerId}-${stats.refereeId}:`, error.message);
         }
       }
       
-      console.log(`✅ [COMMISSION] Выплачено ${totalPaid} по ${successCount} записям`);
+      console.log(`✅ [COMMISSION] Выплачено ${totalPaid} по ${successCount} записям (воркеры: ${workerCount}, обычные: ${regularCount})`);
       
       return {
         processed: pendingStats.length,
         success: successCount,
-        totalPaid
+        totalPaid,
+        breakdown: {
+          workers: workerCount,
+          regular: regularCount
+        }
       };
       
     } catch (error) {
@@ -532,7 +636,7 @@ class ReferralService {
         data: { referrerType: 'WORKER' }
       });
       
-      console.log(`👷 [REFERRAL] Пользователь ${userId} установлен как WORKER`);
+      console.log(`👷 [REFERRAL] Пользователь ${userId} установлен как WORKER (получает 5% от профита рефов)`);
       return user;
       
     } catch (error) {
@@ -562,24 +666,39 @@ class ReferralService {
         _sum: {
           totalTurnover: true,
           totalCommissionPaid: true,
-          turnoverSinceLastPayout: true
+          turnoverSinceLastPayout: true,
+          totalLosses: true,      // ✅ НОВОЕ: Всего потерял казино
+          totalWinnings: true     // ✅ НОВОЕ: Всего выиграл казино
         }
       });
       
-      const commissionRate = user?.referrerType === 'WORKER' 
-        ? CONFIG.WORKER_COMMISSION_RATE 
-        : CONFIG.REGULAR_COMMISSION_RATE;
-      
-      // Расчёт потенциальной комиссии
+      const isWorker = user?.referrerType === 'WORKER';
+      const totalLosses = parseFloat(stats._sum.totalLosses?.toString() || '0');
+      const totalTurnover = parseFloat(stats._sum.totalTurnover?.toString() || '0');
       const pendingTurnover = parseFloat(stats._sum.turnoverSinceLastPayout?.toString() || '0');
-      const potentialCommission = (CONFIG.HOUSE_EDGE * pendingTurnover / 2) * commissionRate;
+      const pendingLosses = totalLosses; // Потерь на пендинге рассчитаем отдельно если нужно
+      
+      let potentialCommission = 0;
+      let commissionRate = 0;
+      
+      if (isWorker) {
+        // Воркер: 5% от чистого профита
+        potentialCommission = totalLosses * CONFIG.WORKER_PROFIT_SHARE;
+        commissionRate = CONFIG.WORKER_PROFIT_SHARE * 100;
+      } else {
+        // Обычный: 30% от дохода казино
+        potentialCommission = (CONFIG.HOUSE_EDGE * totalTurnover / 2) * CONFIG.REGULAR_COMMISSION_RATE;
+        commissionRate = CONFIG.REGULAR_COMMISSION_RATE * 100;
+      }
       
       return {
         referralCode: user?.referralCode,
         referrerType: user?.referrerType || 'REGULAR',
-        commissionRate: commissionRate * 100,
+        isWorker,
+        commissionRate,
         referralsCount,
-        totalTurnover: parseFloat(stats._sum.totalTurnover?.toString() || '0'),
+        totalTurnover,
+        totalLosses,  // ✅ НОВОЕ: Казино выиграло
         totalCommissionPaid: parseFloat(stats._sum.totalCommissionPaid?.toString() || '0'),
         pendingTurnover,
         potentialCommission: potentialCommission.toFixed(4)
