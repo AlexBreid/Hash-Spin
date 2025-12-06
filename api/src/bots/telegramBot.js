@@ -906,6 +906,75 @@ if (!BOT_TOKEN) {
         await ctx.answerCbQuery();
     });
 
+    // ✅ РЕГИСТРИРУЕМ СНАЧАЛА СПЕЦИФИЧНЫЕ CALLBACKS (ДО ОБЩИХ REGEX)
+    // Это КРИТИЧНО - более специфичные patterns должны идти РАНЬШЕ!
+    
+    // ✅ НОВЫЙ CALLBACK: ВЫБОР БОНУСА - РЕГИСТРИРУЕТСЯ ПЕРВЫМ!
+    bot.action(/confirm_deposit_(\d+)_(yes|no)/, async (ctx) => {
+        try {
+            console.log(`[CALLBACK] confirm_deposit triggered - Data: ${ctx.match[0]}`);
+            
+            const amount = parseInt(ctx.match[1]);
+            const useBonus = ctx.match[2] === 'yes';
+            
+            console.log(`[DEPOSIT] Amount: ${amount}, UseBonus: ${useBonus}`);
+            
+            const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+            if (!user) {
+                console.log(`[ERROR] User not found for telegramId: ${ctx.from.id.toString()}`);
+                await ctx.answerCbQuery("❌ Пользователь не найден.");
+                return;
+            }
+
+            const description = useBonus 
+                ? `Deposit User #${user.id} WITH BONUS +100%`
+                : `Deposit User #${user.id}`;
+
+            console.log(`[INVOICE] Creating invoice - Amount: ${amount}, Description: ${description}`);
+
+            const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", description, user.id);
+            if (!invoice) {
+                console.log(`[ERROR] Failed to create invoice`);
+                await ctx.answerCbQuery("❌ Ошибка создания инвойса.");
+                return;
+            }
+
+            console.log(`[INVOICE] Created successfully - ID: ${invoice.invoice_id}`);
+
+            scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+
+            const bonusText = useBonus 
+                ? `\n\n🎁 *С БОНУСОМ:*\n• +${amount} USDT бонуса\n• Отыграй в 10x\n• Действует 7 дней`
+                : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
+
+            try {
+                await ctx.deleteMessage();
+                console.log(`[DELETE] Message deleted`);
+            } catch (e) {
+                console.log(`[DELETE] Failed to delete message: ${e.message}`);
+            }
+
+            await ctx.reply(
+                `✅ *Инвойс создан*\n\nСумма: ${amount} USDT${bonusText}`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
+                            [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }]
+                        ]
+                    },
+                    parse_mode: "Markdown"
+                }
+            );
+            
+            console.log(`[REPLY] Message sent successfully`);
+            await ctx.answerCbQuery();
+        } catch (error) {
+            console.error(`[ERROR] In confirm_deposit callback:`, error);
+            await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`);
+        }
+    });
+
     // ✅ ОБНОВЛЕНО: ПРОВЕРКА РЕФЕРЕРА И ВЫБОР БОНУСА
     bot.action(/deposit_(\d+)/, async (ctx) => {
         const amount = parseInt(ctx.match[1]);
@@ -961,74 +1030,6 @@ if (!BOT_TOKEN) {
         await ctx.answerCbQuery();
     });
 
-    // ✅ НОВЫЙ CALLBACK: ВЫБОР БОНУСА
-    bot.action(/confirm_deposit_(\d+)_(yes|no)/, async (ctx) => {
-        try {
-            console.log(`[CALLBACK] confirm_deposit triggered - Data: ${ctx.match[0]}`);
-            
-            const amount = parseInt(ctx.match[1]);
-            const useBonus = ctx.match[2] === 'yes';
-            
-            console.log(`[DEPOSIT] Amount: ${amount}, UseBonus: ${useBonus}`);
-            
-            const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-            if (!user) {
-                console.log(`[ERROR] User not found for telegramId: ${ctx.from.id.toString()}`);
-                await ctx.answerCbQuery("❌ Пользователь не найден.");
-                return;
-            }
-
-            const description = useBonus 
-                ? `Deposit User #${user.id} WITH BONUS +100%`
-                : `Deposit User #${user.id}`;
-
-            console.log(`[INVOICE] Creating invoice - Amount: ${amount}, Description: ${description}`);
-
-            const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", description, user.id);
-            if (!invoice) {
-                console.log(`[ERROR] Failed to create invoice`);
-                await ctx.answerCbQuery("❌ Ошибка создания инвойса.");
-                return;
-            }
-
-            console.log(`[INVOICE] Created successfully - ID: ${invoice.invoice_id}`);
-
-            scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
-
-            const bonusText = useBonus 
-                ? `\n\n🎁 *С БОНУСОМ:*\n• +${amount} USDT бонуса\n• Отыграй в 10x\n• Действует 7 дней`
-                : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
-
-            try {
-                // Удаляем старое сообщение
-                await ctx.deleteMessage();
-                console.log(`[DELETE] Message deleted`);
-            } catch (e) {
-                console.log(`[DELETE] Failed to delete message: ${e.message}`);
-            }
-
-            // Отправляем новое сообщение
-            await ctx.reply(
-                `✅ *Инвойс создан*\n\nСумма: ${amount} USDT${bonusText}`,
-                {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
-                            [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }]
-                        ]
-                    },
-                    parse_mode: "Markdown"
-                }
-            );
-            
-            console.log(`[REPLY] Message sent successfully`);
-            
-            await ctx.answerCbQuery();
-        } catch (error) {
-            console.error(`[ERROR] In confirm_deposit callback:`, error);
-            await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`);
-        }
-    });
 
     bot.action(/check_invoice_(\d+)/, async (ctx) => {
         try {
