@@ -489,7 +489,7 @@ export function CrashGame() {
                           min="0"
                           step="0.01"
                           disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
+                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-2 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
                           placeholder="0.00"
                         />
                       </div>
