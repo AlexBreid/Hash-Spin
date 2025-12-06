@@ -52,7 +52,7 @@ export function useBalance() {
       console.log(`🔄 Загружаю балансы пользователя ${user?.id}...`);
 
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/balance/get-balances`,
+        `${API_BASE_URL}/api/v1/wallet/balance`,
         {
           method: 'GET',
           headers: {
