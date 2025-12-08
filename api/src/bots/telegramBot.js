@@ -579,6 +579,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
+            // ✅ ПРОВЕРКА ВЫВОДА СУММЫ - ЭТА ЧАСТЬ ДОЛЖНА БЫТЬ ПЕРВОЙ!
             if (waitingForWithdrawAmount.has(user.id)) {
                 const amount = parseFloat(text);
                 const balance = await getUserBalance(user.id);
@@ -592,6 +593,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
+            // ✅ ПРОВЕРКА АДРЕСА ВЫВОДА
             if (waitingForWithdrawAddress.has(user.id)) {
                 const amount = waitingForWithdrawAddress.get(user.id);
                 const walletAddress = text.trim();
@@ -649,7 +651,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
-            // ✅ ОБНОВЛЕНО: ПРОВЕРКА РЕФЕРЕРА И ВЫБОР БОНУСА
+            // ✅ ПРОВЕРКА СУММЫ ДЕПОЗИТА - ИСПРАВЛЕНО!
             if (waitingForDeposit.has(user.id)) {
                 const amount = Number(text);
                 if (isNaN(amount) || amount <= 0) {
@@ -658,9 +660,18 @@ if (!BOT_TOKEN) {
                 }
                 waitingForDeposit.delete(user.id);
                 
-                // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР?
-                if (user.referredById) {
-                    // ЕСТЬ РЕФЕРЕР - СПРАШИВАЕМ ИСПОЛЬЗОВАТЬ БОНУС
+                // ✅ КРИТИЧНО: Проверяем был ли уже депозит
+                const existingDeposit = await prisma.transaction.findFirst({
+                    where: {
+                        userId: user.id,
+                        type: 'DEPOSIT',
+                        status: 'COMPLETED'
+                    }
+                });
+                
+                // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР И ЭТО ПЕРВЫЙ ДЕПОЗИТ?
+                if (user.referredById && !existingDeposit) {
+                    // ЕСТЬ РЕФЕРЕР И ПЕРВЫЙ ДЕПОЗИТ - СПРАШИВАЕМ ИСПОЛЬЗОВАТЬ БОНУС
                     await ctx.reply(
                         `💰 *Пополнение на ${amount} USDT*\n\n` +
                         `🎁 Использовать бонус?`,
@@ -675,7 +686,7 @@ if (!BOT_TOKEN) {
                         }
                     );
                 } else {
-                    // НЕТ РЕФЕРЕРА - ПОПОЛНЯЕМ БЕЗ БОНУСА
+                    // ЛИБО НЕТ РЕФЕРЕРА, ЛИБО УЖЕ БЫЛ ДЕПОЗИТ - ПОПОЛНЯЕМ БЕЗ ВОПРОСА
                     const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
                     if (!invoice) {
                         await ctx.reply("❌ Ошибка при создании инвойса.");
@@ -698,6 +709,7 @@ if (!BOT_TOKEN) {
                 return;
             }
 
+            // ✅ ОБРАБОТКА ОСНОВНЫХ КОМАНД
             switch (text) {
                 case '🎰 Казино':
                     const oneTimeToken = await generateOneTimeToken(user.id);
@@ -906,10 +918,7 @@ if (!BOT_TOKEN) {
         await ctx.answerCbQuery();
     });
 
-    // ✅ РЕГИСТРИРУЕМ СНАЧАЛА СПЕЦИФИЧНЫЕ CALLBACKS (ДО ОБЩИХ REGEX)
-    // Это КРИТИЧНО - более специфичные patterns должны идти РАНЬШЕ!
-    
-    // ✅ НОВЫЙ CALLBACK: ВЫБОР БОНУСА - РЕГИСТРИРУЕТСЯ ПЕРВЫМ!
+    // ✅ НОВЫЙ CALLBACK: ВЫБОР БОНУСА
     bot.action(/confirm_deposit_(\d+)_(yes|no)/, async (ctx) => {
         try {
             console.log(`[CALLBACK] confirm_deposit triggered - Data: ${ctx.match[0]}`);
@@ -975,130 +984,68 @@ if (!BOT_TOKEN) {
         }
     });
 
-    // ✅ ОБНОВЛЕНО: ПРОВЕРКА РЕФЕРЕРА И ВЫБОР БОНУСА
-// ✅ ИСПРАВЛЕНО: ПРОВЕРКА ПЕРВОГО ДЕПОЗИТА
+    bot.action(/deposit_(\d+)/, async (ctx) => {
+        const amount = parseInt(ctx.match[1]);
+        const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
+        if (!user) return;
 
-// В callback для deposit сумм:
-bot.action(/deposit_(\d+)/, async (ctx) => {
-    const amount = parseInt(ctx.match[1]);
-    const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-    if (!user) return;
+        // ✅ КРИТИЧНО: Проверяем был ли уже депозит
+        const existingDeposit = await prisma.transaction.findFirst({
+            where: {
+                userId: user.id,
+                type: 'DEPOSIT',
+                status: 'COMPLETED'
+            }
+        });
 
-    // ✅ КРИТИЧНО: Проверяем был ли уже депозит
-    const existingDeposit = await prisma.transaction.findFirst({
-        where: {
-            userId: user.id,
-            type: 'DEPOSIT',
-            status: 'COMPLETED'
+        // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР И ЭТО ПЕРВЫЙ ДЕПОЗИТ?
+        if (user.referredById && !existingDeposit) {
+            // ЕСТЬ РЕФЕРЕР И ПЕРВЫЙ ДЕПОЗИТ - ПОКАЗЫВАЕМ ВОПРОС О БОНУСЕ
+            try {
+                await ctx.deleteMessage();
+            } catch (e) {}
+            
+            await ctx.reply(
+                `💰 *Пополнение на ${amount} USDT*\n\n` +
+                `🎁 Использовать бонус +100%?`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "✅ С БОНУСОМ +100%", callback_data: `confirm_deposit_${amount}_yes` }],
+                            [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount}_no` }]
+                        ]
+                    },
+                    parse_mode: "Markdown"
+                }
+            );
+        } else {
+            // ЛИБО НЕТ РЕФЕРЕРА, ЛИБО УЖЕ БЫЛ ДЕПОЗИТ - ПОПОЛНЯЕМ БЕЗ ВОПРОСА
+            const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
+            if (!invoice) {
+                await ctx.reply("❌ Ошибка создания инвойса.");
+                return await ctx.answerCbQuery();
+            }
+            scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+            
+            try {
+                await ctx.deleteMessage();
+            } catch (e) {}
+            
+            await ctx.reply(
+                `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
+                            [{ text: "🔄 Проверить", callback_data: `check_invoice_${invoice.invoice_id}` }]
+                        ]
+                    },
+                    parse_mode: "Markdown"
+                }
+            );
         }
+        await ctx.answerCbQuery();
     });
-
-    // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР И ЭТО ПЕРВЫЙ ДЕПОЗИТ?
-    if (user.referredById && !existingDeposit) {
-        // ЕСТЬ РЕФЕРЕР И ПЕРВЫЙ ДЕПОЗИТ - ПОКАЗЫВАЕМ ВОПРОС О БОНУСЕ
-        try {
-            await ctx.deleteMessage();
-        } catch (e) {}
-        
-        await ctx.reply(
-            `💰 *Пополнение на ${amount} USDT*\n\n` +
-            `🎁 Использовать бонус +100%?`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "✅ С БОНУСОМ +100%", callback_data: `confirm_deposit_${amount}_yes` }],
-                        [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount}_no` }]
-                    ]
-                },
-                parse_mode: "Markdown"
-            }
-        );
-    } else {
-        // ЛИБО НЕТ РЕФЕРЕРА, ЛИБО УЖЕ БЫЛ ДЕПОЗИТ - ПОПОЛНЯЕМ БЕЗ ВОПРОСА
-        const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
-        if (!invoice) {
-            await ctx.reply("❌ Ошибка создания инвойса.");
-            return await ctx.answerCbQuery();
-        }
-        scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
-        
-        try {
-            await ctx.deleteMessage();
-        } catch (e) {}
-        
-        await ctx.reply(
-            `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
-                        [{ text: "🔄 Проверить", callback_data: `check_invoice_${invoice.invoice_id}` }]
-                    ]
-                },
-                parse_mode: "Markdown"
-            }
-        );
-    }
-    await ctx.answerCbQuery();
-});
-
-// ✅ ТА ЖЕ ЛОГИКА ДЛЯ ТЕКСТОВОГО ВВОДА СУММЫ:
-if (waitingForDeposit.has(user.id)) {
-    const amount = Number(text);
-    if (isNaN(amount) || amount <= 0) {
-        await ctx.reply("❌ Введите корректную сумму. Пример: 10.5");
-        return;
-    }
-    waitingForDeposit.delete(user.id);
-    
-    // ✅ КРИТИЧНО: Проверяем был ли уже депозит
-    const existingDeposit = await prisma.transaction.findFirst({
-        where: {
-            userId: user.id,
-            type: 'DEPOSIT',
-            status: 'COMPLETED'
-        }
-    });
-    
-    // ПРОВЕРКА: ЕСТЬ ЛИ РЕФЕРЕР И ЭТО ПЕРВЫЙ ДЕПОЗИТ?
-    if (user.referredById && !existingDeposit) {
-        // ЕСТЬ РЕФЕРЕР И ПЕРВЫЙ ДЕПОЗИТ - СПРАШИВАЕМ ИСПОЛЬЗОВАТЬ БОНУС
-        await ctx.reply(
-            `💰 *Пополнение на ${amount} USDT*\n\n` +
-            `🎁 Использовать бонус?`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "✅ С БОНУСОМ +100%", callback_data: `confirm_deposit_${amount}_yes` }],
-                        [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount}_no` }]
-                    ]
-                },
-                parse_mode: "Markdown"
-            }
-        );
-    } else {
-        // ЛИБО НЕТ РЕФЕРЕРА, ЛИБО УЖЕ БЫЛ ДЕПОЗИТ - ПОПОЛНЯЕМ БЕЗ ВОПРОСА
-        const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
-        if (!invoice) {
-            await ctx.reply("❌ Ошибка при создании инвойса.");
-            return;
-        }
-        scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
-        await ctx.reply(
-            `✅ *Инвойс создан*\n\nСумма: ${amount} USDT`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "💳 Оплатить", url: invoice.bot_invoice_url }],
-                        [{ text: "🔄 Проверить", callback_data: `check_invoice_${invoice.invoice_id}` }]
-                    ]
-                },
-                parse_mode: "Markdown"
-            }
-        );
-    }
-    return;
-}
 
     bot.action(/check_invoice_(\d+)/, async (ctx) => {
         try {
@@ -1306,7 +1253,7 @@ if (waitingForDeposit.has(user.id)) {
 
                 if (existingTx) {
                     console.log(`[WEBHOOK] ⚠️ Invoice #${invoiceId} already processed (TX ID: ${existingTx.id}), skipping to prevent duplicate`);
-                    res.status(200).send('OK'); // Отправляем OK чтобы не переполнить очередь
+                    res.status(200).send('OK');
                     continue;
                 }
 
@@ -1412,20 +1359,19 @@ if (waitingForDeposit.has(user.id)) {
                             }
                         } catch (e) {
                             console.error(`[WEBHOOK] ⚠️ Bonus grant error:`, e.message);
-                            // Не бросаем ошибку - депозит уже зачислен
                         }
                     }
 
                     // 📨 Отправляем уведомление пользователю
-                    const user = await prisma.user.findUnique({
+                    const userNotif = await prisma.user.findUnique({
                         where: { id: userId },
                         select: { telegramId: true }
                     });
 
-                    if (user?.telegramId) {
+                    if (userNotif?.telegramId) {
                         try {
                             await bot.telegram.sendMessage(
-                                user.telegramId,
+                                userNotif.telegramId,
                                 `🎉 *Пополнение успешно!*\n\n` +
                                 `✅ ${amount} ${asset} зачислено на ваш счёт\n` +
                                 `🚀 Начните игру прямо сейчас!`,
@@ -1440,7 +1386,6 @@ if (waitingForDeposit.has(user.id)) {
 
                 } catch (processingError) {
                     console.error(`[WEBHOOK] ❌ Error processing deposit:`, processingError);
-                    // Отправляем OK всё равно - webhook можно обработать позже
                     res.status(500).send('Processing error, will retry');
                     continue;
                 }
