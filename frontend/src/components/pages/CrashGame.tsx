@@ -384,6 +384,9 @@ export function CrashGame() {
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
+  // ✅ ПОКАЗЫВАЕМ ИСТОРИЮ БЕЗ ТЕКУЩЕГО РАУНДА (начиная со второго элемента)
+  const displayedHistory = crashHistory.slice(1);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white">
       <div className="fixed inset-0 pointer-events-none">
@@ -535,16 +538,16 @@ export function CrashGame() {
             <GlassCard className="flex flex-col h-auto lg:h-[600px] max-h-[400px] lg:max-h-none">
               <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0">
                 <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 text-emerald-400 flex-shrink-0" />
-                <span className="text-sm lg:text-base">ПОСЛЕДНИЕ КРАШИ</span>
+                <span className="text-sm lg:text-base">ЗАВЕРШЁННЫЕ КРАШИ</span>
                 <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
-                  {isHistoryLoaded ? `${crashHistory.length}/10` : '⏳'}
+                  {isHistoryLoaded ? `${displayedHistory.length}/9` : '⏳'}
                 </span>
               </div>
               
               <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-2 lg:p-3 space-y-2">
                 {isHistoryLoaded ? (
-                  crashHistory.length > 0 ? (
-                    crashHistory.map((crash) => {
+                  displayedHistory.length > 0 ? (
+                    displayedHistory.map((crash) => {
                       let bgColor = 'bg-black/40 border-white/10';
                       let textColor = 'text-gray-300';
                       let emoji = '📊';
@@ -590,7 +593,7 @@ export function CrashGame() {
                   ) : (
                     <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
                       <div className="text-3xl lg:text-4xl mb-2">🎮</div>
-                      <div className="text-sm">Ждём первого краша...</div>
+                      <div className="text-sm">Ждём завершения раунда...</div>
                     </div>
                   )
                 ) : (
