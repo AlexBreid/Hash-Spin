@@ -70,7 +70,7 @@ export function CrashGame() {
         toast.success('🚀 Подключено!');
         await fetchBalances();
 
-        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ ЧЕРЕЗ API ENDPOINT
+        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ ЧЕРЕЗ API ENDPOINT ПРИ СТАРТЕ
         console.log('📥 Загружаю историю крашей с API...');
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -97,14 +97,15 @@ export function CrashGame() {
                 console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
               });
 
+              // ✅ УСТАНАВЛИВАЕМ ИСТОРИЮ ОТ API
               setCrashHistory(formatted);
             }
           } else {
             console.warn(`⚠️ API вернул ${response.status}`);
+            setIsHistoryLoaded(true);
           }
         } catch (error) {
           console.warn('⚠️ Ошибка загрузки истории:', error);
-        } finally {
           setIsHistoryLoaded(true);
         }
         
@@ -126,7 +127,7 @@ export function CrashGame() {
   }, [user, token, navigate, fetchBalances]);
 
   // ================================
-  // 2️⃣ СОБЫТИЯ ИГРЫ
+  // 2️⃣ СОБЫТИЯ ИГРЫ - ДОБАВЛЯЕМ НОВЫЕ КРАШИ В РЕАЛЬНОМ ВРЕМЕНИ
   // ================================
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
@@ -150,7 +151,7 @@ export function CrashGame() {
       setCanCashout(false);
       setBetPlaced(false);
 
-      // ✅ ДОБАВЛЯЕМ НОВЫЙ КРАШ В ИСТОРИЮ
+      // ✅ ДОБАВЛЯЕМ НОВЫЙ КРАШ В ИСТОРИЮ (в реальном времени)
       const newCrash: CrashHistory = {
         id: data.gameId || `crash_${Date.now()}`,
         gameId: data.gameId,
@@ -159,7 +160,12 @@ export function CrashGame() {
       };
       
       console.log(`📝 Добавляю краш в историю: ${newCrash.crashPoint}x`);
+      
+      // ✅ ДОБАВЛЯЕМ В НАЧАЛО И ОГРАНИЧИВАЕМ ДО 10
       setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
+      
+      // ✅ ОТМЕЧАЕМ, ЧТО ИСТОРИЯ ПОЛНОСТЬЮ ЗАГРУЖЕНА (добавлены краши в реальном времени)
+      setIsHistoryLoaded(true);
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
@@ -411,7 +417,7 @@ export function CrashGame() {
                   CRASH
                 </h1>
                 <p className="text-xs text-emerald-400 font-mono mt-1">
-                  {isHistoryLoaded ? '🟢 ЖИВАЯ ИГРА' : '🟡 ЗАГРУЗКА...'}
+                  {isHistoryLoaded ? '🟢 ЖИВАЯ ИГРА' : '🟡 ЗАГРУЗКА ИСТОРИИ...'}
                 </p>
               </div>
             </div>
@@ -523,7 +529,7 @@ export function CrashGame() {
                     ) : (
                       <button
                         onClick={handlePlaceBet}
-                        disabled={gameState.status !== 'waiting'}
+                        disabled={gameState.status !== 'waiting' || !isHistoryLoaded}
                         className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                       >
                         🎯 ПОСТАВИТЬ
@@ -575,7 +581,7 @@ export function CrashGame() {
                       }
 
                       return (
-                        <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0`}>
+                        <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0 animate-in fade-in slide-in-from-top duration-300`}>
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-lg flex-shrink-0">{emoji}</span>
@@ -599,7 +605,7 @@ export function CrashGame() {
                 ) : (
                   <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
                     <div className="animate-spin text-xl lg:text-2xl mb-2">⏳</div>
-                    <div className="text-sm">Загрузка...</div>
+                    <div className="text-sm">Загружаю историю...</div>
                   </div>
                 )}
               </div>
