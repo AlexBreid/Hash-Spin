@@ -1203,6 +1203,7 @@ if (!BOT_TOKEN) {
     const handleCryptoPayWebhook = async (req, res) => {
         try {
             const updates = req.body.updates || [req.body];
+            
             for (const update of updates) {
                 const invoice = update.payload || update;
                 const invoiceId = String(invoice.invoice_id);
@@ -1210,15 +1211,75 @@ if (!BOT_TOKEN) {
                 const userId = Number(invoice.payload);
                 const amount = Number(invoice.amount);
                 const asset = invoice.asset;
-                if (isNaN(userId) || userId <= 0) continue;
-                if (status === 'paid') {
-                    const existing = await prisma.transaction.findFirst({
-                        where: { txHash: invoiceId, type: 'DEPOSIT', status: 'COMPLETED' }
+
+                console.log(`[WEBHOOK] Invoice #${invoiceId}, Status: ${status}, User: ${userId}, Amount: ${amount}`);
+
+                // ❌ ВАЛИДАЦИЯ
+                if (isNaN(userId) || userId <= 0) {
+                    console.log(`[WEBHOOK] ❌ Invalid userId: ${invoice.payload}`);
+                    continue;
+                }
+
+                // ❌ ТОЛЬКО ДЛЯ PAID ИНВОЙСОВ
+                if (status !== 'paid') {
+                    console.log(`[WEBHOOK] ⚠️ Invoice #${invoiceId} is ${status}, skipping (not paid yet)`);
+                    continue;
+                }
+
+                // ✅ КРИТИЧНО: Проверяем что инвойс не был обработан раньше
+                const existingTx = await prisma.transaction.findFirst({
+                    where: {
+                        txHash: invoiceId,
+                        type: 'DEPOSIT',
+                        status: 'COMPLETED'
+                    }
+                });
+
+                if (existingTx) {
+                    console.log(`[WEBHOOK] ⚠️ Invoice #${invoiceId} already processed (TX ID: ${existingTx.id}), skipping to prevent duplicate`);
+                    res.status(200).send('OK'); // Отправляем OK чтобы не переполнить очередь
+                    continue;
+                }
+
+                // ✅ Проверяем что инвойс действительно оплачен в системе Crypto Pay
+                const invoiceCheck = await cryptoPayAPI.getInvoices([parseInt(invoiceId)]);
+                if (!invoiceCheck?.items?.length) {
+                    console.log(`[WEBHOOK] ❌ Invoice #${invoiceId} not found in Crypto Pay, suspicious`);
+                    res.status(200).send('OK');
+                    continue;
+                }
+
+                const realInvoice = invoiceCheck.items[0];
+                if (realInvoice.status !== 'paid') {
+                    console.log(`[WEBHOOK] ❌ Invoice #${invoiceId} status is ${realInvoice.status}, not paid`);
+                    res.status(200).send('OK');
+                    continue;
+                }
+
+                // ✅ Если сумма не совпадает - это подозрительно
+                if (Number(realInvoice.amount) !== amount) {
+                    console.log(`[WEBHOOK] ❌ Amount mismatch for invoice #${invoiceId}: ${realInvoice.amount} vs ${amount}`);
+                    res.status(200).send('OK');
+                    continue;
+                }
+
+                // 🎁 Всё ОК - обрабатываем депозит
+                console.log(`[WEBHOOK] ✅ Processing deposit for user ${userId}, amount ${amount} ${asset}`);
+
+                try {
+                    // Получаем токен
+                    const token = await prisma.cryptoToken.findUnique({
+                        where: { symbol: asset }
                     });
-                    if (existing) continue;
-                    const token = await prisma.cryptoToken.findUnique({ where: { symbol: asset } });
-                    if (!token) continue;
-                    await prisma.transaction.create({
+
+                    if (!token) {
+                        console.log(`[WEBHOOK] ❌ Token ${asset} not found`);
+                        res.status(200).send('OK');
+                        continue;
+                    }
+
+                    // Создаём транзакцию депозита
+                    const depositTx = await prisma.transaction.create({
                         data: {
                             userId,
                             tokenId: token.id,
@@ -1228,50 +1289,103 @@ if (!BOT_TOKEN) {
                             txHash: invoiceId
                         }
                     });
-                    await prisma.balance.upsert({
-                        where: { userId_tokenId_type: { userId, tokenId: token.id, type: 'MAIN' } },
-                        create: { userId, tokenId: token.id, type: 'MAIN', amount: amount.toString() },
-                        update: { amount: { increment: amount } }
+
+                    console.log(`[WEBHOOK] 📝 Deposit TX created: ${depositTx.id}`);
+
+                    // Зачисляем на баланс MAIN
+                    const balanceUpdate = await prisma.balance.upsert({
+                        where: {
+                            userId_tokenId_type: {
+                                userId,
+                                tokenId: token.id,
+                                type: 'MAIN'
+                            }
+                        },
+                        create: {
+                            userId,
+                            tokenId: token.id,
+                            type: 'MAIN',
+                            amount: amount.toString()
+                        },
+                        update: {
+                            amount: { increment: amount }
+                        }
                     });
+
+                    console.log(`[WEBHOOK] 💰 Balance updated for user ${userId}: +${amount} USDT`);
+
+                    // 🎁 Проверяем бонус рефералу
                     if (asset === 'USDT') {
                         try {
                             const bonusResult = await referralService.grantDepositBonus(userId, amount, token.id);
                             if (bonusResult) {
-                                const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
+                                console.log(`[WEBHOOK] 🎁 Bonus granted: +${bonusResult.bonusAmount} USDT to user ${userId}`);
+
+                                const user = await prisma.user.findUnique({
+                                    where: { id: userId },
+                                    select: { telegramId: true }
+                                });
+
                                 if (user?.telegramId) {
-                                    await bot.telegram.sendMessage(
-                                        user.telegramId,
-                                        `🎉 *Бонус активирован!*\n\n` +
-                                        `+${bonusResult.bonusAmount} USDT на бонусный баланс\n` +
-                                        `📊 Отыграйте ${bonusResult.requiredWager} USDT для вывода\n` +
-                                        `⏳ Действует 7 дней`,
-                                        { parse_mode: 'Markdown' }
-                                    );
+                                    try {
+                                        await bot.telegram.sendMessage(
+                                            user.telegramId,
+                                            `🎉 *Бонус активирован!*\n\n` +
+                                            `+${bonusResult.bonusAmount} USDT на бонусный баланс\n` +
+                                            `📊 Отыграйте ${bonusResult.requiredWager} USDT для вывода\n` +
+                                            `⏳ Действует 7 дней`,
+                                            { parse_mode: 'Markdown' }
+                                        );
+                                    } catch (e) {
+                                        console.log(`[WEBHOOK] ⚠️ Could not send bonus message to user ${userId}`);
+                                    }
                                 }
                             }
                         } catch (e) {
-                            console.error('Bonus error:', e.message);
+                            console.error(`[WEBHOOK] ⚠️ Bonus grant error:`, e.message);
+                            // Не бросаем ошибку - депозит уже зачислен
                         }
                     }
-                    try {
-                        const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
-                        if (user?.telegramId) {
+
+                    // 📨 Отправляем уведомление пользователю
+                    const user = await prisma.user.findUnique({
+                        where: { id: userId },
+                        select: { telegramId: true }
+                    });
+
+                    if (user?.telegramId) {
+                        try {
                             await bot.telegram.sendMessage(
                                 user.telegramId,
-                                `🎉 *Пополнение успешно!*\n\n${amount} ${asset} зачислено! 🚀`,
+                                `🎉 *Пополнение успешно!*\n\n` +
+                                `✅ ${amount} ${asset} зачислено на ваш счёт\n` +
+                                `🚀 Начните игру прямо сейчас!`,
                                 { parse_mode: 'Markdown' }
                             );
+                        } catch (e) {
+                            console.log(`[WEBHOOK] ⚠️ Could not send deposit confirmation to user ${userId}`);
                         }
-                    } catch (e) {}
+                    }
+
+                    console.log(`[WEBHOOK] ✅ Deposit processed successfully for user ${userId}`);
+
+                } catch (processingError) {
+                    console.error(`[WEBHOOK] ❌ Error processing deposit:`, processingError);
+                    // Отправляем OK всё равно - webhook можно обработать позже
+                    res.status(500).send('Processing error, will retry');
+                    continue;
                 }
             }
+
             res.status(200).send('OK');
+
         } catch (error) {
-            console.error('❌ Webhook error:', error);
+            console.error('[WEBHOOK] ❌ Fatal error:', error);
             res.status(500).send('Error');
         }
     };
 
+    // Экспортируем функцию
     module.exports = {
         start: () => {
             bot.launch();
