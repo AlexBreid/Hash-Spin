@@ -532,8 +532,8 @@ export function CrashGame() {
             </div>
 
             {/* ПРАВАЯ ЧАСТЬ - ИСТОРИЯ */}
-            <div className="lg:col-span-1">
-              <GlassCard className="flex flex-col h-[600px]">
+            <div className="lg:col-span-1 min-w-0">
+              <GlassCard className="flex flex-col h-[600px] min-w-0">
                 <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10">
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
                   <span>ПОСЛЕДНИЕ КРАШИ</span>
@@ -542,7 +542,7 @@ export function CrashGame() {
                   </span>
                 </div>
                 
-                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
                   {isHistoryLoaded ? (
                     crashHistory.length > 0 ? (
                       crashHistory.map((crash) => {
@@ -573,7 +573,7 @@ export function CrashGame() {
                         }
 
                         return (
-                          <div key={crash.id} className={`p-4 rounded-lg border ${bgColor}`}>
+                          <div key={crash.id} className={`p-4 rounded-lg border ${bgColor} flex-shrink-0`}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{emoji}</span>
