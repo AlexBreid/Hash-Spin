@@ -169,7 +169,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                     color: '#e5e7eb',
                   }}
                 >
-                  {formatBalance(walletData.balance)} {walletData.currency}
+                  {formatBalance(Math.floor(walletData.balance * 100) / 100)} {walletData.currency}
                 </span>
               </div>
             </div>
