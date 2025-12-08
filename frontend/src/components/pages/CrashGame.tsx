@@ -15,7 +15,6 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 );
 
 const MAX_WAIT_TIME = 10;
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 interface CrashHistory {
   id: string;
@@ -47,13 +46,14 @@ export function CrashGame() {
   const [totalOnline] = useState(() => 100 + Math.floor(Math.random() * 201));
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
 
   // ================================
-  // 1️⃣ ПОДКЛЮЧЕНИЕ И НАЧАЛЬНАЯ ЗАГРУЗКА
+  // 1️⃣ ПОДКЛЮЧЕНИЕ И ЗАГРУЗКА ИСТОРИИ
   // ================================
   useEffect(() => {
     if (!user || !token) {
@@ -65,17 +65,42 @@ export function CrashGame() {
       try {
         setIsLoading(true);
         
-        console.log('🔌 [COMPONENT] Подключаюсь к Crash серверу...');
+        console.log('🔌 [CRASH] Подключаюсь к серверу...');
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
-        console.log('✅ [COMPONENT] Подключен к Crash серверу');
+        console.log('✅ [CRASH] Подключен к серверу');
         
-        toast.success('🚀 Подключено к Crash серверу!');
+        toast.success('🚀 Подключено!');
+        
+        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ КРАШЕЙ
+        console.log('📥 [CRASH] Загружаю последние краши...');
+        try {
+          const history = await crashGameService.fetchCrashHistory();
+          if (history && Array.isArray(history)) {
+            const formatted = history.map((crash: any) => ({
+              id: crash.id || crash.gameId || `crash_${Date.now()}`,
+              gameId: crash.gameId,
+              crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
+              timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
+            }));
+            
+            console.log(`✅ [CRASH] Загружено ${formatted.length} крашей:`);
+            formatted.forEach((c, i) => {
+              console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
+            });
+            
+            setCrashHistory(formatted.slice(0, 10)); // Последние 10
+            setIsHistoryLoaded(true);
+          }
+        } catch (error) {
+          console.warn('⚠️ [CRASH] Не смог загрузить историю:', error);
+          setIsHistoryLoaded(true); // Всё равно продолжаем
+        }
         
         await fetchBalances();
         
       } catch (error) {
-        console.error('❌ [COMPONENT] Connection error:', error);
-        toast.error('❌ Ошибка подключения к серверу');
+        console.error('❌ [CRASH] Ошибка подключения:', error);
+        toast.error('❌ Ошибка подключения');
       } finally {
         setIsLoading(false);
       }
@@ -84,20 +109,23 @@ export function CrashGame() {
     connect();
 
     return () => {
-      console.log('🧹 [COMPONENT] Очищаю сокеты');
+      console.log('🧹 [CRASH] Отключаюсь');
       crashGameService.disconnect();
     };
   }, [user, token, navigate, fetchBalances]);
 
   // ================================
-  // 2️⃣ ЛОГИКА ИГРЫ И СОБЫТИЙ
+  // 2️⃣ СОБЫТИЯ ИГРЫ
   // ================================
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
-      console.log('📡 [COMPONENT] gameStatus:', data.status);
+      console.log('📡 [GAME] Статус:', data.status, `| Множитель: ${data.multiplier.toFixed(2)}x`);
       setGameState(data);
-      if (data.status === 'waiting') setCanCashout(false);
-      setCanCashout(data.status === 'flying' && betPlaced);
+      if (data.status === 'waiting') {
+        setCanCashout(false);
+      } else if (data.status === 'flying') {
+        setCanCashout(betPlaced);
+      }
     };
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
@@ -105,15 +133,9 @@ export function CrashGame() {
       setCanCashout(betPlaced);
     };
 
+    // ✅ ВАЖНОЕ СОБЫТИЕ: КРАШ
     const handleGameCrashed = (data: any) => {
-      console.log('💣 [COMPONENT] КРАШ СОБЫТИЯ ПОЛУЧЕНО!');
-      console.log('📊 [COMPONENT] Данные краша:', {
-        gameId: data.gameId,
-        crashPoint: data.crashPoint,
-        timestamp: data.timestamp,
-        winners: data.winners?.length || 0,
-        losersCount: data.losersCount
-      });
+      console.log('💥 [GAME] КРАШ! ', `${data.crashPoint}x`);
       
       setGameState((prev) => ({ 
         ...prev, 
@@ -122,69 +144,44 @@ export function CrashGame() {
         gameId: data.gameId 
       }));
       setCanCashout(false);
+      setBetPlaced(false);
 
-      if (betPlaced) {
-        setBetPlaced(false);
-      }
-
-      // ✅ ДОБАВЛЯЕМ В ИСТОРИЮ СРАЗУ ПРИ КРАШЕ
-      if (data.crashPoint) {
-        const newCrash: CrashHistory = {
-          id: data.gameId || `crash_${Date.now()}`,
-          gameId: data.gameId,
-          crashPoint: parseFloat(data.crashPoint.toString()),
-          timestamp: new Date(data.timestamp || Date.now()),
-        };
-        
-        console.log(`📝 [COMPONENT] Добавляю краш в историю:`, newCrash);
-        setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
-      }
+      // ✅ ДОБАВЛЯЕМ КРАШ В ИСТОРИЮ СРАЗУ
+      const newCrash: CrashHistory = {
+        id: data.gameId || `crash_${Date.now()}`,
+        gameId: data.gameId,
+        crashPoint: parseFloat(data.crashPoint.toString()),
+        timestamp: new Date(),
+      };
+      
+      console.log(`📝 [HISTORY] Добавляю краш: ${newCrash.crashPoint}x`);
+      setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
     };
 
-    // ✅ НОВОЕ: Обработка события обновления истории от сервера
+    // ✅ ОБНОВЛЕНИЕ ИСТОРИИ ОТ СЕРВЕРА
     const handleCrashHistoryUpdated = (data: any) => {
-      console.log(`📊 [COMPONENT] ✅ crashHistoryUpdated получено:`, data);
+      console.log(`📊 [HISTORY] Обновление от сервера:`, data);
       
-      if (!data || !data.history || !Array.isArray(data.history)) {
-        console.warn(`⚠️ [COMPONENT] Пустые или неправильные данные истории:`, data);
-        return;
-      }
-
-      try {
-        const formattedHistory = data.history.map((crash: any, idx: number) => {
-          console.log(`  📍 Обработка краша #${idx}:`, crash);
-          return {
-            id: crash.id || crash.gameId || `crash_${Date.now()}_${idx}`,
-            gameId: crash.gameId,
-            crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
-            timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
-          };
-        });
-
-        console.log(`✅ [COMPONENT] История обновлена: ${formattedHistory.length} краш(-ей)`);
-        formattedHistory.forEach((crash, idx) => {
-          console.log(`  ${idx + 1}. 🎯 ${crash.crashPoint}x @ ${crash.timestamp.toLocaleTimeString()}`);
-        });
-
-        setCrashHistory(formattedHistory);
+      if (data && data.history && Array.isArray(data.history)) {
+        const formatted = data.history.map((crash: any) => ({
+          id: crash.id || crash.gameId || `crash_${Date.now()}`,
+          gameId: crash.gameId,
+          crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
+          timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
+        }));
         
-        setTimeout(() => {
-          if (crashHistoryRef.current) {
-            crashHistoryRef.current.scrollTop = 0;
-          }
-        }, 100);
-      } catch (error) {
-        console.error(`❌ [COMPONENT] Ошибка при обработке истории:`, error);
+        console.log(`✅ [HISTORY] Обновлено ${formatted.length} крашей от сервера`);
+        setCrashHistory(formatted);
       }
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
-      console.log('👤 [COMPONENT] playerJoined:', data.playersCount);
+      console.log(`👥 [GAME] Игроков онлайн: ${data.playersCount}`);
       setPlayersCount(data.playersCount);
     };
 
     const handleBetPlaced = (data: any) => {
-      console.log('✅ [COMPONENT] Ставка размещена:', data.bet);
+      console.log(`🎲 [BET] Ставка: $${data.bet}`);
       setBetPlaced(true);
       setCurrentBet(data.bet);
       setCanCashout(false);
@@ -192,11 +189,8 @@ export function CrashGame() {
     };
 
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
-      const winAmount = parseFloat(data.winnings.toString());
-      const multiplier = parseFloat(data.multiplier.toString());
-      const profit = winAmount - currentBet;
-
-      console.log('💰 [COMPONENT] cashoutSuccess:', { multiplier, winAmount, profit });
+      const profit = data.winnings - currentBet;
+      console.log(`💰 [WIN] +$${profit.toFixed(2)} (${data.multiplier.toFixed(2)}x)`);
 
       setBetPlaced(false);
       setCanCashout(false);
@@ -210,11 +204,11 @@ export function CrashGame() {
     };
 
     const handleError = (data: { message: string }) => {
-      console.error('❌ [COMPONENT] Game error:', data.message);
+      console.error('❌ [ERROR]', data.message);
       toast.error(`❌ ${data.message}`);
     };
 
-    console.log('🔔 [COMPONENT] Регистрирую обработчики событий...');
+    console.log('🔌 [GAME] Регистрирую события');
     
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
@@ -226,10 +220,8 @@ export function CrashGame() {
     crashGameService.on('countdownUpdate', handleCountdownUpdate);
     crashGameService.on('error', handleError);
 
-    console.log('✅ [COMPONENT] Все обработчики зарегистрированы');
-
     return () => {
-      console.log('🧹 [COMPONENT] Удаляю обработчики событий');
+      console.log('🧹 [GAME] Удаляю события');
       crashGameService.off('gameStatus', handleGameStatus);
       crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
       crashGameService.off('gameCrashed', handleGameCrashed);
@@ -396,7 +388,7 @@ export function CrashGame() {
       await crashGameService.placeBet(amount, selectedTokenId);
     } catch (e) {
       console.error('Bet error:', e);
-      toast.error('❌ Ошибка при размещении ставки');
+      toast.error('❌ Ошибка ставки');
     } finally {
       setIsLoading(false);
     }
@@ -408,7 +400,7 @@ export function CrashGame() {
       await crashGameService.cashout();
     } catch (e) {
       console.error('Cashout error:', e);
-      toast.error('❌ Ошибка при кэшауте');
+      toast.error('❌ Ошибка');
     } finally {
       setIsLoading(false);
     }
@@ -444,6 +436,9 @@ export function CrashGame() {
                   <Flame className="w-7 h-7 lg:w-8 lg:h-8 text-yellow-500 fill-yellow-500" />
                   CRASH
                 </h1>
+                <p className="text-xs text-emerald-400 font-mono mt-1">
+                  {isHistoryLoaded ? '🟢 ЖИВАЯ ИГРА' : '🟡 ЗАГРУЗКА...'}
+                </p>
               </div>
             </div>
 
@@ -487,7 +482,7 @@ export function CrashGame() {
                         <Timer className="w-12 h-12 lg:w-16 lg:h-16 text-yellow-400 animate-bounce" />
                         <div className="text-center">
                           <h2 className="text-2xl lg:text-3xl font-black text-white mb-2">ОЖИДАНИЕ</h2>
-                          <p className="text-xs lg:text-sm text-gray-300">Размещайте ставки</p>
+                          <p className="text-xs lg:text-sm text-gray-300">Делайте ставки сейчас</p>
                         </div>
                         <div className="w-48 lg:w-60 h-3 bg-black/50 rounded-full overflow-hidden border border-white/20">
                           <div
@@ -496,18 +491,21 @@ export function CrashGame() {
                           />
                         </div>
                         <div className="text-5xl lg:text-6xl font-black text-yellow-300 font-mono">
-                          {gameState.countdown.toFixed(0)}
+                          {gameState.countdown.toFixed(0)}s
                         </div>
                       </div>
                     ) : (
                       <div className="text-center">
                         <div
                           className={`text-7xl lg:text-[140px] font-black font-mono transition-all leading-none ${
-                            gameState.status === 'crashed' ? 'text-red-500' : 'text-emerald-300'
+                            gameState.status === 'crashed' ? 'text-red-500 animate-pulse' : 'text-emerald-300'
                           }`}
                         >
                           {gameState.multiplier.toFixed(2)}x
                         </div>
+                        {gameState.status === 'crashed' && (
+                          <div className="text-red-500 text-lg font-black mt-2">💥 КРАШ!</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -598,7 +596,7 @@ export function CrashGame() {
                             : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
                         }`}
                       >
-                        {isLoading ? 'ЗАГРУЗКА...' : 'ПОСТАВИТЬ'}
+                        {isLoading ? '⏳ ЗАГРУЗКА...' : '🎯 ПОСТАВИТЬ'}
                       </button>
                     )}
                   </div>
@@ -606,63 +604,84 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ПРАВАЯ ЧАСТЬ - CRASH HISTORY */}
+            {/* ПРАВАЯ ЧАСТЬ - HISTORY */}
             <div className="lg:col-span-1">
               <GlassCard className="flex flex-col h-[550px] lg:h-[600px]">
                 <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
                   <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
-                  <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАХИ</span>
-                  <span className="ml-auto text-xs text-gray-500">{crashHistory.length}/10</span>
+                  <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАШИ</span>
+                  <span className="ml-auto text-xs text-gray-500">
+                    {isHistoryLoaded ? `${crashHistory.length}/10` : '⏳'}
+                  </span>
                 </div>
                 
                 <div 
                   ref={crashHistoryRef}
                   className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2"
                 >
-                  {crashHistory.length > 0 ? (
-                    crashHistory.map((crash) => {
-                      let bgColor = 'bg-black/40 border-white/10';
-                      let crashColor = 'text-gray-300';
-                      
-                      if (crash.crashPoint < 2) {
-                        bgColor = 'bg-red-950/30 border-red-500/30';
-                        crashColor = 'text-red-400';
-                      } else if (crash.crashPoint < 5) {
-                        bgColor = 'bg-orange-950/30 border-orange-500/30';
-                        crashColor = 'text-orange-400';
-                      } else if (crash.crashPoint < 10) {
-                        bgColor = 'bg-yellow-950/30 border-yellow-500/30';
-                        crashColor = 'text-yellow-400';
-                      } else if (crash.crashPoint < 20) {
-                        bgColor = 'bg-emerald-950/30 border-emerald-500/30';
-                        crashColor = 'text-emerald-400';
-                      } else {
-                        bgColor = 'bg-purple-950/30 border-purple-500/30';
-                        crashColor = 'text-purple-400';
-                      }
+                  {isHistoryLoaded ? (
+                    crashHistory.length > 0 ? (
+                      crashHistory.map((crash) => {
+                        let bgColor = 'bg-black/40 border-white/10';
+                        let crashColor = 'text-gray-300';
+                        let emoji = '📊';
+                        
+                        if (crash.crashPoint < 1.5) {
+                          bgColor = 'bg-red-950/30 border-red-500/30';
+                          crashColor = 'text-red-400';
+                          emoji = '🔴';
+                        } else if (crash.crashPoint < 3) {
+                          bgColor = 'bg-orange-950/30 border-orange-500/30';
+                          crashColor = 'text-orange-400';
+                          emoji = '🟠';
+                        } else if (crash.crashPoint < 5) {
+                          bgColor = 'bg-yellow-950/30 border-yellow-500/30';
+                          crashColor = 'text-yellow-400';
+                          emoji = '🟡';
+                        } else if (crash.crashPoint < 10) {
+                          bgColor = 'bg-emerald-950/30 border-emerald-500/30';
+                          crashColor = 'text-emerald-400';
+                          emoji = '🟢';
+                        } else {
+                          bgColor = 'bg-purple-950/30 border-purple-500/30';
+                          crashColor = 'text-purple-400';
+                          emoji = '🟣';
+                        }
 
-                      return (
-                        <div 
-                          key={crash.id} 
-                          className={`p-3 lg:p-4 rounded-lg border transition-all hover:border-white/30 ${bgColor}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className={`text-2xl lg:text-3xl font-black font-mono ${crashColor}`}>
-                              {crash.crashPoint.toFixed(2)}x
-                            </span>
-                            <span className="text-[10px] lg:text-xs text-gray-500 font-mono">
-                              {crash.timestamp.toLocaleTimeString()}
-                            </span>
+                        return (
+                          <div 
+                            key={crash.id} 
+                            className={`p-3 lg:p-4 rounded-lg border transition-all hover:border-white/30 hover:shadow-lg ${bgColor}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{emoji}</span>
+                                <span className={`text-2xl lg:text-3xl font-black font-mono ${crashColor}`}>
+                                  {crash.crashPoint.toFixed(2)}x
+                                </span>
+                              </div>
+                              <span className="text-[10px] lg:text-xs text-gray-500 font-mono">
+                                {crash.timestamp.toLocaleTimeString()}
+                              </span>
+                            </div>
                           </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-16 text-gray-500 text-xs">
+                        <div className="text-4xl mb-2">🎮</div>
+                        <div className="font-bold">Игра загружается...</div>
+                        <div className="text-[10px] mt-2 text-gray-600">
+                          Первые краши появятся здесь
                         </div>
-                      );
-                    })
+                      </div>
+                    )
                   ) : (
                     <div className="text-center py-16 text-gray-500 text-xs">
-                      <div className="text-4xl mb-2">📊</div>
-                      <div>Крахи появятся здесь</div>
+                      <div className="animate-spin text-2xl mb-2">⏳</div>
+                      <div className="font-bold">Загрузка истории...</div>
                       <div className="text-[10px] mt-2 text-gray-600">
-                        Сервер отправляет историю автоматически
+                        Получаю последние краши
                       </div>
                     </div>
                   )}
@@ -693,9 +712,6 @@ export function CrashGame() {
         input[type="number"] {
           -moz-appearance: textfield;
         }
-        
-        @keyframes gradient { 0% { background-position: 0%; } 100% { background-position: 100%; } }
-        .animate-gradient { animation: gradient 3s ease infinite; }
       `}</style>
     </div>
   );
