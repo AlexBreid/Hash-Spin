@@ -120,9 +120,9 @@ export function CrashGame() {
     connect();
     
     const historyInterval = setInterval(() => {
-      console.log('🔄 [COMPONENT] Автообновление истории крашей...');
+      console.log('🔄 [COMPONENT] Периодическое обновление истории крашей...');
       fetchCrashHistory();
-    }, 15000);
+    }, 20000); // Каждые 20 сек вместо 15
 
     return () => {
       console.log('🧹 [COMPONENT] Очищаю сокеты и интервалы');
@@ -148,31 +148,57 @@ export function CrashGame() {
     };
 
     const handleGameCrashed = (data: any) => {
-      console.log('💣 [COMPONENT] Краш:', data.crashPoint);
-      setGameState((prev) => ({ ...prev, status: 'crashed', crashPoint: data.crashPoint }));
+      console.log('💣 [COMPONENT] КРАШ СОБЫТИЯ ПОЛУЧЕНО!');
+      console.log('📊 [COMPONENT] Данные краша:', {
+        gameId: data.gameId,
+        crashPoint: data.crashPoint,
+        timestamp: data.timestamp,
+        winners: data.winners?.length || 0,
+        losersCount: data.losersCount
+      });
+      
+      setGameState((prev) => ({ 
+        ...prev, 
+        status: 'crashed', 
+        crashPoint: data.crashPoint,
+        gameId: data.gameId 
+      }));
       setCanCashout(false);
       
+      // ✅ ИСПРАВЛЕНО: Добавляем краш в историю СРАЗУ когда приходит событие
+      const newCrash: CrashHistory = {
+        id: data.gameId || `crash_${Date.now()}`,
+        crashPoint: parseFloat(data.crashPoint),
+        timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+      };
+      
+      console.log('➕ [COMPONENT] Добавляю краш в локальную историю СРАЗУ:');
+      console.log(`  - Crash Point: ${newCrash.crashPoint}x`);
+      console.log(`  - Timestamp: ${newCrash.timestamp.toLocaleTimeString()}`);
+      console.log(`  - GameID: ${newCrash.id}`);
+      
       setCrashHistory((prev) => {
-        const newCrash = {
-          id: data.gameId || `crash_${Date.now()}`,
-          crashPoint: data.crashPoint,
-          timestamp: new Date(),
-        };
-        
-        console.log('➕ [COMPONENT] Добавляю новый краш в историю:', newCrash.crashPoint);
-        
-        const newHistory = [newCrash, ...prev];
-        return newHistory.slice(0, 10);
+        const updated = [newCrash, ...prev].slice(0, 10);
+        console.log(`✅ [COMPONENT] История обновлена! Всего крашей: ${updated.length}`);
+        updated.forEach((crash, idx) => {
+          console.log(`  ${idx + 1}. ${crash.crashPoint}x`);
+        });
+        return updated;
       });
 
       if (betPlaced) {
         setBetPlaced(false);
       }
       
+      // ✅ УЛУЧШЕНО: Синхронизируем с сервером в фоне, но НЕ заменяем локальное
       setTimeout(() => {
-        console.log('📥 [COMPONENT] Обновляю историю с сервера после краша...');
-        fetchCrashHistory();
-      }, 2000);
+        console.log('🔄 [COMPONENT] Синхронизирую историю с сервером (в фоне)...');
+        fetchCrashHistory().then(() => {
+          console.log('✅ [COMPONENT] История синхронизирована с сервером');
+        }).catch(err => {
+          console.error('❌ [COMPONENT] Ошибка синхронизации:', err);
+        });
+      }, 3000);
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
@@ -621,12 +647,7 @@ export function CrashGame() {
                   ref={crashHistoryRef}
                   className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2"
                 >
-                  {crashHistoryLoading ? (
-                    <div className="text-center py-16 text-gray-500 text-xs flex flex-col items-center gap-2">
-                      <Loader className="w-6 h-6 animate-spin text-emerald-400" />
-                      Загрузка крашей...
-                    </div>
-                  ) : crashHistory.length > 0 ? (
+                  {crashHistory.length > 0 ? (
                     crashHistory.map((crash) => {
                       let bgColor = 'bg-black/40 border-white/10';
                       let crashColor = 'text-gray-300';
