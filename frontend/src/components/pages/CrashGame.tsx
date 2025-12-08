@@ -3,12 +3,12 @@ import { crashGameService } from '../../services/crashGameService';
 import type { CrashGameState } from '../../services/crashGameService';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../hooks/useBalance';
-import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw, Loader } from 'lucide-react';
+import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`relative overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl hover:shadow-2xl transition-all duration-300 ${className}`}>
+  <div className={`relative overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl ${className}`}>
     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none rounded-2xl"></div>
     {children}
   </div>
@@ -43,7 +43,6 @@ export function CrashGame() {
   const [canCashout, setCanCashout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
-  const [totalOnline] = useState(() => 100 + Math.floor(Math.random() * 201));
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
@@ -53,7 +52,7 @@ export function CrashGame() {
   const animationFrameRef = useRef<number>();
 
   // ================================
-  // 1️⃣ ПОДКЛЮЧЕНИЕ И ЗАГРУЗКА ИСТОРИИ
+  // 1️⃣ ПОДКЛЮЧЕНИЕ И ЗАГРУЗКА ИСТОРИИ ЧЕРЕЗ API
   // ================================
   useEffect(() => {
     if (!user || !token) {
@@ -61,55 +60,67 @@ export function CrashGame() {
       return;
     }
 
-    const connect = async () => {
+    const init = async () => {
       try {
         setIsLoading(true);
         
-        console.log('🔌 [CRASH] Подключаюсь к серверу...');
+        console.log('🔌 Подключаюсь к серверу...');
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
-        console.log('✅ [CRASH] Подключен к серверу');
-        
+        console.log('✅ Подключен');
         toast.success('🚀 Подключено!');
-        
-        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ КРАШЕЙ
-        console.log('📥 [CRASH] Загружаю последние краши...');
+        await fetchBalances();
+
+        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ ЧЕРЕЗ API ENDPOINT
+        console.log('📥 Загружаю историю крашей с API...');
         try {
-          const history = await crashGameService.fetchCrashHistory();
-          if (history && Array.isArray(history)) {
-            const formatted = history.map((crash: any) => ({
-              id: crash.id || crash.gameId || `crash_${Date.now()}`,
-              gameId: crash.gameId,
-              crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
-              timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
-            }));
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+          const response = await fetch(`${API_URL}/api/v1/crash/last-crashes`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
             
-            console.log(`✅ [CRASH] Загружено ${formatted.length} крашей:`);
-            formatted.forEach((c, i) => {
-              console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
-            });
-            
-            setCrashHistory(formatted.slice(0, 10)); // Последние 10
-            setIsHistoryLoaded(true);
+            if (data.success && data.data && Array.isArray(data.data)) {
+              const formatted = data.data.map((crash: any) => ({
+                id: crash.id || crash.gameId || `crash_${Date.now()}`,
+                gameId: crash.gameId,
+                crashPoint: parseFloat((crash.crashPoint || 0).toString()),
+                timestamp: new Date(crash.timestamp),
+              }));
+
+              console.log(`✅ История загружена: ${formatted.length} крашей`);
+              formatted.forEach((c, i) => {
+                console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
+              });
+
+              setCrashHistory(formatted);
+            }
+          } else {
+            console.warn(`⚠️ API вернул ${response.status}`);
           }
         } catch (error) {
-          console.warn('⚠️ [CRASH] Не смог загрузить историю:', error);
-          setIsHistoryLoaded(true); // Всё равно продолжаем
+          console.warn('⚠️ Ошибка загрузки истории:', error);
+        } finally {
+          setIsHistoryLoaded(true);
         }
         
-        await fetchBalances();
-        
       } catch (error) {
-        console.error('❌ [CRASH] Ошибка подключения:', error);
+        console.error('❌ Ошибка подключения:', error);
         toast.error('❌ Ошибка подключения');
+        setIsHistoryLoaded(true);
       } finally {
         setIsLoading(false);
       }
     };
 
-    connect();
+    init();
 
     return () => {
-      console.log('🧹 [CRASH] Отключаюсь');
+      console.log('🧹 Отключаюсь');
       crashGameService.disconnect();
     };
   }, [user, token, navigate, fetchBalances]);
@@ -119,13 +130,9 @@ export function CrashGame() {
   // ================================
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
-      console.log('📡 [GAME] Статус:', data.status, `| Множитель: ${data.multiplier.toFixed(2)}x`);
       setGameState(data);
-      if (data.status === 'waiting') {
-        setCanCashout(false);
-      } else if (data.status === 'flying') {
-        setCanCashout(betPlaced);
-      }
+      if (data.status === 'waiting') setCanCashout(false);
+      else if (data.status === 'flying') setCanCashout(betPlaced);
     };
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
@@ -133,10 +140,7 @@ export function CrashGame() {
       setCanCashout(betPlaced);
     };
 
-    // ✅ ВАЖНОЕ СОБЫТИЕ: КРАШ
     const handleGameCrashed = (data: any) => {
-      console.log('💥 [GAME] КРАШ! ', `${data.crashPoint}x`);
-      
       setGameState((prev) => ({ 
         ...prev, 
         status: 'crashed', 
@@ -146,7 +150,7 @@ export function CrashGame() {
       setCanCashout(false);
       setBetPlaced(false);
 
-      // ✅ ДОБАВЛЯЕМ КРАШ В ИСТОРИЮ СРАЗУ
+      // ✅ ДОБАВЛЯЕМ НОВЫЙ КРАШ В ИСТОРИЮ
       const newCrash: CrashHistory = {
         id: data.gameId || `crash_${Date.now()}`,
         gameId: data.gameId,
@@ -154,34 +158,15 @@ export function CrashGame() {
         timestamp: new Date(),
       };
       
-      console.log(`📝 [HISTORY] Добавляю краш: ${newCrash.crashPoint}x`);
+      console.log(`📝 Добавляю краш в историю: ${newCrash.crashPoint}x`);
       setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
     };
 
-    // ✅ ОБНОВЛЕНИЕ ИСТОРИИ ОТ СЕРВЕРА
-    const handleCrashHistoryUpdated = (data: any) => {
-      console.log(`📊 [HISTORY] Обновление от сервера:`, data);
-      
-      if (data && data.history && Array.isArray(data.history)) {
-        const formatted = data.history.map((crash: any) => ({
-          id: crash.id || crash.gameId || `crash_${Date.now()}`,
-          gameId: crash.gameId,
-          crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
-          timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
-        }));
-        
-        console.log(`✅ [HISTORY] Обновлено ${formatted.length} крашей от сервера`);
-        setCrashHistory(formatted);
-      }
-    };
-
     const handlePlayerJoined = (data: { playersCount: number }) => {
-      console.log(`👥 [GAME] Игроков онлайн: ${data.playersCount}`);
       setPlayersCount(data.playersCount);
     };
 
     const handleBetPlaced = (data: any) => {
-      console.log(`🎲 [BET] Ставка: $${data.bet}`);
       setBetPlaced(true);
       setCurrentBet(data.bet);
       setCanCashout(false);
@@ -190,8 +175,6 @@ export function CrashGame() {
 
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
       const profit = data.winnings - currentBet;
-      console.log(`💰 [WIN] +$${profit.toFixed(2)} (${data.multiplier.toFixed(2)}x)`);
-
       setBetPlaced(false);
       setCanCashout(false);
       
@@ -204,16 +187,12 @@ export function CrashGame() {
     };
 
     const handleError = (data: { message: string }) => {
-      console.error('❌ [ERROR]', data.message);
       toast.error(`❌ ${data.message}`);
     };
-
-    console.log('🔌 [GAME] Регистрирую события');
     
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
     crashGameService.on('gameCrashed', handleGameCrashed);
-    crashGameService.on('crashHistoryUpdated', handleCrashHistoryUpdated);
     crashGameService.on('playerJoined', handlePlayerJoined);
     crashGameService.on('betPlaced', handleBetPlaced);
     crashGameService.on('cashoutSuccess', handleCashoutSuccess);
@@ -221,11 +200,9 @@ export function CrashGame() {
     crashGameService.on('error', handleError);
 
     return () => {
-      console.log('🧹 [GAME] Удаляю события');
       crashGameService.off('gameStatus', handleGameStatus);
       crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
       crashGameService.off('gameCrashed', handleGameCrashed);
-      crashGameService.off('crashHistoryUpdated', handleCrashHistoryUpdated);
       crashGameService.off('playerJoined', handlePlayerJoined);
       crashGameService.off('betPlaced', handleBetPlaced);
       crashGameService.off('cashoutSuccess', handleCashoutSuccess);
@@ -370,9 +347,6 @@ export function CrashGame() {
     };
   }, [drawChart]);
 
-  // ================================
-  // 4️⃣ ОБРАБОТЧИКИ
-  // ================================
   const handlePlaceBet = async () => {
     const amount = parseFloat(inputBet);
     if (!amount || amount <= 0) {
@@ -410,9 +384,6 @@ export function CrashGame() {
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
-  // ================================
-  // 5️⃣ РЕНДЕР
-  // ================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white">
       <div className="fixed inset-0 pointer-events-none">
@@ -427,13 +398,13 @@ export function CrashGame() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/')}
-                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10 hover:border-emerald-400/50 shadow-lg"
+                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-300 hover:text-emerald-400 transition-colors" />
+                <ArrowLeft className="w-5 h-5 text-gray-300" />
               </button>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-400 flex items-center gap-2 tracking-wider">
-                  <Flame className="w-7 h-7 lg:w-8 lg:h-8 text-yellow-500 fill-yellow-500" />
+                <h1 className="text-3xl lg:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-2">
+                  <Flame className="w-8 h-8 text-yellow-500" />
                   CRASH
                 </h1>
                 <p className="text-xs text-emerald-400 font-mono mt-1">
@@ -442,31 +413,25 @@ export function CrashGame() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <GlassCard className="px-4 lg:px-6 py-2 lg:py-3 flex items-center gap-3 !rounded-full">
-                <div className="text-right">
-                  <p className="text-xs text-gray-400 font-mono">БАЛАНС</p>
-                  <p className="text-xl lg:text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
-                </div>
-                <button
-                  onClick={() => fetchBalances()}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-all"
-                  title="Обновить"
-                >
-                  <RefreshCw className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
-                </button>
-              </GlassCard>
-            </div>
+            <GlassCard className="px-6 py-3 flex items-center gap-3 !rounded-full">
+              <div className="text-right">
+                <p className="text-xs text-gray-400">БАЛАНС</p>
+                <p className="text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
+              </div>
+              <button onClick={() => fetchBalances()} className="p-2 hover:bg-white/20 rounded-lg">
+                <RefreshCw className="w-5 h-5 text-emerald-400" />
+              </button>
+            </GlassCard>
           </div>
         </header>
 
-        {/* MAIN CONTENT */}
-        <div className="max-w-7xl mx-auto p-4 lg:p-6">
+        {/* MAIN */}
+        <div className="max-w-7xl mx-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* ЛЕВАЯ ЧАСТЬ */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
+            {/* ЛЕВАЯ */}
+            <div className="lg:col-span-2 space-y-6">
               {/* CANVAS */}
-              <div className="relative rounded-3xl border border-white/10 shadow-2xl overflow-hidden bg-black/40">
+              <div className="relative rounded-3xl border border-white/10 overflow-hidden bg-black/40">
                 <div style={{ aspectRatio: '16 / 10' }} className="relative w-full">
                   <canvas 
                     ref={canvasRef} 
@@ -475,128 +440,92 @@ export function CrashGame() {
                     className="w-full h-full absolute inset-0"
                   />
 
-                  {/* OVERLAY */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                     {gameState.status === 'waiting' ? (
                       <div className="flex flex-col items-center gap-4">
-                        <Timer className="w-12 h-12 lg:w-16 lg:h-16 text-yellow-400 animate-bounce" />
-                        <div className="text-center">
-                          <h2 className="text-2xl lg:text-3xl font-black text-white mb-2">ОЖИДАНИЕ</h2>
-                          <p className="text-xs lg:text-sm text-gray-300">Делайте ставки сейчас</p>
-                        </div>
-                        <div className="w-48 lg:w-60 h-3 bg-black/50 rounded-full overflow-hidden border border-white/20">
+                        <Timer className="w-16 h-16 text-yellow-400 animate-bounce" />
+                        <h2 className="text-3xl font-black text-white">ОЖИДАНИЕ</h2>
+                        <div className="w-60 h-3 bg-black/50 rounded-full overflow-hidden border border-white/20">
                           <div
-                            className="h-full bg-gradient-to-r from-yellow-400 to-orange-400 transition-all duration-100"
+                            className="h-full bg-yellow-400"
                             style={{ width: `${waitingProgress}%` }}
                           />
                         </div>
-                        <div className="text-5xl lg:text-6xl font-black text-yellow-300 font-mono">
+                        <div className="text-6xl font-black text-yellow-300 font-mono">
                           {gameState.countdown.toFixed(0)}s
                         </div>
                       </div>
                     ) : (
                       <div className="text-center">
-                        <div
-                          className={`text-7xl lg:text-[140px] font-black font-mono transition-all leading-none ${
-                            gameState.status === 'crashed' ? 'text-red-500 animate-pulse' : 'text-emerald-300'
-                          }`}
-                        >
+                        <div className={`text-[140px] font-black font-mono ${
+                          gameState.status === 'crashed' ? 'text-red-500' : 'text-emerald-300'
+                        }`}>
                           {gameState.multiplier.toFixed(2)}x
                         </div>
-                        {gameState.status === 'crashed' && (
-                          <div className="text-red-500 text-lg font-black mt-2">💥 КРАШ!</div>
-                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* TOP INFO */}
                   <div className="absolute top-4 left-4 right-4 flex justify-between z-20">
                     <GlassCard className="px-3 py-2 text-xs font-mono">
-                      ID: <span className="text-white">#{gameState.gameId?.slice(0, 8) || '---'}</span>
+                      ID: #{gameState.gameId?.slice(0, 8) || '---'}
                     </GlassCard>
                     <GlassCard className="px-3 py-2 flex items-center gap-2 text-xs">
                       <Users className="w-4 h-4" />
-                      <span>{playersCount + 345}</span>
+                      {playersCount + 345}
                     </GlassCard>
                   </div>
                 </div>
               </div>
 
-              {/* УПРАВЛЕНИЕ */}
-              <GlassCard className="p-4 lg:p-6">
+              {/* КОНТРОЛЫ */}
+              <GlassCard className="p-6">
                 <div className="space-y-3">
-                  {/* INPUT СТАВКИ */}
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 block">
-                      Размер ставки
-                    </label>
+                    <label className="text-xs font-bold text-gray-300 uppercase mb-2 block">Размер ставки</label>
                     <div className="flex gap-2">
-                      <div className="flex-1 relative flex items-center">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          value={inputBet}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
-                              setInputBet(value);
-                            }
-                          }}
-                          min="0"
-                          step="0.01"
-                          disabled={betPlaced || gameState.status !== 'waiting' || isLoading}
-                          className="w-full bg-white/5 border border-white/20 rounded-xl py-2 lg:py-3 pl-8 pr-3 text-base lg:text-lg font-bold font-mono text-white focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/50 transition-all disabled:opacity-50 appearance-none"
-                          placeholder="0.00"
-                        />
-                      </div>
-
-                      <button
-                        onClick={() => setInputBet((prev) => Math.max(0.01, parseFloat(prev || '0') / 2).toFixed(2))}
-                        className="px-3 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold flex-shrink-0"
+                      <input
+                        type="number"
+                        value={inputBet}
+                        onChange={(e) => setInputBet(e.target.value)}
                         disabled={betPlaced || gameState.status !== 'waiting'}
-                        title="Разделить на 2"
+                        className="flex-1 bg-white/5 border border-white/20 rounded-xl py-3 px-4 text-lg font-bold text-white focus:outline-none focus:border-emerald-400/50"
+                      />
+                      <button
+                        onClick={() => setInputBet((p) => (parseFloat(p || '0') / 2).toFixed(2))}
+                        className="px-4 py-3 bg-white/10 rounded-xl text-sm font-bold"
                       >
                         ÷2
                       </button>
                       <button
-                        onClick={() => setInputBet((prev) => (parseFloat(prev || '0') * 2).toFixed(2))}
-                        className="px-3 py-2 lg:py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs lg:text-sm text-gray-300 transition-all font-bold flex-shrink-0"
-                        disabled={betPlaced || gameState.status !== 'waiting'}
-                        title="Умножить на 2"
+                        onClick={() => setInputBet((p) => (parseFloat(p || '0') * 2).toFixed(2))}
+                        className="px-4 py-3 bg-white/10 rounded-xl text-sm font-bold"
                       >
                         ×2
                       </button>
                     </div>
                   </div>
 
-                  {/* КНОПКА ДЕЙСТВИЯ */}
                   <div>
                     {canCashout ? (
                       <button
                         onClick={handleCashout}
-                        disabled={isLoading}
-                        className="w-full px-4 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wider border border-emerald-300/50 disabled:opacity-50 text-sm lg:text-base"
+                        className="w-full px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                       >
-                        <Zap className="w-4 h-4 lg:w-5 lg:h-5" />
-                        <span className="hidden sm:inline">ЗАБРАТЬ ${potentialWinnings.toFixed(2)}</span>
-                        <span className="sm:hidden">ЗАБРАТЬ</span>
+                        <Zap className="w-5 h-5" />
+                        ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
                       </button>
                     ) : betPlaced ? (
-                      <div className="w-full px-4 lg:px-8 py-3 lg:py-4 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl flex items-center justify-center text-sm lg:text-base animate-pulse">
+                      <div className="w-full px-8 py-4 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl text-center">
                         🎲 СТАВКА: ${currentBet.toFixed(2)}
                       </div>
                     ) : (
                       <button
                         onClick={handlePlaceBet}
-                        disabled={gameState.status !== 'waiting' || isLoading}
-                        className={`w-full px-4 lg:px-8 py-3 lg:py-4 font-black rounded-xl transition-all transform active:scale-95 uppercase tracking-wider shadow-xl flex items-center justify-center border text-sm lg:text-base ${
-                          gameState.status === 'waiting' && !isLoading
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 border-indigo-400/50'
-                            : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border-white/10'
-                        }`}
+                        disabled={gameState.status !== 'waiting'}
+                        className="w-full px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 disabled:opacity-50"
                       >
-                        {isLoading ? '⏳ ЗАГРУЗКА...' : '🎯 ПОСТАВИТЬ'}
+                        🎯 ПОСТАВИТЬ
                       </button>
                     )}
                   </div>
@@ -604,63 +533,57 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ПРАВАЯ ЧАСТЬ - HISTORY */}
-            <div className="lg:col-span-1">
-              <GlassCard className="flex flex-col h-[550px] lg:h-[600px]">
-                <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 backdrop-blur-md z-10">
-                  <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
-                  <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАШИ</span>
+            {/* ИСТОРИЯ СПРАВА */}
+            <div>
+              <GlassCard className="flex flex-col h-[600px]">
+                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  <span>ПОСЛЕДНИЕ КРАШИ</span>
                   <span className="ml-auto text-xs text-gray-500">
                     {isHistoryLoaded ? `${crashHistory.length}/10` : '⏳'}
                   </span>
                 </div>
                 
-                <div 
-                  ref={crashHistoryRef}
-                  className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2"
-                >
+                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto p-3 space-y-2">
                   {isHistoryLoaded ? (
                     crashHistory.length > 0 ? (
                       crashHistory.map((crash) => {
                         let bgColor = 'bg-black/40 border-white/10';
-                        let crashColor = 'text-gray-300';
+                        let textColor = 'text-gray-300';
                         let emoji = '📊';
                         
                         if (crash.crashPoint < 1.5) {
                           bgColor = 'bg-red-950/30 border-red-500/30';
-                          crashColor = 'text-red-400';
+                          textColor = 'text-red-400';
                           emoji = '🔴';
                         } else if (crash.crashPoint < 3) {
                           bgColor = 'bg-orange-950/30 border-orange-500/30';
-                          crashColor = 'text-orange-400';
+                          textColor = 'text-orange-400';
                           emoji = '🟠';
                         } else if (crash.crashPoint < 5) {
                           bgColor = 'bg-yellow-950/30 border-yellow-500/30';
-                          crashColor = 'text-yellow-400';
+                          textColor = 'text-yellow-400';
                           emoji = '🟡';
                         } else if (crash.crashPoint < 10) {
                           bgColor = 'bg-emerald-950/30 border-emerald-500/30';
-                          crashColor = 'text-emerald-400';
+                          textColor = 'text-emerald-400';
                           emoji = '🟢';
                         } else {
                           bgColor = 'bg-purple-950/30 border-purple-500/30';
-                          crashColor = 'text-purple-400';
+                          textColor = 'text-purple-400';
                           emoji = '🟣';
                         }
 
                         return (
-                          <div 
-                            key={crash.id} 
-                            className={`p-3 lg:p-4 rounded-lg border transition-all hover:border-white/30 hover:shadow-lg ${bgColor}`}
-                          >
+                          <div key={crash.id} className={`p-4 rounded-lg border ${bgColor}`}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{emoji}</span>
-                                <span className={`text-2xl lg:text-3xl font-black font-mono ${crashColor}`}>
+                                <span className={`text-3xl font-black font-mono ${textColor}`}>
                                   {crash.crashPoint.toFixed(2)}x
                                 </span>
                               </div>
-                              <span className="text-[10px] lg:text-xs text-gray-500 font-mono">
+                              <span className="text-xs text-gray-500">
                                 {crash.timestamp.toLocaleTimeString()}
                               </span>
                             </div>
@@ -668,21 +591,15 @@ export function CrashGame() {
                         );
                       })
                     ) : (
-                      <div className="text-center py-16 text-gray-500 text-xs">
+                      <div className="text-center py-20 text-gray-500">
                         <div className="text-4xl mb-2">🎮</div>
-                        <div className="font-bold">Игра загружается...</div>
-                        <div className="text-[10px] mt-2 text-gray-600">
-                          Первые краши появятся здесь
-                        </div>
+                        <div>Ждём первого краша...</div>
                       </div>
                     )
                   ) : (
-                    <div className="text-center py-16 text-gray-500 text-xs">
+                    <div className="text-center py-20 text-gray-500">
                       <div className="animate-spin text-2xl mb-2">⏳</div>
-                      <div className="font-bold">Загрузка истории...</div>
-                      <div className="text-[10px] mt-2 text-gray-600">
-                        Получаю последние краши
-                      </div>
+                      <div>Загрузка...</div>
                     </div>
                   )}
                 </div>
@@ -696,22 +613,6 @@ export function CrashGame() {
         div::-webkit-scrollbar { width: 6px; }
         div::-webkit-scrollbar-track { background: transparent; }
         div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 6px; }
-        div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
-        
-        div {
-          scrollbar-color: rgba(34, 197, 94, 0.3) transparent;
-          scrollbar-width: thin;
-        }
-        
-        input[type="number"]::-webkit-outer-spin-button,
-        input[type="number"]::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        
-        input[type="number"] {
-          -moz-appearance: textfield;
-        }
       `}</style>
     </div>
   );
