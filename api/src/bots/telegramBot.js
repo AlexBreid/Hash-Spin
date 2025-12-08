@@ -1048,7 +1048,7 @@ if (!BOT_TOKEN) {
             const invoice = result.items[0];
             if (invoice.status === 'paid') {
                 try {
-                    await ctx.editMessageText(`✅ *Оплачено!* Средства зачислены.`, { parse_mode: 'Markdown' });
+                    await ctx.editMessageText(`✅ *Средства приняты*, обработка`, { parse_mode: 'Markdown' });
                 } catch (e) {
                     if (!e.description?.includes('message is not modified')) {
                         await ctx.reply('✅ Оплата подтверждена! Средства зачислены.');

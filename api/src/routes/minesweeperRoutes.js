@@ -133,6 +133,19 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
     // ⚠️ ПЕРЕДАЁМ userId в сервис для проверки собственности
     const result = await minesweeperService.revealGameCell(gameId, x, y, userId);
 
+    // 🎉 ЕСЛИ ПОЛНАЯ ПОБЕДА - ЗАЧИСЛЯЕМ ВЫИГРЫШ
+    if (result.status === 'WON' && result.winAmount) {
+      const game = await prisma.minesweeperGame.findUnique({
+        where: { id: gameId },
+        select: { tokenId: true },
+      });
+
+      if (game) {
+        await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'MAIN');
+        console.log(`✅ [MINESWEEPER] Выигрыш при полной победе ${result.winAmount} зачислен на MAIN`);
+      }
+    }
+
     res.json({
       success: true,
       data: result,
@@ -192,6 +205,8 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
  * 💰 POST кэшаут (забрать выигрыш)
  * POST /api/v1/minesweeper/cashout
  * Body: { gameId: 1, balanceType: 'MAIN' }
+ * 
+ * ✅ ИСПРАВЛЕНО: Зачисление выигрыша происходит ТОЛЬКО здесь
  */
 router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) => {
   try {
@@ -220,13 +235,18 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       });
     }
 
+    // Сервис только обновляет статус игры, НЕ зачисляет деньги
     const result = await minesweeperService.cashOutGame(gameId, userId);
 
-    // 🆕 Зачисляем выигрыш через хелпер
-    if (result.winAmount && result.winAmount > 0) {
+    // ✅ ЕДИНСТВЕННОЕ МЕСТО, где зачисляется выигрыш при кэшауте
+    if (result.winAmount) {
       const targetBalance = balanceType || 'MAIN';
-      await creditWinnings(userId, result.winAmount, game.tokenId, targetBalance);
-      console.log(`✅ [MINESWEEPER] Выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+      const winAmountNum = parseFloat(result.winAmount);
+      
+      if (winAmountNum > 0) {
+        await creditWinnings(userId, winAmountNum, game.tokenId, targetBalance);
+        console.log(`✅ [MINESWEEPER] Кэшаут: выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+      }
     }
 
     res.json({

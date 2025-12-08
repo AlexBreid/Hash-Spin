@@ -265,14 +265,17 @@ class MinesweeperService {
                 multiplier: currentMultiplier,
                 status: isWon ? 'WON' : 'PLAYING',
             };
-            
-            let finalWinAmount = null;
 
-            // 🎉 ПОЛНАЯ ПОБЕДА
+            // 🎉 ПОЛНАЯ ПОБЕДА - НЕ ЗАЧИСЛЯЕМ, зачисление в контроллере
             if (isWon) {
-                finalWinAmount = potentialWin;
-                await this.depositWinAmount(game.userId, game.tokenId, finalWinAmount);
+                const finalWinAmount = potentialWin;
                 updateData.winAmount = finalWinAmount;
+                
+                await prisma.minesweeperGame.update({
+                    where: { id: gameId },
+                    data: updateData,
+                });
+
                 console.log(`🎉 Игра ${gameId}: ПОЛНАЯ ПОБЕДА! Выигрыш ${finalWinAmount}`);
 
                 // Отправляем ПОЛНОЕ РАСКРЫТОЕ ПОЛЕ
@@ -319,6 +322,7 @@ class MinesweeperService {
 
     /**
      * 💰 Забрать выигрыш (Кэшаут)
+     * ⚠️ ВАЖНО: Зачисление баланса происходит в КОНТРОЛЛЕРЕ через creditWinnings()
      */
     async cashOutGame(gameId, userId) {
         try {
@@ -341,8 +345,8 @@ class MinesweeperService {
             
             const winAmount = new Decimal(game.betAmount).mul(game.multiplier);
             
-            // Пополняем баланс
-            await this.depositWinAmount(game.userId, game.tokenId, winAmount);
+            // ❌ УДАЛЕНО: await this.depositWinAmount(game.userId, game.tokenId, winAmount);
+            // Зачисление теперь происходит ТОЛЬКО в контроллере через creditWinnings()
             
             // Обновляем статус игры
             const finalGame = await prisma.minesweeperGame.update({
@@ -374,7 +378,8 @@ class MinesweeperService {
     }
 
     /**
-     * 🏦 Пополнение баланса
+     * 🏦 Пополнение баланса (ОСТАВЛЕНО для внутреннего использования, если потребуется)
+     * Больше не используется в основной логике!
      */
     async depositWinAmount(userId, tokenId, amount) {
         const winAmountDecimal = amount instanceof Decimal ? amount : new Decimal(amount.toString());

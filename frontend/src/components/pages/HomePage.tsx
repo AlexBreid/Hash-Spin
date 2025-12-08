@@ -62,10 +62,33 @@ export function HomePage() {
     }
   };
 
+  const handleBonusClick = () => {
+    navigate('/referrals'); // 🎁 Переход на рефералки
+  };
+
   return (
     <div className="pb-24 pt-6">
       {/* Welcome Banner */}
       
+      <div className="px-4 mb-8">
+        <div className="bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl p-6 text-primary-foreground relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+          <div className="relative z-10">
+            <div className="flex items-center space-x-2 mb-2">
+              <Gift className="w-6 h-6" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Получите бонусы!</h2>
+            <p className="text-primary-foreground/90 mb-4">Введите реферальную ссылку и получите бонусы!</p>
+            <Button 
+              onClick={handleBonusClick}
+              className="bg-white text-primary hover:bg-white/90 font-semibold shadow-lg"
+              size="sm"
+            >
+              Получить бонус
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* Featured Games Slider */}
       <div className="mb-8">

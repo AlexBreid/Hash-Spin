@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
@@ -42,16 +41,16 @@ export function AccountPage() {
   const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
   // =======================================================
-  // 💡 ИСПРАВЛЕНИЕ: Переменные стилей вынесены в начало
+  // 💡 ЦВЕТОВАЯ ПАЛИТРА: Тёмный синий + бирюзовый
   // =======================================================
-  const mainBg = '#0b1320';
-  const cardBg = '#141c2c';
-  const profileCardBg = 'linear-gradient(145deg, #1b273d, #0d1624)';
-  const levelBoxBg = 'linear-gradient(135deg, #2a4060, #1a2a40)';
-  const levelBorder = 'linear-gradient(90deg, #10b981, #3b82f6)';
-  const achievementButtonBg = '#10b981';
-  const ratingButtonBg = '#374151';
-  const statBoxBg = '#103030';
+  const mainBg = '#0a0f1a';
+  const cardBg = '#0d1425';
+  const profileCardBg = 'linear-gradient(145deg, #0d1829, #0a0f1a)';
+  const levelBoxBg = 'linear-gradient(135deg, #0d2d3d, #0a1f2e)';
+  const levelBorder = 'linear-gradient(90deg, #0ea5e9, #06b6d4)';
+  const statBoxBg = 'linear-gradient(135deg, #0d2d3d, #0a1f2e)';
+  const accentColor = '#0ea5e9'; // Голубой акцент
+  const greenAccent = '#10b981'; // Зелёный для инфо
   // =======================================================
 
 
@@ -130,8 +129,8 @@ export function AccountPage() {
                     fontSize: '24px',
                     fontWeight: 'bold',
                     color: '#fff',
-                    background: 'linear-gradient(135deg, #10b981, #3b82f6)',
-                    boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+                    background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+                    boxShadow: '0 0 10px rgba(14, 165, 233, 0.5)'
                 }}>
                     {photoUrl ? (
                         <motion.img
@@ -145,7 +144,7 @@ export function AccountPage() {
                     <CardTitle className="text-xl font-bold" style={{ color: '#fff' }}>
                         {fullName || username}
                     </CardTitle>
-                    <div className="flex items-center text-sm mt-1" style={{ color: '#fcd34d' }}>
+                    <div className="flex items-center text-sm mt-1" style={{ color: '#10b981' }}>
                         <Star className="w-4 h-4 mr-1" />
                         <span>{vipLevel || "Нет"} статус</span>
                     </div>
@@ -218,7 +217,7 @@ export function AccountPage() {
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
               }}
             >
-              <div className="flex items-center mb-1 text-sm" style={{ color: '#60a5fa' }}>
+              <div className="flex items-center mb-1 text-sm" style={{ color: accentColor }}>
                 <Calendar className="w-4 h-4 mr-1" />
                 Игр сыграно
               </div>
@@ -233,12 +232,12 @@ export function AccountPage() {
     );
   }
 
-  // --- LOADING / ERROR (Используют mainBg, который теперь доступен) ---
+  // --- LOADING / ERROR ---
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4" style={{ backgroundColor: mainBg }}>
       {loading && (
         <>
-          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: '#3b82f6' }} />
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: accentColor }} />
           <p className="text-muted-foreground" style={{ color: '#9ca3af' }}>Загрузка профиля...</p>
         </>
       )}
@@ -260,10 +259,18 @@ export function AccountPage() {
 
       {!loading && !error && !profileData && (
         <>
-          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: '#3b82f6' }} />
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" style={{ color: accentColor }} />
           <p className="text-muted-foreground" style={{ color: '#9ca3af' }}>Инициализация...</p>
         </>
       )}
     </div>
   );
 }
+
+
+
+
+
+
+
+
