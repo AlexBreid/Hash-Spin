@@ -50,7 +50,7 @@ class CrashGameService {
         });
 
         this.socket.on('connect', () => {
-          console.log('✅ Подключились к Crash Server');
+
           
           this.socket!.emit('joinGame', {
             userId,
@@ -155,8 +155,6 @@ class CrashGameService {
       if (!Array.isArray(data.data)) {
         throw new Error('Data is not an array');
       }
-
-      console.log(`✅ [SERVICE] Загружено ${data.data.length} крашей:`);
       
       const crashes = data.data.map((crash: any) => {
         const timestamp = new Date(crash.timestamp);
@@ -172,10 +170,6 @@ class CrashGameService {
         b.timestamp.getTime() - a.timestamp.getTime()
       );
 
-      if (sorted.length > 0) {
-        console.log(`✅ [SERVICE] Первый краш: ${sorted[0].crashPoint}x в ${sorted[0].timestamp.toLocaleTimeString()}`);
-        console.log(`✅ [SERVICE] Последний краш: ${sorted[sorted.length - 1].crashPoint}x в ${sorted[sorted.length - 1].timestamp.toLocaleTimeString()}`);
-      }
 
       return sorted;
     } catch (error) {
