@@ -45,6 +45,7 @@ export function CrashGame() {
   const [canCashout, setCanCashout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
+  const [totalOnline, setTotalOnline] = useState(() => 100 + Math.floor(Math.random() * 201)); // 100-300
   
   // ✅ История крашей
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
@@ -98,8 +99,6 @@ export function CrashGame() {
       }
     } catch (error) {
       console.error('❌ Ошибка загрузки истории крашей:', error);
-      // Не выводим ошибку - это не критично, история может быть пустой
-      // toast.error('❌ Не удалось загрузить историю крашей');
       setCrashHistory([]);
     } finally {
       setCrashHistoryLoading(false);
@@ -224,7 +223,7 @@ export function CrashGame() {
   }, [betPlaced, currentBet, fetchBalances]);
 
   // ================================
-  // 3️⃣ CANVAS ОТРИСОВКА
+  // 3️⃣ CANVAS ОТРИСОВКА С АВТОСЛЕЖКОЙ
   // ================================
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
@@ -259,8 +258,14 @@ export function CrashGame() {
       ctx.stroke();
     }
 
-    const maxMult = gameState.crashPoint ? Math.max(12, gameState.crashPoint + 3) : 12;
     const currentMult = gameState.status === 'crashed' ? (gameState.crashPoint || 1) : gameState.multiplier;
+    
+    // ✅ ИСПРАВЛЕНИЕ: Динамический расчёт maxMult для автослежки
+    let maxMult = 12;
+    if (currentMult > 12) {
+      // Если множитель превышает видимую область, динамически увеличиваем maxMult
+      maxMult = Math.max(12, currentMult + 3);
+    }
 
     const multiplierToY = (mult: number) => h - (mult / maxMult) * h;
     const progressToX = (progress: number) => w * progress;
@@ -425,19 +430,28 @@ export function CrashGame() {
               </div>
             </div>
 
-            <GlassCard className="px-4 lg:px-6 py-2 lg:py-3 flex items-center gap-3 !rounded-full">
-              <div className="text-right">
-                <p className="text-xs text-gray-400 font-mono">БАЛАНС</p>
-                <p className="text-xl lg:text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
-              </div>
-              <button
-                onClick={() => fetchBalances()}
-                className="p-2 hover:bg-white/20 rounded-lg transition-all"
-                title="Обновить"
-              >
-                <RefreshCw className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
-              </button>
-            </GlassCard>
+            <div className="flex items-center gap-3">
+              {/* ✅ ОНЛАЙН */}
+              <GlassCard className="px-3 lg:px-4 py-2 lg:py-3 flex items-center gap-2 !rounded-full">
+                <Users className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs lg:text-sm font-mono text-gray-300">{totalOnline}</span>
+              </GlassCard>
+
+              {/* БАЛАНС */}
+              <GlassCard className="px-4 lg:px-6 py-2 lg:py-3 flex items-center gap-3 !rounded-full">
+                <div className="text-right">
+                  <p className="text-xs text-gray-400 font-mono">БАЛАНС</p>
+                  <p className="text-xl lg:text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
+                </div>
+                <button
+                  onClick={() => fetchBalances()}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-all"
+                  title="Обновить"
+                >
+                  <RefreshCw className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
+                </button>
+              </GlassCard>
+            </div>
           </div>
         </header>
 
