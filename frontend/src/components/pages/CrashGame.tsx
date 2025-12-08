@@ -47,7 +47,6 @@ export function CrashGame() {
   const [totalOnline] = useState(() => 100 + Math.floor(Math.random() * 201));
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
-  const [crashHistoryLoading, setCrashHistoryLoading] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -127,25 +126,56 @@ export function CrashGame() {
       if (betPlaced) {
         setBetPlaced(false);
       }
+
+      // ✅ ДОБАВЛЯЕМ В ИСТОРИЮ СРАЗУ ПРИ КРАШЕ
+      if (data.crashPoint) {
+        const newCrash: CrashHistory = {
+          id: data.gameId || `crash_${Date.now()}`,
+          gameId: data.gameId,
+          crashPoint: parseFloat(data.crashPoint.toString()),
+          timestamp: new Date(data.timestamp || Date.now()),
+        };
+        
+        console.log(`📝 [COMPONENT] Добавляю краш в историю:`, newCrash);
+        setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
+      }
     };
 
     // ✅ НОВОЕ: Обработка события обновления истории от сервера
-    const handleCrashHistoryUpdated = (data: { history: CrashHistory[]; totalInMemory: number }) => {
-      console.log(`📊 [COMPONENT] crashHistoryUpdated: ${data.history.length} крашей`);
+    const handleCrashHistoryUpdated = (data: any) => {
+      console.log(`📊 [COMPONENT] ✅ crashHistoryUpdated получено:`, data);
       
-      const formattedHistory = data.history.map((crash: any) => ({
-        id: crash.id || crash.gameId,
-        gameId: crash.gameId,
-        crashPoint: parseFloat(crash.crashPoint.toString()),
-        timestamp: new Date(crash.timestamp),
-      }));
+      if (!data || !data.history || !Array.isArray(data.history)) {
+        console.warn(`⚠️ [COMPONENT] Пустые или неправильные данные истории:`, data);
+        return;
+      }
 
-      console.log(`✅ [COMPONENT] История обновлена с сервера:`);
-      formattedHistory.forEach((crash, idx) => {
-        console.log(`  ${idx + 1}. ${crash.crashPoint}x`);
-      });
+      try {
+        const formattedHistory = data.history.map((crash: any, idx: number) => {
+          console.log(`  📍 Обработка краша #${idx}:`, crash);
+          return {
+            id: crash.id || crash.gameId || `crash_${Date.now()}_${idx}`,
+            gameId: crash.gameId,
+            crashPoint: parseFloat((crash.crashPoint || crash.multiplier || 0).toString()),
+            timestamp: crash.timestamp ? new Date(crash.timestamp) : new Date(),
+          };
+        });
 
-      setCrashHistory(formattedHistory);
+        console.log(`✅ [COMPONENT] История обновлена: ${formattedHistory.length} краш(-ей)`);
+        formattedHistory.forEach((crash, idx) => {
+          console.log(`  ${idx + 1}. 🎯 ${crash.crashPoint}x @ ${crash.timestamp.toLocaleTimeString()}`);
+        });
+
+        setCrashHistory(formattedHistory);
+        
+        setTimeout(() => {
+          if (crashHistoryRef.current) {
+            crashHistoryRef.current.scrollTop = 0;
+          }
+        }, 100);
+      } catch (error) {
+        console.error(`❌ [COMPONENT] Ошибка при обработке истории:`, error);
+      }
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
@@ -184,6 +214,8 @@ export function CrashGame() {
       toast.error(`❌ ${data.message}`);
     };
 
+    console.log('🔔 [COMPONENT] Регистрирую обработчики событий...');
+    
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
     crashGameService.on('gameCrashed', handleGameCrashed);
@@ -194,7 +226,10 @@ export function CrashGame() {
     crashGameService.on('countdownUpdate', handleCountdownUpdate);
     crashGameService.on('error', handleError);
 
+    console.log('✅ [COMPONENT] Все обработчики зарегистрированы');
+
     return () => {
+      console.log('🧹 [COMPONENT] Удаляю обработчики событий');
       crashGameService.off('gameStatus', handleGameStatus);
       crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
       crashGameService.off('gameCrashed', handleGameCrashed);
@@ -625,7 +660,10 @@ export function CrashGame() {
                   ) : (
                     <div className="text-center py-16 text-gray-500 text-xs">
                       <div className="text-4xl mb-2">📊</div>
-                      Крахи появятся здесь
+                      <div>Крахи появятся здесь</div>
+                      <div className="text-[10px] mt-2 text-gray-600">
+                        Сервер отправляет историю автоматически
+                      </div>
                     </div>
                   )}
                 </div>
