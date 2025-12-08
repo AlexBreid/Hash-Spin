@@ -15,6 +15,7 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 );
 
 const MAX_WAIT_TIME = 10;
+const HISTORY_LOAD_TIMEOUT = 5000; // 5 секунд timeout
 
 interface CrashHistory {
   id: string;
@@ -70,23 +71,34 @@ export function CrashGame() {
         toast.success('🚀 Подключено!');
         await fetchBalances();
 
-        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ ЧЕРЕЗ API ENDPOINT ПРИ СТАРТЕ
+        // ✅ ЗАГРУЖАЕМ ИСТОРИЮ ЧЕРЕЗ API ENDPOINT С TIMEOUT
         console.log('📥 Загружаю историю крашей с API...');
+        
+        // Создаём контроллер для abort-а при timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.warn('⚠️ Timeout загрузки истории');
+        }, HISTORY_LOAD_TIMEOUT);
+
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
           const response = await fetch(`${API_URL}/api/v1/crash/last-crashes`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
           });
+
+          clearTimeout(timeoutId);
 
           if (response.ok) {
             const data = await response.json();
             
-            if (data.success && data.data && Array.isArray(data.data)) {
+            if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
               const formatted = data.data.map((crash: any) => ({
-                id: crash.id || crash.gameId || `crash_${Date.now()}`,
+                id: crash.id || crash.gameId || `crash_${Date.now()}_${Math.random()}`,
                 gameId: crash.gameId,
                 crashPoint: parseFloat((crash.crashPoint || 0).toString()),
                 timestamp: new Date(crash.timestamp),
@@ -97,15 +109,26 @@ export function CrashGame() {
                 console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
               });
 
-              // ✅ УСТАНАВЛИВАЕМ ИСТОРИЮ ОТ API
               setCrashHistory(formatted);
+              setIsHistoryLoaded(true);
+            } else {
+              console.warn('⚠️ История пуста или некорректна');
+              setIsHistoryLoaded(true);
             }
           } else {
             console.warn(`⚠️ API вернул ${response.status}`);
             setIsHistoryLoaded(true);
           }
-        } catch (error) {
-          console.warn('⚠️ Ошибка загрузки истории:', error);
+        } catch (error: any) {
+          clearTimeout(timeoutId);
+          
+          if (error.name === 'AbortError') {
+            console.warn('⚠️ Загрузка истории прервана по timeout');
+          } else {
+            console.warn('⚠️ Ошибка загрузки истории:', error);
+          }
+          
+          // ✅ ДАЖЕ ПРИ ОШИБКЕ ОТМЕЧАЕМ ЧТО ИСТОРИЯ ЗАГРУЖЕНА (игра может начаться)
           setIsHistoryLoaded(true);
         }
         
@@ -153,7 +176,7 @@ export function CrashGame() {
 
       // ✅ ДОБАВЛЯЕМ НОВЫЙ КРАШ В ИСТОРИЮ (в реальном времени)
       const newCrash: CrashHistory = {
-        id: data.gameId || `crash_${Date.now()}`,
+        id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
         gameId: data.gameId,
         crashPoint: parseFloat(data.crashPoint.toString()),
         timestamp: new Date(),
@@ -163,9 +186,6 @@ export function CrashGame() {
       
       // ✅ ДОБАВЛЯЕМ В НАЧАЛО И ОГРАНИЧИВАЕМ ДО 10
       setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
-      
-      // ✅ ОТМЕЧАЕМ, ЧТО ИСТОРИЯ ПОЛНОСТЬЮ ЗАГРУЖЕНА (добавлены краши в реальном времени)
-      setIsHistoryLoaded(true);
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
@@ -417,7 +437,7 @@ export function CrashGame() {
                   CRASH
                 </h1>
                 <p className="text-xs text-emerald-400 font-mono mt-1">
-                  {isHistoryLoaded ? '🟢 ЖИВАЯ ИГРА' : '🟡 ЗАГРУЗКА ИСТОРИИ...'}
+                  {isHistoryLoaded ? '🟢 ГОТОВО' : '🟡 ЗАГРУЗКА...'}
                 </p>
               </div>
             </div>
@@ -500,13 +520,13 @@ export function CrashGame() {
                       />
                       <button
                         onClick={() => setInputBet((p) => (parseFloat(p || '0') / 2).toFixed(2))}
-                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap"
+                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap hover:bg-white/20 transition-colors"
                       >
                         ÷2
                       </button>
                       <button
                         onClick={() => setInputBet((p) => (parseFloat(p || '0') * 2).toFixed(2))}
-                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap"
+                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap hover:bg-white/20 transition-colors"
                       >
                         ×2
                       </button>
@@ -517,7 +537,7 @@ export function CrashGame() {
                     {canCashout ? (
                       <button
                         onClick={handleCashout}
-                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 transition-transform"
                       >
                         <Zap className="w-4 lg:w-5 h-4 lg:h-5" />
                         <span className="text-sm lg:text-base">ЗАБРАТЬ ${potentialWinnings.toFixed(2)}</span>
@@ -530,7 +550,7 @@ export function CrashGame() {
                       <button
                         onClick={handlePlaceBet}
                         disabled={gameState.status !== 'waiting' || !isHistoryLoaded}
-                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all"
                       >
                         🎯 ПОСТАВИТЬ
                       </button>
@@ -544,68 +564,63 @@ export function CrashGame() {
             <GlassCard className="flex flex-col h-auto lg:h-[600px] max-h-[400px] lg:max-h-none">
               <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0">
                 <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 text-emerald-400 flex-shrink-0" />
-                <span className="text-sm lg:text-base">ЗАВЕРШЁННЫЕ КРАШИ</span>
+                <span className="text-sm lg:text-base">ИСТОРИЯ КРАШЕЙ</span>
                 <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
-                  {isHistoryLoaded ? `${displayedHistory.length}/9` : '⏳'}
+                  {displayedHistory.length > 0 ? `${displayedHistory.length}` : '—'}
                 </span>
               </div>
               
               <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-2 lg:p-3 space-y-2">
-                {isHistoryLoaded ? (
-                  displayedHistory.length > 0 ? (
-                    displayedHistory.map((crash) => {
-                      let bgColor = 'bg-black/40 border-white/10';
-                      let textColor = 'text-gray-300';
-                      let emoji = '📊';
-                      
-                      if (crash.crashPoint < 1.5) {
-                        bgColor = 'bg-red-950/30 border-red-500/30';
-                        textColor = 'text-red-400';
-                        emoji = '🔴';
-                      } else if (crash.crashPoint < 3) {
-                        bgColor = 'bg-orange-950/30 border-orange-500/30';
-                        textColor = 'text-orange-400';
-                        emoji = '🟠';
-                      } else if (crash.crashPoint < 5) {
-                        bgColor = 'bg-yellow-950/30 border-yellow-500/30';
-                        textColor = 'text-yellow-400';
-                        emoji = '🟡';
-                      } else if (crash.crashPoint < 10) {
-                        bgColor = 'bg-emerald-950/30 border-emerald-500/30';
-                        textColor = 'text-emerald-400';
-                        emoji = '🟢';
-                      } else {
-                        bgColor = 'bg-purple-950/30 border-purple-500/30';
-                        textColor = 'text-purple-400';
-                        emoji = '🟣';
-                      }
+                {displayedHistory.length > 0 ? (
+                  displayedHistory.map((crash) => {
+                    let bgColor = 'bg-black/40 border-white/10';
+                    let textColor = 'text-gray-300';
+                    let emoji = '📊';
+                    
+                    if (crash.crashPoint < 1.5) {
+                      bgColor = 'bg-red-950/30 border-red-500/30';
+                      textColor = 'text-red-400';
+                      emoji = '🔴';
+                    } else if (crash.crashPoint < 3) {
+                      bgColor = 'bg-orange-950/30 border-orange-500/30';
+                      textColor = 'text-orange-400';
+                      emoji = '🟠';
+                    } else if (crash.crashPoint < 5) {
+                      bgColor = 'bg-yellow-950/30 border-yellow-500/30';
+                      textColor = 'text-yellow-400';
+                      emoji = '🟡';
+                    } else if (crash.crashPoint < 10) {
+                      bgColor = 'bg-emerald-950/30 border-emerald-500/30';
+                      textColor = 'text-emerald-400';
+                      emoji = '🟢';
+                    } else {
+                      bgColor = 'bg-purple-950/30 border-purple-500/30';
+                      textColor = 'text-purple-400';
+                      emoji = '🟣';
+                    }
 
-                      return (
-                        <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0 animate-in fade-in slide-in-from-top duration-300`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-lg flex-shrink-0">{emoji}</span>
-                              <span className={`text-xl lg:text-2xl font-black font-mono ${textColor} truncate`}>
-                                {crash.crashPoint.toFixed(2)}x
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
-                              {crash.timestamp.toLocaleTimeString()}
+                    return (
+                      <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0 animate-in fade-in slide-in-from-top duration-300`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-lg flex-shrink-0">{emoji}</span>
+                            <span className={`text-xl lg:text-2xl font-black font-mono ${textColor} truncate`}>
+                              {crash.crashPoint.toFixed(2)}x
                             </span>
                           </div>
+                          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                            {crash.timestamp.toLocaleTimeString()}
+                          </span>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
-                      <div className="text-3xl lg:text-4xl mb-2">🎮</div>
-                      <div className="text-sm">Ждём завершения раунда...</div>
-                    </div>
-                  )
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
-                    <div className="animate-spin text-xl lg:text-2xl mb-2">⏳</div>
-                    <div className="text-sm">Загружаю историю...</div>
+                    <div className="text-3xl lg:text-4xl mb-2">🎮</div>
+                    <div className="text-sm">
+                      {isHistoryLoaded ? 'Ждём первого краша...' : 'Загружаю данные...'}
+                    </div>
                   </div>
                 )}
               </div>
