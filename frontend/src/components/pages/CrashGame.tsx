@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { crashGameService } from '../../services/crashGameService';
-import type { CrashGameState, LiveEvent } from '../../services/crashGameService';
+import type { CrashGameState } from '../../services/crashGameService';
 import { useAuth } from '../../context/AuthContext';
 import { useBalance } from '../../hooks/useBalance';
 import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw, Loader } from 'lucide-react';
@@ -19,6 +19,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 interface CrashHistory {
   id: string;
+  gameId?: string;
   crashPoint: number;
   timestamp: Date;
 }
@@ -46,47 +47,14 @@ export function CrashGame() {
   const [totalOnline] = useState(() => 100 + Math.floor(Math.random() * 201));
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
-  const [crashHistoryLoading, setCrashHistoryLoading] = useState(true);
+  const [crashHistoryLoading, setCrashHistoryLoading] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
 
   // ================================
-  // 🔄 ЗАГРУЗКА ИСТОРИИ КРАШЕЙ
-  // ================================
-  const fetchCrashHistory = useCallback(async () => {
-    try {
-      setCrashHistoryLoading(true);
-      
-      console.log(`📊 [COMPONENT] Загружаю историю крашей через сервис...`);
-      
-      const crashes = await crashGameService.fetchLastCrashes();
-
-      if (crashes && crashes.length > 0) {
-        console.log(`✅ [COMPONENT] Загружено ${crashes.length} крашей`);
-        console.log(`📍 [COMPONENT] Первый (новый): ${crashes[0].crashPoint}x в ${crashes[0].timestamp.toLocaleTimeString()}`);
-        
-        const sorted = crashes.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        
-        console.log(`✅ [COMPONENT] Установлено ${sorted.length} крашей в state`);
-        setCrashHistory(sorted.slice(0, 10));
-      } else {
-        console.warn('⚠️ [COMPONENT] Крашей не загружено');
-        setCrashHistory([]);
-      }
-    } catch (error) {
-      console.error('❌ [COMPONENT] Ошибка загрузки истории крашей:', error);
-      setCrashHistory([]);
-    } finally {
-      setCrashHistoryLoading(false);
-    }
-  }, []);
-
-  // ================================
-  // 1️⃣ ПОДКЛЮЧЕНИЕ И ЗАГРУЗКА ИСТОРИИ
+  // 1️⃣ ПОДКЛЮЧЕНИЕ И НАЧАЛЬНАЯ ЗАГРУЗКА
   // ================================
   useEffect(() => {
     if (!user || !token) {
@@ -106,9 +74,6 @@ export function CrashGame() {
         
         await fetchBalances();
         
-        console.log('📊 [COMPONENT] Загружаю историю крашей при подключении...');
-        await fetchCrashHistory();
-        
       } catch (error) {
         console.error('❌ [COMPONENT] Connection error:', error);
         toast.error('❌ Ошибка подключения к серверу');
@@ -118,21 +83,15 @@ export function CrashGame() {
     };
 
     connect();
-    
-    const historyInterval = setInterval(() => {
-      console.log('🔄 [COMPONENT] Периодическое обновление истории крашей...');
-      fetchCrashHistory();
-    }, 20000); // Каждые 20 сек вместо 15
 
     return () => {
-      console.log('🧹 [COMPONENT] Очищаю сокеты и интервалы');
+      console.log('🧹 [COMPONENT] Очищаю сокеты');
       crashGameService.disconnect();
-      clearInterval(historyInterval);
     };
-  }, [user, token, navigate, fetchBalances, fetchCrashHistory]);
+  }, [user, token, navigate, fetchBalances]);
 
   // ================================
-  // 2️⃣ ЛОГИКА ИГРЫ
+  // 2️⃣ ЛОГИКА ИГРЫ И СОБЫТИЙ
   // ================================
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
@@ -164,41 +123,29 @@ export function CrashGame() {
         gameId: data.gameId 
       }));
       setCanCashout(false);
-      
-      // ✅ ИСПРАВЛЕНО: Добавляем краш в историю СРАЗУ когда приходит событие
-      const newCrash: CrashHistory = {
-        id: data.gameId || `crash_${Date.now()}`,
-        crashPoint: parseFloat(data.crashPoint),
-        timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
-      };
-      
-      console.log('➕ [COMPONENT] Добавляю краш в локальную историю СРАЗУ:');
-      console.log(`  - Crash Point: ${newCrash.crashPoint}x`);
-      console.log(`  - Timestamp: ${newCrash.timestamp.toLocaleTimeString()}`);
-      console.log(`  - GameID: ${newCrash.id}`);
-      
-      setCrashHistory((prev) => {
-        const updated = [newCrash, ...prev].slice(0, 10);
-        console.log(`✅ [COMPONENT] История обновлена! Всего крашей: ${updated.length}`);
-        updated.forEach((crash, idx) => {
-          console.log(`  ${idx + 1}. ${crash.crashPoint}x`);
-        });
-        return updated;
-      });
 
       if (betPlaced) {
         setBetPlaced(false);
       }
+    };
+
+    // ✅ НОВОЕ: Обработка события обновления истории от сервера
+    const handleCrashHistoryUpdated = (data: { history: CrashHistory[]; totalInMemory: number }) => {
+      console.log(`📊 [COMPONENT] crashHistoryUpdated: ${data.history.length} крашей`);
       
-      // ✅ УЛУЧШЕНО: Синхронизируем с сервером в фоне, но НЕ заменяем локальное
-      setTimeout(() => {
-        console.log('🔄 [COMPONENT] Синхронизирую историю с сервером (в фоне)...');
-        fetchCrashHistory().then(() => {
-          console.log('✅ [COMPONENT] История синхронизирована с сервером');
-        }).catch(err => {
-          console.error('❌ [COMPONENT] Ошибка синхронизации:', err);
-        });
-      }, 3000);
+      const formattedHistory = data.history.map((crash: any) => ({
+        id: crash.id || crash.gameId,
+        gameId: crash.gameId,
+        crashPoint: parseFloat(crash.crashPoint.toString()),
+        timestamp: new Date(crash.timestamp),
+      }));
+
+      console.log(`✅ [COMPONENT] История обновлена с сервера:`);
+      formattedHistory.forEach((crash, idx) => {
+        console.log(`  ${idx + 1}. ${crash.crashPoint}x`);
+      });
+
+      setCrashHistory(formattedHistory);
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => {
@@ -240,6 +187,7 @@ export function CrashGame() {
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
     crashGameService.on('gameCrashed', handleGameCrashed);
+    crashGameService.on('crashHistoryUpdated', handleCrashHistoryUpdated);
     crashGameService.on('playerJoined', handlePlayerJoined);
     crashGameService.on('betPlaced', handleBetPlaced);
     crashGameService.on('cashoutSuccess', handleCashoutSuccess);
@@ -250,13 +198,14 @@ export function CrashGame() {
       crashGameService.off('gameStatus', handleGameStatus);
       crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
       crashGameService.off('gameCrashed', handleGameCrashed);
+      crashGameService.off('crashHistoryUpdated', handleCrashHistoryUpdated);
       crashGameService.off('playerJoined', handlePlayerJoined);
       crashGameService.off('betPlaced', handleBetPlaced);
       crashGameService.off('cashoutSuccess', handleCashoutSuccess);
       crashGameService.off('countdownUpdate', handleCountdownUpdate);
       crashGameService.off('error', handleError);
     };
-  }, [betPlaced, currentBet, fetchBalances, fetchCrashHistory]);
+  }, [betPlaced, currentBet, fetchBalances]);
 
   // ================================
   // 3️⃣ CANVAS ОТРИСОВКА
@@ -629,18 +578,6 @@ export function CrashGame() {
                   <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
                   <span className="text-xs lg:text-sm">ПОСЛЕДНИЕ КРАХИ</span>
                   <span className="ml-auto text-xs text-gray-500">{crashHistory.length}/10</span>
-                  <button
-                    onClick={() => fetchCrashHistory()}
-                    disabled={crashHistoryLoading}
-                    className="ml-2 p-1 hover:bg-white/20 rounded transition-all disabled:opacity-50"
-                    title="Обновить историю"
-                  >
-                    {crashHistoryLoading ? (
-                      <Loader className="w-4 h-4 animate-spin text-emerald-400" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 text-emerald-400" />
-                    )}
-                  </button>
                 </div>
                 
                 <div 

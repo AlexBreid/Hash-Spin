@@ -37,54 +37,53 @@ log.info('Loaded Server Secret (first 5 chars):', SERVER_SECRET ? SERVER_SECRET.
 // ========================
 // РАСПРЕДЕЛЕНИЕ ВЕРОЯТНОСТЕЙ
 // ========================
-/**
- * ✅ НОВОЕ: Формула вероятности выпадения crash point'ов
- * 
- * Требования:
- * - 1.00x до 2.00x: 75% вероятности
- * - 2.00x до 15.00x: 15% вероятности
- * - 15.00x до 30.00x: 4% вероятности
- * - выше 30.00x: 1% вероятности (очень редко)
- * - остальное: 5% (для безопасности)
- * 
- * @param {number} randomValue - Случайное число от 0 до 1
- * @returns {number} crash point (например 1.5, 5.2, 20.1)
- */
 function calculateCrashPointFromRandom(randomValue) {
-  // randomValue: 0.0 <= x < 1.0
-
   if (randomValue < 0.75) {
-    // 75% шанс: 1.00x до 2.00x
-    // Распределение: линейное от 1.0 до 2.0
-    const normalized = randomValue / 0.75;  // 0.0 to 1.0
-    const crashPoint = 1.0 + (normalized * 1.0);  // 1.0 to 2.0
+    const normalized = randomValue / 0.75;
+    const crashPoint = 1.0 + (normalized * 1.0);
     return parseFloat(crashPoint.toFixed(2));
   } 
   else if (randomValue < 0.90) {
-    // 15% шанс: 2.00x до 15.00x
-    const normalized = (randomValue - 0.75) / 0.15;  // 0.0 to 1.0
-    // Используем экспоненциальное распределение для более реалистичного ощущения
-    const crashPoint = 2.0 + (Math.pow(normalized, 1.5) * 13.0);  // 2.0 to 15.0
+    const normalized = (randomValue - 0.75) / 0.15;
+    const crashPoint = 2.0 + (Math.pow(normalized, 1.5) * 13.0);
     return parseFloat(crashPoint.toFixed(2));
   }
   else if (randomValue < 0.94) {
-    // 4% шанс: 15.00x до 30.00x
-    const normalized = (randomValue - 0.90) / 0.04;  // 0.0 to 1.0
-    const crashPoint = 15.0 + (Math.pow(normalized, 2.0) * 15.0);  // 15.0 to 30.0
+    const normalized = (randomValue - 0.90) / 0.04;
+    const crashPoint = 15.0 + (Math.pow(normalized, 2.0) * 15.0);
     return parseFloat(crashPoint.toFixed(2));
   }
   else if (randomValue < 0.95) {
-    // 1% шанс: выше 30.00x (до 100.00x максимум)
-    const normalized = (randomValue - 0.94) / 0.01;  // 0.0 to 1.0
-    const crashPoint = 30.0 + (Math.pow(normalized, 0.5) * 70.0);  // 30.0 to 100.0
+    const normalized = (randomValue - 0.94) / 0.01;
+    const crashPoint = 30.0 + (Math.pow(normalized, 0.5) * 70.0);
     return parseFloat(Math.min(crashPoint, 100.0).toFixed(2));
   }
   else {
-    // 5% запас на случай ошибок: случайное значение от 1.5 до 3.0
     const normalized = (randomValue - 0.95) / 0.05;
     const crashPoint = 1.5 + (normalized * 1.5);
     return parseFloat(crashPoint.toFixed(2));
   }
+}
+
+// ========================
+// ХРАНИЛИЩЕ ИСТОРИИ КРАШЕЙ (В ПАМЯТИ)
+// ========================
+let crashHistory = [];
+
+function addToCrashHistory(gameId, crashPoint, timestamp) {
+  crashHistory.unshift({
+    id: gameId,
+    gameId,
+    crashPoint,
+    timestamp: new Date(timestamp),
+  });
+  
+  // Храним максимум 50 последних крашей в памяти
+  if (crashHistory.length > 50) {
+    crashHistory = crashHistory.slice(0, 50);
+  }
+  
+  log.info(`📊 История обновлена. Всего крашей в памяти: ${crashHistory.length}`);
 }
 
 // ========================
@@ -111,22 +110,15 @@ class GameRoom {
     };
   }
 
-  /**
-   * ✅ ИСПРАВЛЕНО: Новая формула для генерации crash point'а
-   * Использует пользовательское распределение вероятностей
-   */
   generateCrashPoint() {
-    // Генерируем хеш из server seed + client seed (как раньше)
     const combined = this.roundKeys.serverSeed + this.roundKeys.clientSeed;
     const hash = crypto.createHash('sha256').update(combined).digest('hex');
     
-    // Берем первые 13 символов hex'а и преобразуем в число от 0 до 1
     const hex = hash.substring(0, 13);
     const hmac = parseInt(hex, 16);
-    const MAX_HEX_VALUE = 0x10000000000000;  // 2^52
-    let randomValue = hmac / MAX_HEX_VALUE;  // 0.0 <= randomValue < 1.0
+    const MAX_HEX_VALUE = 0x10000000000000;
+    let randomValue = hmac / MAX_HEX_VALUE;
 
-    // ✅ ИСПОЛЬЗУЕМ НОВУЮ ФОРМУЛУ ВЕРОЯТНОСТЕЙ
     const crashPoint = calculateCrashPointFromRandom(randomValue);
 
     log.info(`🎲 Генерирую crash point: randomValue=${randomValue.toFixed(4)}, crashPoint=${crashPoint}x`);
@@ -195,15 +187,21 @@ class GameRoom {
       }
     });
 
+    // ✅ ИСПРАВЛЕНО: Добавляем краш в историю ДО отправки события
+    const crashTimestamp = new Date();
+    addToCrashHistory(this.gameId, this.crashPoint, crashTimestamp);
+
     try {
       await this.finalizeRoundResults(losers, winners);
     } catch (error) {
       log.error(`Ошибка финализации: ${error.message}`);
     }
 
+    // ✅ ИСПРАВЛЕНО: Отправляем историю вместе с событием краша
     io.to('crash-room').emit('gameCrashed', {
       crashPoint: this.crashPoint,
       gameId: this.gameId,
+      timestamp: crashTimestamp,
       winners: winners.map(w => ({
         userId: w.userId,
         bet: w.bet,
@@ -211,6 +209,12 @@ class GameRoom {
         winnings: w.winnings,
       })),
       losersCount: losers.length,
+    });
+
+    // ✅ НОВОЕ: Отправляем обновленную историю крашей на фронт
+    io.to('crash-room').emit('crashHistoryUpdated', {
+      history: crashHistory.slice(0, 10), // Отправляем последние 10
+      totalInMemory: crashHistory.length,
     });
 
     setTimeout(() => {
@@ -268,7 +272,6 @@ class GameRoom {
       log.info(`📤 Финализирую результаты для ${this.players.size} игроков`);
 
       for (const player of this.players.values()) {
-        // 🔑 КРИТИЧНО: Проверяем что betId существует!
         if (!player.betId) {
           log.error(`❌ Нет betId для player ${player.userId}!`);
           continue;
@@ -370,6 +373,12 @@ io.on('connection', socket => {
       countdown: gameRoom.countdownTimer,
     });
 
+    // ✅ НОВОЕ: Отправляем историю при присоединении
+    socket.emit('crashHistoryUpdated', {
+      history: crashHistory.slice(0, 10),
+      totalInMemory: crashHistory.length,
+    });
+
     io.to('crash-room').emit('playerJoined', {
       playersCount: gameRoom.players.size,
     });
@@ -401,7 +410,6 @@ io.on('connection', socket => {
         return;
       }
 
-      // 1️⃣ Верифицируем
       const verifyUrl = `${BACKEND_URL}${API_VERSION}/crash/verify-bet`;
       log.info(`📤 Проверяю ставку для user ${player.userId}...`);
 
@@ -422,7 +430,6 @@ io.on('connection', socket => {
         return;
       }
 
-      // 2️⃣ Создаем ставку
       const createBetUrl = `${BACKEND_URL}${API_VERSION}/crash/create-bet`;
       log.info(`📤 Создаю ставку: user=${player.userId}, amount=${amount}, tokenId=${tokenId}`);
 
@@ -448,7 +455,6 @@ io.on('connection', socket => {
         return;
       }
 
-      // 3️⃣ Сохраняем в памяти
       player.bet = amount;
       player.tokenId = tokenId;
       player.betId = createBetResponse.data.data.betId;

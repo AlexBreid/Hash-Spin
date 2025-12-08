@@ -29,6 +29,13 @@ export interface LiveEvent {
   data?: any;
 }
 
+export interface CrashHistory {
+  id: string;
+  gameId: string;
+  crashPoint: number;
+  timestamp: Date;
+}
+
 class CrashGameService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
@@ -50,7 +57,7 @@ class CrashGameService {
         });
 
         this.socket.on('connect', () => {
-
+          console.log('✅ Подключен к Game Server');
           
           this.socket!.emit('joinGame', {
             userId,
@@ -87,7 +94,14 @@ class CrashGameService {
     });
 
     this.socket.on('gameCrashed', (data: any) => {
+      console.log('💣 gameCrashed событие получено от сервера');
       this.emit('gameCrashed', data);
+    });
+
+    // ✅ НОВОЕ: Обработка события обновления истории от сервера
+    this.socket.on('crashHistoryUpdated', (data: { history: CrashHistory[]; totalInMemory: number }) => {
+      console.log(`📊 [SERVICE] crashHistoryUpdated получено от сервера: ${data.history.length} крашей`);
+      this.emit('crashHistoryUpdated', data);
     });
 
     this.socket.on('playerJoined', (data: { playersCount: number }) => {
@@ -131,7 +145,7 @@ class CrashGameService {
     this.socket.emit('cashout');
   }
 
-  async fetchLastCrashes(): Promise<any[]> {
+  async fetchLastCrashes(): Promise<CrashHistory[]> {
     try {
       console.log(`📊 [SERVICE] Загружаю последние крахи с бэкенда...`);
 
@@ -170,6 +184,7 @@ class CrashGameService {
         b.timestamp.getTime() - a.timestamp.getTime()
       );
 
+      console.log(`✅ [SERVICE] Загружено ${sorted.length} крашей`);
 
       return sorted;
     } catch (error) {
