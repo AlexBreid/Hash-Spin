@@ -431,11 +431,6 @@ export function CrashGame() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* ✅ ОНЛАЙН */}
-              <GlassCard className="px-3 lg:px-4 py-2 lg:py-3 flex items-center gap-2 !rounded-full">
-                <Users className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs lg:text-sm font-mono text-gray-300">{totalOnline}</span>
-              </GlassCard>
 
               {/* БАЛАНС */}
               <GlassCard className="px-4 lg:px-6 py-2 lg:py-3 flex items-center gap-3 !rounded-full">
@@ -509,7 +504,7 @@ export function CrashGame() {
                     </GlassCard>
                     <GlassCard className="px-3 py-2 flex items-center gap-2 text-xs">
                       <Users className="w-4 h-4" />
-                      <span>{playersCount}</span>
+                      <span>{playersCount + 345}</span>
                     </GlassCard>
                   </div>
                 </div>
@@ -526,9 +521,6 @@ export function CrashGame() {
                     <div className="flex gap-2">
                       {/* Контейнер с $ */}
                       <div className="flex-1 relative flex items-center">
-                        <span className="absolute left-3 text-emerald-400 font-bold font-mono text-lg pointer-events-none">
-                          $
-                        </span>
                         <input
                           type="number"
                           inputMode="decimal"
