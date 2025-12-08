@@ -54,7 +54,7 @@ router.post('/api/v1/crash/start-round', (req, res) => {
         });
       }
 
-      // ✅ ИСПРАВЛЕНО: Убрал поле `status` которого нет в schema.prisma
+      // ✅ Создаём раунд БЕЗ поля status
       const newRound = await prisma.crashRound.create({
         data: {
           gameId,
@@ -63,11 +63,10 @@ router.post('/api/v1/crash/start-round', (req, res) => {
           clientSeed: clientSeed || '',
           totalWagered: '0',
           totalPayouts: '0'
-          // ❌ УБРАЛ status - его нет в schema!
         }
       });
 
-      console.log(`✅ [START-ROUND] Раунд создан: ${gameId}, crash=${crashPoint}x`);
+      console.log(`✅ [START-ROUND] Раунд создан: ${gameId}, crash=${crashPoint}x, DB ID: ${newRound.id}`);
 
       res.json({ success: true, data: { roundId: newRound.id } });
     } catch (error) {
@@ -221,6 +220,8 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         return res.status(404).json({ success: false, error: 'Bet not found' });
       }
 
+      console.log(`📝 [CASHOUT-RESULT] Обновляю ставку ${betIdInt}: result=${result}, winnings=${winningsAmount}`);
+
       await prisma.crashBet.update({
         where: { id: betIdInt },
         data: {
@@ -253,6 +254,8 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
       });
 
       if (round) {
+        console.log(`🔄 [CASHOUT-RESULT] Обновляю раунд ${round.gameId}: totalPayouts += ${winningsAmount}`);
+        
         await prisma.crashRound.update({
           where: { id: round.id },
           data: {
@@ -261,6 +264,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         });
       }
 
+      console.log(`✅ [CASHOUT-RESULT] Касаут обработан для ставки ${betIdInt}`);
       res.json({ success: true, data: { status: 'finalized' } });
     } catch (error) {
       console.error('❌ [CASHOUT-RESULT] Ошибка:', error.message);
@@ -387,39 +391,56 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
 
 // ===================================
 // GET /api/v1/crash/last-crashes
+// ✅ ГЛАВНЫЙ ENDPOINT - ЗАГРУЖАЕТ ПОСЛЕДНИЕ КРАХИ
 // ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
-    console.log(`📊 [ROUTE] GET /crash/last-crashes - загружаю последние крахи...`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📊 [ROUTE] GET /crash/last-crashes`);
+    console.log(`${'='.repeat(80)}`);
 
-    // ✅ ИСПРАВЛЕНО: Убрал фильтр по status так как его нет в schema
+    // ✅ Получаем последние ЗАВЕРШЁННЫЕ раунды
+    // Раунд считается завершённым если:
+    // 1. У него есть хотя бы одна ставка И
+    // 2. crashPoint установлен (что означает краш произошёл)
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
         gameId: true,
         crashPoint: true,
         createdAt: true,
+        totalWagered: true,
+        totalPayouts: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: 'desc',  // Сортируем по времени создания (DESC = новые первыми)
       },
-      take: 10,
+      take: 10,  // Берём последние 10
     });
 
-    console.log(`✅ [ROUTE] Найдено ${crashes.length} раундов`);
+    console.log(`✅ Найдено ${crashes.length} раундов в БД`);
 
-    const formattedCrashes = crashes.map((crash, index) => {
-      const formatted = {
+    if (crashes.length > 0) {
+      console.log(`\n📍 СПИСОК РАУНДОВ:`);
+      crashes.forEach((crash, idx) => {
+        console.log(`  ${idx + 1}. GameID: ${crash.gameId.substring(0, 8)}`);
+        console.log(`     - Crash Point: ${crash.crashPoint}x`);
+        console.log(`     - Created: ${crash.createdAt.toLocaleTimeString()}`);
+        console.log(`     - Wagered: ${crash.totalWagered}, Payouts: ${crash.totalPayouts}`);
+      });
+    }
+
+    const formattedCrashes = crashes.map((crash) => {
+      return {
         id: crash.gameId,
         gameId: crash.gameId,
         crashPoint: parseFloat(crash.crashPoint.toString()),
         timestamp: crash.createdAt,
       };
-      console.log(`  ${index + 1}. ${formatted.crashPoint}x - ${formatted.timestamp.toLocaleTimeString()}`);
-      return formatted;
     });
 
-    console.log(`📤 [ROUTE] Отправляю ${formattedCrashes.length} крашей на фронт`);
+    console.log(`\n📤 Отправляю ${formattedCrashes.length} крашей на фронт`);
+    console.log(`${'='.repeat(80)}\n`);
 
     res.json({
       success: true,
@@ -443,7 +464,6 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
   try {
     console.log(`📈 [ROUTE] GET /crash/statistics - загружаю статистику...`);
 
-    // ✅ ИСПРАВЛЕНО: Убрал фильтр по status
     const crashes = await prisma.crashRound.findMany({
       select: { crashPoint: true },
       orderBy: { createdAt: 'desc' },
