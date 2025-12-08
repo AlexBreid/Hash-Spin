@@ -385,15 +385,15 @@ export function CrashGame() {
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white">
+    <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white flex flex-col">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 flex flex-col flex-1">
         {/* HEADER */}
-        <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4 lg:px-6">
+        <header className="flex-shrink-0 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4 lg:px-6">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -426,13 +426,13 @@ export function CrashGame() {
         </header>
 
         {/* MAIN */}
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex-1 max-w-7xl mx-auto w-full p-6 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {/* ЛЕВАЯ */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 flex flex-col gap-6 h-full min-h-0">
               {/* CANVAS */}
-              <div className="relative rounded-3xl border border-white/10 overflow-hidden bg-black/40">
-                <div style={{ aspectRatio: '16 / 10' }} className="relative w-full">
+              <div className="relative rounded-3xl border border-white/10 overflow-hidden bg-black/40 flex-1 min-h-0">
+                <div className="relative w-full h-full">
                   <canvas 
                     ref={canvasRef} 
                     width={800} 
@@ -479,7 +479,7 @@ export function CrashGame() {
               </div>
 
               {/* КОНТРОЛЫ */}
-              <GlassCard className="p-6">
+              <GlassCard className="p-6 flex-shrink-0">
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-bold text-gray-300 uppercase mb-2 block">Размер ставки</label>
@@ -534,9 +534,9 @@ export function CrashGame() {
             </div>
 
             {/* ИСТОРИЯ СПРАВА */}
-            <div>
-              <GlassCard className="flex flex-col h-[600px]">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10">
+            <div className="lg:col-span-1 flex flex-col h-full min-h-0">
+              <GlassCard className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0">
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
                   <span>ПОСЛЕДНИЕ КРАШИ</span>
                   <span className="ml-auto text-xs text-gray-500">
@@ -544,7 +544,7 @@ export function CrashGame() {
                   </span>
                 </div>
                 
-                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
                   {isHistoryLoaded ? (
                     crashHistory.length > 0 ? (
                       crashHistory.map((crash) => {
@@ -575,15 +575,15 @@ export function CrashGame() {
                         }
 
                         return (
-                          <div key={crash.id} className={`p-4 rounded-lg border ${bgColor}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{emoji}</span>
-                                <span className={`text-3xl font-black font-mono ${textColor}`}>
+                          <div key={crash.id} className={`p-3 rounded-lg border flex-shrink-0 ${bgColor}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className="text-lg flex-shrink-0">{emoji}</span>
+                                <span className={`text-2xl font-black font-mono flex-shrink-0 ${textColor}`}>
                                   {crash.crashPoint.toFixed(2)}x
                                 </span>
                               </div>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
                                 {crash.timestamp.toLocaleTimeString()}
                               </span>
                             </div>
@@ -591,15 +591,19 @@ export function CrashGame() {
                         );
                       })
                     ) : (
-                      <div className="text-center py-20 text-gray-500">
-                        <div className="text-4xl mb-2">🎮</div>
-                        <div>Ждём первого краша...</div>
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <div className="text-center">
+                          <div className="text-4xl mb-2">🎮</div>
+                          <div>Ждём первого краша...</div>
+                        </div>
                       </div>
                     )
                   ) : (
-                    <div className="text-center py-20 text-gray-500">
-                      <div className="animate-spin text-2xl mb-2">⏳</div>
-                      <div>Загрузка...</div>
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="text-center">
+                        <div className="animate-spin text-2xl mb-2">⏳</div>
+                        <div>Загрузка...</div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -613,6 +617,7 @@ export function CrashGame() {
         div::-webkit-scrollbar { width: 6px; }
         div::-webkit-scrollbar-track { background: transparent; }
         div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 6px; }
+        div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
       `}</style>
     </div>
   );
