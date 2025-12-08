@@ -395,16 +395,16 @@ export function CrashGame() {
         {/* HEADER */}
         <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4 lg:px-6">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 lg:gap-4">
               <button
                 onClick={() => navigate('/')}
-                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                className="p-2 lg:p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-300" />
               </button>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-2">
-                  <Flame className="w-8 h-8 text-yellow-500" />
+                <h1 className="text-2xl lg:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-2">
+                  <Flame className="w-6 lg:w-8 h-6 lg:h-8 text-yellow-500" />
                   CRASH
                 </h1>
                 <p className="text-xs text-emerald-400 font-mono mt-1">
@@ -413,23 +413,23 @@ export function CrashGame() {
               </div>
             </div>
 
-            <GlassCard className="px-6 py-3 flex items-center gap-3 !rounded-full">
+            <GlassCard className="px-4 lg:px-6 py-2 lg:py-3 flex items-center gap-2 lg:gap-3 !rounded-full">
               <div className="text-right">
                 <p className="text-xs text-gray-400">БАЛАНС</p>
-                <p className="text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
+                <p className="text-lg lg:text-2xl font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
               </div>
               <button onClick={() => fetchBalances()} className="p-2 hover:bg-white/20 rounded-lg">
-                <RefreshCw className="w-5 h-5 text-emerald-400" />
+                <RefreshCw className="w-4 lg:w-5 h-4 lg:h-5 text-emerald-400" />
               </button>
             </GlassCard>
           </div>
         </header>
 
         {/* MAIN CONTENT */}
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* ЛЕВАЯ ЧАСТЬ - ИГРА */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="max-w-7xl mx-auto p-4 lg:p-6">
+          <div className="flex flex-col gap-4 lg:gap-6">
+            {/* ИГРА И КОНТРОЛЫ */}
+            <div className="flex flex-col gap-4 lg:gap-6">
               {/* CANVAS БЛОК ИГРЫ */}
               <GlassCard className="relative rounded-3xl overflow-hidden bg-black/40 w-full" style={{aspectRatio: '16/10'}}>
                 <canvas 
@@ -441,22 +441,22 @@ export function CrashGame() {
 
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                   {gameState.status === 'waiting' ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <Timer className="w-16 h-16 text-yellow-400 animate-bounce" />
-                      <h2 className="text-3xl font-black text-white">ОЖИДАНИЕ</h2>
-                      <div className="w-60 h-3 bg-black/50 rounded-full overflow-hidden border border-white/20">
+                    <div className="flex flex-col items-center gap-3 lg:gap-4">
+                      <Timer className="w-12 lg:w-16 h-12 lg:h-16 text-yellow-400 animate-bounce" />
+                      <h2 className="text-2xl lg:text-3xl font-black text-white">ОЖИДАНИЕ</h2>
+                      <div className="w-48 lg:w-60 h-3 bg-black/50 rounded-full overflow-hidden border border-white/20">
                         <div
                           className="h-full bg-yellow-400"
                           style={{ width: `${waitingProgress}%` }}
                         />
                       </div>
-                      <div className="text-6xl font-black text-yellow-300 font-mono">
+                      <div className="text-5xl lg:text-6xl font-black text-yellow-300 font-mono">
                         {gameState.countdown.toFixed(0)}s
                       </div>
                     </div>
                   ) : (
                     <div className="text-center">
-                      <div className={`text-[140px] font-black font-mono ${
+                      <div className={`text-6xl lg:text-[140px] font-black font-mono leading-none ${
                         gameState.status === 'crashed' ? 'text-red-500' : 'text-emerald-300'
                       }`}>
                         {gameState.multiplier.toFixed(2)}x
@@ -465,19 +465,19 @@ export function CrashGame() {
                   )}
                 </div>
 
-                <div className="absolute top-4 left-4 right-4 flex justify-between z-20 pointer-events-none">
-                  <GlassCard className="px-3 py-2 text-xs font-mono pointer-events-auto">
+                <div className="absolute top-3 lg:top-4 left-3 lg:left-4 right-3 lg:right-4 flex justify-between z-20 pointer-events-none gap-2">
+                  <GlassCard className="px-2 lg:px-3 py-2 text-xs font-mono pointer-events-auto">
                     ID: #{gameState.gameId?.slice(0, 8) || '---'}
                   </GlassCard>
-                  <GlassCard className="px-3 py-2 flex items-center gap-2 text-xs pointer-events-auto">
-                    <Users className="w-4 h-4" />
-                    {playersCount + 345}
+                  <GlassCard className="px-2 lg:px-3 py-2 flex items-center gap-2 text-xs pointer-events-auto">
+                    <Users className="w-3 lg:w-4 h-3 lg:h-4" />
+                    <span className="hidden sm:inline">{playersCount + 345}</span>
                   </GlassCard>
                 </div>
               </GlassCard>
 
               {/* КОНТРОЛЫ */}
-              <GlassCard className="p-6">
+              <GlassCard className="p-4 lg:p-6">
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-bold text-gray-300 uppercase mb-2 block">Размер ставки</label>
@@ -491,13 +491,13 @@ export function CrashGame() {
                       />
                       <button
                         onClick={() => setInputBet((p) => (parseFloat(p || '0') / 2).toFixed(2))}
-                        className="px-4 py-3 bg-white/10 rounded-xl text-sm font-bold"
+                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap"
                       >
                         ÷2
                       </button>
                       <button
                         onClick={() => setInputBet((p) => (parseFloat(p || '0') * 2).toFixed(2))}
-                        className="px-4 py-3 bg-white/10 rounded-xl text-sm font-bold"
+                        className="px-3 lg:px-4 py-3 bg-white/10 rounded-xl text-sm font-bold whitespace-nowrap"
                       >
                         ×2
                       </button>
@@ -508,20 +508,20 @@ export function CrashGame() {
                     {canCashout ? (
                       <button
                         onClick={handleCashout}
-                        className="w-full px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                       >
-                        <Zap className="w-5 h-5" />
-                        ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
+                        <Zap className="w-4 lg:w-5 h-4 lg:h-5" />
+                        <span className="text-sm lg:text-base">ЗАБРАТЬ ${potentialWinnings.toFixed(2)}</span>
                       </button>
                     ) : betPlaced ? (
-                      <div className="w-full px-8 py-4 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl text-center">
+                      <div className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl text-center">
                         🎲 СТАВКА: ${currentBet.toFixed(2)}
                       </div>
                     ) : (
                       <button
                         onClick={handlePlaceBet}
                         disabled={gameState.status !== 'waiting'}
-                        className="w-full px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 disabled:opacity-50"
+                        className="w-full px-6 lg:px-8 py-3 lg:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                       >
                         🎯 ПОСТАВИТЬ
                       </button>
@@ -531,78 +531,76 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ПРАВАЯ ЧАСТЬ - ИСТОРИЯ */}
-            <div className="lg:col-span-1 min-w-0">
-              <GlassCard className="flex flex-col h-[600px] min-w-0">
-                <div className="p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10">
-                  <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  <span>ПОСЛЕДНИЕ КРАШИ</span>
-                  <span className="ml-auto text-xs text-gray-500">
-                    {isHistoryLoaded ? `${crashHistory.length}/10` : '⏳'}
-                  </span>
-                </div>
-                
-                <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
-                  {isHistoryLoaded ? (
-                    crashHistory.length > 0 ? (
-                      crashHistory.map((crash) => {
-                        let bgColor = 'bg-black/40 border-white/10';
-                        let textColor = 'text-gray-300';
-                        let emoji = '📊';
-                        
-                        if (crash.crashPoint < 1.5) {
-                          bgColor = 'bg-red-950/30 border-red-500/30';
-                          textColor = 'text-red-400';
-                          emoji = '🔴';
-                        } else if (crash.crashPoint < 3) {
-                          bgColor = 'bg-orange-950/30 border-orange-500/30';
-                          textColor = 'text-orange-400';
-                          emoji = '🟠';
-                        } else if (crash.crashPoint < 5) {
-                          bgColor = 'bg-yellow-950/30 border-yellow-500/30';
-                          textColor = 'text-yellow-400';
-                          emoji = '🟡';
-                        } else if (crash.crashPoint < 10) {
-                          bgColor = 'bg-emerald-950/30 border-emerald-500/30';
-                          textColor = 'text-emerald-400';
-                          emoji = '🟢';
-                        } else {
-                          bgColor = 'bg-purple-950/30 border-purple-500/30';
-                          textColor = 'text-purple-400';
-                          emoji = '🟣';
-                        }
+            {/* ИСТОРИЯ КРАШЕЙ */}
+            <GlassCard className="flex flex-col h-auto lg:h-[600px] max-h-[400px] lg:max-h-none">
+              <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0">
+                <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 text-emerald-400 flex-shrink-0" />
+                <span className="text-sm lg:text-base">ПОСЛЕДНИЕ КРАШИ</span>
+                <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
+                  {isHistoryLoaded ? `${crashHistory.length}/10` : '⏳'}
+                </span>
+              </div>
+              
+              <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-2 lg:p-3 space-y-2">
+                {isHistoryLoaded ? (
+                  crashHistory.length > 0 ? (
+                    crashHistory.map((crash) => {
+                      let bgColor = 'bg-black/40 border-white/10';
+                      let textColor = 'text-gray-300';
+                      let emoji = '📊';
+                      
+                      if (crash.crashPoint < 1.5) {
+                        bgColor = 'bg-red-950/30 border-red-500/30';
+                        textColor = 'text-red-400';
+                        emoji = '🔴';
+                      } else if (crash.crashPoint < 3) {
+                        bgColor = 'bg-orange-950/30 border-orange-500/30';
+                        textColor = 'text-orange-400';
+                        emoji = '🟠';
+                      } else if (crash.crashPoint < 5) {
+                        bgColor = 'bg-yellow-950/30 border-yellow-500/30';
+                        textColor = 'text-yellow-400';
+                        emoji = '🟡';
+                      } else if (crash.crashPoint < 10) {
+                        bgColor = 'bg-emerald-950/30 border-emerald-500/30';
+                        textColor = 'text-emerald-400';
+                        emoji = '🟢';
+                      } else {
+                        bgColor = 'bg-purple-950/30 border-purple-500/30';
+                        textColor = 'text-purple-400';
+                        emoji = '🟣';
+                      }
 
-                        return (
-                          <div key={crash.id} className={`p-4 rounded-lg border ${bgColor} flex-shrink-0`}>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{emoji}</span>
-                                <span className={`text-2xl font-black font-mono ${textColor}`}>
-                                  {crash.crashPoint.toFixed(2)}x
-                                </span>
-                              </div>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
-                                {crash.timestamp.toLocaleTimeString()}
+                      return (
+                        <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-lg flex-shrink-0">{emoji}</span>
+                              <span className={`text-xl lg:text-2xl font-black font-mono ${textColor} truncate`}>
+                                {crash.crashPoint.toFixed(2)}x
                               </span>
                             </div>
+                            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                              {crash.timestamp.toLocaleTimeString()}
+                            </span>
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="text-center py-20 text-gray-500">
-                        <div className="text-4xl mb-2">🎮</div>
-                        <div>Ждём первого краша...</div>
-                      </div>
-                    )
+                        </div>
+                      );
+                    })
                   ) : (
-                    <div className="text-center py-20 text-gray-500">
-                      <div className="animate-spin text-2xl mb-2">⏳</div>
-                      <div>Загрузка...</div>
+                    <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
+                      <div className="text-3xl lg:text-4xl mb-2">🎮</div>
+                      <div className="text-sm">Ждём первого краша...</div>
                     </div>
-                  )}
-                </div>
-              </GlassCard>
-            </div>
+                  )
+                ) : (
+                  <div className="text-center py-10 lg:py-20 text-gray-500 flex-1 flex flex-col items-center justify-center">
+                    <div className="animate-spin text-xl lg:text-2xl mb-2">⏳</div>
+                    <div className="text-sm">Загрузка...</div>
+                  </div>
+                )}
+              </div>
+            </GlassCard>
           </div>
         </div>
       </div>
