@@ -1,7 +1,7 @@
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
-import { Users, Gift, Copy, CheckCircle, AlertCircle, Loader, TrendingUp, Award, Zap, Target } from 'lucide-react';
+import { Users, Gift, Copy, CheckCircle, AlertCircle, Loader, TrendingUp, Award, Zap, Target, Sparkles, ArrowUpRight, Crown, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
@@ -10,20 +10,17 @@ import { motion } from 'framer-motion';
 
 interface ReferralStats {
   myReferralCode: string;
-  myRefeersCount: number;
+  myReferralsCount?: number;
+  myRefeersCount?: number;
   referredByCode?: string;
   referrerUsername?: string;
-  bonusPercentage: number;
-  referrerType?: string;
+  bonusPercentage?: number;
   commissionRate?: number;
+  referrerType?: string;
   totalTurnover?: number | string;
   totalCommissionPaid?: number | string;
   pendingTurnover?: number | string;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔧 УТИЛИТА: БЕЗОПАСНОЕ ПРЕОБРАЗОВАНИЕ В ЧИСЛО
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function toNumber(value: any): number {
   if (value === null || value === undefined) return 0;
@@ -54,19 +51,16 @@ export function ReferralsPage() {
   
   const hasLoadedRef = useRef(false);
 
-  // 🔑 Загружаем статистику
   const { data: statsData, execute: loadStats } = useFetch(
     'REFERRAL_GET_referral_stats',
     'GET'
   );
 
-  // 🔗 Привязываем реферальный код
   const { execute: linkReferrer } = useFetch(
     'REFERRAL_POST_referral_link-referrer',
     'POST'
   );
 
-  // Загружаем данные ОДИН РАЗ при монтировании
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -80,7 +74,6 @@ export function ReferralsPage() {
       const result = await loadStats();
       console.log('📊 Реферальная статистика:', result);
       
-      // ✅ ИСПРАВЛЕНИЕ: Проверяем success флаг
       if (result && result.data) {
         setStats(result.data as ReferralStats);
       } else if (result) {
@@ -137,10 +130,6 @@ export function ReferralsPage() {
   if (!isAuthenticated) {
     return (
       <div className="pb-24 pt-6 px-4">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent mb-2">🎁 Реферальная программа</h1>
-          <p className="text-muted-foreground">Приглашайте друзей и получайте награды!</p>
-        </div>
         <Card className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
           <p className="text-amber-700 dark:text-amber-500 font-semibold">⚠️ Пожалуйста, войдите в систему</p>
         </Card>
@@ -162,10 +151,6 @@ export function ReferralsPage() {
   if (error && !stats) {
     return (
       <div className="pb-24 pt-6 px-4">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent mb-2">🎁 Реферальная программа</h1>
-          <p className="text-muted-foreground">Приглашайте друзей и получайте награды!</p>
-        </div>
         <Card className="p-5 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/20 border-red-200 dark:border-red-800">
           <p className="text-red-700 dark:text-red-500 font-semibold">❌ {error}</p>
           <Button
@@ -180,198 +165,381 @@ export function ReferralsPage() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // ✅ БЕЗОПАСНОЕ ПРЕОБРАЗОВАНИЕ ВСЕХ ЗНАЧЕНИЙ
-  // ═══════════════════════════════════════════════════════════════════════════════
-
   const totalTurnover = toNumber(stats?.totalTurnover);
   const totalCommissionPaid = toNumber(stats?.totalCommissionPaid);
   const pendingTurnover = toNumber(stats?.pendingTurnover);
-  const potentialCommission = stats ? Math.max(0, toNumber(stats.totalCommissionPaid) - toNumber(stats.totalCommissionPaid)) : 0;
+  const commissionRate = stats?.commissionRate || 30;
+  const referralsCount = stats?.myReferralsCount || stats?.myRefeersCount || 0;
 
   return (
-    <div className="pb-24 pt-6 px-4 space-y-6">
-      {/* Header */}
-      <div className="space-y-2 mb-4">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">🎁 Реферальная программа</h1>
-        <p className="text-muted-foreground text-lg">Приглашайте друзей и зарабатывайте на их игре</p>
-      </div>
-
-      {/* Ваш реферальный код */}
+    <div className="pb-24 pt-6 px-4 space-y-4">
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* HERO SECTION - ГЛАВНАЯ КАРТОЧКА С КОДОМ */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="space-y-3"
       >
-        <Card className="p-6 bg-gradient-to-br from-indigo-500/20 via-violet-500/20 to-purple-500/20 border-2 border-indigo-400/50 dark:from-indigo-950/50 dark:via-violet-950/40 dark:to-purple-950/30 dark:border-indigo-800/50 shadow-lg shadow-indigo-500/10">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="p-2.5 bg-indigo-600/20 rounded-lg">
-              <Users className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <h3 className="font-bold text-xl">Ваш реферальный код</h3>
+        {/* Заголовок */}
+        <div className="space-y-1 px-1">
+          <div className="flex items-center gap-2">
+            <Crown className="w-7 h-7 text-amber-500" />
+            <h1 className="text-3xl font-black bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-600 bg-clip-text text-transparent">
+              Реферальная Программа
+            </h1>
           </div>
+          <p className="text-muted-foreground text-sm font-medium">Приглашай друзей и зарабатывай постоянно 🚀</p>
+        </div>
+
+        {/* ГЛАВНАЯ КАРТОЧКА - МОЙ КОД */}
+        <Card className="relative overflow-hidden p-6 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 border-0 shadow-2xl">
+          {/* Decorative circles */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-10 -left-20 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
           
-          <div className="flex gap-3 items-center">
-            <div className="flex-1 p-4 bg-white/40 dark:bg-black/30 rounded-xl border-2 border-indigo-300/50 dark:border-indigo-700/50">
-              <p className="text-center font-mono text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                {stats?.myReferralCode || 'N/A'}
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-white/80 text-sm font-semibold">ВАШ РЕФЕРАЛЬНЫЙ КОД</p>
+                  <p className="text-white/60 text-xs">Поделись и зарабатывай</p>
+                </div>
+              </div>
+              <Sparkles className="w-6 h-6 text-white/40 animate-pulse" />
+            </div>
+
+            {/* КОД И КОПИРОВАНИЕ */}
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-5 mb-4 border border-white/20">
+              <p className="text-center font-mono text-4xl font-black text-white tracking-wider drop-shadow-lg">
+                {stats?.myReferralCode || 'ЗАГРУЗКА...'}
               </p>
             </div>
-            <Button
-              size="sm"
-              onClick={copyCode}
-              className="px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold"
-            >
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
 
-          <p className="text-sm text-muted-foreground mt-4 font-medium">
-            📤 Поделитесь этим кодом с друзьями и получайте {stats?.commissionRate || 30}% от игровой комиссии их оборота!
-          </p>
+            <Button
+              onClick={copyCode}
+              className="w-full bg-white text-indigo-600 hover:bg-white/90 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+            >
+              <Copy className="w-5 h-5" />
+              <span>СКОПИРОВАТЬ КОД</span>
+            </Button>
+
+            <p className="text-white/70 text-xs mt-4 text-center font-medium">
+              📤 Отправь этот код друзьям и получай {commissionRate}% от их игр навсегда!
+            </p>
+          </div>
         </Card>
       </motion.div>
 
-      {/* Статистика */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* БОЛЬШИЕ ЦИФРЫ СТАТИСТИКИ */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-2 gap-4"
+        className="grid grid-cols-2 gap-3"
       >
-        <Card className="p-5 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-2 border-emerald-400/50 dark:from-emerald-950/40 dark:to-teal-950/20 dark:border-emerald-800/50 shadow-lg shadow-emerald-500/10">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-emerald-600/20 rounded-lg">
-              <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+        {/* Рефералов */}
+        <Card className="p-5 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-2 border-emerald-400/60 dark:from-emerald-950/40 dark:to-teal-950/20 dark:border-emerald-700/60">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">👥 Рефералов</p>
+              <p className="text-4xl font-black text-emerald-700 dark:text-emerald-300">{referralsCount}</p>
             </div>
-            <span className="text-xs font-semibold text-muted-foreground">Рефералов</span>
+            <div className="p-3 bg-emerald-600/30 rounded-lg">
+              <Users className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">{stats?.myRefeersCount || 0}</p>
         </Card>
 
-        <Card className="p-5 bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border-2 border-cyan-400/50 dark:from-cyan-950/40 dark:to-blue-950/20 dark:border-cyan-800/50 shadow-lg shadow-cyan-500/10">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-cyan-600/20 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+        {/* Комиссия */}
+        <Card className="p-5 bg-gradient-to-br from-orange-500/20 to-rose-500/10 border-2 border-orange-400/60 dark:from-orange-950/40 dark:to-rose-950/20 dark:border-orange-700/60">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-2">⚡ Комиссия</p>
+              <p className="text-4xl font-black text-orange-700 dark:text-orange-300">{commissionRate}%</p>
             </div>
-            <span className="text-xs font-semibold text-muted-foreground">Оборот</span>
+            <div className="p-3 bg-orange-600/30 rounded-lg">
+              <Flame className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-cyan-700 dark:text-cyan-300">${totalTurnover.toFixed(2)}</p>
         </Card>
 
-        <Card className="p-5 bg-gradient-to-br from-lime-500/20 to-green-500/10 border-2 border-lime-400/50 dark:from-lime-950/40 dark:to-green-950/20 dark:border-lime-800/50 shadow-lg shadow-lime-500/10">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-lime-600/20 rounded-lg">
-              <Award className="w-4 h-4 text-lime-700 dark:text-lime-400" />
+        {/* Оборот */}
+        <Card className="p-5 bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border-2 border-cyan-400/60 dark:from-cyan-950/40 dark:to-blue-950/20 dark:border-cyan-700/60">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wide mb-2">📊 Оборот</p>
+              <p className="text-3xl font-black text-cyan-700 dark:text-cyan-300">${totalTurnover.toFixed(0)}</p>
             </div>
-            <span className="text-xs font-semibold text-muted-foreground">Выплачено</span>
+            <div className="p-3 bg-cyan-600/30 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-lime-700 dark:text-lime-300">${totalCommissionPaid.toFixed(2)}</p>
         </Card>
 
-        <Card className="p-5 bg-gradient-to-br from-orange-500/20 to-rose-500/10 border-2 border-orange-400/50 dark:from-orange-950/40 dark:to-rose-950/20 dark:border-orange-800/50 shadow-lg shadow-orange-500/10">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-orange-600/20 rounded-lg">
-              <Zap className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+        {/* Выплачено */}
+        <Card className="p-5 bg-gradient-to-br from-lime-500/20 to-green-500/10 border-2 border-lime-400/60 dark:from-lime-950/40 dark:to-green-950/20 dark:border-lime-700/60">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold text-lime-700 dark:text-lime-400 uppercase tracking-wide mb-2">💰 Выплачено</p>
+              <p className="text-3xl font-black text-lime-700 dark:text-lime-300">${totalCommissionPaid.toFixed(0)}</p>
             </div>
-            <span className="text-xs font-semibold text-muted-foreground">Комиссия</span>
-          </div>
-          <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{stats?.commissionRate || 30}%</p>
-        </Card>
-      </motion.div>
-
-      {/* Что ты получаешь за рефералов */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="p-6 bg-gradient-to-br from-violet-500/15 to-purple-500/10 border-2 border-violet-400/50 dark:from-violet-950/40 dark:to-purple-950/20 dark:border-violet-800/50 shadow-lg shadow-violet-500/10">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="p-2.5 bg-violet-600/20 rounded-lg">
-              <Target className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-            </div>
-            <h3 className="font-bold text-lg">💰 Что ты получаешь за рефералов?</h3>
-          </div>
-          <div className="space-y-3 pl-2">
-            <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-l-4 border-violet-600 dark:border-violet-400">
-              <p className="font-semibold text-violet-900 dark:text-violet-200">
-                Вы получаете {stats?.commissionRate || 30}% от игровой комиссии оборота реферала
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                📈 Пример: реферал потратил 100 USDT → казино получит комиссию → вы получите {stats?.commissionRate || 30}% от этой комиссии
-              </p>
+            <div className="p-3 bg-lime-600/30 rounded-lg">
+              <Award className="w-6 h-6 text-lime-600 dark:text-lime-400" />
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {/* Что ты получаешь введя реферала */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* УСЛОВИЯ БОНУСА - ОТДЕЛЬНАЯ КАРТОЧКА */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       {!stats?.referredByCode && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.2 }}
         >
-          <Card className="p-6 bg-gradient-to-br from-amber-500/15 to-yellow-500/10 border-2 border-amber-400/50 dark:from-amber-950/40 dark:to-yellow-950/20 dark:border-amber-800/50 shadow-lg shadow-amber-500/10">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2.5 bg-amber-600/20 rounded-lg">
-                <Gift className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          <Card className="p-6 bg-gradient-to-br from-yellow-500/15 to-amber-500/10 border-2 border-yellow-400/60 dark:from-yellow-950/40 dark:to-amber-950/20 dark:border-yellow-700/60">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-yellow-600/20 rounded-xl">
+                <Gift className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <h3 className="font-bold text-lg">🎁 Что ты получишь введя реферала?</h3>
-            </div>
-            <div className="space-y-3">
-              <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-2 border-yellow-500 dark:border-yellow-600">
-                <p className="font-semibold text-amber-900 dark:text-amber-200">💎 Приветственный бонус</p>
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-300 mt-2">+100% к твоему первому пополнению</p>
-                <p className="text-xs text-muted-foreground mt-2">📈 Пример: Пополнил 10 USDT → получишь 10 USDT бонусом</p>
-              </div>
-              <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-l-4 border-amber-600 dark:border-amber-400">
-                <p className="font-semibold text-amber-900 dark:text-amber-200">📊 Требования на вывод</p>
-                <p className="text-xs text-muted-foreground mt-2">Отыграй бонус в 10x перед выводом</p>
-                <p className="text-xs text-muted-foreground mt-1">Пример: 10 USDT бонуса → отыграй 100 USDT в играх</p>
-              </div>
-              <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-l-4 border-amber-600 dark:border-amber-400">
-                <p className="font-semibold text-amber-900 dark:text-amber-200">⏰ Срок действия</p>
-                <p className="text-xs text-muted-foreground mt-2">Бонус действует 7 дней с момента активации</p>
+              <div className="flex-1">
+                <h3 className="font-black text-lg text-yellow-900 dark:text-yellow-200 mb-3">
+                  🎁 Что получит друг при регистрации?
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-yellow-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">+</div>
+                    <div>
+                      <p className="font-bold text-yellow-900 dark:text-yellow-200">100% Бонус к первому депозиту</p>
+                      <p className="text-sm text-yellow-800 dark:text-yellow-300 mt-1">Пример: пополнил 100$ → получит 100$ бонуса</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-yellow-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">+</div>
+                    <div>
+                      <p className="font-bold text-yellow-900 dark:text-yellow-200">Максимум 10,000$ бонуса</p>
+                      <p className="text-sm text-yellow-800 dark:text-yellow-300 mt-1">Лимит за одно пополнение не превышает 10,000$</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
         </motion.div>
       )}
 
-      {/* Раздел: Введите реферальный код */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* УСЛОВИЯ ОТЫГРЫША - ОТДЕЛЬНАЯ КАРТОЧКА */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {!stats?.referredByCode && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <Card className="p-6 bg-gradient-to-br from-purple-500/15 to-indigo-500/10 border-2 border-purple-400/60 dark:from-purple-950/40 dark:to-indigo-950/20 dark:border-purple-700/60">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-purple-600/20 rounded-xl">
+                <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-lg text-purple-900 dark:text-purple-200 mb-3">
+                  🎯 Условия отыгрыша бонуса
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</div>
+                    <div>
+                      <p className="font-bold text-purple-900 dark:text-purple-200">Отыграй бонус в 10x</p>
+                      <p className="text-sm text-purple-800 dark:text-purple-300 mt-1">Пример: получил 100$ бонуса → нужно поставить 1,000$ в играх</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
+                    <div>
+                      <p className="font-bold text-purple-900 dark:text-purple-200">Бонус автоматически переходит в MAIN</p>
+                      <p className="text-sm text-purple-800 dark:text-purple-300 mt-1">После выполнения условий деньги доступны для вывода</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
+                    <div>
+                      <p className="font-bold text-purple-900 dark:text-purple-200">Срок действия: 7 дней</p>
+                      <p className="text-sm text-purple-800 dark:text-purple-300 mt-1">Бонус сгорает, если не выполнить условия за неделю</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* КАК ЗАРАБАТЫВАЕШЬ ТЫ */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className="p-6 bg-gradient-to-br from-emerald-500/15 to-green-500/10 border-2 border-emerald-400/60 dark:from-emerald-950/40 dark:to-green-950/20 dark:border-emerald-700/60">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-emerald-600/20 rounded-xl">
+              <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-black text-lg text-emerald-900 dark:text-emerald-200 mb-3">
+                💸 Как зарабатываешь ты?
+              </h3>
+              <div className="space-y-3">
+                <div className="bg-white/50 dark:bg-black/20 rounded-xl p-4 border-l-4 border-emerald-600 dark:border-emerald-400">
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200 mb-2">
+                    ✅ {commissionRate}% от оборота каждого реферала
+                  </p>
+                  <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                    Если друг потратил 1,000$ в играх → казино получит комиссию → ты получишь {commissionRate}% от этой комиссии
+                  </p>
+                </div>
+                <div className="bg-white/50 dark:bg-black/20 rounded-xl p-4 border-l-4 border-emerald-600 dark:border-emerald-400">
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200 mb-2">
+                    🔄 Выплата автоматическая
+                  </p>
+                  <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                    Деньги начисляются сразу на твой основной баланс. Минимальный оборот для выплаты: 100$ USDT
+                  </p>
+                </div>
+                <div className="bg-white/50 dark:bg-black/20 rounded-xl p-4 border-l-4 border-emerald-600 dark:border-emerald-400">
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200 mb-2">
+                    ♾️ Без ограничений на количество
+                  </p>
+                  <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                    Приглашай сколько угодно рефералов — каждый будет приносить {commissionRate}% комиссии
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* ПРОЦЕСС - КАК ЭТО РАБОТАЕТ */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <Card className="p-6 bg-gradient-to-br from-indigo-500/15 to-blue-500/10 border-2 border-indigo-400/60 dark:from-indigo-950/40 dark:to-blue-950/20 dark:border-indigo-700/60">
+          <h3 className="font-black text-lg text-indigo-900 dark:text-indigo-200 mb-6">
+            📚 Как это работает? (3 простых шага)
+          </h3>
+          <div className="space-y-4">
+            {/* Шаг 1 */}
+            <div className="flex gap-4 items-start">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-lg">
+                1️⃣
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900 dark:text-indigo-200 text-base mb-1">
+                  Скопируй свой реферальный код
+                </p>
+                <p className="text-sm text-indigo-800 dark:text-indigo-300">
+                  Код виден в центре страницы — нажми "СКОПИРОВАТЬ" и отправь другу
+                </p>
+              </div>
+            </div>
+
+            {/* Стрелка */}
+            <div className="flex justify-center">
+              <ArrowUpRight className="w-6 h-6 text-indigo-600 dark:text-indigo-400 rotate-90" />
+            </div>
+
+            {/* Шаг 2 */}
+            <div className="flex gap-4 items-start">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-lg">
+                2️⃣
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900 dark:text-indigo-200 text-base mb-1">
+                  Друг вводит код при регистрации
+                </p>
+                <p className="text-sm text-indigo-800 dark:text-indigo-300">
+                  Он получит +100% бонус к первому депозиту. Например: пополнил 500$ → получит 500$ бонуса
+                </p>
+              </div>
+            </div>
+
+            {/* Стрелка */}
+            <div className="flex justify-center">
+              <ArrowUpRight className="w-6 h-6 text-indigo-600 dark:text-indigo-400 rotate-90" />
+            </div>
+
+            {/* Шаг 3 */}
+            <div className="flex gap-4 items-start">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-lg">
+                3️⃣
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900 dark:text-indigo-200 text-base mb-1">
+                  Получай {commissionRate}% на каждый его оборот
+                </p>
+                <p className="text-sm text-indigo-800 dark:text-indigo-300">
+                  Друг играет, проигрывает — ты зарабатываешь. Выплаты автоматические, без лимитов!
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* ВВОД РЕФЕРАЛЬНОГО КОДА (если не введен) */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       {!stats?.referredByCode ? (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="p-6 bg-gradient-to-br from-rose-500/15 to-red-500/10 border-2 border-rose-400/50 dark:from-rose-950/40 dark:to-red-950/20 dark:border-rose-800/50 shadow-lg shadow-rose-500/10">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2.5 bg-rose-600/20 rounded-lg">
+          <Card className="p-6 bg-gradient-to-br from-rose-500/15 to-red-500/10 border-2 border-rose-400/60 dark:from-rose-950/40 dark:to-red-950/20 dark:border-rose-700/60">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="p-3 bg-rose-600/20 rounded-xl">
                 <Gift className="w-6 h-6 text-rose-600 dark:text-rose-400" />
               </div>
-              <h3 className="font-bold text-lg">Введите реферальный код</h3>
+              <div>
+                <h3 className="font-black text-lg text-rose-900 dark:text-rose-200">
+                  Было ли вас кто-то пригласил? 🎁
+                </h3>
+                <p className="text-sm text-rose-800 dark:text-rose-300 mt-1">
+                  Если вас пригласил друг — введите его код и получайте +100% к первому депозиту!
+                </p>
+              </div>
             </div>
 
-            <form onSubmit={handleLinkReferrer} className="space-y-4">
-              <p className="text-sm text-muted-foreground font-medium">
-                Если вас пригласил друг, введите его реферальный код и получайте +100% к первому пополнению!
-              </p>
-
+            <form onSubmit={handleLinkReferrer} className="space-y-3">
               <Input
                 type="text"
-                placeholder="Введите код реферера..."
+                placeholder="Введите реферальный код (например: ABC123)"
                 value={inputCode}
-                onChange={(e) => setInputCode(e.target.value)}
-                className="rounded-lg bg-white/50 dark:bg-black/30 border-rose-300/50 dark:border-rose-700/50 focus:border-rose-500"
+                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                className="rounded-xl bg-white/50 dark:bg-black/30 border-rose-300/50 dark:border-rose-700/50 focus:border-rose-500 text-base py-3"
                 disabled={linking}
               />
 
               <Button
                 type="submit"
                 disabled={linking || !inputCode.trim()}
-                className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white rounded-lg font-semibold shadow-lg"
+                className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white rounded-xl font-bold py-3 shadow-lg transition-all"
               >
                 {linking ? (
                   <>
@@ -379,119 +547,160 @@ export function ReferralsPage() {
                     Привязка...
                   </>
                 ) : (
-                  '✓ Ввести код'
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Ввести код и получить бонус!
+                  </>
                 )}
               </Button>
 
-              <p className="text-xs text-muted-foreground text-center font-medium">
-                ⚠️ Внимание: код можно ввести только один раз!
+              <p className="text-xs text-rose-700 dark:text-rose-300 text-center font-semibold">
+                ⚠️ Внимание: код можно ввести только один раз! Выбирай внимательно 🎯
               </p>
             </form>
           </Card>
         </motion.div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="p-6 bg-gradient-to-br from-emerald-500/20 to-green-500/10 border-2 border-emerald-400/50 dark:from-emerald-950/40 dark:to-green-950/20 dark:border-emerald-800/50 shadow-lg shadow-emerald-500/10">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2.5 bg-emerald-600/20 rounded-lg">
+          <Card className="p-6 bg-gradient-to-br from-emerald-500/20 to-green-500/10 border-2 border-emerald-400/60 dark:from-emerald-950/40 dark:to-green-950/20 dark:border-emerald-700/60">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-600/20 rounded-xl">
                 <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h3 className="font-bold text-lg text-emerald-700 dark:text-emerald-300">Вы привязаны к рефереру</h3>
+              <div>
+                <h3 className="font-black text-lg text-emerald-700 dark:text-emerald-300 mb-2">
+                  ✅ Вы привязаны к рефереру!
+                </h3>
+                <p className="text-sm text-emerald-800 dark:text-emerald-300 mb-3">
+                  Реферер: <span className="font-bold">{stats?.referrerUsername}</span>
+                </p>
+                <div className="bg-white/50 dark:bg-black/20 rounded-xl p-3 border-l-4 border-emerald-600 dark:border-emerald-400">
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">
+                    🎁 При первом депозите вы получите +100% бонуса!
+                  </p>
+                </div>
+              </div>
             </div>
-
-            <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-2 border-emerald-300/50 dark:border-emerald-700/50">
-              <p className="text-sm text-muted-foreground mb-2">Реферер:</p>
-              <p className="font-semibold text-lg text-emerald-700 dark:text-emerald-300">{stats?.referrerUsername}</p>
-            </div>
-
-            <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-4 font-medium">
-              ✅ Вы получите +100% бонус к первому пополнению!
-            </p>
           </Card>
         </motion.div>
       )}
 
-      {/* Как это работает */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* ПОЛНЫЕ УСЛОВИЯ - ОТДЕЛЬНАЯ КАРТОЧКА */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.45 }}
       >
-        <Card className="p-6 bg-gradient-to-br from-indigo-500/10 to-blue-500/10 border-2 border-indigo-400/50 dark:from-indigo-950/30 dark:to-blue-950/20 dark:border-indigo-800/50 shadow-lg shadow-indigo-500/5">
-          <h3 className="font-bold text-xl mb-6">📚 Как работает реферальная система</h3>
+        <Card className="p-6 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900/50 dark:to-slate-800/30 border-2 border-slate-300/50 dark:border-slate-700/50">
+          <h3 className="font-black text-lg mb-5 text-slate-900 dark:text-slate-100">
+            📋 Полные условия программы
+          </h3>
+          
           <div className="space-y-5">
-            <div className="flex gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-indigo-500/30">
-                1
+            {/* Для Реферера */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">✓</div>
+                <p className="font-bold text-base text-slate-900 dark:text-slate-100">Для вас (реферер)</p>
               </div>
-              <div>
-                <p className="font-semibold text-lg">Поделись своим кодом</p>
-                <p className="text-sm text-muted-foreground">Отправь реферальный код своему другу</p>
-              </div>
+              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 ml-8">
+                <li>• Получайте {commissionRate}% от игровой комиссии каждого реферала</li>
+                <li>• Комиссия выплачивается автоматически на основной баланс</li>
+                <li>• Нет лимита на количество приглашённых людей</li>
+                <li>• Минимальный оборот реферала для выплаты: 100 USDT</li>
+                <li>• Минимальная выплата: 1 USDT</li>
+              </ul>
             </div>
 
-            <div className="flex gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-purple-700 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/30">
-                2
+            {/* Для Реферала */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-amber-600 flex items-center justify-center text-white text-xs font-bold">🎁</div>
+                <p className="font-bold text-base text-slate-900 dark:text-slate-100">Для друга (реферал)</p>
               </div>
-              <div>
-                <p className="font-semibold text-lg">Друг регистрируется</p>
-                <p className="text-sm text-muted-foreground">Друг использует твой код при регистрации</p>
-              </div>
+              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 ml-8">
+                <li>• +100% бонус к первому депозиту</li>
+                <li>• Максимум 10,000 USDT бонуса за одно пополнение</li>
+                <li>• Отыграй бонус в 10x перед выводом (пример: 100$ бонуса = 1,000$ игр)</li>
+                <li>• Бонус автоматически переводится в основной баланс после выполнения</li>
+                <li>• Срок действия бонуса: 7 дней с момента активации</li>
+                <li>• Код вводится один раз и не может быть изменён</li>
+              </ul>
             </div>
 
-            <div className="flex gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-emerald-500/30">
-                3
+            {/* Прозрачность */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold">🔒</div>
+                <p className="font-bold text-base text-slate-900 dark:text-slate-100">Как это считается?</p>
               </div>
-              <div>
-                <p className="font-semibold text-lg">Получайте выплаты</p>
-                <p className="text-sm text-muted-foreground">{stats?.commissionRate || 30}% от игровой комиссии его оборота — автоматически!</p>
+              <div className="bg-white/50 dark:bg-black/20 rounded-xl p-4 border-l-4 border-green-600 dark:border-green-400 ml-8">
+                <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                  <span className="font-bold">Комиссия = (Оборот × 3% [дом. преимущество]) × {commissionRate}%</span>
+                  <br />
+                  <br />
+                  Пример: Реферал потратил 1,000$
+                  <br />
+                  → Казино получает доход: 1,000$ × 3% = 30$
+                  <br />
+                  → Вы получаете: 30$ × {commissionRate}% = {(30 * commissionRate / 100).toFixed(2)}$
+                </p>
               </div>
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {/* Полные условия */}
-      <Card className="p-6 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900/50 dark:to-slate-800/30 border-2 border-slate-300/50 dark:border-slate-700/50">
-        <h3 className="font-bold text-xl mb-6">📋 Полные условия реферальной программы</h3>
-        <div className="space-y-6 text-sm">
-          <div>
-            <p className="font-bold text-base mb-3 text-indigo-700 dark:text-indigo-300">✅ Для реферера (пригласивший):</p>
-            <ul className="space-y-2 text-muted-foreground ml-6">
-              <li>• Получай {stats?.commissionRate || 30}% от игровой комиссии оборота своих рефералов</li>
-              <li>• Комиссия выплачивается автоматически при достижении минимума (100 USDT оборота)</li>
-              <li>• Нет лимита на количество приглашенных людей</li>
-              <li>• Реферальная ссылка уникальна и не изменяется</li>
-            </ul>
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* ПРИМЕРЫ ЗАРАБОТКОВ - КРАСИВАЯ ТАБЛИЦА */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <Card className="p-6 bg-gradient-to-br from-violet-500/15 to-purple-500/10 border-2 border-violet-400/60 dark:from-violet-950/40 dark:to-purple-950/20 dark:border-violet-700/60">
+          <h3 className="font-black text-lg mb-4 text-violet-900 dark:text-violet-200">
+            📈 Примеры заработков
+          </h3>
+          
+          <div className="space-y-3">
+            {[
+              { referrals: 5, turnover: 5000, commission: 45 },
+              { referrals: 10, turnover: 15000, commission: 135 },
+              { referrals: 20, turnover: 50000, commission: 450 },
+              { referrals: 50, turnover: 200000, commission: 1800 }
+            ].map((example, idx) => (
+              <div key={idx} className="bg-white/50 dark:bg-black/20 rounded-xl p-4 border-l-4 border-violet-600 dark:border-violet-400">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-bold text-violet-900 dark:text-violet-200">
+                    {example.referrals} рефералов × {example.turnover.toLocaleString()}$ оборота
+                  </p>
+                  <p className="font-black text-xl text-violet-700 dark:text-violet-300">
+                    = ${example.commission.toLocaleString()}
+                  </p>
+                </div>
+                <p className="text-xs text-violet-800 dark:text-violet-300">
+                  Средний оборот на реферала: ${(example.turnover / example.referrals).toFixed(0)}
+                </p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="font-bold text-base mb-3 text-amber-700 dark:text-amber-300">🎁 Для реферала (приглашённый):</p>
-            <ul className="space-y-2 text-muted-foreground ml-6">
-              <li>• Получи +100% к первому пополнению в виде бонуса</li>
-              <li>• Максимум 10,000 USDT бонуса за одно пополнение</li>
-              <li>• Отыграй бонус в 10x перед выводом</li>
-              <li>• Бонус автоматически переводится в основной баланс после выполнения условий</li>
-              <li>• Действует 7 дней с момента активации</li>
-              <li>• Код вводится один раз и не может быть изменен</li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-bold text-base mb-3 text-slate-700 dark:text-slate-300">🔒 Общие правила:</p>
-            <ul className="space-y-2 text-muted-foreground ml-6">
-              <li>• Минимум 100 USDT оборота для выплаты комиссии</li>
-              <li>• Минимум 1 USDT для вывода комиссии</li>
-              <li>• Выплаты производятся на основной баланс</li>
-              <li>• Система прозрачна и работает в реальном времени</li>
-            </ul>
-          </div>
-        </div>
-      </Card>
+
+          <p className="text-xs text-violet-800 dark:text-violet-300 mt-4 text-center font-semibold italic">
+            Это примеры при среднем обороте 1,000$ на реферала
+          </p>
+        </Card>
+      </motion.div>
+
+      {/* Spacer */}
+      <div className="h-2" />
     </div>
   );
 }
