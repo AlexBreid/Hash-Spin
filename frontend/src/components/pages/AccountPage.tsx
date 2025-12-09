@@ -2,14 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../ui/button";
-import { Card } from "../ui/card";
 import {
   Loader2,
   TrendingUp,
   TrendingDown,
   Zap,
   Trophy,
-  Target,
   Flame,
   Percent,
   Clock,
@@ -30,7 +28,7 @@ interface UserProfile {
   lastName: string | null;
   photoUrl: string | null;
   vipLevel: string;
-  vipRank?: 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
+  vipRank?: string;
   level: number;
   totalScore: number;
   totalGames: number;
@@ -53,7 +51,7 @@ interface UserProfile {
 interface BalanceData {
   tokenId: number;
   symbol: string;
-  amount: number;
+  amount: number | string;
   type: string;
 }
 
@@ -61,7 +59,7 @@ interface BalanceData {
 // 🎨 ЦВЕТОВАЯ СХЕМА VIP СТАТУСОВ
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const VIP_COLORS = {
+const VIP_COLORS: Record<string, any> = {
   bronze: {
     name: 'Бронза',
     color: '#cd7f32',
@@ -94,7 +92,29 @@ const VIP_COLORS = {
   },
 };
 
-function calculateVipRank(totalGames: number): 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' {
+// ════════════════════════════════════════════════════════════════════════════════
+// 🔧 УТИЛИТЫ
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Безопасно преобразует значение в число
+ */
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  }
+  if (typeof value === 'object' && value.toString) {
+    const str = value.toString();
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+  }
+  return 0;
+}
+
+function calculateVipRank(totalGames: number): string {
   if (totalGames >= 1500) return 'diamond';
   if (totalGames >= 500) return 'platinum';
   if (totalGames >= 150) return 'gold';
@@ -103,7 +123,7 @@ function calculateVipRank(totalGames: number): 'bronze' | 'silver' | 'gold' | 'p
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 КОМПОНЕНТ: STAT BOX
+// 🎯 КОМПОНЕНТ: StatBox
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface StatBoxProps {
@@ -160,7 +180,6 @@ export function AccountPage() {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   const mainBg = '#0a0f1a';
-  const cardBg = '#0d1425';
   const accentColor = '#0ea5e9';
   const greenAccent = '#10b981';
   const redAccent = '#ef4444';
@@ -172,19 +191,21 @@ export function AccountPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      fetchProfile().catch((err: Error) => console.error('Profile error:', err));
-      fetchBalance().catch((err: Error) => console.error('Balance error:', err));
+      fetchProfile().catch((err: Error) => console.error('❌ Profile error:', err.message));
+      fetchBalance().catch((err: Error) => console.error('❌ Balance error:', err.message));
     }
   }, [fetchProfile, fetchBalance]);
 
   useEffect(() => {
-    if (data) {
-      setProfileData(data as UserProfile);
+    if (data && data.success) {
+      console.log('✅ Profile data loaded:', data.data);
+      setProfileData(data.data as UserProfile);
     }
   }, [data]);
 
   useEffect(() => {
     if (balanceData && balanceData.success && Array.isArray(balanceData.data)) {
+      console.log('✅ Balance data loaded:', balanceData.data);
       setBalances(balanceData.data);
     }
   }, [balanceData]);
@@ -220,10 +241,11 @@ export function AccountPage() {
       photoUrl,
       createdAt,
       level,
+      vipRank = 'bronze',
     } = profileData;
 
-    const vipRank = calculateVipRank(totalGames);
-    const vipInfo = VIP_COLORS[vipRank];
+    const calculatedVipRank = vipRank || calculateVipRank(totalGames);
+    const vipInfo = VIP_COLORS[calculatedVipRank] || VIP_COLORS.bronze;
     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
 
     const getInitials = (fName: string, lName: string | null) => {
@@ -236,27 +258,32 @@ export function AccountPage() {
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
     const lossCount = totalGames - winningBets;
 
+    // Безопасное преобразование всех числовых значений
+    const safeRoi = toNumber(roi);
+    const safeWinRate = toNumber(winRate);
+    const safeAvgBetSize = toNumber(avgBetSize);
+    const safeGamesPerDay = toNumber(gamesPerDay);
+    const safeTotalScore = toNumber(totalScore);
+    const safeLargestWin = largestWin ? toNumber(largestWin.amount) : 0;
+
     return (
       <div style={{ backgroundColor: mainBg, minHeight: '100vh', padding: '20px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
           
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
           {/* 🎪 ШАПКА ПРОФИЛЯ */}
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             style={{
-              background: `linear-gradient(135deg, ${vipInfo.bgGradient.split(',')[0]}, #0d1425)`,
+              background: `linear-gradient(135deg, ${vipInfo.bgGradient})`,
               borderRadius: '20px',
               padding: '32px',
               marginBottom: '24px',
               border: `2px solid ${vipInfo.color}40`,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
               {/* АВАТАР */}
               <motion.div
                 initial={{ scale: 0 }}
@@ -310,7 +337,7 @@ export function AccountPage() {
               </motion.div>
 
               {/* ИНФОРМАЦИЯ */}
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: '200px' }}>
                 <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#fff', margin: '0 0 8px 0' }}>
                   {fullName || username}
                 </h1>
@@ -376,11 +403,7 @@ export function AccountPage() {
             </div>
           </motion.div>
 
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-          {/* 📊 ОСНОВНЫЕ МЕТРИКИ (3 СТРОКИ) */}
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-
-          {/* СТРОКА 1: Выигрыши и Игры */}
+          {/* СТРОКА 1: ОСНОВНЫЕ МЕТРИКИ */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
             <StatBox
               icon={<Trophy className="w-5 h-5" />}
@@ -406,35 +429,35 @@ export function AccountPage() {
             <StatBox
               icon={<Percent className="w-5 h-5" />}
               label="Win Rate"
-              value={winRate}
+              value={safeWinRate}
               unit="%"
               color={greenAccent}
               delay={0.45}
             />
           </div>
 
-          {/* СТРОКА 2: Финансовые показатели */}
+          {/* СТРОКА 2: ФИНАНСОВЫЕ МЕТРИКИ */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
             <StatBox
               icon={<DollarSign className="w-5 h-5" />}
               label="Общий счёт"
-              value={totalScore >= 0 ? '+' : ''}
-              unit={`${totalScore.toFixed(2)} USDT`}
-              color={totalScore >= 0 ? greenAccent : redAccent}
+              value={`${safeTotalScore >= 0 ? '+' : ''}${safeTotalScore.toFixed(2)}`}
+              unit="USDT"
+              color={safeTotalScore >= 0 ? greenAccent : redAccent}
               delay={0.5}
             />
             <StatBox
               icon={<BarChart3 className="w-5 h-5" />}
               label="ROI"
-              value={roi.toFixed(1)}
+              value={safeRoi.toFixed(1)}
               unit="%"
-              color={roi >= 0 ? greenAccent : redAccent}
+              color={safeRoi >= 0 ? greenAccent : redAccent}
               delay={0.55}
             />
             <StatBox
               icon={<Zap className="w-5 h-5" />}
               label="Средняя ставка"
-              value={avgBetSize.toFixed(2)}
+              value={safeAvgBetSize.toFixed(2)}
               unit="USDT"
               color={accentColor}
               delay={0.6}
@@ -442,19 +465,19 @@ export function AccountPage() {
             <StatBox
               icon={<Clock className="w-5 h-5" />}
               label="Игр в день"
-              value={gamesPerDay}
+              value={safeGamesPerDay}
               color={accentColor}
               delay={0.65}
             />
           </div>
 
-          {/* СТРОКА 3: Лучший результат */}
-          {largestWin && (
+          {/* СТРОКА 3: ЛУЧШИЙ РЕЗУЛЬТАТ */}
+          {largestWin && safeLargestWin > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <StatBox
                 icon={<Flame className="w-5 h-5" />}
                 label="Самый большой выигрыш"
-                value={largestWin.amount.toFixed(2)}
+                value={safeLargestWin.toFixed(2)}
                 unit={`USDT (${largestWin.gameType})`}
                 color="#fbbf24"
                 delay={0.7}
@@ -462,10 +485,7 @@ export function AccountPage() {
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-          {/* 🎮 СТАТИСТИКА ПО ТИПАМ ИГР */}
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-
+          {/* СТАТИСТИКА ПО ТИПАМ ИГР */}
           {Object.keys(gameStats).length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -483,52 +503,56 @@ export function AccountPage() {
                 📊 Статистика по играм
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                {Object.entries(gameStats).map(([gameType, stats]: [string, any], idx) => (
-                  <motion.div
-                    key={gameType}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.8 + idx * 0.05 }}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      border: '1px solid rgba(14, 165, 233, 0.1)',
-                    }}
-                  >
-                    <h4 style={{ color: accentColor, fontSize: '14px', fontWeight: 'bold', margin: '0 0 12px 0', textTransform: 'capitalize' }}>
-                      {gameType}
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: '#9ca3af' }}>Игр:</span>
-                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.count}</span>
+                {Object.entries(gameStats).map(([gameType, stats]: [string, any], idx) => {
+                  const count = toNumber(stats.count);
+                  const totalBet = toNumber(stats.totalBet);
+                  const totalProfit = toNumber(stats.totalProfit);
+                  const avgProfit = toNumber(stats.avgProfit);
+
+                  return (
+                    <motion.div
+                      key={gameType}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + idx * 0.05 }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid rgba(14, 165, 233, 0.1)',
+                      }}
+                    >
+                      <h4 style={{ color: accentColor, fontSize: '14px', fontWeight: 'bold', margin: '0 0 12px 0', textTransform: 'capitalize' }}>
+                        {gameType}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: '#9ca3af' }}>Игр:</span>
+                          <span style={{ color: '#fff', fontWeight: 'bold' }}>{count}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: '#9ca3af' }}>Всего ставок:</span>
+                          <span style={{ color: '#fff', fontWeight: 'bold' }}>{totalBet.toFixed(2)} USDT</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: '#9ca3af' }}>Профит:</span>
+                          <span style={{ color: totalProfit >= 0 ? greenAccent : redAccent, fontWeight: 'bold' }}>
+                            {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)} USDT
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: '#9ca3af' }}>Средн. ставка:</span>
+                          <span style={{ color: '#fff', fontWeight: 'bold' }}>{avgProfit.toFixed(2)} USDT</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: '#9ca3af' }}>Всего ставок:</span>
-                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.totalBet.toFixed(2)} USDT</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: '#9ca3af' }}>Профит:</span>
-                        <span style={{ color: stats.totalProfit >= 0 ? greenAccent : redAccent, fontWeight: 'bold' }}>
-                          {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)} USDT
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: '#9ca3af' }}>Средн. ставка:</span>
-                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.avgProfit?.toFixed(2) || '0.00'} USDT</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-          {/* 💰 БАЛАНС */}
-          {/* ═══════════════════════════════════════════════════════════════════════ */}
-
+          {/* БАЛАНС */}
           {balances.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -545,26 +569,27 @@ export function AccountPage() {
                 💰 Доступный баланс
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-                {balances.map((balance, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
-                      {balance.symbol}
+                {balances.map((balance, idx) => {
+                  const amount = toNumber(balance.amount);
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
+                        {balance.symbol}
+                      </div>
+                      <div style={{ color: greenAccent, fontSize: '20px', fontWeight: 'bold' }}>
+                        {amount.toFixed(8)}
+                      </div>
                     </div>
-                    <div style={{ color: greenAccent, fontSize: '20px', fontWeight: 'bold' }}>
-                      {typeof balance.amount === 'string'
-                        ? parseFloat(balance.amount).toFixed(8)
-                        : balance.amount.toFixed(8)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           )}
@@ -573,10 +598,7 @@ export function AccountPage() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 📍 LOADING / ERROR
-  // ═══════════════════════════════════════════════════════════════════════════════
-
+  // LOADING / ERROR
   return (
     <div
       style={{
