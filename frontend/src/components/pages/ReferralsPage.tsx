@@ -270,7 +270,7 @@ export function ReferralsPage() {
             <CheckCircle className="w-6 h-6 text-emerald-500" />
             <div>
               <p className="font-bold text-emerald-400">
-                Ты уже привязан к пригласившему
+                Ты уже привязан к пригласившему!
               </p>
               <p className="text-xs text-emerald-300">
                 Пользователь: {stats?.referrerUsername}
