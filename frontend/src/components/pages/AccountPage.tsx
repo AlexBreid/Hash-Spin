@@ -56,6 +56,37 @@ interface BalanceData {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 🔧 УТИЛИТЫ
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  }
+  if (typeof value === 'object' && value.toString) {
+    try {
+      const str = value.toString();
+      const num = parseFloat(str);
+      return isNaN(num) ? 0 : num;
+    } catch (e) {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+function calculateVipRank(totalGames: number): string {
+  if (totalGames >= 1500) return 'diamond';
+  if (totalGames >= 500) return 'platinum';
+  if (totalGames >= 150) return 'gold';
+  if (totalGames >= 50) return 'silver';
+  return 'bronze';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 🎨 ЦВЕТОВАЯ СХЕМА VIP СТАТУСОВ
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -91,36 +122,6 @@ const VIP_COLORS: Record<string, any> = {
     icon: '✨',
   },
 };
-
-// ════════════════════════════════════════════════════════════════════════════════
-// 🔧 УТИЛИТЫ
-// ════════════════════════════════════════════════════════════════════════════════
-
-/**
- * Безопасно преобразует значение в число
- */
-function toNumber(value: any): number {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const num = parseFloat(value);
-    return isNaN(num) ? 0 : num;
-  }
-  if (typeof value === 'object' && value.toString) {
-    const str = value.toString();
-    const num = parseFloat(str);
-    return isNaN(num) ? 0 : num;
-  }
-  return 0;
-}
-
-function calculateVipRank(totalGames: number): string {
-  if (totalGames >= 1500) return 'diamond';
-  if (totalGames >= 500) return 'platinum';
-  if (totalGames >= 150) return 'gold';
-  if (totalGames >= 50) return 'silver';
-  return 'bronze';
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🎯 КОМПОНЕНТ: StatBox
@@ -169,10 +170,12 @@ export function AccountPage() {
   const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [balances, setBalances] = useState<BalanceData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const hasLoadedRef = useRef(false);
 
-  const { data, loading, error, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
+  const { data, loading: profileLoading, error: profileError, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
   const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -185,24 +188,57 @@ export function AccountPage() {
   const redAccent = '#ef4444';
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // 🔄 ЗАГРУЗКА
+  // 🔄 ЗАГРУЗКА ДАННЫХ
   // ═══════════════════════════════════════════════════════════════════════════════
 
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      fetchProfile().catch((err: Error) => console.error('❌ Profile error:', err.message));
+      console.log('🔄 Начинаю загрузку...');
+      fetchProfile().catch((err: Error) => {
+        console.error('❌ Profile error:', err.message);
+        setError('Failed to load profile');
+        setLoading(false);
+      });
       fetchBalance().catch((err: Error) => console.error('❌ Balance error:', err.message));
     }
   }, [fetchProfile, fetchBalance]);
 
+  // ✅ ИСПРАВЛЕНИЕ: Обработка ответа профиля
   useEffect(() => {
-    if (data && data.success) {
-      console.log('✅ Profile data loaded:', data.data);
-      setProfileData(data.data as UserProfile);
+    console.log('📊 useEffect data изменился:', data);
+    
+    if (data) {
+      console.log('📦 data объект:', data);
+      
+      // Проверяем структуру ответа
+      if (data.success && data.data) {
+        console.log('✅ Профиль загружен успешно:', data.data);
+        setProfileData(data.data as UserProfile);
+        setError(null);
+        setLoading(false);
+      } else if (data.data) {
+        // Если нет success флага, но есть data
+        console.log('✅ Профиль загружен (без success):', data.data);
+        setProfileData(data.data as UserProfile);
+        setError(null);
+        setLoading(false);
+      } else {
+        console.warn('⚠️ Ответ не имеет data:', data);
+      }
     }
   }, [data]);
 
+  // ✅ Обработка ошибок профиля
+  useEffect(() => {
+    if (profileError) {
+      console.error('❌ Profile error:', profileError);
+      setError(profileError);
+      setLoading(false);
+    }
+  }, [profileError]);
+
+  // ✅ Обработка ответа баланса
   useEffect(() => {
     if (balanceData && balanceData.success && Array.isArray(balanceData.data)) {
       console.log('✅ Balance data loaded:', balanceData.data);
@@ -217,6 +253,18 @@ export function AccountPage() {
 
   const handleNavigateWithdraw = () => {
     navigate("/withdraw");
+  };
+
+  const handleRetry = () => {
+    console.log('🔄 Повторная загрузка...');
+    setLoading(true);
+    setError(null);
+    hasLoadedRef.current = false;
+    fetchProfile().catch((err: Error) => {
+      console.error('❌ Retry error:', err.message);
+      setError('Failed to load profile');
+      setLoading(false);
+    });
   };
 
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -598,7 +646,10 @@ export function AccountPage() {
     );
   }
 
-  // LOADING / ERROR
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // LOADING / ERROR STATES
+  // ═══════════════════════════════════════════════════════════════════════════════
+
   return (
     <div
       style={{
@@ -611,31 +662,32 @@ export function AccountPage() {
         gap: '16px',
       }}
     >
-      {loading && (
+      {loading || profileLoading ? (
         <>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
             <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
           </motion.div>
           <p style={{ color: '#9ca3af' }}>Загрузка профиля...</p>
         </>
-      )}
-
-      {error && (
+      ) : error ? (
         <>
-          <p style={{ color: '#ef4444', fontWeight: 'bold' }}>❌ Ошибка: {error}</p>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', textAlign: 'center' }}>❌ Ошибка: {error}</p>
           <Button
-            onClick={() => {
-              hasLoadedRef.current = false;
-              fetchProfile().catch((err: Error) => console.error(err));
-              fetchBalance().catch((err: Error) => console.error(err));
+            onClick={handleRetry}
+            style={{
+              background: accentColor,
+              color: '#fff',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              fontWeight: 'bold',
+              cursor: 'pointer',
             }}
           >
             Повторить
           </Button>
         </>
-      )}
-
-      {!loading && !error && !profileData && (
+      ) : (
         <>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
             <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
