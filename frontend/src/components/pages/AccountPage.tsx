@@ -4,8 +4,6 @@ import { useAuth } from "../../context/AuthContext";
 import { Button } from "../ui/button";
 import {
   Loader2,
-  TrendingUp,
-  TrendingDown,
   Flame,
   Trophy,
 } from "lucide-react";
@@ -28,13 +26,6 @@ interface UserProfile {
     gameType: string;
   };
   createdAt: string;
-}
-
-interface BalanceData {
-  tokenId: number;
-  symbol: string;
-  amount: number | string;
-  type: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -121,14 +112,12 @@ export function AccountPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
-  const [balances, setBalances] = useState<BalanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const hasLoadedRef = useRef(false);
 
   const { data, loading: profileLoading, error: profileError, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
-  const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
   const mainBg = '#0a0f1a';
   const accentColor = '#0ea5e9';
@@ -148,9 +137,8 @@ export function AccountPage() {
         setError('Failed to load profile');
         setLoading(false);
       });
-      fetchBalance().catch((err: Error) => console.error('❌ Balance error:', err.message));
     }
-  }, [fetchProfile, fetchBalance]);
+  }, [fetchProfile]);
 
   // ✅ Обработка ответа профиля
   useEffect(() => {
@@ -175,21 +163,6 @@ export function AccountPage() {
       setLoading(false);
     }
   }, [profileError]);
-
-  useEffect(() => {
-    if (balanceData && balanceData.success && Array.isArray(balanceData.data)) {
-      setBalances(balanceData.data);
-    }
-  }, [balanceData]);
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
-
-  const handleNavigateWithdraw = () => {
-    navigate("/withdraw");
-  };
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // 🎯 РЕНДЕР ПРОФИЛЯ
@@ -308,126 +281,28 @@ export function AccountPage() {
                 📅 Игрок с {dateJoined}
               </p>
             </div>
-
-            {/* КНОПКИ */}
-            <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleNavigateWithdraw}
-                style={{
-                  background: `linear-gradient(135deg, ${accentColor}, #06b6d4)`,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '12px 24px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                💸 Вывести
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '8px',
-                  padding: '12px 24px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                🚪 Выход
-              </motion.button>
-            </div>
           </motion.div>
 
           {/* ОСНОВНЫЕ МЕТРИКИ */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
             <MetricCard
-              icon={<Trophy className="w-8 h-8" style={{ margin: '0 auto' }} />}
-              label="Всего игр"
-              value={totalGames.toLocaleString('ru-RU')}
+              icon={<Trophy className="w-8 h-8" style={{ margin: '0 auto', color: accentColor }} />}
+              label="Всего игр сыграно"
+              value={totalGames > 0 ? totalGames.toLocaleString('ru-RU') : '0'}
               color={accentColor}
               delay={0.3}
-            />
-            <MetricCard
-              icon={<TrendingUp className="w-8 h-8" style={{ margin: '0 auto', color: greenAccent }} />}
-              label="Выигрышей"
-              value={winningBets}
-              color={greenAccent}
-              delay={0.35}
-            />
-            <MetricCard
-              icon={<TrendingDown className="w-8 h-8" style={{ margin: '0 auto', color: redAccent }} />}
-              label="Проигрышей"
-              value={lossCount}
-              color={redAccent}
-              delay={0.4}
             />
             {largestWin && safeLargestWin > 0 && (
               <MetricCard
                 icon={<Flame className="w-8 h-8" style={{ margin: '0 auto', color: '#fbbf24' }} />}
-                label="Макс выигрыш"
+                label="Максимальный выигрыш"
                 value={safeLargestWin.toFixed(2)}
                 unit="USDT"
                 color="#fbbf24"
-                delay={0.45}
+                delay={0.35}
               />
             )}
           </div>
-
-          {/* БАЛАНС */}
-          {balances.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              style={{
-                background: `linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02))`,
-                border: `2px solid ${greenAccent}40`,
-                borderRadius: '16px',
-                padding: '24px',
-              }}
-            >
-              <h3 style={{ color: greenAccent, fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>
-                💰 Доступный баланс
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-                {balances.map((balance, idx) => {
-                  const amount = toNumber(balance.amount);
-                  return (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.55 + idx * 0.1 }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '12px',
-                        padding: '16px',
-                        textAlign: 'center',
-                        border: '1px solid rgba(16, 185, 129, 0.2)',
-                      }}
-                    >
-                      <div style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
-                        {balance.symbol}
-                      </div>
-                      <div style={{ color: greenAccent, fontSize: '24px', fontWeight: 'bold' }}>
-                        {amount.toFixed(8)}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
         </div>
       </div>
     );
