@@ -1,12 +1,12 @@
 /**
- * ✅ ОБНОВЛЕННЫЙ userRoutes.js
+ * ✅ ОБНОВЛЕННЫЙ userRoutes.js С РАСШИРЕННОЙ СТАТИСТИКОЙ
  * 
- * ИСПРАВЛЕНИЯ:
- * 1. ✅ Правильный расчёт VIP ранга по количеству игр
- * 2. ✅ Динамический расчёт уровня, win rate, статистики
- * 3. ✅ Безопасное преобразование Decimal → number
- * 4. ✅ Добавлена информация о днях активности
- * 5. ✅ Улучшена логика расчётов
+ * ДОБАВЛЕНО:
+ * 1. ✅ Запрос статистики по всем типам игр
+ * 2. ✅ Самый большой выигрыш
+ * 3. ✅ Количество выигрышей по типам игр
+ * 4. ✅ Лучшая игра (максимальный выигрыш на одной ставке)
+ * 5. ✅ Детальная статистика по игровым типам
  */
 
 const express = require('express');
@@ -19,15 +19,6 @@ const logger = require('../utils/logger');
 // 🎯 ФУНКЦИЯ: ОПРЕДЕЛИТЬ VIP РАНГ ПО КОЛИЧЕСТВУ ИГР
 // ════════════════════════════════════════════════════════════════════════════════
 
-/**
- * Определить VIP ранг на основе количества сыгранных игр
- * 
- * 🥉 Бронза: 0-49 игр
- * 🥈 Серебро: 50-149 игр
- * 🥇 Золото: 150-499 игр
- * 💎 Платина: 500-1499 игр
- * ✨ Бриллиант: 1500+ игр
- */
 function calculateVipRank(totalGames) {
   if (totalGames >= 1500) return 'diamond';
   if (totalGames >= 500) return 'platinum';
@@ -36,9 +27,6 @@ function calculateVipRank(totalGames) {
   return 'bronze';
 }
 
-/**
- * Получить название VIP ранга
- */
 function getVipName(rank) {
   const names = {
     bronze: 'Бронза',
@@ -51,7 +39,7 @@ function getVipName(rank) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 📊 ГЛАВНЫЙ МАРШРУТ: GET /profile
+// 📊 ГЛАВНЫЙ МАРШРУТ: GET /profile (РАСШИРЕННЫЙ)
 // ════════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -61,10 +49,19 @@ router.get('/profile', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
   try {
-    logger.info('USER', 'Fetching user profile', { userId });
+    logger.info('USER', 'Fetching user profile with extended stats', { userId });
 
     // ✅ ПАРАЛЛЕЛЬНАЯ ЗАГРУЗКА ВСЕХ ДАННЫХ
-    const [user, totalGames, totalScoreAggregate, betDetails] = await Promise.all([
+    const [
+      user,
+      allBets,
+      totalGames,
+      totalScoreAggregate,
+      betDetails,
+      gameTypeStats,
+      largestWin,
+      winningBets,
+    ] = await Promise.all([
       // Пользователь
       prisma.user.findUnique({
         where: { id: userId },
@@ -79,20 +76,53 @@ router.get('/profile', authenticateToken, async (req, res) => {
         },
       }),
 
+      // Все ставки (для детальной обработки)
+      prisma.bet.findMany({
+        where: { userId },
+        select: {
+          gameType: true,
+          betAmount: true,
+          payoutAmount: true,
+          netAmount: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+
       // Количество всех ставок (игр)
       prisma.bet.count({ where: { userId } }),
 
-      // Сумма чистого выигрыша (netAmount)
+      // Сумма чистого выигрыша
       prisma.bet.aggregate({
         _sum: { netAmount: true },
         where: { userId },
       }),
 
-      // Детали ставок для расчёта статистики
+      // Детали ставок
       prisma.bet.aggregate({
         _sum: { betAmount: true, payoutAmount: true },
         _count: true,
         where: { userId },
+      }),
+
+      // Статистика по типам игр
+      prisma.bet.groupBy({
+        by: ['gameType'],
+        where: { userId },
+        _count: true,
+        _sum: { netAmount: true, betAmount: true },
+      }),
+
+      // Самый большой выигрыш
+      prisma.bet.findFirst({
+        where: { userId, netAmount: { gt: 0 } },
+        orderBy: { netAmount: 'desc' },
+        select: { netAmount: true, gameType: true, createdAt: true },
+      }),
+
+      // Количество выигрышей
+      prisma.bet.count({
+        where: { userId, netAmount: { gt: 0 } },
       }),
     ]);
 
@@ -125,39 +155,56 @@ router.get('/profile', authenticateToken, async (req, res) => {
     // 📊 РАСЧЁТЫ СТАТИСТИКИ
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    // 🎮 Уровень (1 уровень за 10 игр)
     const level = Math.max(1, Math.floor(totalGames / 10) + 1);
-
-    // 🥇 VIP Ранг (динамический на основе количества игр)
     const vipRank = calculateVipRank(totalGames);
     const vipLevel = getVipName(vipRank);
 
-    // 📈 Win Rate (процент выигранных ставок)
     let winRate = 0;
     if (totalGames > 0) {
-      const winningBets = await prisma.bet.count({
-        where: {
-          userId,
-          netAmount: { gt: 0 }, // netAmount > 0 = выигрыш
-        },
-      });
       winRate = Math.round((winningBets / totalGames) * 100);
     }
 
-    // 💰 Средняя ставка
     const avgBetSize = totalGames > 0 ? totalWagered / totalGames : 0;
-
-    // 📅 Дни активности
     const daysActive = Math.max(
       1,
       Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24))
     );
-
-    // 🎯 Игр в день
     const gamesPerDay = totalGames > 0 ? Math.round(totalGames / daysActive) : 0;
-
-    // 💵 ROI (Return on Investment)
     const roi = totalWagered > 0 ? ((totalScore / totalWagered) * 100).toFixed(2) : '0.00';
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🎮 СТАТИСТИКА ПО ТИПАМ ИГР
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    const gameStats = {};
+    gameTypeStats.forEach((stat) => {
+      const netAmount = stat._sum.netAmount
+        ? parseFloat(stat._sum.netAmount.toString())
+        : 0;
+      const betAmount = stat._sum.betAmount
+        ? parseFloat(stat._sum.betAmount.toString())
+        : 0;
+
+      gameStats[stat.gameType.toLowerCase()] = {
+        count: stat._count,
+        totalBet: Math.round(betAmount * 100) / 100,
+        totalProfit: Math.round(netAmount * 100) / 100,
+        avgProfit: stat._count > 0 ? Math.round((netAmount / stat._count) * 100) / 100 : 0,
+      };
+    });
+
+    // 🏆 САМЫЙ БОЛЬШОЙ ВЫИГРЫШ
+    const largestWinAmount = largestWin
+      ? parseFloat(largestWin.netAmount.toString())
+      : 0;
+
+    const largestWinData = largestWin
+      ? {
+          amount: Math.round(largestWinAmount * 100) / 100,
+          gameType: largestWin.gameType,
+          date: largestWin.createdAt.toISOString(),
+        }
+      : null;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // ✅ ФОРМИРОВАНИЕ ОТВЕТА
@@ -173,14 +220,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
       // 🎮 Уровень и VIP
       level,
-      vipLevel, // Например: "Золото"
-      vipRank, // Например: "gold"
+      vipLevel,
+      vipRank,
 
       // 📊 Статистика игр
       totalGames,
-      totalScore: Math.round(totalScore * 100) / 100, // Округление до 2 знаков
+      totalScore: Math.round(totalScore * 100) / 100,
       totalWagered: Math.round(totalWagered * 100) / 100,
       totalPayouts: Math.round(totalPayouts * 100) / 100,
+      winningBets,
 
       // 📈 Процентные показатели
       winRate,
@@ -195,6 +243,12 @@ router.get('/profile', authenticateToken, async (req, res) => {
       avgBetSize: Math.round(avgBetSize * 100) / 100,
       netProfit: Math.round(totalScore * 100) / 100,
 
+      // 🏆 Лучший результат
+      largestWin: largestWinData,
+
+      // 🎮 Статистика по типам игр
+      gameStats,
+
       // 🔗 Реферальные данные
       referrerId: user.referrerId,
     };
@@ -204,12 +258,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
       level,
       vipRank,
       totalGames,
-      winRate: `${winRate}%`,
+      largestWin: largestWinAmount,
     });
-
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // ✅ ОТПРАВКА ОТВЕТА
-    // ═══════════════════════════════════════════════════════════════════════════════
 
     res.json({
       success: true,
@@ -230,12 +280,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 📊 ДОПОЛНИТЕЛЬНЫЙ МАРШРУТ: GET /stats
+// 📊 МАРШРУТ: GET /stats (ДЕТАЛЬНАЯ СТАТИСТИКА)
 // ════════════════════════════════════════════════════════════════════════════════
 
-/**
- * Получить расширенную статистику пользователя
- */
 router.get('/stats', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
@@ -250,6 +297,9 @@ router.get('/stats', authenticateToken, async (req, res) => {
       totalScore,
       totalWagered,
       lastGameDate,
+      gameTypeStats,
+      largestWin,
+      largestLoss,
     ] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId } }),
 
@@ -278,6 +328,25 @@ router.get('/stats', authenticateToken, async (req, res) => {
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       }),
+
+      prisma.bet.groupBy({
+        by: ['gameType'],
+        where: { userId },
+        _count: true,
+        _sum: { netAmount: true, betAmount: true },
+      }),
+
+      prisma.bet.findFirst({
+        where: { userId, netAmount: { gt: 0 } },
+        orderBy: { netAmount: 'desc' },
+        select: { netAmount: true, gameType: true, createdAt: true },
+      }),
+
+      prisma.bet.findFirst({
+        where: { userId, netAmount: { lt: 0 } },
+        orderBy: { netAmount: 'asc' },
+        select: { netAmount: true, gameType: true, createdAt: true },
+      }),
     ]);
 
     if (!user) {
@@ -291,6 +360,24 @@ router.get('/stats', authenticateToken, async (req, res) => {
     const totalWageredAmount = totalWagered._sum.betAmount
       ? parseFloat(totalWagered._sum.betAmount.toString())
       : 0;
+
+    // 🎮 Статистика по игровым типам
+    const gameTypeData = {};
+    gameTypeStats.forEach((stat) => {
+      const netAmount = stat._sum.netAmount
+        ? parseFloat(stat._sum.netAmount.toString())
+        : 0;
+      const betAmount = stat._sum.betAmount
+        ? parseFloat(stat._sum.betAmount.toString())
+        : 0;
+
+      gameTypeData[stat.gameType.toLowerCase()] = {
+        games: stat._count,
+        totalBet: Math.round(betAmount * 100) / 100,
+        totalProfit: Math.round(netAmount * 100) / 100,
+        avgBet: Math.round((betAmount / stat._count) * 100) / 100,
+      };
+    });
 
     const stats = {
       userId,
@@ -307,6 +394,23 @@ router.get('/stats', authenticateToken, async (req, res) => {
       level: Math.max(1, Math.floor(totalGames / 10) + 1),
       vipRank: calculateVipRank(totalGames),
       vipLevel: getVipName(calculateVipRank(totalGames)),
+      
+      // 🏆 Экстремальные значения
+      largestWin: largestWin
+        ? {
+            amount: Math.round(parseFloat(largestWin.netAmount.toString()) * 100) / 100,
+            gameType: largestWin.gameType,
+          }
+        : null,
+      largestLoss: largestLoss
+        ? {
+            amount: Math.round(parseFloat(largestLoss.netAmount.toString()) * 100) / 100,
+            gameType: largestLoss.gameType,
+          }
+        : null,
+
+      // 🎮 По типам игр
+      gameTypeStats: gameTypeData,
     };
 
     res.json({
@@ -315,6 +419,63 @@ router.get('/stats', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     logger.error('USER', 'Error fetching user stats', { userId, error: error.message });
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🏆 МАРШРУТ: GET /leaderboard (ТОП ИГРОКИ)
+// ════════════════════════════════════════════════════════════════════════════════
+
+router.get('/leaderboard', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    // ТОП ПО ВЫИГРЫШАМ
+    const topWinners = await prisma.bet.groupBy({
+      by: ['userId'],
+      _sum: { netAmount: true },
+      _count: true,
+      orderBy: { _sum: { netAmount: 'desc' } },
+      take: limit,
+    });
+
+    // ТОП ПО КОЛИЧЕСТВУ ИГР
+    const topPlayers = await prisma.bet.groupBy({
+      by: ['userId'],
+      _count: true,
+      orderBy: { _count: { _all: 'desc' } },
+      take: limit,
+    });
+
+    // ТОП ПО WIN RATE
+    const winRateData = await prisma.$queryRaw`
+      SELECT 
+        userId,
+        COUNT(*) as total_games,
+        COUNT(CASE WHEN netAmount > 0 THEN 1 END) as winning_games,
+        ROUND(COUNT(CASE WHEN netAmount > 0 THEN 1 END)::numeric / COUNT(*) * 100) as win_rate
+      FROM "Bet"
+      GROUP BY userId
+      HAVING COUNT(*) >= 10
+      ORDER BY win_rate DESC
+      LIMIT ${limit}
+    `;
+
+    res.json({
+      success: true,
+      data: {
+        topWinners,
+        topPlayers,
+        topWinRate: winRateData,
+      },
+    });
+  } catch (error) {
+    logger.error('USER', 'Error fetching leaderboard', { error: error.message });
 
     res.status(500).json({
       success: false,

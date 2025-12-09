@@ -2,8 +2,20 @@ import { useState, useEffect, useRef } from "react";
 import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Loader2, User, Crown, BarChart2, Calendar, Star, LogOut, Send, Zap, Trophy, TrendingUp } from "lucide-react";
+import { Card } from "../ui/card";
+import {
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  Trophy,
+  Target,
+  Flame,
+  Percent,
+  Clock,
+  DollarSign,
+  BarChart3,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
@@ -22,8 +34,19 @@ interface UserProfile {
   level: number;
   totalScore: number;
   totalGames: number;
+  winningBets: number;
   winRate?: number;
   totalWagered?: number;
+  roi?: number;
+  daysActive?: number;
+  gamesPerDay?: number;
+  avgBetSize?: number;
+  largestWin?: {
+    amount: number;
+    gameType: string;
+    date: string;
+  };
+  gameStats?: Record<string, any>;
   createdAt: string;
 }
 
@@ -42,53 +65,34 @@ const VIP_COLORS = {
   bronze: {
     name: 'Бронза',
     color: '#cd7f32',
-    lightColor: 'rgba(205, 127, 50, 0.1)',
     bgGradient: 'linear-gradient(135deg, #8B4513, #CD7F32)',
     icon: '🥉',
-    minGames: 0,
-    maxGames: 49,
   },
   silver: {
     name: 'Серебро',
     color: '#c0c0c0',
-    lightColor: 'rgba(192, 192, 192, 0.1)',
     bgGradient: 'linear-gradient(135deg, #708090, #C0C0C0)',
     icon: '🥈',
-    minGames: 50,
-    maxGames: 149,
   },
   gold: {
     name: 'Золото',
     color: '#ffd700',
-    lightColor: 'rgba(255, 215, 0, 0.1)',
     bgGradient: 'linear-gradient(135deg, #DAA520, #FFD700)',
     icon: '🥇',
-    minGames: 150,
-    maxGames: 499,
   },
   platinum: {
     name: 'Платина',
     color: '#e5e4e2',
-    lightColor: 'rgba(229, 228, 226, 0.1)',
     bgGradient: 'linear-gradient(135deg, #71797E, #E5E4E2)',
     icon: '💎',
-    minGames: 500,
-    maxGames: 1499,
   },
   diamond: {
     name: 'Бриллиант',
     color: '#00ffff',
-    lightColor: 'rgba(0, 255, 255, 0.1)',
     bgGradient: 'linear-gradient(135deg, #00CED1, #00FFFF)',
     icon: '✨',
-    minGames: 1500,
-    maxGames: Infinity,
   },
 };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 ФУНКЦИЯ: ОПРЕДЕЛИТЬ VIP РАНГ ПО КОЛИЧЕСТВУ ИГР
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function calculateVipRank(totalGames: number): 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' {
   if (totalGames >= 1500) return 'diamond';
@@ -98,42 +102,46 @@ function calculateVipRank(totalGames: number): 'bronze' | 'silver' | 'gold' | 'p
   return 'bronze';
 }
 
-/**
- * Получить прогресс до следующего ранга
- */
-function getVipProgress(totalGames: number) {
-  const ranks = [
-    { rank: 'bronze' as const, min: 0, max: 49 },
-    { rank: 'silver' as const, min: 50, max: 149 },
-    { rank: 'gold' as const, min: 150, max: 499 },
-    { rank: 'platinum' as const, min: 500, max: 1499 },
-    { rank: 'diamond' as const, min: 1500, max: Infinity },
-  ];
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎯 КОМПОНЕНТ: STAT BOX
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  const currentRank = ranks.find(r => totalGames >= r.min && totalGames <= r.max);
-  const nextRank = ranks.find(r => r.min > totalGames);
-
-  if (!currentRank) return { current: 'bronze' as const, next: 'silver' as const, progress: 0, gamesNeeded: 50 };
-
-  if (currentRank.rank === 'diamond') {
-    return { current: 'diamond' as const, next: null, progress: 100, gamesNeeded: 0 };
-  }
-
-  const gamesInCurrent = totalGames - currentRank.min;
-  const gamesInCurrentRange = currentRank.max - currentRank.min + 1;
-  const progress = Math.round((gamesInCurrent / gamesInCurrentRange) * 100);
-  const gamesNeeded = nextRank ? nextRank.min - totalGames : 0;
-
-  return {
-    current: currentRank.rank,
-    next: nextRank?.rank || null,
-    progress,
-    gamesNeeded,
-  };
+interface StatBoxProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  unit?: string;
+  color?: string;
+  delay?: number;
 }
 
+const StatBox = ({ icon, label, value, unit = '', color = '#0ea5e9', delay = 0 }: StatBoxProps) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay }}
+    style={{
+      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(6, 182, 212, 0.05))',
+      border: `1px solid ${color}40`,
+      borderRadius: '12px',
+      padding: '16px',
+      flex: 1,
+      minWidth: '120px',
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+      <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '600' }}>{label}</span>
+      <div style={{ color, opacity: 0.7 }}>{icon}</div>
+    </div>
+    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fff' }}>
+      {value}
+      {unit && <span style={{ fontSize: '12px', marginLeft: '4px', color: '#9ca3af' }}>{unit}</span>}
+    </div>
+  </motion.div>
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 КОМПОНЕНТ СТРАНИЦЫ АККАУНТА
+// 📱 ГЛАВНЫЙ КОМПОНЕНТ
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AccountPage() {
@@ -148,24 +156,24 @@ export function AccountPage() {
   const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // 🎨 ЦВЕТОВАЯ ПАЛИТРА
+  // 🎨 ЦВЕТА
   // ═══════════════════════════════════════════════════════════════════════════════
+
   const mainBg = '#0a0f1a';
   const cardBg = '#0d1425';
-  const profileCardBg = 'linear-gradient(145deg, #0d1829, #0a0f1a)';
   const accentColor = '#0ea5e9';
   const greenAccent = '#10b981';
-  const warningColor = '#f59e0b';
+  const redAccent = '#ef4444';
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // 🔄 ЗАГРУЗКА ДАННЫХ
+  // 🔄 ЗАГРУЗКА
   // ═══════════════════════════════════════════════════════════════════════════════
 
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      fetchProfile().catch((err: Error) => console.error('❌ Ошибка профиля:', err.message));
-      fetchBalance().catch((err: Error) => console.error('❌ Ошибка баланса:', err.message));
+      fetchProfile().catch((err: Error) => console.error('Profile error:', err));
+      fetchBalance().catch((err: Error) => console.error('Balance error:', err));
     }
   }, [fetchProfile, fetchBalance]);
 
@@ -191,17 +199,31 @@ export function AccountPage() {
   };
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // 🎯 РЕНДЕР ПРОФИЛЯ
+  // 🎯 РЕНДЕР
   // ═══════════════════════════════════════════════════════════════════════════════
 
   if (profileData) {
-    const { username, firstName, lastName, vipLevel, level, totalScore, totalGames, createdAt, photoUrl } = profileData;
+    const {
+      username,
+      firstName,
+      lastName,
+      totalScore,
+      totalGames,
+      winningBets,
+      winRate = 0,
+      roi = 0,
+      daysActive = 1,
+      gamesPerDay = 0,
+      avgBetSize = 0,
+      largestWin,
+      gameStats = {},
+      photoUrl,
+      createdAt,
+      level,
+    } = profileData;
 
-    // 📊 ВЫЧИСЛЯЕМ ДИНАМИЧЕСКИ
     const vipRank = calculateVipRank(totalGames);
     const vipInfo = VIP_COLORS[vipRank];
-    const vipProgress = getVipProgress(totalGames);
-
     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
 
     const getInitials = (fName: string, lName: string | null) => {
@@ -212,43 +234,50 @@ export function AccountPage() {
 
     const initials = getInitials(firstName || "", lastName);
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-
-    // 📈 ВЫЧИСЛЯЕМ ДОПОЛНИТЕЛЬНУЮ СТАТИСТИКУ
-    const winRate = totalGames > 0 ? Math.round((totalScore / (totalScore + Math.abs(Math.min(totalScore, 0)))) * 100) : 0;
-    const avgBetSize = totalScore > 0 ? (totalScore / totalGames).toFixed(2) : '0.00';
-    const daysActive = Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+    const lossCount = totalGames - winningBets;
 
     return (
-      <div className="p-4 sm:p-6 text-foreground min-h-screen flex flex-col items-center pb-20" style={{ backgroundColor: mainBg }}>
-        
-        {/* 🎪 ГЛАВНАЯ КАРТОЧКА ПРОФИЛЯ */}
-        <Card className="w-full max-w-2xl shadow-2xl border-none rounded-3xl overflow-hidden" style={{ backgroundColor: cardBg }}>
+      <div style={{ backgroundColor: mainBg, minHeight: '100vh', padding: '20px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
           
-          {/* 🔝 ВЕРХНИЙ БЛОК С АВАТАРОМ И СТАТУСОМ */}
-          <div style={{ padding: '32px 24px', background: profileCardBg }}>
-            
-            {/* Аватар и основная информация */}
-            <div className="flex items-center space-x-6 mb-8">
-              {/* 🖼️ Аватар */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🎪 ШАПКА ПРОФИЛЯ */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{
+              background: `linear-gradient(135deg, ${vipInfo.bgGradient.split(',')[0]}, #0d1425)`,
+              borderRadius: '20px',
+              padding: '32px',
+              marginBottom: '24px',
+              border: `2px solid ${vipInfo.color}40`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              {/* АВАТАР */}
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: 0.2 }}
                 style={{
-                  width: '80px',
-                  height: '80px',
+                  width: '100px',
+                  height: '100px',
                   borderRadius: '50%',
+                  background: vipInfo.bgGradient,
+                  border: `3px solid ${vipInfo.color}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '28px',
+                  fontSize: '40px',
                   fontWeight: 'bold',
                   color: '#fff',
-                  background: vipInfo.bgGradient,
                   boxShadow: `0 0 20px ${vipInfo.color}`,
-                  border: `3px solid ${vipInfo.color}`,
                   position: 'relative',
                   overflow: 'hidden',
+                  flexShrink: 0,
                 }}
               >
                 {photoUrl ? (
@@ -264,341 +293,320 @@ export function AccountPage() {
                 ) : (
                   initials
                 )}
-                {/* VIP значок */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-5px',
-                  right: '-5px',
-                  fontSize: '28px',
-                  background: mainBg,
-                  borderRadius: '50%',
-                  padding: '2px',
-                  border: `2px solid ${vipInfo.color}`,
-                }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '-8px',
+                    right: '-8px',
+                    fontSize: '32px',
+                    background: mainBg,
+                    borderRadius: '50%',
+                    padding: '4px',
+                    border: `2px solid ${vipInfo.color}`,
+                  }}
+                >
                   {vipInfo.icon}
                 </div>
               </motion.div>
 
-              {/* Информация о пользователе */}
-              <div className="flex-1">
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <h1 className="text-3xl font-extrabold mb-1" style={{ color: '#fff' }}>
-                    {fullName || username}
-                  </h1>
-                  
-                  {/* VIP Ранг */}
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '4px 12px',
+              {/* ИНФОРМАЦИЯ */}
+              <div style={{ flex: 1 }}>
+                <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#fff', margin: '0 0 8px 0' }}>
+                  {fullName || username}
+                </h1>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
                       background: vipInfo.bgGradient,
                       color: '#fff',
+                      padding: '6px 16px',
                       borderRadius: '20px',
                       fontSize: '14px',
                       fontWeight: 'bold',
-                    }}>
-                      {vipInfo.icon} {vipInfo.name}
-                    </span>
-                  </div>
+                    }}
+                  >
+                    {vipInfo.icon} {vipInfo.name}
+                  </span>
+                  <span style={{ color: '#9ca3af', fontSize: '14px' }}>
+                    Уровень {level}
+                  </span>
+                </div>
+                <p style={{ color: '#9ca3af', fontSize: '13px', margin: '0' }}>
+                  Игрок с {dateJoined} • {daysActive} дней активности
+                </p>
+              </div>
 
-                  {/* Статус и дата */}
-                  <p className="text-xs" style={{ color: '#9ca3af' }}>
-                    Игрок с {dateJoined} • {daysActive} дней активности
-                  </p>
-                </motion.div>
+              {/* КНОПКИ */}
+              <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleNavigateWithdraw}
+                  style={{
+                    background: `linear-gradient(135deg, ${accentColor}, #06b6d4)`,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 20px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                  }}
+                >
+                  💸 Вывести
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogout}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '8px',
+                    padding: '10px 20px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                  }}
+                >
+                  🚪 Выход
+                </motion.button>
               </div>
             </div>
+          </motion.div>
 
-            {/* 📊 ПРОГРЕСС К СЛЕДУЮЩЕМУ РАНГУ */}
-            {vipProgress.next && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  marginTop: '16px',
-                }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold" style={{ color: '#e5e7eb' }}>
-                    До {VIP_COLORS[vipProgress.next as keyof typeof VIP_COLORS].name}
-                  </span>
-                  <span className="text-xs font-bold" style={{ color: warningColor }}>
-                    {vipProgress.gamesNeeded} игр
-                  </span>
-                </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                }}>
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${vipProgress.progress}%` }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                    style={{
-                      height: '100%',
-                      background: vipInfo.bgGradient,
-                      borderRadius: '4px',
-                    }}
-                  />
-                </div>
-              </motion.div>
-            )}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 📊 ОСНОВНЫЕ МЕТРИКИ (3 СТРОКИ) */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
 
-            {vipProgress.current === 'diamond' && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                style={{
-                  background: 'rgba(0, 255, 255, 0.1)',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  marginTop: '16px',
-                  textAlign: 'center',
-                  color: '#00ffff',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                }}
-              >
-                🎉 Поздравляем! Вы достигли максимального ранга!
-              </motion.div>
-            )}
-
+          {/* СТРОКА 1: Выигрыши и Игры */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <StatBox
+              icon={<Trophy className="w-5 h-5" />}
+              label="Всего игр"
+              value={totalGames.toLocaleString('ru-RU')}
+              color={accentColor}
+              delay={0.3}
+            />
+            <StatBox
+              icon={<TrendingUp className="w-5 h-5" />}
+              label="Выигрышей"
+              value={winningBets}
+              color={greenAccent}
+              delay={0.35}
+            />
+            <StatBox
+              icon={<TrendingDown className="w-5 h-5" />}
+              label="Проигрышей"
+              value={lossCount}
+              color={redAccent}
+              delay={0.4}
+            />
+            <StatBox
+              icon={<Percent className="w-5 h-5" />}
+              label="Win Rate"
+              value={winRate}
+              unit="%"
+              color={greenAccent}
+              delay={0.45}
+            />
           </div>
 
-          {/* 📊 СТАТИСТИКА */}
+          {/* СТРОКА 2: Финансовые показатели */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <StatBox
+              icon={<DollarSign className="w-5 h-5" />}
+              label="Общий счёт"
+              value={totalScore >= 0 ? '+' : ''}
+              unit={`${totalScore.toFixed(2)} USDT`}
+              color={totalScore >= 0 ? greenAccent : redAccent}
+              delay={0.5}
+            />
+            <StatBox
+              icon={<BarChart3 className="w-5 h-5" />}
+              label="ROI"
+              value={roi.toFixed(1)}
+              unit="%"
+              color={roi >= 0 ? greenAccent : redAccent}
+              delay={0.55}
+            />
+            <StatBox
+              icon={<Zap className="w-5 h-5" />}
+              label="Средняя ставка"
+              value={avgBetSize.toFixed(2)}
+              unit="USDT"
+              color={accentColor}
+              delay={0.6}
+            />
+            <StatBox
+              icon={<Clock className="w-5 h-5" />}
+              label="Игр в день"
+              value={gamesPerDay}
+              color={accentColor}
+              delay={0.65}
+            />
+          </div>
 
-          <CardContent className="p-6">
-            
-            {/* Главные KPI */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              
-              {/* 🎮 Игр сыграно */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                style={{
-                  background: 'linear-gradient(135deg, #0d2d3d, #0a1f2e)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(14, 165, 233, 0.2)',
-                }}
-              >
-                <div className="flex items-center mb-2 text-sm" style={{ color: accentColor }}>
-                  <Zap className="w-5 h-5 mr-2" />
-                  Игр сыграно
-                </div>
-                <p className="text-3xl font-extrabold" style={{ color: '#fff' }}>
-                  {totalGames.toLocaleString('ru-RU')}
-                </p>
-                <p className="text-xs mt-2" style={{ color: '#9ca3af' }}>
-                  {daysActive > 0 ? Math.round(totalGames / daysActive) : 0} в день
-                </p>
-              </motion.div>
-
-              {/* 💰 Общий счёт */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                style={{
-                  background: 'linear-gradient(135deg, #0d2d3d, #0a1f2e)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
-                  border: `1px solid ${totalScore >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-                }}
-              >
-                <div className="flex items-center mb-2 text-sm" style={{ color: totalScore >= 0 ? greenAccent : '#ef4444' }}>
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  Общий счёт
-                </div>
-                <p className="text-3xl font-extrabold" style={{ color: totalScore >= 0 ? greenAccent : '#ef4444' }}>
-                  {totalScore.toFixed(2)} USDT
-                </p>
-                <p className="text-xs mt-2" style={{ color: '#9ca3af' }}>
-                  {totalGames > 0 ? (totalScore >= 0 ? '+' : '') + (totalScore / totalGames).toFixed(2) : '0.00'} за игру
-                </p>
-              </motion.div>
-
+          {/* СТРОКА 3: Лучший результат */}
+          {largestWin && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              <StatBox
+                icon={<Flame className="w-5 h-5" />}
+                label="Самый большой выигрыш"
+                value={largestWin.amount.toFixed(2)}
+                unit={`USDT (${largestWin.gameType})`}
+                color="#fbbf24"
+                delay={0.7}
+              />
             </div>
+          )}
 
-            {/* Дополнительная статистика */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🎮 СТАТИСТИКА ПО ТИПАМ ИГР */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          {Object.keys(gameStats).length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="grid grid-cols-3 gap-3"
+              transition={{ delay: 0.75 }}
+              style={{
+                background: `linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(6, 182, 212, 0.02))`,
+                border: '1px solid rgba(14, 165, 233, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                marginBottom: '20px',
+              }}
             >
-              
-              {/* Уровень */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '12px',
-                padding: '16px',
-                textAlign: 'center',
-              }}>
-                <div className="text-xs mb-2" style={{ color: '#9ca3af' }}>Уровень</div>
-                <div className="text-2xl font-extrabold" style={{ color: accentColor }}>
-                  {level}
-                </div>
-              </div>
-
-              {/* Win Rate */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '12px',
-                padding: '16px',
-                textAlign: 'center',
-              }}>
-                <div className="text-xs mb-2" style={{ color: '#9ca3af' }}>Win Rate</div>
-                <div className="text-2xl font-extrabold" style={{ color: '#10b981' }}>
-                  {winRate}%
-                </div>
-              </div>
-
-              {/* Макс Ставка */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '12px',
-                padding: '16px',
-                textAlign: 'center',
-              }}>
-                <div className="text-xs mb-2" style={{ color: '#9ca3af' }}>Мах Ставка</div>
-                <div className="text-2xl font-extrabold" style={{ color: warningColor }}>
-                  {avgBetSize}
-                </div>
-              </div>
-
-            </motion.div>
-
-            {/* Баланс */}
-            {balances.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                style={{
-                  marginTop: '24px',
-                  padding: '16px',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                }}
-              >
-                <div className="text-sm font-semibold mb-3" style={{ color: greenAccent }}>
-                  💰 Доступный баланс
-                </div>
-                <div className="space-y-2">
-                  {balances.map((balance, idx) => (
-                    <div key={idx} className="flex justify-between items-center">
-                      <span style={{ color: '#e5e7eb' }}>{balance.symbol}</span>
-                      <span className="font-bold" style={{ color: '#fff' }}>
-                        {typeof balance.amount === 'string' ? parseFloat(balance.amount).toFixed(8) : balance.amount.toFixed(8)} {balance.symbol}
-                      </span>
+              <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>
+                📊 Статистика по играм
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                {Object.entries(gameStats).map(([gameType, stats]: [string, any], idx) => (
+                  <motion.div
+                    key={gameType}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.8 + idx * 0.05 }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      border: '1px solid rgba(14, 165, 233, 0.1)',
+                    }}
+                  >
+                    <h4 style={{ color: accentColor, fontSize: '14px', fontWeight: 'bold', margin: '0 0 12px 0', textTransform: 'capitalize' }}>
+                      {gameType}
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: '#9ca3af' }}>Игр:</span>
+                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.count}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: '#9ca3af' }}>Всего ставок:</span>
+                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.totalBet.toFixed(2)} USDT</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: '#9ca3af' }}>Профит:</span>
+                        <span style={{ color: stats.totalProfit >= 0 ? greenAccent : redAccent, fontWeight: 'bold' }}>
+                          {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)} USDT
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: '#9ca3af' }}>Средн. ставка:</span>
+                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{stats.avgProfit?.toFixed(2) || '0.00'} USDT</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
-          </CardContent>
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 💰 БАЛАНС */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
 
-          {/* 🔘 КНОПКИ ДЕЙСТВИЙ */}
-
-          <div style={{
-            padding: '20px 24px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-            display: 'flex',
-            gap: '12px',
-            flexDirection: 'column',
-          }}>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleNavigateWithdraw}
+          {balances.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85 }}
               style={{
-                width: '100%',
-                padding: '12px',
-                background: `linear-gradient(135deg, ${accentColor}, #06b6d4)`,
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '14px',
+                background: `linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02))`,
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '16px',
+                padding: '24px',
               }}
             >
-              💸 Вывести средства
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '12px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              🚪 Выход
-            </motion.button>
-          </div>
-
-        </Card>
-
+              <h3 style={{ color: greenAccent, fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>
+                💰 Доступный баланс
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                {balances.map((balance, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
+                      {balance.symbol}
+                    </div>
+                    <div style={{ color: greenAccent, fontSize: '20px', fontWeight: 'bold' }}>
+                      {typeof balance.amount === 'string'
+                        ? parseFloat(balance.amount).toFixed(8)
+                        : balance.amount.toFixed(8)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
     );
   }
 
-  // 📍 LOADING / ERROR СОСТОЯНИЯ
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 📍 LOADING / ERROR
+  // ═══════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4" style={{ backgroundColor: mainBg }}>
+    <div
+      style={{
+        backgroundColor: mainBg,
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '16px',
+      }}
+    >
       {loading && (
         <>
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          >
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
             <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
           </motion.div>
-          <p className="text-muted-foreground mt-4" style={{ color: '#9ca3af' }}>
-            Загрузка профиля...
-          </p>
+          <p style={{ color: '#9ca3af' }}>Загрузка профиля...</p>
         </>
       )}
 
       {error && (
         <>
-          <p className="text-red-600 mb-4 font-semibold">❌ Ошибка: {error}</p>
-          <Button 
+          <p style={{ color: '#ef4444', fontWeight: 'bold' }}>❌ Ошибка: {error}</p>
+          <Button
             onClick={() => {
               hasLoadedRef.current = false;
-              fetchProfile().catch((err: Error) => console.error('Fetch error:', err));
-              fetchBalance().catch((err: Error) => console.error('Balance error:', err));
+              fetchProfile().catch((err: Error) => console.error(err));
+              fetchBalance().catch((err: Error) => console.error(err));
             }}
-            style={{ background: accentColor, color: '#fff' }}
           >
             Повторить
           </Button>
@@ -607,15 +615,10 @@ export function AccountPage() {
 
       {!loading && !error && !profileData && (
         <>
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          >
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
             <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
           </motion.div>
-          <p className="text-muted-foreground mt-4" style={{ color: '#9ca3af' }}>
-            Инициализация...
-          </p>
+          <p style={{ color: '#9ca3af' }}>Инициализация...</p>
         </>
       )}
     </div>
