@@ -204,27 +204,35 @@ export function AccountPage() {
     }
   }, [fetchProfile, fetchBalance]);
 
-  // ✅ ИСПРАВЛЕНИЕ: Обработка ответа профиля
+  // ✅ ИСПРАВЛЕНИЕ: Обработка разных форматов ответа API
   useEffect(() => {
     console.log('📊 useEffect data изменился:', data);
     
     if (data) {
       console.log('📦 data объект:', data);
       
-      // Проверяем структуру ответа
-      if (data.success && data.data) {
-        console.log('✅ Профиль загружен успешно:', data.data);
+      // ✅ Проверяем разные форматы ответа
+      
+      if (data.success && data.data && typeof data.data === 'object') {
+        // Формат 1: {success: true, data: {...}}
+        console.log('✅ Формат 1: Профиль загружен успешно:', data.data);
         setProfileData(data.data as UserProfile);
         setError(null);
         setLoading(false);
-      } else if (data.data) {
-        // Если нет success флага, но есть data
-        console.log('✅ Профиль загружен (без success):', data.data);
+      } else if (data.id && data.username) {
+        // Формат 2: Данные приходят напрямую {id, username, ...}
+        console.log('✅ Формат 2: Профиль загружен напрямую:', data);
+        setProfileData(data as UserProfile);
+        setError(null);
+        setLoading(false);
+      } else if (data.data && typeof data.data === 'object') {
+        // Формат 3: Есть data, но нет success флага
+        console.log('✅ Формат 3: Профиль загружен (без success):', data.data);
         setProfileData(data.data as UserProfile);
         setError(null);
         setLoading(false);
       } else {
-        console.warn('⚠️ Ответ не имеет data:', data);
+        console.warn('⚠️ Неизвестный формат ответа:', data);
       }
     }
   }, [data]);
