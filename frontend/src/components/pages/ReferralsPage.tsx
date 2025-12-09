@@ -16,9 +16,32 @@ interface ReferralStats {
   bonusPercentage: number;
   referrerType?: string;
   commissionRate?: number;
-  totalTurnover?: number;
-  totalCommissionPaid?: number;
-  pendingTurnover?: number;
+  totalTurnover?: number | string;
+  totalCommissionPaid?: number | string;
+  pendingTurnover?: number | string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔧 УТИЛИТА: БЕЗОПАСНОЕ ПРЕОБРАЗОВАНИЕ В ЧИСЛО
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  }
+  if (typeof value === 'object' && value.toString) {
+    try {
+      const str = value.toString();
+      const num = parseFloat(str);
+      return isNaN(num) ? 0 : num;
+    } catch (e) {
+      return 0;
+    }
+  }
+  return 0;
 }
 
 export function ReferralsPage() {
@@ -56,7 +79,14 @@ export function ReferralsPage() {
       setLoading(true);
       const result = await loadStats();
       console.log('📊 Реферальная статистика:', result);
-      setStats(result as ReferralStats);
+      
+      // ✅ ИСПРАВЛЕНИЕ: Проверяем success флаг
+      if (result && result.data) {
+        setStats(result.data as ReferralStats);
+      } else if (result) {
+        setStats(result as ReferralStats);
+      }
+      
       setError('');
     } catch (err) {
       console.error('❌ Ошибка загрузки:', err);
@@ -150,6 +180,15 @@ export function ReferralsPage() {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ✅ БЕЗОПАСНОЕ ПРЕОБРАЗОВАНИЕ ВСЕХ ЗНАЧЕНИЙ
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  const totalTurnover = toNumber(stats?.totalTurnover);
+  const totalCommissionPaid = toNumber(stats?.totalCommissionPaid);
+  const pendingTurnover = toNumber(stats?.pendingTurnover);
+  const potentialCommission = stats ? Math.max(0, toNumber(stats.totalCommissionPaid) - toNumber(stats.totalCommissionPaid)) : 0;
+
   return (
     <div className="pb-24 pt-6 px-4 space-y-6">
       {/* Header */}
@@ -187,7 +226,7 @@ export function ReferralsPage() {
           </div>
 
           <p className="text-sm text-muted-foreground mt-4 font-medium">
-            📤 Поделитесь этим кодом с друзьями и получайте 30% от игровой комиссии их оборота!
+            📤 Поделитесь этим кодом с друзьями и получайте {stats?.commissionRate || 30}% от игровой комиссии их оборота!
           </p>
         </Card>
       </motion.div>
@@ -216,7 +255,7 @@ export function ReferralsPage() {
             </div>
             <span className="text-xs font-semibold text-muted-foreground">Оборот</span>
           </div>
-          <p className="text-3xl font-bold text-cyan-700 dark:text-cyan-300">${(stats?.totalTurnover || 0).toFixed(0)}</p>
+          <p className="text-3xl font-bold text-cyan-700 dark:text-cyan-300">${totalTurnover.toFixed(2)}</p>
         </Card>
 
         <Card className="p-5 bg-gradient-to-br from-lime-500/20 to-green-500/10 border-2 border-lime-400/50 dark:from-lime-950/40 dark:to-green-950/20 dark:border-lime-800/50 shadow-lg shadow-lime-500/10">
@@ -226,7 +265,7 @@ export function ReferralsPage() {
             </div>
             <span className="text-xs font-semibold text-muted-foreground">Выплачено</span>
           </div>
-          <p className="text-3xl font-bold text-lime-700 dark:text-lime-300">${(stats?.totalCommissionPaid || 0).toFixed(2)}</p>
+          <p className="text-3xl font-bold text-lime-700 dark:text-lime-300">${totalCommissionPaid.toFixed(2)}</p>
         </Card>
 
         <Card className="p-5 bg-gradient-to-br from-orange-500/20 to-rose-500/10 border-2 border-orange-400/50 dark:from-orange-950/40 dark:to-rose-950/20 dark:border-orange-800/50 shadow-lg shadow-orange-500/10">
@@ -236,7 +275,7 @@ export function ReferralsPage() {
             </div>
             <span className="text-xs font-semibold text-muted-foreground">Комиссия</span>
           </div>
-          <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">30%</p>
+          <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{stats?.commissionRate || 30}%</p>
         </Card>
       </motion.div>
 
@@ -255,8 +294,12 @@ export function ReferralsPage() {
           </div>
           <div className="space-y-3 pl-2">
             <div className="p-4 bg-white/50 dark:bg-black/30 rounded-lg border-l-4 border-violet-600 dark:border-violet-400">
-              <p className="font-semibold text-violet-900 dark:text-violet-200">Вы получаете 30% от игровой комиссии оборота реферала</p>
-              <p className="text-sm text-muted-foreground mt-2">📈 Пример: реферал потратил 100 USDT → казино получит комиссию → вы получите 30% от этой комиссии</p>
+              <p className="font-semibold text-violet-900 dark:text-violet-200">
+                Вы получаете {stats?.commissionRate || 30}% от игровой комиссии оборота реферала
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                📈 Пример: реферал потратил 100 USDT → казино получит комиссию → вы получите {stats?.commissionRate || 30}% от этой комиссии
+              </p>
             </div>
           </div>
         </Card>
@@ -407,7 +450,7 @@ export function ReferralsPage() {
               </div>
               <div>
                 <p className="font-semibold text-lg">Получайте выплаты</p>
-                <p className="text-sm text-muted-foreground">30% от игровой комиссии его оборота — автоматически!</p>
+                <p className="text-sm text-muted-foreground">{stats?.commissionRate || 30}% от игровой комиссии его оборота — автоматически!</p>
               </div>
             </div>
           </div>
@@ -421,7 +464,7 @@ export function ReferralsPage() {
           <div>
             <p className="font-bold text-base mb-3 text-indigo-700 dark:text-indigo-300">✅ Для реферера (пригласивший):</p>
             <ul className="space-y-2 text-muted-foreground ml-6">
-              <li>• Получай 30% от игровой комиссии оборота своих рефералов</li>
+              <li>• Получай {stats?.commissionRate || 30}% от игровой комиссии оборота своих рефералов</li>
               <li>• Комиссия выплачивается автоматически при достижении минимума (100 USDT оборота)</li>
               <li>• Нет лимита на количество приглашенных людей</li>
               <li>• Реферальная ссылка уникальна и не изменяется</li>
