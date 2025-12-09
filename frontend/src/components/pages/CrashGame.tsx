@@ -46,13 +46,14 @@ export function CrashGame() {
   const [playersCount, setPlayersCount] = useState(0);
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
+  const [activeCrash, setActiveCrash] = useState<CrashHistory | null>(null);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
-  // 🆕 CAMERA FOLLOW ПАРАМЕТРЫ
+  // CAMERA FOLLOW
   const [cameraY, setCameraY] = useState(0);
   const [targetCameraY, setTargetCameraY] = useState(0);
-  const cameraLerpSpeed = 0.12; // 0-1, больше = быстрее
+  const cameraLerpSpeed = 0.12;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
@@ -66,7 +67,6 @@ export function CrashGame() {
     const init = async () => {
       try {
         setIsLoading(true);
-        
         console.log('🔌 Подключаюсь к серверу...');
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         console.log('✅ Подключен');
@@ -74,63 +74,47 @@ export function CrashGame() {
         await fetchBalances();
 
         console.log('📥 Загружаю историю крашей с API...');
-        
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.warn('⚠️ Timeout загрузки истории');
-        }, HISTORY_LOAD_TIMEOUT);
+        const timeoutId = setTimeout(() => controller.abort(), HISTORY_LOAD_TIMEOUT);
 
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
           const response = await fetch(`${API_URL}/api/v1/crash/last-crashes`, {
             method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            signal: controller.signal
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
           if (response.ok) {
             const data = await response.json();
-            
-            if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
-              const formatted = data.data.map((crash: any) => ({
-                id: crash.id || crash.gameId || `crash_${Date.now()}_${Math.random()}`,
-                gameId: crash.gameId,
-                crashPoint: parseFloat((crash.crashPoint || 0).toString()),
-                timestamp: new Date(crash.timestamp),
-              }));
-
-              console.log(`✅ История загружена: ${formatted.length} крашей`);
-              formatted.forEach((c, i) => {
-                console.log(`  ${i + 1}. ${c.crashPoint}x @ ${c.timestamp.toLocaleTimeString()}`);
-              });
+            if (data.success && Array.isArray(data.data)) {
+              const formatted = data.data
+                .filter((crash: any) => crash.crashPoint != null)
+                .map((crash: any) => ({
+                  id: crash.id || crash.gameId || `crash_${Date.now()}_${Math.random()}`,
+                  gameId: crash.gameId,
+                  crashPoint: parseFloat(crash.crashPoint.toString()),
+                  timestamp: new Date(crash.timestamp),
+                }))
+                .slice(0, 10);
 
               setCrashHistory(formatted);
               setIsHistoryLoaded(true);
             } else {
-              console.warn('⚠️ История пуста или некорректна');
               setIsHistoryLoaded(true);
             }
           } else {
-            console.warn(`⚠️ API вернул ${response.status}`);
             setIsHistoryLoaded(true);
           }
         } catch (error: any) {
           clearTimeout(timeoutId);
-          
-          if (error.name === 'AbortError') {
-            console.warn('⚠️ Загрузка истории прервана по timeout');
-          } else {
+          if (error.name !== 'AbortError') {
             console.warn('⚠️ Ошибка загрузки истории:', error);
           }
-          
           setIsHistoryLoaded(true);
         }
-        
       } catch (error) {
         console.error('❌ Ошибка подключения:', error);
         toast.error('❌ Ошибка подключения');
@@ -161,11 +145,11 @@ export function CrashGame() {
     };
 
     const handleGameCrashed = (data: any) => {
-      setGameState((prev) => ({ 
-        ...prev, 
-        status: 'crashed', 
+      setGameState((prev) => ({
+        ...prev,
+        status: 'crashed',
         crashPoint: data.crashPoint,
-        gameId: data.gameId 
+        gameId: data.gameId,
       }));
       setCanCashout(false);
       setBetPlaced(false);
@@ -176,42 +160,35 @@ export function CrashGame() {
         crashPoint: parseFloat(data.crashPoint.toString()),
         timestamp: new Date(),
       };
-      
-      console.log(`📝 Добавляю краш в историю: ${newCrash.crashPoint}x`);
-      setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
+
+      setActiveCrash(newCrash);
+      setTimeout(() => {
+        setCrashHistory((prev) => [newCrash, ...prev].slice(0, 10));
+        setActiveCrash(null);
+      }, 1500);
     };
 
-    const handlePlayerJoined = (data: { playersCount: number }) => {
-      setPlayersCount(data.playersCount);
-    };
-
+    const handlePlayerJoined = (data: { playersCount: number }) => setPlayersCount(data.playersCount);
     const handleBetPlaced = (data: any) => {
       setBetPlaced(true);
       setCurrentBet(data.bet);
       setCanCashout(false);
       toast.success(`✅ Ставка: $${data.bet}`);
     };
-
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
       const profit = data.winnings - currentBet;
       setBetPlaced(false);
       setCanCashout(false);
-      
       setTimeout(() => fetchBalances(), 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
     };
-
     const handleCountdownUpdate = (data: { seconds: number }) => {
       setGameState((prev) => ({ ...prev, countdown: data.seconds, status: 'waiting' }));
-      // 🆕 RESET CAMERA при ожидании нового раунда
       setCameraY(0);
       setTargetCameraY(0);
     };
+    const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
 
-    const handleError = (data: { message: string }) => {
-      toast.error(`❌ ${data.message}`);
-    };
-    
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
     crashGameService.on('gameCrashed', handleGameCrashed);
@@ -233,11 +210,14 @@ export function CrashGame() {
     };
   }, [betPlaced, currentBet, fetchBalances]);
 
-  // 🆕 ОБНОВЛЕНИЕ CAMERA POSITION
+  // CAMERA FOLLOW
   useEffect(() => {
-    // Smooth lerp (линейная интерполяция) между текущей и целевой позицией
-    setCameraY(prev => prev + (targetCameraY - prev) * cameraLerpSpeed);
-  }, [targetCameraY, cameraLerpSpeed]);
+    setCameraY((prev) => prev + (targetCameraY - prev) * cameraLerpSpeed);
+  }, [targetCameraY]);
+
+  // GRAPH DRAWING
+  const currentCrashPoint = activeCrash?.crashPoint ?? gameState.crashPoint;
+  const currentMult = gameState.status === 'crashed' && currentCrashPoint ? currentCrashPoint : gameState.multiplier;
 
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
@@ -248,181 +228,115 @@ export function CrashGame() {
     const w = canvas.width;
     const h = canvas.height;
     const padding = 60;
-
-    // 🆕 BUG FIX: Очищаем весь canvas перед рисованием (избегаем артефактов)
     ctx.clearRect(0, 0, w, h);
 
-    // Фон
     const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
     bgGradient.addColorStop(0, 'rgba(15, 20, 25, 0.95)');
     bgGradient.addColorStop(1, 'rgba(8, 12, 18, 0.98)');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, w, h);
 
-    // 🆕 СЕТКА: добавляем динамические Y координаты с учётом камеры
+    let maxMult = 12;
+    if (currentMult > 12) maxMult = Math.max(12, currentMult + 3);
+
+    const multiplierToY = (mult: number) => h - (mult / maxMult) * h - cameraY;
+
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
     ctx.lineWidth = 1;
     ctx.font = '12px monospace';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.textAlign = 'right';
 
-    for (let i = 0; i <= 8; i++) {
-      const y = padding + (h / 8) * i - cameraY;
-      
-      // 🆕 Только рисуем если видимо на экране
-      if (y > padding / 2 - 50 && y < h - padding + 50) {
+    for (let i = 0; i <= 6; i++) {
+      const mult = 1 + i * 2;
+      const y = multiplierToY(mult);
+      if (y > -50 && y < h + 50) {
         ctx.beginPath();
         ctx.moveTo(padding, y);
         ctx.lineTo(w - padding / 2, y);
         ctx.stroke();
-
-        // 🆕 Метки множителя на левой оси
-        const multiplierValue = 1 + i * 1.5;
-        ctx.fillText(`${multiplierValue.toFixed(1)}x`, padding - 10, y + 4);
+        ctx.fillText(`${mult.toFixed(1)}x`, padding - 10, y + 4);
       }
+    }
 
-      const x = padding + (w / 8) * i;
+    for (let i = 1; i <= 5; i++) {
+      const x = padding + (w - padding * 2) * (i / 5);
       ctx.beginPath();
       ctx.moveTo(x, padding / 2);
-      ctx.lineTo(x, h - padding);
+      ctx.lineTo(x, h - padding / 2);
       ctx.stroke();
-    }
-
-    const currentMult = gameState.status === 'crashed' ? (gameState.crashPoint || 1) : gameState.multiplier;
-    
-    let maxMult = 12;
-    if (currentMult > 12) {
-      maxMult = Math.max(12, currentMult + 3);
-    }
-
-    // 🆕 ФУНКЦИИ ПРЕОБРАЗОВАНИЯ С CAMERA
-    const multiplierToY = (mult: number) => h - (mult / maxMult) * h - cameraY;
-    const progressToX = (progress: number) => w * progress;
-
-    // 🆕 ОБНОВЛЯЕМ TARGET CAMERA POSITION
-    // Точка должна быть примерно на 40% сверху экрана
-    if (gameState.status !== 'waiting' && gameState.status === 'flying') {
-      const currentMult = gameState.multiplier;
-      const rawY = h - (currentMult / maxMult) * h;
-      const targetY = rawY - h * 0.4; // 40% от высоты = середина-выше
-      setTargetCameraY(targetY);
-    } else if (gameState.status === 'crashed') {
-      const crashY = h - (gameState.crashPoint! / maxMult) * h;
-      const targetY = crashY - h * 0.4;
-      setTargetCameraY(targetY);
-    } else {
-      // Waiting - камера в нормальной позиции
-      setTargetCameraY(0);
     }
 
     if (gameState.status !== 'waiting') {
       const progressRatio = Math.sqrt(Math.min(1, (currentMult - 1) / (maxMult - 1)));
-      const headX = progressToX(progressRatio);
+      const headX = padding + (w - padding * 2) * progressRatio;
       const headY = multiplierToY(currentMult);
 
-      // 🆕 BUG FIX: Проверяем что headY не NaN
-      if (isNaN(headY)) {
-        console.warn('⚠️ headY is NaN, skipping draw');
-        animationFrameRef.current = requestAnimationFrame(drawChart);
-        return;
-      }
-
-      const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
-      const fillColor =
-        gameState.status === 'crashed'
-          ? ['rgba(239, 68, 68, 0.2)', 'rgba(239, 68, 68, 0)']
-          : ['rgba(34, 197, 94, 0.3)', 'rgba(34, 197, 94, 0)'];
-
-      fillGradient.addColorStop(0, fillColor[0]);
-      fillGradient.addColorStop(1, fillColor[1]);
-      ctx.fillStyle = fillGradient;
-
-      ctx.beginPath();
-      ctx.moveTo(0, h - cameraY);
-
-      // 🆕 Больше точек для гладкой кривой
-      const steps = Math.min(200, Math.max(50, Math.floor(headX / 2)));
-      for (let x = 0; x <= headX; x += Math.max(1, headX / steps)) {
-        const progress = x / w;
-        const multAtX = 1 + (maxMult - 1) * Math.pow(progress, 2);
-        const yPos = multiplierToY(multAtX);
-        
-        // 🆕 BUG FIX: Проверяем что yPos валидна
-        if (!isNaN(yPos)) {
-          ctx.lineTo(x, yPos);
-        }
-      }
-
-      ctx.lineTo(headX, headY);
-      ctx.lineTo(headX, h - cameraY);
-      ctx.fill();
-
-      ctx.shadowColor = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
-      ctx.lineWidth = 5;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(0, h - cameraY);
-
-      for (let x = 0; x <= headX; x += Math.max(1, headX / steps)) {
-        const progress = x / w;
-        const multAtX = 1 + (maxMult - 1) * Math.pow(progress, 2);
-        const yPos = multiplierToY(multAtX);
-        
-        if (!isNaN(yPos)) {
-          ctx.lineTo(x, yPos);
-        }
-      }
-      ctx.lineTo(headX, headY);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // 🆕 HEAD INDICATOR - более видимая точка
-      if (gameState.status === 'flying') {
-        // Пульсирующий круг
-        const pulseSize = 12 + Math.sin(Date.now() / 200) * 5;
-        
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
-        ctx.lineWidth = 3;
+      if (!isNaN(headY)) {
+        const steps = 100;
         ctx.beginPath();
-        ctx.arc(headX, headY, 18 + Math.sin(Date.now() / 150) * 7, 0, Math.PI * 2);
+        ctx.moveTo(padding, h - cameraY);
+        for (let i = 0; i <= steps; i++) {
+          const x = padding + (headX - padding) * (i / steps);
+          const localProgress = (x - padding) / (w - padding * 2);
+          const localMult = 1 + (maxMult - 1) * Math.pow(localProgress, 2);
+          const y = multiplierToY(localMult);
+          if (!isNaN(y)) ctx.lineTo(x, y);
+        }
+        ctx.lineTo(headX, h - cameraY);
+        ctx.closePath();
+
+        const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
+        fillGradient.addColorStop(
+          0,
+          gameState.status === 'crashed' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.3)'
+        );
+        fillGradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = fillGradient;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(padding, h - cameraY);
+        for (let i = 0; i <= steps; i++) {
+          const x = padding + (headX - padding) * (i / steps);
+          const localProgress = (x - padding) / (w - padding * 2);
+          const localMult = 1 + (maxMult - 1) * Math.pow(localProgress, 2);
+          const y = multiplierToY(localMult);
+          if (!isNaN(y)) ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.stroke();
 
-        ctx.fillStyle = '#22c55e';
-        ctx.beginPath();
-        ctx.arc(headX, headY, pulseSize, 0, Math.PI * 2);
-        ctx.fill();
-      }
+        if (gameState.status === 'flying') {
+          ctx.fillStyle = '#22c55e';
+          ctx.beginPath();
+          ctx.arc(headX, headY, 10 + Math.sin(Date.now() / 200) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
-      // 🆕 CRASHED TEXT - лучше позиционирование
-      if (gameState.status === 'crashed') {
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.font = 'bold 48px "Inter", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 30;
-        ctx.fillText(`КРАХ @ ${gameState.crashPoint?.toFixed(2)}x`, w / 2, h / 2 + 50 - cameraY);
-        ctx.shadowBlur = 0;
+        if (gameState.status === 'crashed') {
+          ctx.font = 'bold 48px "Inter", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 30;
+          ctx.fillText(`КРАХ @ ${currentCrashPoint?.toFixed(2)}x`, w / 2, h / 2 + 50 - cameraY);
+          ctx.shadowBlur = 0;
+        }
       }
     } else {
-      // WAITING STATE
       ctx.beginPath();
-      ctx.arc(w / 2, h / 2 + 100, 80 + Math.sin(Date.now() / 200) * 8, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(234, 179, 8, 0.08)';
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(234, 179, 8, 0.25)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(w / 2, h / 2 + 100, 80 + Math.sin(Date.now() / 200) * 8, 0, Math.PI * 2);
+      ctx.arc(w / 2, h / 2 + 100, 60 + Math.sin(Date.now() / 300) * 6, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(234, 179, 8, 0.4)';
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
     animationFrameRef.current = requestAnimationFrame(drawChart);
-  }, [gameState, cameraY]);
+  }, [gameState, cameraY, currentMult, currentCrashPoint]);
 
   useEffect(() => {
     animationFrameRef.current = requestAnimationFrame(drawChart);
@@ -430,6 +344,26 @@ export function CrashGame() {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [drawChart]);
+
+  // CAMERA TARGET UPDATE
+  useEffect(() => {
+    const w = canvasRef.current?.width || 800;
+    const h = canvasRef.current?.height || 500;
+    let maxMult = 12;
+    if (currentMult > 12) maxMult = Math.max(12, currentMult + 3);
+
+    if (gameState.status === 'flying') {
+      const rawY = h - (currentMult / maxMult) * h;
+      const targetY = rawY - h * 0.4;
+      setTargetCameraY(targetY);
+    } else if (gameState.status === 'crashed' && currentCrashPoint) {
+      const crashY = h - (currentCrashPoint / maxMult) * h;
+      const targetY = crashY - h * 0.4;
+      setTargetCameraY(targetY);
+    } else {
+      setTargetCameraY(0);
+    }
+  }, [gameState.status, currentMult, currentCrashPoint]);
 
   const handlePlaceBet = async () => {
     const amount = parseFloat(inputBet);
@@ -467,7 +401,6 @@ export function CrashGame() {
   const mainBalance = parseFloat(balances.find((b) => b.type === 'MAIN')?.amount?.toString() || '0');
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
-  const displayedHistory = crashHistory.slice(1);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white">
@@ -477,7 +410,6 @@ export function CrashGame() {
       </div>
 
       <div className="relative z-10 w-full">
-        {/* HEADER */}
         <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4 lg:px-6">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2 lg:gap-4">
@@ -510,22 +442,16 @@ export function CrashGame() {
           </div>
         </header>
 
-        {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto p-4 lg:p-6">
           <div className="flex flex-col gap-4 lg:gap-6">
-            {/* ИГРА И КОНТРОЛЫ */}
             <div className="flex flex-col gap-4 lg:gap-6">
-              {/* CANVAS БЛОК ИГРЫ */}
-              {/* 🆕 BUG FIX: Добавлен overflow-hidden для предотвращения выхода за границы */}
-              <GlassCard className="relative rounded-3xl overflow-hidden bg-black/40 w-full" style={{aspectRatio: '16/10'}}>
-                <canvas 
-                  ref={canvasRef} 
-                  width={800} 
-                  height={500} 
+              <GlassCard className="relative rounded-3xl overflow-hidden bg-black/40 w-full" style={{ aspectRatio: '16/10' }}>
+                <canvas
+                  ref={canvasRef}
+                  width={800}
+                  height={500}
                   className="w-full h-full block"
                 />
-
-                {/* 🆕 BUG FIX: z-index и pointer-events правильные */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                   {gameState.status === 'waiting' ? (
                     <div className="flex flex-col items-center gap-3 lg:gap-4">
@@ -543,16 +469,17 @@ export function CrashGame() {
                     </div>
                   ) : (
                     <div className="text-center drop-shadow-2xl">
-                      <div className={`text-6xl lg:text-[140px] font-black font-mono leading-none transition-all ${
-                        gameState.status === 'crashed' ? 'text-red-500 animate-pulse' : 'text-emerald-300'
-                      }`}>
+                      <div
+                        className={`text-6xl lg:text-[140px] font-black font-mono leading-none transition-all ${
+                          gameState.status === 'crashed' ? 'text-red-500 animate-pulse' : 'text-emerald-300'
+                        }`}
+                      >
                         {gameState.multiplier.toFixed(2)}x
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* 🆕 BUG FIX: Улучшена позиция элементов */}
                 <div className="absolute top-3 lg:top-4 left-3 lg:left-4 right-3 lg:right-4 flex justify-between z-20 pointer-events-none gap-2">
                   <GlassCard className="px-2 lg:px-3 py-2 text-xs font-mono pointer-events-auto">
                     ID: #{gameState.gameId?.slice(0, 8) || '---'}
@@ -564,7 +491,6 @@ export function CrashGame() {
                 </div>
               </GlassCard>
 
-              {/* КОНТРОЛЫ */}
               <GlassCard className="p-4 lg:p-6">
                 <div className="space-y-3">
                   <div>
@@ -621,23 +547,22 @@ export function CrashGame() {
               </GlassCard>
             </div>
 
-            {/* ИСТОРИЯ КРАШЕЙ */}
             <GlassCard className="flex flex-col h-auto lg:h-[600px] max-h-[400px] lg:max-h-none">
               <div className="p-3 lg:p-4 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0 rounded-t-2xl">
                 <TrendingUp className="w-4 lg:w-5 h-4 lg:h-5 text-emerald-400 flex-shrink-0" />
                 <span className="text-sm lg:text-base">ИСТОРИЯ КРАШЕЙ</span>
                 <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
-                  {displayedHistory.length > 0 ? `${displayedHistory.length}` : '—'}
+                  {crashHistory.length > 0 ? `${crashHistory.length}` : '—'}
                 </span>
               </div>
-              
+
               <div ref={crashHistoryRef} className="flex-1 overflow-y-auto overflow-x-hidden p-2 lg:p-3 space-y-2">
-                {displayedHistory.length > 0 ? (
-                  displayedHistory.map((crash) => {
+                {crashHistory.length > 0 ? (
+                  crashHistory.map((crash) => {
                     let bgColor = 'bg-black/40 border-white/10';
                     let textColor = 'text-gray-300';
                     let emoji = '📊';
-                    
+
                     if (crash.crashPoint < 1.5) {
                       bgColor = 'bg-red-950/30 border-red-500/30';
                       textColor = 'text-red-400';
@@ -661,7 +586,10 @@ export function CrashGame() {
                     }
 
                     return (
-                      <div key={crash.id} className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0 animate-in fade-in slide-in-from-top duration-300`}>
+                      <div
+                        key={crash.id}
+                        className={`p-3 lg:p-4 rounded-lg border ${bgColor} flex-shrink-0 animate-in fade-in slide-in-from-top duration-300`}
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-lg flex-shrink-0">{emoji}</span>
@@ -688,20 +616,14 @@ export function CrashGame() {
             </GlassCard>
           </div>
         </div>
-      </div>
 
-      <style>{`
-        div::-webkit-scrollbar { width: 6px; }
-        div::-webkit-scrollbar-track { background: transparent; }
-        div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 6px; }
-        div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
-        
-        /* 🆕 BUG FIX: Убраны артефакты анимации */
-        * {
-          image-rendering: auto;
-          image-rendering: crisp-edges;
-        }
-      `}</style>
+        <style>{`
+          div::-webkit-scrollbar { width: 6px; }
+          div::-webkit-scrollbar-track { background: transparent; }
+          div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 6px; }
+          div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
+        `}</style>
+      </div>
     </div>
   );
 }
