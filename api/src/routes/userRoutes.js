@@ -1,12 +1,12 @@
 /**
- * ✅ ИСПРАВЛЕННЫЙ userRoutes.js (v5) - БЕЗ ОШИБОК
+ * ✅ ИСПРАВЛЕННЫЙ userRoutes.js (v6) - С UNION ЗАПРОСОМ
  * 
  * ИСПРАВЛЕНИЯ:
- * 1. ✅ Правильный синтаксис console.log
- * 2. ✅ Используем правильное имя поля: referredById (не referrerId)
- * 3. ✅ Оптимизация через Prisma агрегацию
- * 4. ✅ Raw SQL для статистики по типам игр
- * 5. ✅ Полное логирование
+ * 1. ✅ UNION запрос для сбора ВСЕХ игр (Crash + Minesweeper + обычные)
+ * 2. ✅ Правильный расчет totalGames из всех таблиц
+ * 3. ✅ Поиск макс выигрыша по ВСЕМ типам игр
+ * 4. ✅ Статистика по типам игр из UNION
+ * 5. ✅ Все логирование
  */
 
 const express = require('express');
@@ -55,7 +55,7 @@ function getVipName(rank) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 📊 ГЛАВНЫЙ МАРШРУТ: GET /profile (ПРАВИЛЬНЫЙ)
+// 📊 ГЛАВНЫЙ МАРШРУТ: GET /profile (С UNION - СОБИРАЕТ ВСЕ ИГРЫ)
 // ════════════════════════════════════════════════════════════════════════════════
 
 router.get('/profile', authenticateToken, async (req, res) => {
@@ -79,7 +79,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         lastName: true,
         photoUrl: true,
         createdAt: true,
-        referredById: true, // ✅ ИСПРАВЛЕНО: правильное имя поля
+        referredById: true,
       },
     });
 
@@ -94,122 +94,144 @@ router.get('/profile', authenticateToken, async (req, res) => {
     console.log(`[PROFILE] ✅ Пользователь найден: ${user.username}`);
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 2: Получить СТАТИСТИКУ через агрегацию БД
+    // ЭТАП 2: ПОЛУЧИТЬ ВСЕ ИГРЫ ЧЕРЕЗ UNION ЗАПРОС
     // ════════════════════════════════════════════════════════════════════════════
 
-    console.log('[PROFILE] 📋 Этап 2: Загружаю статистику из БД...');
+    console.log('[PROFILE] 📋 Этап 2: Загружаю ВСЕ ИГРЫ из всех таблиц (Crash + Minesweeper + обычные)...');
 
-    const betStats = await prisma.bet.aggregate({
-      where: { userId },
-      _count: true,
-      _sum: {
-        betAmount: true,
-        payoutAmount: true,
-        netAmount: true,
-      },
-    });
-
-    const totalGames = betStats._count || 0;
-    const totalWagered = toNumber(betStats._sum?.betAmount) || 0;
-    const totalPayouts = toNumber(betStats._sum?.payoutAmount) || 0;
-    const totalScore = toNumber(betStats._sum?.netAmount) || 0;
-
-    console.log('[PROFILE] ✅ Базовая статистика загружена:');
-    console.log(`  - Всего игр: ${totalGames}`);
-    console.log(`  - Всего ставок: ${totalWagered.toFixed(2)}`);
-    console.log(`  - Общий счёт: ${totalScore.toFixed(2)}`);
-
-    // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 3: Считаем выигрыши
-    // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 3: Считаю выигрыши...');
-    
-    const winningBets = await prisma.bet.count({
-      where: {
-        userId,
-        netAmount: { gt: 0 }
-      }
-    });
-
-    console.log(`[PROFILE] ✅ Выигрышей: ${winningBets}`);
-
-    // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 4: Найти самый большой выигрыш
-    // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 4: Ищу самый большой выигрыш...');
-
-    const largestWinBet = await prisma.bet.findFirst({
-      where: {
-        userId,
-        netAmount: { gt: 0 }
-      },
-      orderBy: { netAmount: 'desc' },
-      select: {
-        netAmount: true,
-        gameType: true,
-        createdAt: true,
-      }
-    });
-
-    console.log('[PROFILE] ✅ Самый большой выигрыш найден');
-
-    // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 5: Получить статистику по типам игр через SQL
-    // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 5: Загружаю статистику по типам игр...');
-
-    let gameTypeStatsRaw = [];
+    let allGames = [];
     try {
-      gameTypeStatsRaw = await prisma.$queryRaw`
+      // ✅ UNION: собираем игры из ВСЕХ таблиц
+      allGames = await prisma.$queryRaw`
+        -- CRASH ИГРЫ
         SELECT 
-          "gameType",
-          COUNT(*) as count,
-          SUM("betAmount") as totalBet,
-          SUM("netAmount") as totalProfit
+          'CRASH' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          (COALESCE("exitMultiplier", 0) - 1) * "betAmount" as "netAmount",
+          "createdAt",
+          COALESCE("exitMultiplier", 0) * "betAmount" as "payout"
+        FROM "CrashBet"
+        WHERE "userId" = ${userId}
+        
+        UNION ALL
+        
+        -- MINESWEEPER ИГРЫ
+        SELECT 
+          'MINESWEEPER' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          COALESCE("winAmount", 0) - "betAmount" as "netAmount",
+          "createdAt",
+          COALESCE("winAmount", 0) as "payout"
+        FROM "MinesweeperBet"
+        WHERE "userId" = ${userId}
+        
+        UNION ALL
+        
+        -- ОБЫЧНЫЕ СТАВКИ (Slot, Roulette, Blackjack)
+        SELECT 
+          LOWER("gameType"::text) as "gameType",
+          "userId",
+          "betAmount",
+          "netAmount",
+          "createdAt",
+          "payoutAmount" as "payout"
         FROM "Bet"
         WHERE "userId" = ${userId}
-        GROUP BY "gameType"
+        
+        ORDER BY "createdAt" DESC
       `;
-      console.log('[PROFILE] ✅ Статистика по типам игр загружена');
+
+      console.log(`[PROFILE] ✅ Всего игр найдено: ${allGames.length}`);
     } catch (err) {
-      console.warn('[PROFILE] ⚠️ Ошибка загрузки статистики по типам:', err.message);
-      gameTypeStatsRaw = [];
+      console.warn('[PROFILE] ⚠️ Ошибка UNION запроса:', err.message);
+      console.error(err);
+      allGames = [];
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 6: Форматировать статистику по играм
+    // ЭТАП 3: ПОДСЧЁТ СТАТИСТИКИ
     // ════════════════════════════════════════════════════════════════════════════
 
-    console.log('[PROFILE] 📋 Этап 6: Форматирую статистику по играм...');
+    console.log('[PROFILE] 📋 Этап 3: Подсчитываю статистику...');
 
-    const gameStats = {};
-    if (Array.isArray(gameTypeStatsRaw)) {
-      for (const stat of gameTypeStatsRaw) {
-        const gameType = (stat.gameType || 'unknown').toLowerCase();
-        const count = toNumber(stat.count) || 0;
-        const totalBet = toNumber(stat.totalBet) || 0;
-        const totalProfit = toNumber(stat.totalProfit) || 0;
-        const avgProfit = count > 0 ? totalProfit / count : 0;
+    const totalGames = allGames.length;
+    let totalWagered = 0;
+    let totalScore = 0;
+    let winningBets = 0;
+    let largestWin = null;
+    let largestWinAmount = 0;
 
-        gameStats[gameType] = {
-          count,
-          totalBet: Math.round(totalBet * 100) / 100,
-          totalProfit: Math.round(totalProfit * 100) / 100,
-          avgProfit: Math.round(avgProfit * 100) / 100,
-        };
+    for (const game of allGames) {
+      const betAmount = toNumber(game.betAmount);
+      const netAmount = toNumber(game.netAmount);
+
+      totalWagered += betAmount;
+      totalScore += netAmount;
+
+      if (netAmount > 0) {
+        winningBets++;
+        if (netAmount > largestWinAmount) {
+          largestWinAmount = netAmount;
+          largestWin = {
+            amount: netAmount,
+            gameType: game.gameType || 'unknown',
+            date: game.createdAt?.toISOString() || new Date().toISOString(),
+          };
+        }
       }
     }
 
-    console.log(`[PROFILE] ✅ Статистика по ${Object.keys(gameStats).length} типам игр подготовлена`);
+    console.log('[PROFILE] ✅ Статистика подсчитана:');
+    console.log(`  - Всего игр: ${totalGames}`);
+    console.log(`  - Всего ставок: ${totalWagered.toFixed(2)} USDT`);
+    console.log(`  - Выигрышей: ${winningBets}`);
+    console.log(`  - Общий счёт: ${totalScore.toFixed(2)} USDT`);
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 7: Расчёты метрик
+    // ЭТАП 4: СТАТИСТИКА ПО ТИПАМ ИГР
     // ════════════════════════════════════════════════════════════════════════════
 
-    console.log('[PROFILE] 📋 Этап 7: Рассчитываю метрики...');
+    console.log('[PROFILE] 📋 Этап 4: Подсчитываю статистику по типам игр...');
+
+    const gameStats = {};
+    for (const game of allGames) {
+      const gameType = (game.gameType || 'unknown').toLowerCase();
+      const betAmount = toNumber(game.betAmount);
+      const netAmount = toNumber(game.netAmount);
+
+      if (!gameStats[gameType]) {
+        gameStats[gameType] = {
+          count: 0,
+          totalBet: 0,
+          totalProfit: 0,
+          avgProfit: 0,
+        };
+      }
+
+      gameStats[gameType].count += 1;
+      gameStats[gameType].totalBet += betAmount;
+      gameStats[gameType].totalProfit += netAmount;
+    }
+
+    // Подсчитаем средний профит по типам
+    for (const gameType in gameStats) {
+      const count = gameStats[gameType].count;
+      gameStats[gameType].totalBet = Math.round(gameStats[gameType].totalBet * 100) / 100;
+      gameStats[gameType].totalProfit = Math.round(gameStats[gameType].totalProfit * 100) / 100;
+      gameStats[gameType].avgProfit = count > 0 
+        ? Math.round((gameStats[gameType].totalProfit / count) * 100) / 100 
+        : 0;
+    }
+
+    console.log(`[PROFILE] ✅ Статистика по ${Object.keys(gameStats).length} типам игр`);
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // ЭТАП 5: РАСЧЁТЫ МЕТРИК
+    // ════════════════════════════════════════════════════════════════════════════
+
+    console.log('[PROFILE] 📋 Этап 5: Рассчитываю метрики...');
 
     const level = Math.max(1, Math.floor(totalGames / 10) + 1);
     const vipRank = calculateVipRank(totalGames);
@@ -230,28 +252,10 @@ router.get('/profile', authenticateToken, async (req, res) => {
     console.log(`  - VIP: ${vipLevel}`);
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 8: Лучший результат
+    // ЭТАП 6: ФОРМИРОВАНИЕ ОТВЕТА
     // ════════════════════════════════════════════════════════════════════════════
 
-    console.log('[PROFILE] 📋 Этап 8: Подготавливаю лучший результат...');
-
-    const largestWinData = largestWinBet
-      ? {
-          amount: Math.round(toNumber(largestWinBet.netAmount) * 100) / 100,
-          gameType: largestWinBet.gameType || 'unknown',
-          date: largestWinBet.createdAt.toISOString(),
-        }
-      : null;
-
-    if (largestWinData) {
-      console.log(`[PROFILE] ✅ Самый большой выигрыш: ${largestWinData.amount} USDT`);
-    }
-
-    // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 9: Формирование ответа
-    // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 9: Формирую ответ...');
+    console.log('[PROFILE] 📋 Этап 6: Формирую ответ...');
 
     const userData = {
       id: user.id.toString(),
@@ -262,10 +266,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
       level,
       vipLevel,
       vipRank,
-      totalGames,
+      totalGames, // ✅ ПРАВИЛЬНОЕ ЗНАЧЕНИЕ (из UNION)
       totalScore: Math.round(totalScore * 100) / 100,
       totalWagered: Math.round(totalWagered * 100) / 100,
-      totalPayouts: Math.round(totalPayouts * 100) / 100,
       winningBets,
       winRate,
       roi: Math.round(roi * 100) / 100,
@@ -274,8 +277,12 @@ router.get('/profile', authenticateToken, async (req, res) => {
       gamesPerDay,
       avgBetSize: Math.round(avgBetSize * 100) / 100,
       netProfit: Math.round(totalScore * 100) / 100,
-      largestWin: largestWinData,
-      gameStats,
+      largestWin: largestWin ? {
+        amount: Math.round(largestWin.amount * 100) / 100,
+        gameType: largestWin.gameType,
+        date: largestWin.date,
+      } : null,
+      gameStats, // ✅ ПРАВИЛЬНАЯ СТАТИСТИКА (из UNION)
       referrerId: user.referredById,
     };
 
@@ -286,7 +293,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       level,
       vipRank,
       totalGames,
-      largestWin: largestWinData?.amount,
+      largestWin: largestWin?.amount,
     });
 
     return res.json({
@@ -314,7 +321,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 📊 МАРШРУТ: GET /stats
+// 📊 МАРШРУТ: GET /stats (АНАЛОГИЧНО С UNION)
 // ════════════════════════════════════════════════════════════════════════════════
 
 router.get('/stats', authenticateToken, async (req, res) => {
@@ -332,36 +339,64 @@ router.get('/stats', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const betStats = await prisma.bet.aggregate({
-      where: { userId },
-      _count: true,
-      _sum: {
-        betAmount: true,
-        netAmount: true,
-      },
-    });
+    // ✅ UNION запрос для ВСЕ игр
+    let allGames = [];
+    try {
+      allGames = await prisma.$queryRaw`
+        SELECT 
+          'CRASH' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          (COALESCE("exitMultiplier", 0) - 1) * "betAmount" as "netAmount",
+          "createdAt"
+        FROM "CrashBet"
+        WHERE "userId" = ${userId}
+        
+        UNION ALL
+        
+        SELECT 
+          'MINESWEEPER' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          COALESCE("winAmount", 0) - "betAmount" as "netAmount",
+          "createdAt"
+        FROM "MinesweeperBet"
+        WHERE "userId" = ${userId}
+        
+        UNION ALL
+        
+        SELECT 
+          LOWER("gameType"::text) as "gameType",
+          "userId",
+          "betAmount",
+          "netAmount",
+          "createdAt"
+        FROM "Bet"
+        WHERE "userId" = ${userId}
+      `;
+    } catch (err) {
+      console.warn('[STATS] ⚠️ Ошибка UNION:', err.message);
+      allGames = [];
+    }
 
-    const totalGames = betStats._count || 0;
-    const totalScore = toNumber(betStats._sum?.netAmount) || 0;
-    const totalWagered = toNumber(betStats._sum?.betAmount) || 0;
+    const totalGames = allGames.length;
+    let totalScore = 0;
+    let totalWagered = 0;
+    let winCount = 0;
 
-    const winCount = await prisma.bet.count({
-      where: { userId, netAmount: { gt: 0 } }
-    });
+    for (const game of allGames) {
+      const betAmount = toNumber(game.betAmount);
+      const netAmount = toNumber(game.netAmount);
+
+      totalWagered += betAmount;
+      totalScore += netAmount;
+
+      if (netAmount > 0) {
+        winCount++;
+      }
+    }
 
     const lossCount = totalGames - winCount;
-
-    const largestWin = await prisma.bet.findFirst({
-      where: { userId, netAmount: { gt: 0 } },
-      orderBy: { netAmount: 'desc' },
-      select: { netAmount: true, gameType: true },
-    });
-
-    const largestLoss = await prisma.bet.findFirst({
-      where: { userId, netAmount: { lt: 0 } },
-      orderBy: { netAmount: 'asc' },
-      select: { netAmount: true, gameType: true },
-    });
 
     const stats = {
       userId,
@@ -377,18 +412,6 @@ router.get('/stats', authenticateToken, async (req, res) => {
       level: Math.max(1, Math.floor(totalGames / 10) + 1),
       vipRank: calculateVipRank(totalGames),
       vipLevel: getVipName(calculateVipRank(totalGames)),
-      largestWin: largestWin
-        ? {
-            amount: Math.round(toNumber(largestWin.netAmount) * 100) / 100,
-            gameType: largestWin.gameType || 'unknown',
-          }
-        : null,
-      largestLoss: largestLoss
-        ? {
-            amount: Math.round(toNumber(largestLoss.netAmount) * 100) / 100,
-            gameType: largestLoss.gameType || 'unknown',
-          }
-        : null,
     };
 
     res.json({ success: true, data: stats });

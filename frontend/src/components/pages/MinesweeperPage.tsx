@@ -33,6 +33,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [gameStatus, setGameStatus] = useState<'PLAYING' | 'WON' | 'LOST' | 'CASHED_OUT'>('PLAYING');
   const [winAmount, setWinAmount] = useState<string | null>(null);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
+  const [nextMultiplier, setNextMultiplier] = useState<number>(1.0); // 🆕
+  const [maxMultiplier, setMaxMultiplier] = useState<number>(0); // 🆕
   const [potentialWin, setPotentialWin] = useState<string>('0');
   const [balance, setBalance] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -45,12 +47,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { execute: cashOut } = useFetch('MINESWEEPER_POST_minesweeper_cashout', 'POST');
   const { execute: getBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
-  // 🔹 ФУНКЦИЯ: расчёт максимального множителя
-  const calculateMaxMultiplier = useCallback((minesCount: number): number => {
-    const totalCells = 6 * 6; // 36 клеток
-    return minesCount > 0 ? parseFloat((totalCells / minesCount).toFixed(2)) : 0;
-  }, []);
-
   useEffect(() => {
     if (step === 'REVEAL_BOARD') {
       const timer = setTimeout(() => {
@@ -60,6 +56,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [step]);
 
+  // Загрузить баланс
   useEffect(() => {
     const loadBalance = async () => {
       try {
@@ -78,6 +75,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     loadBalance();
   }, []);
 
+  // Загрузить сложности
   useEffect(() => {
     const load = async () => {
       try {
@@ -126,6 +124,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setGrid(gameData.grid);
       setOpenedCells(new Map());
       setCurrentMultiplier(parseFloat(gameData.currentMultiplier) || 1.0);
+      setNextMultiplier(parseFloat(gameData.nextMultiplier) || 1.0); // 🆕
+      setMaxMultiplier(parseFloat(gameData.maxMultiplier) || 0); // 🆕
       setPotentialWin(gameData.potentialWin?.toString() || '0');
       setStep('PLAYING');
       toast.success('Игра начата!');
@@ -163,6 +163,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setOpenedCells(prev => new Map(prev).set(cellKey, !result.isMine));
 
       setCurrentMultiplier(parseFloat(result.currentMultiplier) || 1.0);
+      setNextMultiplier(parseFloat(result.nextMultiplier) || 1.0); // 🆕
+      setMaxMultiplier(parseFloat(result.maxMultiplier) || 0); // 🆕
       setPotentialWin(result.potentialWin?.toString() || '0');
 
       if (result.status === 'WON') {
@@ -210,7 +212,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [gameId, cashOut]);
 
-  // 🔹 ОБНОВЛЕНО: вместо ✅ → 💰
   const getCellContent = (cell?: GridCell) => {
     if (!cell || !cell.revealed) return '';
     if (cell.isMine) return '💣';
@@ -224,6 +225,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     setGameStatus('PLAYING');
     setWinAmount(null);
     setCurrentMultiplier(1.0);
+    setNextMultiplier(1.0);
+    setMaxMultiplier(0);
     setPotentialWin('0');
     setOpenedCells(new Map());
   }, []);
@@ -371,22 +374,29 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           animation: pulse-scale 0.6s ease-out;
         }
         .stats-container {
-          display: flex;
-          justify-content: space-around;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
           gap: 12px;
           margin-bottom: 16px;
           animation: slideInDown 0.6s ease-out 0.1s both;
         }
         .stat-box {
-          flex: 1;
-          text-align: center;
           padding: 12px;
           background: rgba(0, 0, 0, 0.3);
           border-radius: 8px;
           border: 1px solid rgba(59, 130, 246, 0.3);
+          text-align: center;
+        }
+        .stat-label {
+          font-size: 12px;
+          color: #9ca3af;
+          margin-bottom: 4px;
+        }
+        .stat-value {
+          font-size: 20px;
+          font-weight: bold;
         }
 
-        /* 🔹 СТИЛЬ ДЛЯ ПОЛЯ СТАВКИ — ЗЕЛЁНАЯ РАМКА */
         .bet-input {
           border: 2px solid #10b981 !important;
           background: rgba(16, 185, 129, 0.1) !important;
@@ -461,9 +471,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                           <p className="text-sm text-gray-400">
                             💣 {diff.minesCount} мин • 🎯 6×6 поле
                           </p>
-                          {/* 🔹 ОТОБРАЖЕНИЕ МАКС. МНОЖИТЕЛЯ */}
+                          {/* 🆕 ИСПРАВЛЕНО: Правильный расчет макс множителя */}
                           <p className="text-xs text-green-400 mt-1">
-                            Макс. ×{calculateMaxMultiplier(diff.minesCount).toFixed(2)}
+                            Макс. ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(2)}
                           </p>
                         </div>
                         <Trophy
@@ -478,7 +488,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
               <div className="mb-6">
                 <label className="block text-sm text-gray-300 mb-2">Ставка (USDT)</label>
-                {/* 🔹 ПРИМЕНЕНИЕ КЛАССА ДЛЯ ЗЕЛЁНОЙ РАМКИ */}
                 <Input
                   type="number"
                   min="1"
@@ -511,22 +520,31 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
             <Card className="card-animated p-5 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
               <div className="stats-container">
                 <div className="stat-box">
-                  <p className="text-xs text-gray-400">Множитель</p>
-                  <p className="text-2xl font-bold text-green-400">x{currentMultiplier.toFixed(2)}</p>
+                  <div className="stat-label">Текущий</div>
+                  <div className="stat-value text-green-400">×{currentMultiplier.toFixed(2)}</div>
                 </div>
                 <div className="stat-box">
-                  <p className="text-xs text-gray-400">Потенциальный</p>
-                  <p className="text-2xl font-bold text-yellow-400">{potentialWin} USDT</p>
+                  <div className="stat-label">Следующий</div>
+                  <div className="stat-value text-blue-400">×{nextMultiplier.toFixed(2)}</div>
                 </div>
-                <Button
-                  onClick={handleCashOut}
-                  disabled={cellLoading}
-                  className="stat-box bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg flex items-center justify-center gap-1 border-0"
-                >
-                  <Zap size={16} />
-                  Забрать
-                </Button>
+                <div className="stat-box">
+                  <div className="stat-label">Максимум</div>
+                  <div className="stat-value text-purple-400">×{maxMultiplier.toFixed(2)}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Потенциальный</div>
+                  <div className="stat-value text-yellow-400">{potentialWin} USDT</div>
+                </div>
               </div>
+
+              <Button
+                onClick={handleCashOut}
+                disabled={cellLoading}
+                className="w-full mb-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg flex items-center justify-center gap-2 border-0 font-bold py-2"
+              >
+                <Zap size={18} />
+                Забрать выигрыш
+              </Button>
 
               <div className="minesweeper-grid">
                 {grid.map((row, y) =>
@@ -563,18 +581,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
             <Card className="card-animated p-5 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
               <div className="stats-container">
                 <div className="stat-box">
-                  <p className="text-xs text-gray-400">Множитель</p>
-                  <p className="text-2xl font-bold text-green-400">x{currentMultiplier.toFixed(2)}</p>
+                  <div className="stat-label">Итоговый</div>
+                  <div className="stat-value text-green-400">×{currentMultiplier.toFixed(2)}</div>
                 </div>
                 <div className="stat-box">
-                  <p className="text-xs text-gray-400">Потенциальный</p>
-                  <p className="text-2xl font-bold text-yellow-400">{potentialWin} USDT</p>
+                  <div className="stat-label">Выигрыш</div>
+                  <div className={`stat-value ${gameStatus === 'WON' || gameStatus === 'CASHED_OUT' ? 'text-green-400' : 'text-red-400'}`}>
+                    {winAmount ? winAmount + ' USDT' : '0'}
+                  </div>
                 </div>
                 <div className="stat-box">
-                  <p className="text-xs text-gray-400">Статус</p>
-                  <p className={`text-2xl font-bold ${gameStatus === 'WON' || gameStatus === 'CASHED_OUT' ? 'text-green-400' : 'text-red-400'}`}>
+                  <div className="stat-label">Статус</div>
+                  <div className={`stat-value ${gameStatus === 'WON' || gameStatus === 'CASHED_OUT' ? 'text-green-400' : 'text-red-400'}`}>
                     {gameStatus === 'WON' ? '🎉' : gameStatus === 'CASHED_OUT' ? '💸' : '💣'}
-                  </p>
+                  </div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Максимум</div>
+                  <div className="stat-value text-purple-400">×{maxMultiplier.toFixed(2)}</div>
                 </div>
               </div>
 
