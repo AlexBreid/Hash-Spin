@@ -3,15 +3,10 @@ import { Card } from '../ui/card'
 import { Input } from '../ui/input'
 import {
   Users,
-  Crown,
   Copy,
   CheckCircle,
   Loader,
-  TrendingUp,
-  Award,
-  Zap,
-  Sparkles,
-  Flame,
+  Share2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useFetch } from '../../hooks/useDynamicApi'
@@ -44,6 +39,7 @@ export function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showBonusModal, setShowBonusModal] = useState(false)
   const hasLoadedRef = useRef(false)
 
   const { execute: loadStats } = useFetch(
@@ -70,7 +66,7 @@ export function ReferralsPage() {
       if (result?.data) setStats(result.data)
       else if (result) setStats(result)
       setError('')
-    } catch (err) {
+    } catch {
       setError('Ошибка загрузки статистики')
     } finally {
       setLoading(false)
@@ -79,7 +75,6 @@ export function ReferralsPage() {
 
   const handleLinkReferrer = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!inputCode.trim()) {
       toast.error('Введите код')
       return
@@ -89,6 +84,7 @@ export function ReferralsPage() {
       setLinking(true)
       await linkReferrer({ referralCode: inputCode.trim() })
       toast.success('✅ Код успешно активирован')
+      setShowBonusModal(true)
       setInputCode('')
       await loadStatsData()
     } catch (err: any) {
@@ -101,15 +97,15 @@ export function ReferralsPage() {
   const copyCode = () => {
     if (stats?.myReferralCode) {
       navigator.clipboard.writeText(stats.myReferralCode)
-      toast.success('✅ Код скопирован')
+      toast.success('✅ Скопировано')
     }
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="pb-24 pt-6 px-4">
-        <Card className="p-5">
-          <p>Войдите в аккаунт</p>
+      <div className="min-h-screen bg-[#050f1e] flex items-center justify-center">
+        <Card className="p-6 bg-white/5 text-white">
+          Войдите в аккаунт
         </Card>
       </div>
     )
@@ -117,124 +113,59 @@ export function ReferralsPage() {
 
   if (loading) {
     return (
-      <div className="pb-24 pt-6 px-4 flex justify-center items-center min-h-[400px]">
-        <Loader className="w-8 h-8 animate-spin text-indigo-500" />
+      <div className="min-h-screen bg-[#050f1e] flex justify-center items-center">
+        <Loader className="w-8 h-8 animate-spin text-emerald-400" />
       </div>
     )
   }
 
-  const totalTurnover = toNumber(stats?.totalTurnover)
+  const referralsCount =
+    stats?.myReferralsCount || stats?.myRefeersCount || 0
+
   const totalCommissionPaid = toNumber(stats?.totalCommissionPaid)
-  const commissionRate = stats?.commissionRate || 30
-  const referralsCount = stats?.myReferralsCount || stats?.myRefeersCount || 0
 
   return (
-    <div className="pb-24 pt-6 px-4 space-y-4">
+    <div className="min-h-screen bg-[#050f1e] pb-24 pt-6 px-4 text-white space-y-4">
 
-      {/* HERO */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-center gap-2 mb-2">
-          <Crown className="w-7 h-7 text-amber-500" />
-          <h1 className="text-3xl font-black bg-gradient-to-r from-amber-400 via-pink-500 to-indigo-600 bg-clip-text text-transparent">
-            Реферальная Империя
-          </h1>
-        </div>
-
-        <Card className="relative p-6 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 border-0 overflow-hidden">
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-          <div className="relative z-10">
-            <p className="text-white/70 text-sm mb-2 font-bold">
-              ТВОЙ ЛИЧНЫЙ КОД
-            </p>
-
-            <div className="bg-white/20 rounded-xl p-5 mb-4 text-center">
-              <p className="font-mono text-4xl font-black text-white tracking-widest">
-                {stats?.myReferralCode || '...'}
-              </p>
-            </div>
-
-            <Button
-              onClick={copyCode}
-              className="w-full bg-white text-indigo-700 font-bold rounded-xl py-3 flex items-center justify-center gap-2"
-            >
-              <Copy className="w-5 h-5" />
-              СКОПИРОВАТЬ
-            </Button>
-
-            <p className="text-white/70 text-xs mt-3 text-center font-medium">
-              Делись кодом и получай {commissionRate}% с оборота друзей
-            </p>
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* СТАТИСТИКА */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          title="Рефералов"
-          value={referralsCount}
-          icon={<Users className="w-6 h-6" />}
-        />
-        <StatCard
-          title="Процент"
-          value={`${commissionRate}%`}
-          icon={<Flame className="w-6 h-6" />}
-        />
-        <StatCard
-          title="Оборот"
-          value={`$${totalTurnover.toFixed(0)}`}
-          icon={<TrendingUp className="w-6 h-6" />}
-        />
-        <StatCard
-          title="Заработано"
-          value={`$${totalCommissionPaid.toFixed(0)}`}
-          icon={<Award className="w-6 h-6" />}
-        />
+      {/* Заголовок */}
+      <div>
+        <h1 className="text-2xl font-bold">Реферальная программа</h1>
+        <p className="text-sm text-slate-400">
+          Приглашайте друзей и играйте вместе!
+        </p>
       </div>
 
-      {/* ПРОДАЮЩИЙ БЛОК */}
-      <Card className="p-6 bg-gradient-to-br from-black/80 to-zinc-900/80 text-white border-0">
-        <h3 className="font-black text-xl mb-3">
-          🚀 Одна из самых сильных рефералок на рынке
-        </h3>
-        <p className="text-sm text-zinc-300 leading-relaxed">
-          Ты не просто приглашаешь друзей.  
-          Ты создаёшь личный источник дохода.
+      {/* Карточки статистики */}
+      <div className="flex gap-3">
+        <MiniCard title="Приглашено" value={referralsCount} />
+        <MiniCard title="Бонусы" value={totalCommissionPaid} color="text-emerald-400" />
+      </div>
 
-          Каждый твой реферал — это актив.  
-          Каждый его депозит — твоё усиление.  
-          Каждый его оборот — твои деньги.
+      {/* Большой блок бонусов */}
+      <Card className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-700/10 border border-emerald-500/20 backdrop-blur-xl">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm text-slate-400 mb-1">Доступно бонусов</p>
+            <p className="text-3xl font-bold text-emerald-400">
+              {totalCommissionPaid}
+            </p>
+          </div>
 
-          Это не «акция».  
-          Это система.
-        </p>
-
-        <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
-          <div className="bg-white/10 p-3 rounded-xl">
-            <Sparkles className="w-4 h-4 mb-1" />
-            Доход работает 24/7
-          </div>
-          <div className="bg-white/10 p-3 rounded-xl">
-            <Zap className="w-4 h-4 mb-1" />
-            Начисления мгновенные
-          </div>
-          <div className="bg-white/10 p-3 rounded-xl">
-            <Award className="w-4 h-4 mb-1" />
-            Без потолка по доходу
-          </div>
-          <div className="bg-white/10 p-3 rounded-xl">
-            <Flame className="w-4 h-4 mb-1" />
-            Максимальный процент
-          </div>
+          <button className="px-5 py-2 rounded-xl bg-emerald-500 text-black font-bold">
+            Использовать
+          </button>
         </div>
       </Card>
 
-      {/* БЛОК ВВОДА КОДА */}
-      {!stats?.referredByCode ? (
-        <Card className="p-6 bg-gradient-to-br from-rose-500/10 to-red-500/5 border-2 border-rose-500/30">
-          <h3 className="font-black text-lg mb-3 text-rose-500">
-            Тебя пригласили?
-          </h3>
+      {/* Ввод кода + описание бонуса наверху */}
+      {!stats?.referredByCode && (
+        <Card className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+          <p className="text-sm font-bold mb-2">
+            🎁 Введи реферальный код и получи бонус
+          </p>
+          <p className="text-xs text-slate-400 mb-4">
+            Получи +100% к первому пополнению после активации кода
+          </p>
 
           <form onSubmit={handleLinkReferrer} className="space-y-3">
             <Input
@@ -242,13 +173,13 @@ export function ReferralsPage() {
               value={inputCode}
               onChange={(e) => setInputCode(e.target.value.toUpperCase())}
               disabled={linking}
-              className="rounded-xl"
+              className="rounded-xl bg-white/5 border border-white/10"
             />
 
             <Button
               type="submit"
               disabled={linking || !inputCode}
-              className="w-full rounded-xl bg-gradient-to-r from-rose-600 to-red-600 font-bold"
+              className="w-full rounded-xl bg-emerald-500 text-black font-bold"
             >
               {linking ? (
                 <>
@@ -256,58 +187,95 @@ export function ReferralsPage() {
                   Активация...
                 </>
               ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-2" />
-                  Активировать код
-                </>
+                'Активировать код'
               )}
             </Button>
           </form>
         </Card>
-      ) : (
-        <Card className="p-6 bg-emerald-500/10 border-emerald-500/30 border-2">
+      )}
+
+      {/* Если уже привязан */}
+      {stats?.referredByCode && (
+        <Card className="p-5 rounded-2xl bg-emerald-500/10 border-emerald-500/30 border">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-6 h-6 text-emerald-500" />
+            <CheckCircle className="w-6 h-6 text-emerald-400" />
             <div>
               <p className="font-bold text-emerald-400">
-                Ты уже привязан к пригласившему!
+                Бонус активирован
               </p>
               <p className="text-xs text-emerald-300">
-                Пользователь: {stats?.referrerUsername}
+                Пригласил: {stats?.referrerUsername}
               </p>
             </div>
           </div>
         </Card>
       )}
 
+      {/* Реферальная ссылка */}
+      <Card className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+        <p className="text-sm font-bold mb-3 flex items-center gap-2">
+          <Share2 className="w-4 h-4" />
+          Ваша реферальная ссылка
+        </p>
+
+        <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-3">
+          <span className="text-xs truncate text-slate-300 flex-1">
+            https://game-portal.com/ref/{stats?.myReferralCode}
+          </span>
+          <Copy className="w-4 h-4 text-slate-400 cursor-pointer" onClick={copyCode}/>
+        </div>
+
+        <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+          <span className="text-sm font-mono flex-1 text-white">
+            {stats?.myReferralCode}
+          </span>
+          <Copy className="w-4 h-4 text-slate-400 cursor-pointer" onClick={copyCode}/>
+        </div>
+      </Card>
+
+      {/* МОДАЛКА С БОНУСОМ */}
+      {showBonusModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#050f1e] p-6 rounded-2xl border border-white/10 max-w-sm w-full"
+          >
+            <h3 className="text-xl font-bold mb-2 text-emerald-400">
+              🎉 Бонус активирован
+            </h3>
+            <p className="text-sm text-slate-300 mb-4 leading-relaxed">
+              Вам доступен бонус <b>+100% к первому депозиту</b>.
+              Пополните баланс и получите удвоенную сумму!
+            </p>
+
+            <button
+              onClick={() => setShowBonusModal(false)}
+              className="w-full py-2 rounded-xl bg-emerald-500 text-black font-bold"
+            >
+              Понятно
+            </button>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   )
 }
 
-function StatCard({
+function MiniCard({
   title,
   value,
-  icon,
+  color = 'text-blue-400'
 }: {
   title: string
   value: string | number
-  icon: React.ReactNode
+  color?: string
 }) {
   return (
-    <Card className="p-5 bg-white/5 border-white/10">
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-xs text-zinc-400 font-bold uppercase mb-1">
-            {title}
-          </p>
-          <p className="text-2xl font-black text-white">
-            {value}
-          </p>
-        </div>
-        <div className="p-3 bg-white/10 rounded-xl text-white">
-          {icon}
-        </div>
-      </div>
-    </Card>
+    <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+      <p className="text-xs text-slate-400 mb-1">{title}</p>
+      <p className={`text-3xl font-bold ${color}`}>{value}</p>
+    </div>
   )
 }
