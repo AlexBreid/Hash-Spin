@@ -25,6 +25,7 @@ import { useFetch } from '../../hooks/useDynamicApi'
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 
 interface ReferralStats {
   myReferralCode: string
@@ -46,6 +47,7 @@ function toNumber(value: any): number {
 
 export function ReferralsPage() {
   const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const [inputCode, setInputCode] = useState('')
   const [linking, setLinking] = useState(false)
   const [stats, setStats] = useState<ReferralStats | null>(null)
@@ -136,8 +138,6 @@ export function ReferralsPage() {
       description: 'Первое пополнение',
       details: [
         'Получи 100% бонус к первому депозиту при вводе реферального кода',
-        'Минимальное пополнение: $10',
-        'Максимальный бонус: $500',
         'Бонус активируется автоматически после пополнения',
         'Действует только один раз на аккаунт'
       ]
@@ -151,19 +151,7 @@ export function ReferralsPage() {
         'Выплаты начисляются автоматически каждый день',
         'Нет ограничений по количеству рефералов',
         'Комиссия начисляется пожизненно',
-        'Минимум для вывода: $1'
-      ]
-    },
-    {
-      id: 3,
-      title: '📈 Уровни партнёров',
-      description: 'Увеличивай проценты',
-      details: [
-        '1-10 рефералов: 30% комиссия',
-        '11-50 рефералов: 35% комиссия',
-        '51-100 рефералов: 40% комиссия',
-        '100+ рефералов: 50% комиссия',
-        'Повышение уровня автоматическое'
+        'Минимум для вывода: $100'
       ]
     },
     {
@@ -173,9 +161,7 @@ export function ReferralsPage() {
       details: [
         'Выводи заработанные средства в любое время',
         'Выплаты обрабатываются за 24 часа',
-        'Поддержка нескольких способов вывода',
         'Все операции защищены и зашифрованы',
-        'Комиссия платформы: 0% на вывод'
       ]
     }
   ]
@@ -197,7 +183,6 @@ export function ReferralsPage() {
             <br />
             <span className="text-white text-xl md:text-2xl not-italic font-bold tracking-normal">Программа</span>
           </h1>
-          <p className="text-zinc-400 text-sm mt-2">Зарабатывай на рефералах – пожизненно</p>
         </motion.div>
       </div>
 
@@ -238,7 +223,7 @@ export function ReferralsPage() {
                       ВВЕДИ ПРОМОКОД
                     </h2>
                     <p className="text-zinc-300 text-sm md:text-base">
-                      Получи <span className="font-bold text-yellow-400">+100% бонус</span> к первому пополнению и присоединись к нашей программе
+                      Получи <span className="font-bold text-yellow-400">бонус</span>
                     </p>
                   </div>
 
@@ -271,10 +256,6 @@ export function ReferralsPage() {
                         </>
                       )}
                     </Button>
-
-                    <p className="text-center text-zinc-500 text-xs">
-                      ✓ Безопасно • ✓ Анонимно • ✓ Мгновенно
-                    </p>
                   </form>
                 </div>
               </Card>
@@ -380,10 +361,6 @@ export function ReferralsPage() {
                 <Copy className="w-5 h-5" />
                 КОПИРОВАТЬ И ПРИГЛАСИТЬ
               </Button>
-              
-              <p className="text-indigo-300/70 text-xs md:text-sm mt-4 max-w-[85%] mx-auto leading-relaxed">
-                Друзья получат +100% бонус, а ты будешь зарабатывать <span className="text-indigo-300 font-bold">{commissionRate}%</span> с их профитов навсегда
-              </p>
             </div>
           </Card>
         </motion.div>
@@ -484,19 +461,71 @@ export function ReferralsPage() {
                 <p className="text-zinc-300 pt-1">Скопируй свой реферальный код и поделись с друзьями</p>
               </div>
               <div className="flex gap-4">
-                <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 text-white font-bold flex-shrink-0 text-sm">2</div>
-                <p className="text-zinc-300 pt-1">Друзья вводят твой код и получают бонус +100%</p>
-              </div>
-              <div className="flex gap-4">
                 <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 text-white font-bold flex-shrink-0 text-sm">3</div>
                 <p className="text-zinc-300 pt-1">Ты получаешь {commissionRate}% от их профитов автоматически</p>
               </div>
-              <div className="flex gap-4">
-                <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 text-white font-bold flex-shrink-0 text-sm">4</div>
-                <p className="text-zinc-300 pt-1">Выводи свой доход в любой момент без комиссии</p>
-              </div>
             </div>
           </Card>
+        </motion.div>
+      </div>
+
+      {/* 6. ИНФОРМАЦИЯ О РЕФЕРАЛАХ И УСЛОВИЯХ */}
+      <div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="space-y-4">
+            {/* Referral Program Info */}
+            <div>
+              <div className="flex items-center gap-2 px-1 mb-4">
+                <Users className="w-6 h-6 text-purple-400" />
+                <h2 className="text-lg md:text-xl font-bold text-white">О программе рефералов</h2>
+              </div>
+
+              <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-purple-400" />
+                      Привлекай рефералов
+                    </h4>
+                    <p className="text-zinc-300 text-sm">Делись своим кодом и зарабатывай на каждом приглашенном друге. Нет ограничений по количеству рефералов.</p>
+                  </div>
+
+                  <div className="h-px bg-purple-500/20" />
+
+                  <div>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-pink-400" />
+                      30% от оборота
+                    </h4>
+                    <p className="text-zinc-300 text-sm">Получай 30% комиссии от прибыли каждого реферала.</p>
+                  </div>
+
+                  <div className="h-px bg-purple-500/20" />
+
+                  <div>
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-yellow-400" />
+                      Выплаты каждый день
+                    </h4>
+                    <p className="text-zinc-300 text-sm">Комиссия начисляется автоматически каждый день.</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Conditions Button */}
+            <Button 
+              onClick={() => navigate('/support?section=referral')}
+              className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30 transition-all"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              ПОДРОБНЫЕ УСЛОВИЯ РЕФЕРАЛОВ
+            </Button>
+          </div>
         </motion.div>
       </div>
 
@@ -627,7 +656,10 @@ export function ReferralsPage() {
                     </Button>
                     
                     <Button 
-                      onClick={() => setShowBonusModal(false)}
+                      onClick={() => {
+                        setShowBonusModal(false)
+                        navigate('/support?section=bonus')
+                      }}
                       variant="outline"
                       className="w-full py-5 text-sm bg-transparent border-zinc-600 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-2xl transition-all"
                     >
