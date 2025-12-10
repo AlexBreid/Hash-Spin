@@ -62,11 +62,18 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
     const invoiceIdNum = parseInt(invoiceId);
     const amountNum = parseFloat(amount);
     
+    // ✅ ВАЛИДАЦИЯ
     if (isNaN(userIdNum) || isNaN(invoiceIdNum) || isNaN(amountNum)) {
       logger.warn('BOT', 'Invalid parameters for scheduleDepositCheck', { userId, invoiceId, amount });
       return;
     }
     
+    if (amountNum <= 0) {
+      logger.warn('BOT', 'Invalid amount', { amount: amountNum });
+      return;
+    }
+    
+    // ✅ СОХРАНЯЕМ pendingDeposit в БД для отслеживания
     await prisma.pendingDeposit.upsert({
       where: { invoiceId: invoiceIdNum.toString() },
       create: {
@@ -74,32 +81,68 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
         invoiceId: invoiceIdNum.toString(),
         amount: amountNum.toFixed(8).toString(),
         asset: String(asset),
-        status: 'pending'
+        status: 'pending',
+        createdAt: new Date()
       },
-      update: { updatedAt: new Date() }
+      update: { 
+        updatedAt: new Date(),
+        status: 'pending'
+      }
     });
 
     logger.info('BOT', `Scheduled deposit check`, { 
       userId: userIdNum, 
       invoiceId: invoiceIdNum,
-      amount: amountNum.toFixed(8)
+      amount: amountNum.toFixed(8),
+      asset
     });
 
     let checkCount = 0;
-    const maxChecks = 6;
-    const checkInterval = 30 * 1000;
+    const maxChecks = 12; // ✅ УВЕЛИЧЕНО: было 6, теперь 12 (6 минут вместо 3)
+    const checkInterval = 30 * 1000; // 30 секунд
 
     const checkDeposit = async () => {
       checkCount++;
-      logger.debug('BOT', `Deposit check #${checkCount}/${maxChecks}`, { invoiceId: invoiceIdNum });
+      logger.debug('BOT', `Deposit check #${checkCount}/${maxChecks}`, { 
+        invoiceId: invoiceIdNum,
+        asset
+      });
 
       try {
+        // ✅ ИСПРАВЛЕНИЕ: Правильный запрос к API с timeout
         const response = await axios.get(`${CRYPTO_PAY_API}/getInvoices`, {
           headers: { 'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN },
-          params: { invoiceIds: invoiceIdNum }
+          params: { invoiceIds: invoiceIdNum.toString() }, // ✅ Строка, не число
+          timeout: 5000 // 5 секунд timeout
         });
 
-        if (!response.data?.ok || !response.data.result?.items?.length) {
+        // ✅ Проверяем структуру ответа
+        if (!response.data) {
+          logger.warn('BOT', `No response from Crypto Pay API`, { invoiceId: invoiceIdNum });
+          if (checkCount < maxChecks) {
+            setTimeout(checkDeposit, checkInterval);
+          }
+          return;
+        }
+
+        if (!response.data.ok) {
+          logger.warn('BOT', `Crypto Pay API returned error`, { 
+            invoiceId: invoiceIdNum,
+            response: response.data,
+            checkCount
+          });
+          if (checkCount < maxChecks) {
+            setTimeout(checkDeposit, checkInterval);
+          }
+          return;
+        }
+
+        // ✅ Проверяем items
+        if (!response.data.result?.items || response.data.result.items.length === 0) {
+          logger.debug('BOT', `Invoice not found in API response`, { 
+            invoiceId: invoiceIdNum,
+            checkCount
+          });
           if (checkCount < maxChecks) {
             setTimeout(checkDeposit, checkInterval);
           }
@@ -108,20 +151,40 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 
         const invoice = response.data.result.items[0];
         
-        logger.info('BOT', `Invoice status: ${invoice.status}`, { 
+        logger.info('BOT', `Got invoice from API`, { 
           invoiceId: invoiceIdNum,
-          status: invoice.status
+          apiId: invoice.invoice_id,
+          status: invoice.status,
+          amount: invoice.amount,
+          asset: invoice.asset,
+          checkCount
         });
 
-        if (invoice.status !== 'paid') {
+        // ✅ ИСПРАВЛЕНИЕ: Проверяем разные варианты статуса (case-insensitive)
+        const statusLower = String(invoice.status).toLowerCase();
+        const isPaid = ['paid', 'completed'].includes(statusLower);
+
+        if (!isPaid) {
+          logger.debug('BOT', `Invoice not yet paid`, { 
+            invoiceId: invoiceIdNum, 
+            status: invoice.status,
+            checkCount
+          });
+          
           if (checkCount < maxChecks) {
             setTimeout(checkDeposit, checkInterval);
           }
           return;
         }
 
-        logger.info('BOT', `Invoice PAID! Processing...`, { invoiceId: invoiceIdNum });
+        logger.info('BOT', `🎉 INVOICE PAID! Starting transaction creation...`, { 
+          invoiceId: invoiceIdNum,
+          userId: userIdNum,
+          amount: amountNum.toFixed(8),
+          asset
+        });
 
+        // ✅ ПРОВЕРКА ДУБЛИКАТА перед созданием
         const existingTx = await prisma.transaction.findFirst({
           where: { 
             txHash: invoiceIdNum.toString(), 
@@ -131,83 +194,255 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
         });
 
         if (existingTx) {
-          logger.warn('BOT', `Duplicate invoice detected`, { invoiceId: invoiceIdNum });
+          logger.warn('BOT', `Duplicate deposit detected - already processed`, { 
+            invoiceId: invoiceIdNum,
+            existingTxId: existingTx.id,
+            userId: userIdNum
+          });
+          
+          // Отмечаем как обработано
+          await prisma.pendingDeposit.update({
+            where: { invoiceId: invoiceIdNum.toString() },
+            data: { status: 'processed' }
+          });
           return;
         }
 
-        const token = await prisma.cryptoToken.findUnique({ where: { symbol: asset } });
+        // ✅ ПОЛУЧАЕМ ТОКЕН из БД
+        const token = await prisma.cryptoToken.findUnique({ 
+          where: { symbol: asset } 
+        });
+        
         if (!token) {
-          logger.warn('BOT', `Token not found`, { asset });
+          logger.error('BOT', `Token not found in database`, { asset });
+          
+          // Пытаемся создать токен если его нет
+          try {
+            const newToken = await prisma.cryptoToken.create({
+              data: {
+                symbol: asset,
+                name: asset,
+                decimals: 8
+              }
+            });
+            logger.info('BOT', `Created new token`, { tokenId: newToken.id, symbol: asset });
+          } catch (e) {
+            logger.error('BOT', `Failed to create token`, { asset, error: e.message });
+            return;
+          }
+          
+          // Повторяем попытку получения токена
+          const retryToken = await prisma.cryptoToken.findUnique({ 
+            where: { symbol: asset } 
+          });
+          
+          if (!retryToken) {
+            logger.error('BOT', `Still no token after creation attempt`, { asset });
+            return;
+          }
+          
+          await handleDepositWithToken(retryToken, userIdNum, invoiceIdNum, amountNum, asset, bot);
           return;
         }
 
-        await prisma.$transaction(async (tx) => {
-          await tx.transaction.create({
-            data: {
-              userId: userIdNum,
-              tokenId: token.id,
-              type: 'DEPOSIT',
-              status: 'COMPLETED',
-              amount: amountNum.toFixed(8).toString(),
-              txHash: invoiceIdNum.toString()
-            }
-          });
-
-          await tx.balance.upsert({
-            where: {
-              userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: 'MAIN' }
-            },
-            create: { 
-              userId: userIdNum, 
-              tokenId: token.id, 
-              type: 'MAIN', 
-              amount: amountNum.toFixed(8).toString() 
-            },
-            update: { amount: { increment: amountNum } }
-          });
-
-          if (asset === 'USDT') {
-            try {
-              await referralService.grantDepositBonus(userIdNum, amountNum, token.id);
-            } catch (e) {
-              logger.warn('BOT', `Failed to grant bonus`, { error: e.message });
-            }
-          }
+        logger.info('BOT', `Found token in database`, { 
+          tokenId: token.id, 
+          symbol: token.symbol,
+          decimals: token.decimals
         });
 
-        await prisma.pendingDeposit.update({
-          where: { invoiceId: invoiceIdNum.toString() },
-          data: { status: 'processed' }
-        });
-
-        try {
-          const user = await prisma.user.findUnique({ 
-            where: { id: userIdNum }, 
-            select: { telegramId: true } 
-          });
-          if (user?.telegramId) {
-            await bot.telegram.sendMessage(
-              user.telegramId,
-              `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}\n\nДеньги зачислены на ваш счёт. 🎉`,
-              { parse_mode: 'Markdown' }
-            );
-          }
-        } catch (e) {
-          logger.warn('BOT', `Failed to send deposit notification`, { error: e.message });
-        }
+        // ✅ СОЗДАЁМ ТРАНЗАКЦИЮ В БД (АТОМАРНО)
+        await handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot);
 
       } catch (error) {
-        logger.error('BOT', `Error checking invoice`, { invoiceId: invoiceIdNum, error: error.message });
+        logger.error('BOT', `Error checking invoice`, { 
+          invoiceId: invoiceIdNum, 
+          checkCount,
+          error: error.message,
+          errorCode: error.code
+        });
+        
         if (checkCount < maxChecks) {
+          logger.debug('BOT', `Scheduling next check`, { 
+            nextCheck: checkCount + 1,
+            totalWaitTime: (checkCount + 1) * 30
+          });
           setTimeout(checkDeposit, checkInterval);
+        } else {
+          logger.error('BOT', `❌ Max checks (${maxChecks}) reached for invoice`, { 
+            invoiceId: invoiceIdNum,
+            userId: userIdNum,
+            amount: amountNum.toFixed(8)
+          });
+          
+          // Отмечаем как failed
+          await prisma.pendingDeposit.update({
+            where: { invoiceId: invoiceIdNum.toString() },
+            data: { status: 'failed' }
+          }).catch(e => logger.warn('BOT', `Failed to mark deposit as failed`, { error: e.message }));
         }
       }
     };
 
+    // ✅ Первый чек через 5 секунд
     setTimeout(checkDeposit, 5000);
     
   } catch (error) {
-    logger.error('BOT', `Error scheduling deposit check`, { error: error.message });
+    logger.error('BOT', `Error scheduling deposit check`, { 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+}
+
+/**
+ * ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для создания транзакции
+ * Добавь эту функцию рядом с scheduleDepositCheck
+ */
+async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot) {
+  try {
+    logger.info('BOT', `Processing deposit with token`, { 
+      tokenId: token.id,
+      userId: userIdNum,
+      amount: amountNum.toFixed(8)
+    });
+
+    // ✅ ИСПОЛЬЗОВАНИЕ TRANSACTION для АТОМАРНОСТИ
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Создаём транзакцию депозита
+      const newTx = await tx.transaction.create({
+        data: {
+          userId: userIdNum,
+          tokenId: token.id,
+          type: 'DEPOSIT',
+          status: 'COMPLETED',
+          amount: amountNum.toFixed(8).toString(),
+          txHash: invoiceIdNum.toString(),
+          createdAt: new Date()
+        }
+      });
+
+      logger.info('BOT', `✅ Created transaction in DB`, { 
+        txId: newTx.id,
+        userId: userIdNum,
+        amount: amountNum.toFixed(8)
+      });
+
+      // 2. Обновляем или создаём баланс
+      const updatedBalance = await tx.balance.upsert({
+        where: {
+          userId_tokenId_type: { 
+            userId: userIdNum, 
+            tokenId: token.id, 
+            type: 'MAIN' 
+          }
+        },
+        create: { 
+          userId: userIdNum, 
+          tokenId: token.id, 
+          type: 'MAIN', 
+          amount: amountNum.toFixed(8).toString() 
+        },
+        update: { 
+          amount: { increment: amountNum } 
+        }
+      });
+
+      logger.info('BOT', `✅ Updated balance`, { 
+        userId: userIdNum,
+        newBalance: updatedBalance.amount,
+        token: token.symbol
+      });
+
+      // 3. Выдаём реферальный бонус если есть реферер
+      if (asset === 'USDT') {
+        try {
+          const bonusResult = await referralService.grantDepositBonus(
+            userIdNum, 
+            amountNum, 
+            token.id
+          );
+          
+          if (bonusResult) {
+            logger.info('BOT', `✅ Referral bonus granted`, { 
+              userId: userIdNum,
+              bonusAmount: bonusResult.bonusAmount,
+              requiredWager: bonusResult.requiredWager
+            });
+          } else {
+            logger.debug('BOT', `No referral bonus (no referrer)`, { userId: userIdNum });
+          }
+        } catch (e) {
+          logger.warn('BOT', `Failed to grant bonus`, { 
+            error: e.message,
+            userId: userIdNum
+          });
+        }
+      }
+
+      return newTx;
+    }, {
+      timeout: 30000 // 30 секунд для выполнения транзакции
+    });
+
+    logger.info('BOT', `✅ DEPOSIT FULLY COMPLETED AND SAVED TO DB`, { 
+      txId: result.id,
+      invoiceId: invoiceIdNum,
+      userId: userIdNum,
+      amount: amountNum.toFixed(8),
+      token: token.symbol
+    });
+
+    // ✅ ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЮ
+    try {
+      const user = await prisma.user.findUnique({ 
+        where: { id: userIdNum }, 
+        select: { telegramId: true, username: true } 
+      });
+      
+      if (user?.telegramId) {
+        await bot.telegram.sendMessage(
+          user.telegramId,
+          `✅ *Пополнение успешно!*\n\n` +
+          `💰 +${amountNum.toFixed(8)} ${asset}\n` +
+          `🎉 Деньги зачислены на ваш счёт!\n\n` +
+          `ID транзакции: \`${result.id}\``,
+          { parse_mode: 'Markdown' }
+        );
+        
+        logger.info('BOT', `✅ Sent notification to user`, { 
+          userId: userIdNum,
+          telegramId: user.telegramId
+        });
+      }
+    } catch (e) {
+      logger.warn('BOT', `Failed to send deposit notification`, { 
+        error: e.message,
+        userId: userIdNum
+      });
+    }
+
+    // ✅ ОТМЕЧАЕМ PENDING DEPOSIT КАК ОБРАБОТАННЫЙ
+    await prisma.pendingDeposit.update({
+      where: { invoiceId: invoiceIdNum.toString() },
+      data: { status: 'processed' }
+    }).catch(e => logger.warn('BOT', `Failed to update pendingDeposit`, { error: e.message }));
+
+  } catch (error) {
+    logger.error('BOT', `Error handling deposit`, { 
+      error: error.message,
+      stack: error.stack,
+      invoiceId: invoiceIdNum,
+      userId: userIdNum
+    });
+    
+    // ОТМЕЧАЕМ КАК FAILED чтобы не повторять
+    await prisma.pendingDeposit.update({
+      where: { invoiceId: invoiceIdNum.toString() },
+      data: { status: 'failed' }
+    }).catch(e => logger.warn('BOT', `Failed to mark as failed`, { error: e.message }));
+    
+    throw error;
   }
 }
 

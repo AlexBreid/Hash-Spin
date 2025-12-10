@@ -676,6 +676,7 @@ class ReferralService {
   
   /**
    * 🔄 Массовая выплата комиссий (для CRON)
+   * ✅ ИСПРАВЛЕНИЕ: Гарантирует что totalPaid всегда число
    */
   async processAllPendingCommissions(tokenId = 2) {
     try {
@@ -690,7 +691,7 @@ class ReferralService {
       
       logger.info('REFERRAL', `Found pending payouts`, { count: pendingStats.length });
       
-      let totalPaid = 0;
+      let totalPaidNum = 0; // ✅ ИСПРАВЛЕНИЕ: используем число вместо строки
       let successCount = 0;
       let workerCount = 0;
       let regularCount = 0;
@@ -704,7 +705,12 @@ class ReferralService {
           );
           
           if (result) {
-            totalPaid += parseFloat(result.commission.toString());
+            // ✅ ИСПРАВЛЕНИЕ: Парсим комиссию и добавляем как число
+            const commissionNum = typeof result.commission === 'string' 
+              ? parseFloat(result.commission) 
+              : parseFloat(result.commission);
+            
+            totalPaidNum += commissionNum;
             successCount++;
             
             if (result.type === 'WORKER') {
@@ -722,23 +728,20 @@ class ReferralService {
         }
       }
       
-      logger.info('REFERRAL', `All commissions processed`, {
+      // ✅ ИСПРАВЛЕНИЕ: Возвращаем totalPaid как число (не строку)
+      const result = {
         processed: pendingStats.length,
         success: successCount,
-        totalPaid: totalPaid.toFixed(8),
-        workers: workerCount,
-        regular: regularCount
-      });
-      
-      return {
-        processed: pendingStats.length,
-        success: successCount,
-        totalPaid: totalPaid.toFixed(8),
+        totalPaid: parseFloat(totalPaidNum.toFixed(8)), // число!
         breakdown: {
           workers: workerCount,
           regular: regularCount
         }
       };
+      
+      logger.info('REFERRAL', `All commissions processed`, result);
+      
+      return result;
       
     } catch (error) {
       logger.error('REFERRAL', 'Failed to process all commissions', { error: error.message });
