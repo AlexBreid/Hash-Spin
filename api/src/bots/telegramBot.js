@@ -10,6 +10,8 @@
  * 6. ✅ Визуальная обратная связь о статусе
  * 7. ✅ Кнопка "Проверить статус платежа"
  * 8. ✅ Правильное логирование ВЕЗДЕ
+ * 9. ✅ "Настройки" → "Профиль"
+ * 10. ✅ Система тикетов поддержки вместо "Помощь"
  */
 
 const { Telegraf } = require('telegraf');
@@ -35,6 +37,8 @@ const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_1
 const waitingForDeposit = new Map();
 const waitingForWithdrawAmount = new Map();
 const waitingForWithdrawAddress = new Map();
+const waitingForTicketMessage = new Map(); // user.id -> ticketType
+const supportTickets = new Map(); // user.id -> { ticketId, type, status, message, createdAt }
 
 // ✅ ИСПРАВЛЕНИЕ: Таймауты для очистки Map'ов
 function setStateTimeout(map, userId, timeoutMs = 10 * 60 * 1000) {
@@ -44,6 +48,11 @@ function setStateTimeout(map, userId, timeoutMs = 10 * 60 * 1000) {
       logger.debug('BOT', `Cleaned up state for user ${userId}`);
     }
   }, timeoutMs);
+}
+
+// ✅ Генерация ticketId
+function generateTicketId() {
+  return 'TK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 }
 
 // ====================================
@@ -275,7 +284,7 @@ if (!BOT_TOKEN) {
         [{ text: '🎰 Казино' }],
         [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
         [{ text: '📥 Мои выводы' }],
-        [{ text: '👥 Рефералы' }, { text: '⚙️ Настройки' }],
+        [{ text: '👥 Рефералы' }, { text: '👤 Профиль' }],
         [{ text: '❓ Помощь' }]
       ],
       resize_keyboard: true,
@@ -485,6 +494,52 @@ if (!BOT_TOKEN) {
   });
 
   // ====================================
+  // REPLY_TICKET COMMAND ДЛЯ АДМИНА
+  // ====================================
+  bot.command('reply_ticket', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.reply('❌ Только администраторы могут использовать эту команду.');
+      return;
+    }
+
+    const args = ctx.message.text.split(' ');
+    const ticketId = args[1];
+
+    if (!ticketId) {
+      await ctx.reply('❌ Укажите ID тикета.\n\nПример: /reply_ticket TK-ABC123DEF456');
+      return;
+    }
+
+    // Найти пользователя с этим тикетом
+    let ticketUser = null;
+    for (const [userId, ticket] of supportTickets.entries()) {
+      if (ticket.ticketId === ticketId) {
+        ticketUser = userId;
+        break;
+      }
+    }
+
+    if (!ticketUser) {
+      await ctx.reply(`❌ Тикет ${ticketId} не найден.`);
+      return;
+    }
+
+    const ticket = supportTickets.get(ticketUser);
+    ticket.status = 'REPLIED';
+
+    await ctx.reply(
+      `✅ Ответьте на следующее сообщение для пользователя ${ticketUser}:\n\n` +
+      `📝 Его сообщение:\n\`\`\`\n${ticket.message}\n\`\`\`\n\n` +
+      `Напишите ответ:`,
+      { parse_mode: 'Markdown' }
+    );
+  });
+
+  // ====================================
   // MAIN MESSAGE HANDLER
   // ====================================
   bot.on('message', async (ctx) => {
@@ -505,6 +560,69 @@ if (!BOT_TOKEN) {
       if (user.isBlocked) {
         logger.warn('BOT', `Blocked user sent message`, { userId: user.id });
         await ctx.reply('🚫 Ваш аккаунт заблокирован.');
+        return;
+      }
+
+      // ✅ ОБРАБОТКА СООБЩЕНИЙ ДЛЯ ТИКЕТОВ
+      if (waitingForTicketMessage.has(user.id)) {
+        const ticketType = waitingForTicketMessage.get(user.id);
+        const ticketId = generateTicketId();
+        const messageText = text;
+
+        const typeLabels = {
+          'GENERAL': '📋 Общая поддержка',
+          'BUG': '⚠️ Ошибка',
+          'CONTACT': '💬 От пользователя'
+        };
+
+        const typeLabel = typeLabels[ticketType] || ticketType;
+
+        supportTickets.set(user.id, {
+          ticketId,
+          type: ticketType,
+          status: 'OPEN',
+          message: messageText,
+          createdAt: new Date()
+        });
+
+        waitingForTicketMessage.delete(user.id);
+
+        logger.info('BOT', `Support ticket created`, { 
+          ticketId, 
+          userId: user.id, 
+          type: ticketType 
+        });
+
+        await ctx.reply(
+          `✅ *Заявка создана!*\n\n` +
+          `🎫 Номер: \`${ticketId}\`\n` +
+          `📝 Тип: ${typeLabel}\n` +
+          `⏳ Статус: На рассмотрении\n\n` +
+          `Администратор рассмотрит вашу заявку в ближайшее время и напишет вам в чат.`,
+          { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
+        );
+
+        // Отправляем администраторам
+        const admins = await prisma.user.findMany({ where: { isAdmin: true } });
+        for (const admin of admins) {
+          if (admin.telegramId) {
+            try {
+              await bot.telegram.sendMessage(
+                admin.telegramId,
+                `🎫 НОВАЯ ЗАЯВКА ПОДДЕРЖКИ\n\n` +
+                `🎫 Номер: \`${ticketId}\`\n` +
+                `👤 От пользователя: ${user.id} (${user.username ? '@' + user.username : 'ID'})\n` +
+                `📝 Тип: ${typeLabel}\n` +
+                `⏰ Время: ${new Date().toLocaleString()}\n\n` +
+                `📄 Сообщение:\n\`\`\`\n${messageText}\n\`\`\`\n\n` +
+                `Команда для ответа: /reply_ticket ${ticketId}`,
+                { parse_mode: 'Markdown' }
+              );
+            } catch (e) {
+              logger.warn('BOT', `Failed to notify admin about ticket`, { error: e.message });
+            }
+          }
+        }
         return;
       }
 
@@ -841,18 +959,41 @@ if (!BOT_TOKEN) {
           break;
         }
 
-        case '⚙️ Настройки': {
+        case '👤 Профиль': {
           const userBal = await getUserBalance(user.id);
           const badges = [];
           if (user.isAdmin) badges.push('👑 АДМИН');
           if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
           
           await ctx.reply(
-            `⚙️ *Настройки*\n\n` +
-            `👤 ${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
-            `💰 Основной: ${userBal.toFixed(8)} USDT` +
+            `👤 *Профиль*\n\n` +
+            `${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
+            `💰 Баланс: ${userBal.toFixed(8)} USDT` +
             (badges.length ? `\n${badges.join(' | ')}` : ''),
             { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
+          );
+          break;
+        }
+
+        case '❓ Помощь': {
+          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ
+          waitingForDeposit.delete(user.id);
+          waitingForWithdrawAmount.delete(user.id);
+          waitingForWithdrawAddress.delete(user.id);
+          
+          await ctx.reply(
+            `❓ *Помощь и поддержка*\n\nВыберите тип заявки:`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '📋 Общая поддержка', callback_data: 'support_general' }],
+                  [{ text: '⚠️ Сообщить об ошибке', callback_data: 'support_bug' }],
+                  [{ text: '💬 Связаться с админом', callback_data: 'support_contact' }],
+                  [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+                ]
+              },
+              parse_mode: 'Markdown'
+            }
           );
           break;
         }
@@ -886,6 +1027,7 @@ if (!BOT_TOKEN) {
     waitingForDeposit.delete(userId);
     waitingForWithdrawAmount.delete(userId);
     waitingForWithdrawAddress.delete(userId);
+    waitingForTicketMessage.delete(userId);
     
     try {
       await ctx.deleteMessage();
@@ -894,7 +1036,7 @@ if (!BOT_TOKEN) {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
     });
-    const menu = user?.isAdmin ? getMainMenuKeyboard() : getMainMenuKeyboard();
+    const menu = getMainMenuKeyboard();
     
     await ctx.reply('📋 *Выберите действие:*', menu);
     await ctx.answerCbQuery();
@@ -912,6 +1054,101 @@ if (!BOT_TOKEN) {
     } catch (e) {}
     
     await ctx.reply('❌ Пополнение отменено.', getMainMenuKeyboard());
+    await ctx.answerCbQuery();
+  });
+
+  // ====================================
+  // SUPPORT TICKET HANDLERS
+  // ====================================
+
+  bot.action('support_general', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    if (!user) return;
+    
+    waitingForTicketMessage.set(user.id, 'GENERAL');
+    
+    await ctx.editMessageText(
+      '📋 *Опишите вашу проблему:*\n\nНапишите подробное описание того, что вам нужно:',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '◀️ Назад', callback_data: 'support_back' }]
+          ]
+        },
+        parse_mode: 'Markdown'
+      }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('support_bug', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    if (!user) return;
+    
+    waitingForTicketMessage.set(user.id, 'BUG');
+    
+    await ctx.editMessageText(
+      '⚠️ *Сообщить об ошибке*\n\nОпишите ошибку как можно подробнее:\n• Что вы делали\n• Что произошло\n• Какую ошибку вы видели',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '◀️ Назад', callback_data: 'support_back' }]
+          ]
+        },
+        parse_mode: 'Markdown'
+      }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('support_contact', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    if (!user) return;
+    
+    waitingForTicketMessage.set(user.id, 'CONTACT');
+    
+    await ctx.editMessageText(
+      '💬 *Связаться с администратором*\n\nНапишите ваше сообщение. Администратор ответит вам в ближайшее время:',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '◀️ Назад', callback_data: 'support_back' }]
+          ]
+        },
+        parse_mode: 'Markdown'
+      }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('support_back', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    if (!user) return;
+    
+    waitingForTicketMessage.delete(user.id);
+    
+    await ctx.editMessageText(
+      `❓ *Помощь и поддержка*\n\nВыберите тип заявки:`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📋 Общая поддержка', callback_data: 'support_general' }],
+            [{ text: '⚠️ Сообщить об ошибке', callback_data: 'support_bug' }],
+            [{ text: '💬 Связаться с админом', callback_data: 'support_contact' }],
+            [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+          ]
+        },
+        parse_mode: 'Markdown'
+      }
+    );
     await ctx.answerCbQuery();
   });
 
