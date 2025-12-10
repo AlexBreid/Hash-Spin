@@ -155,7 +155,7 @@ export function ReferralsPage() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.05 }}
           >
             <div className="relative">
               {/* Пульсирующий фон */}
@@ -233,6 +233,7 @@ export function ReferralsPage() {
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }}
+            transition={{ delay: 0.05 }}
           >
             <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/20 border border-green-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -257,7 +258,7 @@ export function ReferralsPage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.1 }}
         >
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             <StatCard
@@ -297,7 +298,7 @@ export function ReferralsPage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }} 
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.15 }}
         >
           <div className="flex items-center gap-2 mb-4 px-1">
             <Crown className="w-6 h-6 text-indigo-400" />
@@ -337,7 +338,7 @@ export function ReferralsPage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }} 
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.2 }}
         >
           <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
             <div className="flex items-start gap-4 mb-4">
