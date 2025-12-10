@@ -344,12 +344,12 @@ export function ReferralsPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-bold text-lg mb-2">Зарабатывай на рефералах</h3>
-                    <p className="text-zinc-300 text-sm mb-4">Получай {commissionRate}% от прибыли каждого приглашенного друга</p>
+                    <p className="text-zinc-300 text-sm mb-4">30% от преимущества казино каждого реферала, пожизненно</p>
                     <Button 
                       onClick={() => navigate('/support?section=referral')}
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"
                     >
-                      Подробнее
+                      Подробнее о расчётах
                     </Button>
                   </div>
                 </div>
@@ -456,9 +456,9 @@ export function ReferralsPage() {
                     <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-4">
                       <div className="flex items-center gap-3 mb-1">
                         <Unlock className="w-5 h-5 text-purple-400" />
-                        <span className="text-white font-bold">{commissionRate}% комиссия</span>
+                        <span className="text-white font-bold">Комиссия реферала</span>
                       </div>
-                      <p className="text-zinc-400 text-xs">От прибыли рефералов</p>
+                      <p className="text-zinc-400 text-xs">От преимущества казино</p>
                     </div>
 
                     <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl p-4">
