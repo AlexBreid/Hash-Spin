@@ -1,17 +1,13 @@
 /**
- * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ telegramBot.js
+ * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ telegramBot.js С АДМИН-ПАНЕЛЬЮ
  * 
- * ✅ ИСПРАВЛЕНИЯ:
- * 1. ✅ ПРАВИЛЬНАЯ проверка статуса платежа (цикл с логированием)
- * 2. ✅ ИСПРАВЛЕН парсинг webhook
- * 3. ✅ ID mismatch ИСПРАВЛЕН
- * 4. ✅ DEDUPLICATION работает правильно
- * 5. ✅ Кнопки НАЗАД на ВСЕХ шагах
- * 6. ✅ Визуальная обратная связь о статусе
- * 7. ✅ Кнопка "Проверить статус платежа"
- * 8. ✅ Правильное логирование ВЕЗДЕ
- * 9. ✅ "Настройки" → "Профиль"
- * 10. ✅ Система тикетов поддержки вместо "Помощь"
+ * ✅ ФУНКЦИИ АДМИНА:
+ * 1. ⚙️ Админ Панель - кнопка в меню
+ * 2. 📋 Список заявок на вывод (PENDING)
+ * 3. 🎫 Список support тикетов
+ * 4. ✅ Одобрить вывод
+ * 5. ❌ Отклонить вывод
+ * 6. 💬 Ответить на тикет
  */
 
 const { Telegraf } = require('telegraf');
@@ -37,8 +33,10 @@ const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_1
 const waitingForDeposit = new Map();
 const waitingForWithdrawAmount = new Map();
 const waitingForWithdrawAddress = new Map();
-const waitingForTicketMessage = new Map(); // user.id -> ticketType
-const supportTickets = new Map(); // user.id -> { ticketId, type, status, message, createdAt }
+const waitingForTicketMessage = new Map();
+const supportTickets = new Map();
+const adminWaitingForReply = new Map(); // adminId -> ticketId
+const adminWaitingForWithdrawalReply = new Map(); // adminId -> withdrawalId
 
 // ✅ ИСПРАВЛЕНИЕ: Таймауты для очистки Map'ов
 function setStateTimeout(map, userId, timeoutMs = 10 * 60 * 1000) {
@@ -60,7 +58,6 @@ function generateTicketId() {
 // ====================================
 async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USDT') {
   try {
-    // ✅ ВАЛИДАЦИЯ
     const userIdNum = parseInt(userId);
     const invoiceIdNum = parseInt(invoiceId);
     const amountNum = parseFloat(amount);
@@ -70,7 +67,6 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
       return;
     }
     
-    // ✅ СОХРАНЯЕМ PENDING (БЕЗ ПЕРЕЗАПИСИ СТАТУСА)
     await prisma.pendingDeposit.upsert({
       where: { invoiceId: invoiceIdNum.toString() },
       create: {
@@ -80,7 +76,7 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
         asset: String(asset),
         status: 'pending'
       },
-      update: { updatedAt: new Date() } // ✅ ТОЛЬКО обновляем время, НЕ статус!
+      update: { updatedAt: new Date() }
     });
 
     logger.info('BOT', `Scheduled deposit check`, { 
@@ -89,10 +85,9 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
       amount: amountNum.toFixed(8)
     });
 
-    // ✅ ЦИКЛ ПРОВЕРКИ С ЛОГИРОВАНИЕМ
     let checkCount = 0;
-    const maxChecks = 6; // Проверяем 6 раз = 3 минуты
-    const checkInterval = 30 * 1000; // 30 секунд
+    const maxChecks = 6;
+    const checkInterval = 30 * 1000;
 
     const checkDeposit = async () => {
       checkCount++;
@@ -104,25 +99,7 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           params: { invoiceIds: invoiceIdNum }
         });
 
-        // ✅ ЛОГИРУЕМ ОТВЕТ
-        if (!response.data) {
-          logger.warn('BOT', `No response data`, { invoiceId: invoiceIdNum });
-          if (checkCount < maxChecks) {
-            setTimeout(checkDeposit, checkInterval);
-          }
-          return;
-        }
-
-        if (!response.data.ok) {
-          logger.warn('BOT', `API not ok`, { invoiceId: invoiceIdNum, response: response.data });
-          if (checkCount < maxChecks) {
-            setTimeout(checkDeposit, checkInterval);
-          }
-          return;
-        }
-
-        if (!response.data.result?.items?.length) {
-          logger.warn('BOT', `No items in response`, { invoiceId: invoiceIdNum });
+        if (!response.data?.ok || !response.data.result?.items?.length) {
           if (checkCount < maxChecks) {
             setTimeout(checkDeposit, checkInterval);
           }
@@ -136,37 +113,15 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           status: invoice.status
         });
 
-        // ✅ ЕСЛИ НЕ PAID - ПРОДОЛЖАЕМ ЖДАТЬ
         if (invoice.status !== 'paid') {
           if (checkCount < maxChecks) {
             setTimeout(checkDeposit, checkInterval);
-          } else {
-            logger.warn('BOT', `Max checks reached, invoice not paid`, { invoiceId: invoiceIdNum });
-            
-            // Уведомляем пользователя
-            const user = await prisma.user.findUnique({ 
-              where: { id: userIdNum }, 
-              select: { telegramId: true } 
-            });
-            if (user?.telegramId) {
-              try {
-                await bot.telegram.sendMessage(
-                  user.telegramId,
-                  `⏱️ *Время проверки истекло*\n\nИнвойс всё ещё не оплачен. Статус: ${invoice.status}\n\nПопробуйте снова или свяжитесь с поддержкой.`,
-                  { parse_mode: 'Markdown' }
-                );
-              } catch (e) {
-                logger.warn('BOT', `Failed to notify user`, { error: e.message });
-              }
-            }
           }
           return;
         }
 
-        // ✅ ПЛАТЁЖ ПРИШЁЛ! ОБРАБАТЫВАЕМ
         logger.info('BOT', `Invoice PAID! Processing...`, { invoiceId: invoiceIdNum });
 
-        // 1. Проверяем дубликат (по txHash)
         const existingTx = await prisma.transaction.findFirst({
           where: { 
             txHash: invoiceIdNum.toString(), 
@@ -180,14 +135,12 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           return;
         }
 
-        // 2. Получаем токен
         const token = await prisma.cryptoToken.findUnique({ where: { symbol: asset } });
         if (!token) {
           logger.warn('BOT', `Token not found`, { asset });
           return;
         }
 
-        // 3. ✅ СОЗДАЁМ ТРАНЗАКЦИЮ И БАЛАНС (TRANSACTION)
         await prisma.$transaction(async (tx) => {
           await tx.transaction.create({
             data: {
@@ -213,7 +166,6 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
             update: { amount: { increment: amountNum } }
           });
 
-          // 4. Пытаемся выдать бонус
           if (asset === 'USDT') {
             try {
               await referralService.grantDepositBonus(userIdNum, amountNum, token.id);
@@ -223,19 +175,11 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           }
         });
 
-        // 5. Обновляем pendingDeposit статус
         await prisma.pendingDeposit.update({
           where: { invoiceId: invoiceIdNum.toString() },
           data: { status: 'processed' }
         });
 
-        logger.info('BOT', `Deposit PROCESSED`, {
-          userId: userIdNum,
-          amount: amountNum.toFixed(8),
-          asset
-        });
-
-        // 6. Уведомляем пользователя
         try {
           const user = await prisma.user.findUnique({ 
             where: { id: userIdNum }, 
@@ -254,15 +198,13 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 
       } catch (error) {
         logger.error('BOT', `Error checking invoice`, { invoiceId: invoiceIdNum, error: error.message });
-        
         if (checkCount < maxChecks) {
           setTimeout(checkDeposit, checkInterval);
         }
       }
     };
 
-    // Начинаем проверку
-    setTimeout(checkDeposit, 5000); // Первая проверка через 5 секунд
+    setTimeout(checkDeposit, 5000);
     
   } catch (error) {
     logger.error('BOT', `Error scheduling deposit check`, { error: error.message });
@@ -278,19 +220,28 @@ if (!BOT_TOKEN) {
   // ====================================
   // КЛАВИАТУРЫ
   // ====================================
-  const getMainMenuKeyboard = () => ({
-    reply_markup: {
-      keyboard: [
-        [{ text: '🎰 Казино' }],
-        [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
-        [{ text: '📥 Мои выводы' }],
-        [{ text: '👥 Рефералы' }, { text: '👤 Профиль' }],
-        [{ text: '❓ Помощь' }]
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
+  const getMainMenuKeyboard = (isAdmin = false) => {
+    const baseButtons = [
+      [{ text: '🎰 Казино' }],
+      [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
+      [{ text: '📥 Мои выводы' }],
+      [{ text: '👥 Рефералы' }, { text: '👤 Профиль' }]
+    ];
+
+    if (isAdmin) {
+      baseButtons.push([{ text: '⚙️ Админ Панель' }]);
     }
-  });
+
+    baseButtons.push([{ text: '❓ Помощь' }]);
+
+    return {
+      reply_markup: {
+        keyboard: baseButtons,
+        resize_keyboard: true,
+        one_time_keyboard: false
+      }
+    };
+  };
 
   const getBackButton = () => ({
     reply_markup: {
@@ -485,7 +436,7 @@ if (!BOT_TOKEN) {
         await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
       }
 
-      const menu = getMainMenuKeyboard();
+      const menu = getMainMenuKeyboard(user.isAdmin);
       await ctx.reply('📋 *Выберите действие:*', menu);
     } catch (error) {
       logger.error('BOT', `Error in /start command`, { error: error.message });
@@ -494,9 +445,10 @@ if (!BOT_TOKEN) {
   });
 
   // ====================================
-  // REPLY_TICKET COMMAND ДЛЯ АДМИНА
+  // ADMIN PANEL COMMANDS
   // ====================================
-  bot.command('reply_ticket', async (ctx) => {
+
+  bot.command('admin_withdrawals', async (ctx) => {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
     });
@@ -506,37 +458,92 @@ if (!BOT_TOKEN) {
       return;
     }
 
-    const args = ctx.message.text.split(' ');
-    const ticketId = args[1];
+    const pendingWithdrawals = await prisma.transaction.findMany({
+      where: { type: 'WITHDRAW', status: 'PENDING' },
+      select: { id: true, userId: true, amount: true, walletAddress: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    if (!ticketId) {
-      await ctx.reply('❌ Укажите ID тикета.\n\nПример: /reply_ticket TK-ABC123DEF456');
+    if (pendingWithdrawals.length === 0) {
+      await ctx.reply('✅ Нет заявок на вывод.');
       return;
     }
 
-    // Найти пользователя с этим тикетом
-    let ticketUser = null;
+    let msg = `💸 *ЗАЯВКИ НА ВЫВОД (${pendingWithdrawals.length}):*\n\n`;
+    
+    for (const w of pendingWithdrawals) {
+      const amount = parseFloat(w.amount.toString());
+      const shortAddr = w.walletAddress.length > 15 ? `${w.walletAddress.slice(0,10)}...` : w.walletAddress;
+      
+      msg += `ID: #${w.id}\n` +
+             `👤 User: ${w.userId}\n` +
+             `💰 ${amount.toFixed(8)} USDT\n` +
+             `📍 ${shortAddr}\n` +
+             `⏰ ${new Date(w.createdAt).toLocaleString()}\n\n`;
+    }
+
+    await ctx.reply(msg, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '✅ Одобрить', callback_data: 'admin_approve_withdrawal' }],
+          [{ text: '❌ Отклонить', callback_data: 'admin_reject_withdrawal' }]
+        ]
+      },
+      parse_mode: 'Markdown'
+    });
+  });
+
+  bot.command('admin_tickets', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.reply('❌ Только администраторы могут использовать эту команду.');
+      return;
+    }
+
+    if (supportTickets.size === 0) {
+      await ctx.reply('✅ Нет открытых тикетов.');
+      return;
+    }
+
+    let msg = `🎫 *ПОДДЕРЖКА (${supportTickets.size}):*\n\n`;
+    let ticketsList = [];
+
     for (const [userId, ticket] of supportTickets.entries()) {
-      if (ticket.ticketId === ticketId) {
-        ticketUser = userId;
-        break;
+      if (ticket.status === 'OPEN' || ticket.status === 'REPLIED') {
+        const typeLabel = {
+          'GENERAL': '📋',
+          'BUG': '⚠️',
+          'CONTACT': '💬'
+        }[ticket.type] || '❓';
+
+        ticketsList.push({
+          id: ticket.ticketId,
+          userId,
+          type: typeLabel,
+          message: ticket.message.substring(0, 50) + (ticket.message.length > 50 ? '...' : '')
+        });
       }
     }
 
-    if (!ticketUser) {
-      await ctx.reply(`❌ Тикет ${ticketId} не найден.`);
+    if (ticketsList.length === 0) {
+      await ctx.reply('✅ Нет открытых тикетов.');
       return;
     }
 
-    const ticket = supportTickets.get(ticketUser);
-    ticket.status = 'REPLIED';
+    for (const t of ticketsList) {
+      msg += `${t.type} ${t.id}\n` +
+             `👤 User: ${t.userId}\n` +
+             `📝 ${t.message}\n\n`;
+    }
 
-    await ctx.reply(
-      `✅ Ответьте на следующее сообщение для пользователя ${ticketUser}:\n\n` +
-      `📝 Его сообщение:\n\`\`\`\n${ticket.message}\n\`\`\`\n\n` +
-      `Напишите ответ:`,
-      { parse_mode: 'Markdown' }
-    );
+    await ctx.reply(msg, {
+      parse_mode: 'Markdown'
+    });
+
+    await ctx.reply('Используйте: /reply_ticket TK-ABC123DEF456');
   });
 
   // ====================================
@@ -563,7 +570,56 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ОБРАБОТКА СООБЩЕНИЙ ДЛЯ ТИКЕТОВ
+      // ✅ ОБРАБОТКА ОТВЕТОВ АДМИНИСТРАТОРА НА ТИКЕТЫ
+      if (adminWaitingForReply.has(user.id)) {
+        const ticketId = adminWaitingForReply.get(user.id);
+        let ticketUser = null;
+
+        for (const [userId, ticket] of supportTickets.entries()) {
+          if (ticket.ticketId === ticketId) {
+            ticketUser = userId;
+            break;
+          }
+        }
+
+        if (ticketUser) {
+          const ticket = supportTickets.get(ticketUser);
+          adminWaitingForReply.delete(user.id);
+
+          const ticketUser_ = await prisma.user.findUnique({ 
+            where: { id: ticketUser }, 
+            select: { telegramId: true } 
+          });
+
+          if (ticketUser_?.telegramId) {
+            try {
+              await bot.telegram.sendMessage(
+                ticketUser_.telegramId,
+                `💬 *Ответ администратора*\n\n` +
+                `🎫 Тикет: \`${ticketId}\`\n\n` +
+                `📝 Ваше сообщение:\n\`\`\`\n${ticket.message}\n\`\`\`\n\n` +
+                `✅ Ответ:\n\`\`\`\n${text}\n\`\`\``,
+                { parse_mode: 'Markdown' }
+              );
+
+              ticket.status = 'RESOLVED';
+
+              await ctx.reply(
+                `✅ Ответ отправлен пользователю ${ticketUser}`,
+                getMainMenuKeyboard(user.isAdmin)
+              );
+
+              logger.info('BOT', `Admin replied to ticket`, { ticketId, adminId: user.id });
+            } catch (e) {
+              logger.warn('BOT', `Failed to send reply to user`, { error: e.message });
+              await ctx.reply('❌ Ошибка при отправке ответа.');
+            }
+          }
+        }
+        return;
+      }
+
+      // ✅ ОБРАБОТКА СООБЩЕНИЙ ДЛЯ ТИКЕТОВ ПОДДЕРЖКИ
       if (waitingForTicketMessage.has(user.id)) {
         const ticketType = waitingForTicketMessage.get(user.id);
         const ticketId = generateTicketId();
@@ -599,10 +655,9 @@ if (!BOT_TOKEN) {
           `📝 Тип: ${typeLabel}\n` +
           `⏳ Статус: На рассмотрении\n\n` +
           `Администратор рассмотрит вашу заявку в ближайшее время и напишет вам в чат.`,
-          { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
+          { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
         );
 
-        // Отправляем администраторам
         const admins = await prisma.user.findMany({ where: { isAdmin: true } });
         for (const admin of admins) {
           if (admin.telegramId) {
@@ -628,10 +683,9 @@ if (!BOT_TOKEN) {
 
       // ✅ ВЫВОД: ШАГ 1 - СУММА
       if (waitingForWithdrawAmount.has(user.id)) {
-        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА СУММЫ
         if (text === '◀️ Назад') {
           waitingForWithdrawAmount.delete(user.id);
-          const menu = getMainMenuKeyboard();
+          const menu = getMainMenuKeyboard(user.isAdmin);
           await ctx.reply('📋 *Выберите действие:*', menu);
           return;
         }
@@ -661,10 +715,9 @@ if (!BOT_TOKEN) {
 
       // ✅ ВЫВОД: ШАГ 2 - АДРЕС
       if (waitingForWithdrawAddress.has(user.id)) {
-        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА АДРЕСА
         if (text === '◀️ Назад') {
           waitingForWithdrawAddress.delete(user.id);
-          const menu = getMainMenuKeyboard();
+          const menu = getMainMenuKeyboard(user.isAdmin);
           await ctx.reply('📋 *Выберите действие:*', menu);
           return;
         }
@@ -725,7 +778,7 @@ if (!BOT_TOKEN) {
           `📍 Адрес: \`${walletAddress}\`\n` +
           `⏳ Статус: На обработке\n\n` +
           `Администратор рассмотрит заявку в ближайшее время.`,
-          { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
+          { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
         );
 
         const admins = await prisma.user.findMany({ where: { isAdmin: true } });
@@ -734,7 +787,14 @@ if (!BOT_TOKEN) {
             try {
               await bot.telegram.sendMessage(
                 admin.telegramId,
-                `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\nПользователь: ${user.id}\nСумма: ${amount.toFixed(8)} USDT\nАдрес: ${walletAddress}\n\nКоманда: /approve_withdraw ${withdrawal.id}`,
+                `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\n` +
+                `ID: #${withdrawal.id}\n` +
+                `👤 Пользователь: ${user.id}\n` +
+                `💰 Сумма: ${amount.toFixed(8)} USDT\n` +
+                `📍 Адрес: ${walletAddress}\n\n` +
+                `Команды:\n` +
+                `/approve_withdraw ${withdrawal.id}\n` +
+                `/reject_withdraw ${withdrawal.id}`,
                 { parse_mode: 'Markdown' }
               );
             } catch (e) {
@@ -747,10 +807,9 @@ if (!BOT_TOKEN) {
 
       // ✅ ПОПОЛНЕНИЕ: ШАГ 1 - СУММА
       if (waitingForDeposit.has(user.id)) {
-        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА СУММЫ
         if (text === '◀️ Назад') {
           waitingForDeposit.delete(user.id);
-          const menu = getMainMenuKeyboard();
+          const menu = getMainMenuKeyboard(user.isAdmin);
           await ctx.reply('📋 *Выберите действие:*', menu);
           return;
         }
@@ -768,7 +827,6 @@ if (!BOT_TOKEN) {
         waitingForDeposit.delete(user.id);
         logger.info('BOT', `User entered deposit amount`, { userId: user.id, amount: amount.toFixed(8) });
         
-        // Проверяем первый ли это депозит
         const existingDeposit = await prisma.transaction.findFirst({
           where: {
             userId: user.id,
@@ -778,7 +836,6 @@ if (!BOT_TOKEN) {
         });
         
         if (user.referredById && !existingDeposit) {
-          // ✅ ПОКАЗЫВАЕМ ВОПРОС О БОНУСЕ С КНОПКОЙ НАЗАД
           await ctx.reply(
             `💰 *Пополнение на ${amount.toFixed(8)} USDT*\n\n🎁 Использовать бонус +100%?`,
             {
@@ -793,10 +850,9 @@ if (!BOT_TOKEN) {
             }
           );
         } else {
-          // ✅ СОЗДАЁМ ИНВОЙС И ПОКАЗЫВАЕМ КНОПКУ ПРОВЕРКИ
           const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
           if (!invoice) {
-            await ctx.reply("❌ Ошибка при создании инвойса.", getMainMenuKeyboard());
+            await ctx.reply("❌ Ошибка при создании инвойса.", getMainMenuKeyboard(user.isAdmin));
             return;
           }
           
@@ -842,7 +898,6 @@ if (!BOT_TOKEN) {
         }
 
         case '💰 Пополнить': {
-          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ (если остались)
           waitingForDeposit.delete(user.id);
           waitingForWithdrawAmount.delete(user.id);
           waitingForWithdrawAddress.delete(user.id);
@@ -868,7 +923,6 @@ if (!BOT_TOKEN) {
         }
 
         case '💸 Вывести': {
-          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ (если остались)
           waitingForDeposit.delete(user.id);
           waitingForWithdrawAmount.delete(user.id);
           waitingForWithdrawAddress.delete(user.id);
@@ -909,7 +963,7 @@ if (!BOT_TOKEN) {
           });
 
           if (userTx.length === 0) {
-            await ctx.reply('У вас пока нет заявок на вывод.', getMainMenuKeyboard());
+            await ctx.reply('У вас пока нет заявок на вывод.', getMainMenuKeyboard(user.isAdmin));
             return;
           }
 
@@ -927,7 +981,7 @@ if (!BOT_TOKEN) {
                    `ID: #${tx.id}\n\n`;
           }
 
-          await ctx.reply(msg, { parse_mode: 'Markdown', ...getMainMenuKeyboard() });
+          await ctx.reply(msg, { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) });
           break;
         }
 
@@ -951,10 +1005,10 @@ if (!BOT_TOKEN) {
               `⏳ Накоплено: ${stats.potentialCommission} USDT\n\n` +
               `💎 Ваша комиссия: *${stats.commissionRate}%*`;
             
-            await ctx.reply(refMsg, { parse_mode: 'Markdown', ...getMainMenuKeyboard() });
+            await ctx.reply(refMsg, { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) });
           } catch (error) {
             logger.error('BOT', `Error in referrals command`, { error: error.message });
-            await ctx.reply('❌ Ошибка при получении информации о рефералах.', getMainMenuKeyboard());
+            await ctx.reply('❌ Ошибка при получении информации о рефералах.', getMainMenuKeyboard(user.isAdmin));
           }
           break;
         }
@@ -970,13 +1024,34 @@ if (!BOT_TOKEN) {
             `${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
             `💰 Баланс: ${userBal.toFixed(8)} USDT` +
             (badges.length ? `\n${badges.join(' | ')}` : ''),
-            { parse_mode: 'Markdown', ...getMainMenuKeyboard() }
+            { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+          );
+          break;
+        }
+
+        case '⚙️ Админ Панель': {
+          if (!user.isAdmin) {
+            await ctx.reply('❌ У вас нет доступа.');
+            return;
+          }
+
+          await ctx.reply(
+            `⚙️ *Админ Панель*\n\nВыберите действие:`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '💸 Заявки на вывод', callback_data: 'admin_show_withdrawals' }],
+                  [{ text: '🎫 Заявки поддержки', callback_data: 'admin_show_tickets' }],
+                  [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+                ]
+              },
+              parse_mode: 'Markdown'
+            }
           );
           break;
         }
 
         case '❓ Помощь': {
-          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ
           waitingForDeposit.delete(user.id);
           waitingForWithdrawAmount.delete(user.id);
           waitingForWithdrawAddress.delete(user.id);
@@ -1002,12 +1077,12 @@ if (!BOT_TOKEN) {
           waitingForDeposit.delete(user.id);
           waitingForWithdrawAmount.delete(user.id);
           waitingForWithdrawAddress.delete(user.id);
-          await ctx.reply('📋 Выберите действие:', getMainMenuKeyboard());
+          await ctx.reply('📋 Выберите действие:', getMainMenuKeyboard(user.isAdmin));
           break;
         }
 
         default: {
-          const menu = getMainMenuKeyboard();
+          const menu = getMainMenuKeyboard(user.isAdmin);
           await ctx.reply('📋 *Выберите действие:*', menu);
         }
       }
@@ -1022,7 +1097,6 @@ if (!BOT_TOKEN) {
   // ====================================
 
   bot.action('back_to_menu', async (ctx) => {
-    // ✅ ОЧИЩАЕМ ВСЕ СОСТОЯНИЯ
     const userId = parseInt(ctx.from.id);
     waitingForDeposit.delete(userId);
     waitingForWithdrawAmount.delete(userId);
@@ -1036,14 +1110,13 @@ if (!BOT_TOKEN) {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
     });
-    const menu = getMainMenuKeyboard();
+    const menu = getMainMenuKeyboard(user?.isAdmin || false);
     
     await ctx.reply('📋 *Выберите действие:*', menu);
     await ctx.answerCbQuery();
   });
 
   bot.action('cancel_deposit', async (ctx) => {
-    // ✅ ОЧИЩАЕМ СОСТОЯНИЯ
     const userId = parseInt(ctx.from.id);
     waitingForDeposit.delete(userId);
     waitingForWithdrawAmount.delete(userId);
@@ -1053,12 +1126,281 @@ if (!BOT_TOKEN) {
       await ctx.deleteMessage();
     } catch (e) {}
     
-    await ctx.reply('❌ Пополнение отменено.', getMainMenuKeyboard());
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    
+    await ctx.reply('❌ Пополнение отменено.', getMainMenuKeyboard(user?.isAdmin || false));
     await ctx.answerCbQuery();
   });
 
   // ====================================
-  // SUPPORT TICKET HANDLERS
+  // ADMIN PANEL CALLBACKS
+  // ====================================
+
+  bot.action('admin_show_withdrawals', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('❌ Нет доступа');
+      return;
+    }
+
+    const pendingWithdrawals = await prisma.transaction.findMany({
+      where: { type: 'WITHDRAW', status: 'PENDING' },
+      select: { id: true, userId: true, amount: true, walletAddress: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    if (pendingWithdrawals.length === 0) {
+      await ctx.editMessageText('✅ Нет заявок на вывод.', { parse_mode: 'Markdown' });
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    let msg = `💸 *ЗАЯВКИ НА ВЫВОД (${pendingWithdrawals.length}):*\n\n`;
+    
+    for (const w of pendingWithdrawals) {
+      const amount = parseFloat(w.amount.toString());
+      const shortAddr = w.walletAddress.length > 15 ? `${w.walletAddress.slice(0,10)}...` : w.walletAddress;
+      
+      msg += `ID: #${w.id}\n` +
+             `👤 User: ${w.userId}\n` +
+             `💰 ${amount.toFixed(8)} USDT\n` +
+             `📍 ${shortAddr}\n` +
+             `⏰ ${new Date(w.createdAt).toLocaleString()}\n\n`;
+    }
+
+    const buttons = [];
+    for (const w of pendingWithdrawals) {
+      buttons.push([
+        { text: `✅ #${w.id}`, callback_data: `approve_withdrawal_${w.id}` },
+        { text: `❌ #${w.id}`, callback_data: `reject_withdrawal_${w.id}` }
+      ]);
+    }
+
+    buttons.push([{ text: '◀️ Назад', callback_data: 'back_to_menu' }]);
+
+    await ctx.editMessageText(msg, {
+      reply_markup: { inline_keyboard: buttons },
+      parse_mode: 'Markdown'
+    });
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('admin_show_tickets', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('❌ Нет доступа');
+      return;
+    }
+
+    if (supportTickets.size === 0) {
+      await ctx.editMessageText('✅ Нет открытых тикетов.', { parse_mode: 'Markdown' });
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    let msg = `🎫 *ПОДДЕРЖКА (${supportTickets.size}):*\n\n`;
+    let ticketsList = [];
+
+    for (const [userId, ticket] of supportTickets.entries()) {
+      if (ticket.status === 'OPEN' || ticket.status === 'REPLIED') {
+        const typeLabel = {
+          'GENERAL': '📋',
+          'BUG': '⚠️',
+          'CONTACT': '💬'
+        }[ticket.type] || '❓';
+
+        ticketsList.push({
+          id: ticket.ticketId,
+          userId,
+          type: typeLabel,
+          message: ticket.message.substring(0, 40) + (ticket.message.length > 40 ? '...' : '')
+        });
+      }
+    }
+
+    if (ticketsList.length === 0) {
+      await ctx.editMessageText('✅ Нет открытых тикетов.', { parse_mode: 'Markdown' });
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    for (const t of ticketsList) {
+      msg += `${t.type} ${t.id}\n` +
+             `👤 User: ${t.userId}\n` +
+             `📝 ${t.message}\n\n`;
+    }
+
+    const buttons = [];
+    for (const t of ticketsList) {
+      buttons.push([
+        { text: `💬 ${t.id}`, callback_data: `reply_ticket_action_${t.id}` }
+      ]);
+    }
+    buttons.push([{ text: '◀️ Назад', callback_data: 'back_to_menu' }]);
+
+    await ctx.editMessageText(msg, {
+      reply_markup: { inline_keyboard: buttons },
+      parse_mode: 'Markdown'
+    });
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/approve_withdrawal_(\d+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('❌ Нет доступа');
+      return;
+    }
+
+    const withdrawalId = parseInt(ctx.match[1]);
+
+    const withdrawal = await prisma.transaction.findUnique({
+      where: { id: withdrawalId }
+    });
+
+    if (!withdrawal) {
+      await ctx.answerCbQuery('❌ Заявка не найдена');
+      return;
+    }
+
+    await prisma.transaction.update({
+      where: { id: withdrawalId },
+      data: { status: 'COMPLETED', txHash: `APPROVED_${Date.now()}` }
+    });
+
+    const userRecord = await prisma.user.findUnique({ 
+      where: { id: withdrawal.userId }, 
+      select: { telegramId: true } 
+    });
+
+    if (userRecord?.telegramId) {
+      try {
+        await bot.telegram.sendMessage(
+          userRecord.telegramId,
+          `✅ *Вывод одобрен!*\n\n` +
+          `💰 ${parseFloat(withdrawal.amount.toString()).toFixed(8)} USDT\n` +
+          `📍 ${withdrawal.walletAddress}\n` +
+          `⏰ Средства поступят в течение 24 часов.`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (e) {
+        logger.warn('BOT', `Failed to notify user`, { error: e.message });
+      }
+    }
+
+    await ctx.answerCbQuery('✅ Вывод одобрен');
+    await ctx.reply('✅ Заявка #' + withdrawalId + ' одобрена');
+  });
+
+  bot.action(/reject_withdrawal_(\d+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('❌ Нет доступа');
+      return;
+    }
+
+    const withdrawalId = parseInt(ctx.match[1]);
+
+    const withdrawal = await prisma.transaction.findUnique({
+      where: { id: withdrawalId }
+    });
+
+    if (!withdrawal) {
+      await ctx.answerCbQuery('❌ Заявка не найдена');
+      return;
+    }
+
+    const token = await prisma.cryptoToken.findUnique({ where: { symbol: 'USDT' } });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.transaction.update({
+        where: { id: withdrawalId },
+        data: { status: 'REJECTED' }
+      });
+
+      if (token) {
+        await tx.balance.update({
+          where: { 
+            userId_tokenId_type: { 
+              userId: withdrawal.userId, 
+              tokenId: token.id, 
+              type: 'MAIN' 
+            } 
+          },
+          data: { amount: { increment: parseFloat(withdrawal.amount.toString()) } }
+        });
+      }
+    });
+
+    const userRecord = await prisma.user.findUnique({ 
+      where: { id: withdrawal.userId }, 
+      select: { telegramId: true } 
+    });
+
+    if (userRecord?.telegramId) {
+      try {
+        await bot.telegram.sendMessage(
+          userRecord.telegramId,
+          `❌ *Вывод отклонен*\n\n` +
+          `💰 ${parseFloat(withdrawal.amount.toString()).toFixed(8)} USDT\n` +
+          `💬 Средства вернулись на ваш счет.\n\n` +
+          `Свяжитесь с поддержкой для уточнения деталей.`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (e) {
+        logger.warn('BOT', `Failed to notify user`, { error: e.message });
+      }
+    }
+
+    await ctx.answerCbQuery('✅ Вывод отклонен');
+    await ctx.reply('❌ Заявка #' + withdrawalId + ' отклонена');
+  });
+
+  bot.action(/reply_ticket_action_(.+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('❌ Нет доступа');
+      return;
+    }
+
+    const ticketId = ctx.match[1];
+    adminWaitingForReply.set(user.id, ticketId);
+
+    await ctx.editMessageText(
+      `🎫 Тикет: \`${ticketId}\`\n\n` +
+      `Напишите ответ для пользователя:`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '❌ Отмена', callback_data: 'admin_show_tickets' }]
+          ]
+        },
+        parse_mode: 'Markdown'
+      }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  // ====================================
+  // SUPPORT TICKET CALLBACKS
   // ====================================
 
   bot.action('support_general', async (ctx) => {
@@ -1201,7 +1543,7 @@ if (!BOT_TOKEN) {
       } else {
         const invoice = await cryptoPayAPI.createInvoice(amount, "USDT", `Deposit User #${user.id}`, user.id);
         if (!invoice) {
-          await ctx.reply("❌ Ошибка создания инвойса.", getMainMenuKeyboard());
+          await ctx.reply("❌ Ошибка создания инвойса.", getMainMenuKeyboard(user.isAdmin));
           return await ctx.answerCbQuery();
         }
         
@@ -1427,18 +1769,15 @@ if (!BOT_TOKEN) {
   });
 
   // ====================================
-  // WEBHOOK HANDLER - ✅ ИСПРАВЛЕННЫЙ
+  // WEBHOOK HANDLER
   // ====================================
   const handleCryptoPayWebhook = async (req, res) => {
     try {
-      // ✅ ПРАВИЛЬНЫЙ ПАРСИНГ WEBHOOK
       let updates = [];
       
       if (req.body.updates && Array.isArray(req.body.updates)) {
-        // Формат 1: { updates: [...] }
         updates = req.body.updates;
       } else if (req.body.invoice_id) {
-        // Формат 2: { invoice_id: ..., status: ..., ... }
         updates = [req.body];
       } else {
         logger.warn('BOT', `Unknown webhook format`, { body: req.body });
@@ -1447,7 +1786,6 @@ if (!BOT_TOKEN) {
       }
 
       for (const update of updates) {
-        // ✅ ПРАВИЛЬНОЕ ИЗВЛЕЧЕНИЕ ДАННЫХ
         const invoice = update.payload || update;
         
         const invoiceId = String(invoice.invoice_id);
@@ -1456,7 +1794,6 @@ if (!BOT_TOKEN) {
         const amount = parseFloat(invoice.amount);
         const asset = String(invoice.asset);
 
-        // ✅ ВАЛИДАЦИЯ
         if (!invoiceId || !status || !userIdStr || isNaN(amount) || amount <= 0) {
           logger.warn('BOT', `Invalid webhook parameters`, { 
             invoiceId, status, userIdStr, amount, asset 
@@ -1480,13 +1817,11 @@ if (!BOT_TOKEN) {
           amount: amountNum.toFixed(8)
         });
 
-        // Только для PAID
         if (status !== 'paid') {
           logger.debug('BOT', `Invoice not paid`, { invoiceId: invoiceIdNum, status });
           continue;
         }
 
-        // ✅ ПРОВЕРЯЕМ ДУБЛИКАТ (по txHash = invoiceId)
         const existingTx = await prisma.transaction.findFirst({
           where: {
             txHash: invoiceIdNum.toString(),
@@ -1500,7 +1835,6 @@ if (!BOT_TOKEN) {
           continue;
         }
 
-        // Получаем токен
         const token = await prisma.cryptoToken.findUnique({
           where: { symbol: asset }
         });
@@ -1510,7 +1844,6 @@ if (!BOT_TOKEN) {
           continue;
         }
 
-        // ✅ TRANSACTION для атомарности
         await prisma.$transaction(async (tx) => {
           await tx.transaction.create({
             data: {
@@ -1548,7 +1881,6 @@ if (!BOT_TOKEN) {
           amount: amountNum.toFixed(8)
         });
 
-        // Выдаём бонус
         if (asset === 'USDT') {
           try {
             await referralService.grantDepositBonus(userIdNum, amountNum, token.id);
@@ -1557,7 +1889,6 @@ if (!BOT_TOKEN) {
           }
         }
 
-        // Уведомляем пользователя
         try {
           const userNotif = await prisma.user.findUnique({
             where: { id: userIdNum },
