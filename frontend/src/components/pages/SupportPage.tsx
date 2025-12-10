@@ -188,7 +188,7 @@ export function SupportPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-white mb-1">ПРОГРАММА РЕФЕРАЛОВ</h2>
-                  <p className="text-purple-300 text-sm">30% от преимущества казино</p>
+                  <p className="text-purple-300 text-sm">30% комиссии с оборота твоих рефералов</p>
                 </div>
               </div>
             </Card>
@@ -217,15 +217,15 @@ export function SupportPage() {
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">3</div>
                   <div>
-                    <p className="text-white font-semibold">Твой реферал играет</p>
-                    <p className="text-zinc-400 text-sm">Каждая ставка добавляет в твой доход</p>
+                    <p className="text-white font-semibold">Они играют и делают ставки</p>
+                    <p className="text-zinc-400 text-sm">Каждая ставка – твой доход</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">4</div>
                   <div>
-                    <p className="text-white font-semibold">Получай комиссию</p>
-                    <p className="text-zinc-400 text-sm">Выводи доход в любой момент</p>
+                    <p className="text-white font-semibold">Получай деньги бесконечно</p>
+                    <p className="text-zinc-400 text-sm">Комиссия начисляется пожизненно</p>
                   </div>
                 </div>
               </div>
@@ -235,55 +235,20 @@ export function SupportPage() {
             <Card className="p-6 border-zinc-700">
               <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-400" />
-                Формула расчета комиссии
+                Как считается комиссия?
               </h3>
               <div className="space-y-4 text-zinc-300">
-                <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-700">
-                  <p className="text-white font-semibold mb-3 text-center text-lg">
-                    (Преимущество казино × Оборот реферала ÷ 2) × 30%
-                  </p>
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 p-4 rounded-xl border border-purple-500/30">
+                  <p className="text-white font-semibold mb-2 text-base">(Преимущество казино × Оборот ÷ 2) × 30%</p>
+                  <p className="text-sm text-purple-200">Чем больше оборот твоих рефералов – тем больше твой доход</p>
+                </div>
+
+                <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
+                  <p className="text-white font-semibold text-sm mb-3">Пример:</p>
                   <div className="space-y-2 text-sm">
-                    <p>• <span className="text-cyan-400 font-semibold">Преимущество казино</span> = сумма прибыли, которую система получает от игры</p>
-                    <p>• <span className="text-cyan-400 font-semibold">Оборот реферала</span> = общая сумма ставок твоего реферала</p>
-                    <p>• <span className="text-cyan-400 font-semibold">30%</span> = твоя комиссия</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Detailed Example */}
-            <Card className="p-6 border-zinc-700">
-              <h3 className="font-bold text-lg text-white mb-4">📊 Подробный пример</h3>
-              <div className="space-y-4 text-zinc-300">
-                <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 p-4 rounded-lg border border-orange-500/20">
-                  <p className="text-sm mb-3"><span className="text-white font-semibold">Сценарий:</span> Твой реферал сделал 10 ставок по $100</p>
-                  
-                  <div className="space-y-2 text-sm bg-zinc-900/50 p-3 rounded mt-3">
-                    <p><span className="text-cyan-400">Оборот реферала</span> = $100 × 10 = <span className="text-white font-semibold">$1,000</span></p>
-                    <p><span className="text-cyan-400">Преимущество казино</span> (RTP 97%) = <span className="text-white font-semibold">$30</span></p>
-                    <p className="text-zinc-400 text-xs mt-2 pt-2 border-t border-zinc-700">
-                      (При RTP 97% казино оставляет себе 3% от оборота = $1,000 × 3% = $30)
-                    </p>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-orange-500/20">
-                    <p className="text-white font-semibold mb-2">Расчет твоей комиссии:</p>
-                    <p className="text-sm">($30 × $1,000 ÷ 2) × 30% = <span className="text-yellow-300 font-bold">$450</span></p>
-                    <p className="text-xs text-zinc-400 mt-2">($15,000 ÷ 2) × 30% = $7,500 × 30% = $450</p>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 p-4 rounded-lg border border-blue-500/20">
-                  <p className="text-sm"><span className="text-white font-semibold">Ещё пример:</span> Реферал проиграл $500</p>
-                  
-                  <div className="space-y-2 text-sm bg-zinc-900/50 p-3 rounded mt-3">
-                    <p><span className="text-cyan-400">Оборот</span> = <span className="text-white font-semibold">$500</span></p>
-                    <p><span className="text-cyan-400">Преимущество казино</span> = $500 × 3% = <span className="text-white font-semibold">$15</span></p>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-blue-500/20">
-                    <p className="text-white font-semibold mb-2">Твоя комиссия:</p>
-                    <p className="text-sm">($15 × $500 ÷ 2) × 30% = <span className="text-yellow-300 font-bold">$112.50</span></p>
+                    <p>Реферал накрутил: <span className="text-yellow-300 font-bold">$10,000</span></p>
+                    <p>Преимущество казино: <span className="text-yellow-300 font-bold">0.05</span> (5%)</p>
+                    <p>Расчёт: (0.05 × $10,000 ÷ 2) × 30% = (250) × 30% = <span className="text-yellow-300 font-bold">$75</span></p>
                   </div>
                 </div>
               </div>
@@ -291,31 +256,15 @@ export function SupportPage() {
 
             {/* Key Points */}
             <Card className="p-6 bg-green-500/10 border-green-500/20">
-              <h3 className="font-bold text-lg text-white mb-3">✅ Важные моменты</h3>
+              <h3 className="font-bold text-lg text-white mb-3">✅ Преимущества программы</h3>
               <ul className="space-y-2 text-sm text-zinc-300">
-                <li>• Комиссия зависит от <span className="text-green-300 font-semibold">реального заработка казино</span></li>
-                <li>• Чем больше оборот реферала, тем больше твой доход</li>
-                <li>• Выплачивается на все ставки реферала автоматически</li>
+                <li>• 30% комиссии со всех ставок реферала</li>
+                <li>• Выплаты на все ставки автоматически</li>
                 <li>• Нет ограничений по количеству рефералов</li>
-                <li>• Комиссия начисляется <span className="text-green-300 font-semibold">пожизненно</span></li>
-                <li>• Минимум для вывода: зависит от баланса</li>
+                <li>• Деньги начисляются пожизненно</li>
+                <li>• Вывод в любой момент без ограничений</li>
+                <li>• Дополнительный доход помимо собственного заработка</li>
               </ul>
-            </Card>
-
-            {/* RTP Explanation */}
-            <Card className="p-6 bg-blue-500/10 border-blue-500/20">
-              <h3 className="font-bold text-lg text-white mb-3">🎮 Что такое RTP и преимущество казино?</h3>
-              <p className="text-zinc-300 text-sm mb-3">
-                <span className="text-blue-300 font-semibold">RTP (Return to Player)</span> – это процент денег, который игра возвращает игроку в долгосрочной перспективе.
-              </p>
-              <div className="bg-zinc-900/50 p-3 rounded text-sm text-zinc-300 space-y-2">
-                <p><span className="text-white font-semibold">Например:</span> RTP 97% означает:</p>
-                <p>• Игроки возвращают 97% от всех ставок</p>
-                <p>• Казино оставляет себе 3% (преимущество казино)</p>
-                <p className="text-xs text-zinc-400 mt-2 pt-2 border-t border-zinc-700">
-                  При $1,000 оборота: казино получает $30 прибыли, это становится базой для твоей комиссии
-                </p>
-              </div>
             </Card>
           </div>
         </div>
