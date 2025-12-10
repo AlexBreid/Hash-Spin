@@ -14,7 +14,6 @@ import {
   Flame,
   Gift,
   X,
-  ArrowRight,
   ChevronDown,
   Star,
   Unlock,
@@ -53,7 +52,6 @@ export function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [showBonusModal, setShowBonusModal] = useState(false)
-  const [expandedCondition, setExpandedCondition] = useState<number | null>(null)
   const hasLoadedRef = useRef(false)
 
   const { execute: loadStats } = useFetch('REFERRAL_GET_referral_stats', 'GET')
@@ -131,41 +129,6 @@ export function ReferralsPage() {
   const commissionRate = stats?.commissionRate || 30
   const referralsCount = stats?.myReferralsCount || stats?.myRefeersCount || 0
 
-  const conditions = [
-    {
-      id: 1,
-      title: '🎁 Стартовый бонус +100%',
-      description: 'Первое пополнение',
-      details: [
-        'Получи 100% бонус к первому депозиту при вводе реферального кода',
-        'Бонус активируется автоматически после пополнения',
-        'Действует только один раз на аккаунт'
-      ]
-    },
-    {
-      id: 2,
-      title: '💰 Комиссия рефералов',
-      description: `${commissionRate}% от прибыли`,
-      details: [
-        `Ты получаешь ${commissionRate}% комиссии от всех профитов твоих рефералов`,
-        'Выплаты начисляются автоматически каждый день',
-        'Нет ограничений по количеству рефералов',
-        'Комиссия начисляется пожизненно',
-        'Минимум для вывода: $100'
-      ]
-    },
-    {
-      id: 4,
-      title: '🔒 Безопасность и вывод',
-      description: 'Как вывести деньги',
-      details: [
-        'Выводи заработанные средства в любое время',
-        'Выплаты обрабатываются за 24 часа',
-        'Все операции защищены и зашифрованы',
-      ]
-    }
-  ]
-
   return (
     <div className="pb-32 pt-6 px-4 space-y-6 relative overflow-hidden">
       
@@ -223,7 +186,7 @@ export function ReferralsPage() {
                       ВВЕДИ ПРОМОКОД
                     </h2>
                     <p className="text-zinc-300 text-sm md:text-base">
-                      Получи <span className="font-bold text-yellow-400">бонус</span>
+                      И получи <span className="font-bold text-yellow-400">эксклюзивный бонус</span>
                     </p>
                   </div>
 
@@ -252,7 +215,7 @@ export function ReferralsPage() {
                       ) : (
                         <>
                           <Sparkles className="w-6 h-6" />
-                          АКТИВИРОВАТЬ БОНУС
+                          АКТИВИРОВАТЬ
                         </>
                       )}
                     </Button>
@@ -263,271 +226,138 @@ export function ReferralsPage() {
           </motion.div>
         </div>
       ) : (
-        <div>
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }}
-          >
-            <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/20 border border-green-500/30 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-green-400" />
+        <>
+          {/* ПОСЛЕ ВВОДА КОДА - АКТИВИРОВАН БЛОК */}
+          <div>
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }}
+            >
+              <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/20 border border-green-500/30 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-green-400 uppercase font-bold tracking-wider">Ваш наставник</p>
+                    <p className="text-white font-bold">{stats.referrerUsername || stats.referredByCode}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-green-400 uppercase font-bold tracking-wider">Ваш наставник</p>
-                  <p className="text-white font-bold">{stats.referrerUsername || stats.referredByCode}</p>
+                <div className="px-3 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[10px] text-green-300 whitespace-nowrap">
+                  ✓ АКТИВИРОВАНО
                 </div>
               </div>
-              <div className="px-3 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[10px] text-green-300 whitespace-nowrap">
-                ✓ АКТИВИРОВАНО
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* 2. СТАТИСТИКА (СЕТКА) */}
-      <div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
-            <StatCard
-              title="МОЯ КОМАНДА"
-              value={referralsCount}
-              icon={<Users className="w-5 h-5 text-cyan-400" />}
-              gradient="from-cyan-500/10 to-blue-500/10"
-              border="border-cyan-500/20"
-            />
-            <StatCard
-              title="МОЙ ДОХОД"
-              value={`$${totalCommissionPaid.toFixed(0)}`}
-              icon={<Award className="w-5 h-5 text-yellow-400" />}
-              gradient="from-yellow-500/10 to-orange-500/10"
-              border="border-yellow-500/20"
-            />
-            <StatCard
-              title="ОБОРОТ СЕТИ"
-              value={`$${totalTurnover.toFixed(0)}`}
-              icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
-              gradient="from-purple-500/10 to-pink-500/10"
-              border="border-purple-500/20"
-            />
-            <StatCard
-              title="ТЕКУЩАЯ СТАВКА"
-              value={`${commissionRate}%`}
-              icon={<Flame className="w-5 h-5 text-red-400" />}
-              gradient="from-red-500/10 to-rose-500/10"
-              border="border-red-500/20"
-            />
-          </div>
-        </motion.div>
-      </div>
-
-      {/* 3. КАРТОЧКА С МОИМ КОДОМ */}
-      <div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <Crown className="w-6 h-6 text-indigo-400" />
-            <h2 className="text-lg md:text-xl font-bold text-white">Твой реферальный код</h2>
+            </motion.div>
           </div>
 
-          <Card className="relative overflow-hidden border-0 rounded-3xl group">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black z-0" />
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0 mix-blend-overlay" />
-            
-            <div className="relative z-10 p-6 md:p-8 flex flex-col items-center text-center">
-              <p className="text-indigo-200 text-xs font-bold tracking-[0.2em] uppercase mb-4">
-                Поделись с друзьями
-              </p>
+          {/* СТАТИСТИКА */}
+          <div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <StatCard
+                  title="МОЯ КОМАНДА"
+                  value={referralsCount}
+                  icon={<Users className="w-5 h-5 text-cyan-400" />}
+                  gradient="from-cyan-500/10 to-blue-500/10"
+                  border="border-cyan-500/20"
+                />
+                <StatCard
+                  title="МОЙ ДОХОД"
+                  value={`$${totalCommissionPaid.toFixed(0)}`}
+                  icon={<Award className="w-5 h-5 text-yellow-400" />}
+                  gradient="from-yellow-500/10 to-orange-500/10"
+                  border="border-yellow-500/20"
+                />
+                <StatCard
+                  title="ОБОРОТ СЕТИ"
+                  value={`$${totalTurnover.toFixed(0)}`}
+                  icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
+                  gradient="from-purple-500/10 to-pink-500/10"
+                  border="border-purple-500/20"
+                />
+                <StatCard
+                  title="СТАВКА"
+                  value={`${commissionRate}%`}
+                  icon={<Flame className="w-5 h-5 text-red-400" />}
+                  gradient="from-red-500/10 to-rose-500/10"
+                  border="border-red-500/20"
+                />
+              </div>
+            </motion.div>
+          </div>
 
-              <div className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-100%] group-hover:animate-pulse transition-all duration-1000" />
-                <p className="font-mono text-3xl md:text-4xl font-black text-white tracking-widest drop-shadow-lg select-all">
-                  {stats?.myReferralCode || '...'}
-                </p>
+          {/* МОЙ КОД */}
+          <div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <Crown className="w-6 h-6 text-indigo-400" />
+                <h2 className="text-lg md:text-xl font-bold text-white">Твой реферальный код</h2>
               </div>
 
-              <Button
-                onClick={copyCode}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold rounded-xl py-6 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all active:scale-95"
-              >
-                <Copy className="w-5 h-5" />
-                КОПИРОВАТЬ И ПРИГЛАСИТЬ
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      </div>
+              <Card className="relative overflow-hidden border-0 rounded-3xl group">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black z-0" />
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0 mix-blend-overlay" />
+                
+                <div className="relative z-10 p-6 md:p-8 flex flex-col items-center text-center">
+                  <p className="text-indigo-200 text-xs font-bold tracking-[0.2em] uppercase mb-4">
+                    Поделись с друзьями
+                  </p>
 
-      {/* 4. УСЛОВИЯ ПРОГРАММЫ */}
-      <div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1 mb-4">
-              <Zap className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-lg md:text-xl font-bold text-white">Условия программы</h2>
-            </div>
+                  <div className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-100%] group-hover:animate-pulse transition-all duration-1000" />
+                    <p className="font-mono text-3xl md:text-4xl font-black text-white tracking-widest drop-shadow-lg select-all">
+                      {stats?.myReferralCode || '...'}
+                    </p>
+                  </div>
 
-            {conditions.map((condition) => (
-              <div key={condition.id}>
-                <motion.div>
-                  <button
-                    onClick={() => setExpandedCondition(expandedCondition === condition.id ? null : condition.id)}
-                    className="w-full text-left"
+                  <Button
+                    onClick={copyCode}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold rounded-xl py-6 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all active:scale-95"
                   >
-                    <Card className="p-4 md:p-5 bg-gradient-to-r from-zinc-800 to-zinc-900 border-zinc-700 hover:border-zinc-600 transition-all cursor-pointer group">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className="text-2xl mt-1">{condition.title.split(' ')[0]}</div>
-                          <div className="flex-1">
-                            <h3 className="font-bold text-white text-sm md:text-base">
-                              {condition.title.replace(/^[^ ]+ /, '')}
-                            </h3>
-                            <p className="text-zinc-400 text-xs md:text-sm mt-1">{condition.description}</p>
-                          </div>
-                        </div>
-                        <ChevronDown 
-                          className={`w-5 h-5 text-zinc-400 transition-transform flex-shrink-0 ${
-                            expandedCondition === condition.id ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </div>
-                    </Card>
-                  </button>
-                </motion.div>
-
-                <AnimatePresence>
-                  {expandedCondition === condition.id && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="overflow-hidden">
-                        <Card className="mt-2 p-4 md:p-5 bg-zinc-900/50 border-zinc-700 border-t-0 rounded-t-none">
-                          <div className="space-y-3">
-                            {condition.details.map((detail, idx) => (
-                              <motion.div 
-                                key={idx}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="flex items-start gap-3"
-                              >
-                                <CheckCircle className="w-4 h-4 text-green-400 mt-1 flex-shrink-0" />
-                                <span className="text-zinc-300 text-xs md:text-sm">{detail}</span>
-                              </motion.div>
-                            ))}
-                          </div>
-                        </Card>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                    <Copy className="w-5 h-5" />
+                    КОПИРОВАТЬ И ПРИГЛАСИТЬ
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
           </div>
-        </motion.div>
-      </div>
 
-      {/* 5. КАК ЭТО РАБОТАЕТ */}
-      <div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="p-6 md:p-8 bg-gradient-to-br from-blue-900/20 via-purple-900/10 to-pink-900/20 border border-blue-500/20">
-            <div className="flex items-start gap-3 mb-4">
-              <Rocket className="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" />
-              <h3 className="text-lg font-bold text-white">Как начать зарабатывать?</h3>
-            </div>
-            
-            <div className="space-y-3 text-sm md:text-base">
-              <div className="flex gap-4">
-                <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 text-white font-bold flex-shrink-0 text-sm">1</div>
-                <p className="text-zinc-300 pt-1">Скопируй свой реферальный код и поделись с друзьями</p>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 text-white font-bold flex-shrink-0 text-sm">3</div>
-                <p className="text-zinc-300 pt-1">Ты получаешь {commissionRate}% от их профитов автоматически</p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* 6. ИНФОРМАЦИЯ О РЕФЕРАЛАХ И УСЛОВИЯХ */}
-      <div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <div className="space-y-4">
-            {/* Referral Program Info */}
-            <div>
-              <div className="flex items-center gap-2 px-1 mb-4">
-                <Users className="w-6 h-6 text-purple-400" />
-                <h2 className="text-lg md:text-xl font-bold text-white">О программе рефералов</h2>
-              </div>
-
+          {/* КРАТКАЯ ИНФА О РЕФЕРАЛАХ */}
+          <div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
               <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <Gift className="w-4 h-4 text-purple-400" />
-                      Привлекай рефералов
-                    </h4>
-                    <p className="text-zinc-300 text-sm">Делись своим кодом и зарабатывай на каждом приглашенном друге. Нет ограничений по количеству рефералов.</p>
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-white" />
                   </div>
-
-                  <div className="h-px bg-purple-500/20" />
-
-                  <div>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-pink-400" />
-                      30% от оборота
-                    </h4>
-                    <p className="text-zinc-300 text-sm">Получай 30% комиссии от прибыли каждого реферала.</p>
-                  </div>
-
-                  <div className="h-px bg-purple-500/20" />
-
-                  <div>
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-yellow-400" />
-                      Выплаты каждый день
-                    </h4>
-                    <p className="text-zinc-300 text-sm">Комиссия начисляется автоматически каждый день.</p>
+                  <div className="flex-1">
+                    <h3 className="text-white font-bold text-lg mb-2">Зарабатывай на рефералах</h3>
+                    <p className="text-zinc-300 text-sm mb-4">Получай {commissionRate}% от прибыли каждого приглашенного друга</p>
+                    <Button 
+                      onClick={() => navigate('/support?section=referral')}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"
+                    >
+                      Подробнее
+                    </Button>
                   </div>
                 </div>
               </Card>
-            </div>
-
-            {/* Conditions Button */}
-            <Button 
-              onClick={() => navigate('/support?section=referral')}
-              className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30 transition-all"
-            >
-              <Zap className="w-5 h-5 mr-2" />
-              ПОДРОБНЫЕ УСЛОВИЯ РЕФЕРАЛОВ
-            </Button>
+            </motion.div>
           </div>
-        </motion.div>
-      </div>
+        </>
+      )}
 
       {/* === MODAL: BONUS ACTIVATED === */}
       <AnimatePresence>
@@ -605,7 +435,7 @@ export function ReferralsPage() {
                     transition={{ delay: 0.4 }}
                     className="text-zinc-300 text-base mb-8"
                   >
-                    Поздравляем! Ты присоединился к нашей партнёрской программе
+                    Поздравляем! Ты присоединился к нашей программе
                   </motion.p>
 
                   {/* Bonus Details */}
@@ -615,28 +445,28 @@ export function ReferralsPage() {
                     transition={{ delay: 0.5 }}
                     className="w-full space-y-3 mb-8"
                   >
-                    <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-5">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Star className="w-6 h-6 text-yellow-400" />
-                        <span className="text-white font-bold text-lg">+100% к депозиту</span>
+                    <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-4">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Star className="w-5 h-5 text-yellow-400" />
+                        <span className="text-white font-bold">Стартовый бонус</span>
                       </div>
-                      <p className="text-zinc-400 text-sm">На первое пополнение счёта</p>
+                      <p className="text-zinc-400 text-xs">Узнай подробнее в условиях</p>
                     </div>
 
-                    <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-5">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Unlock className="w-6 h-6 text-purple-400" />
-                        <span className="text-white font-bold text-lg">{commissionRate}% комиссия</span>
+                    <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-4">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Unlock className="w-5 h-5 text-purple-400" />
+                        <span className="text-white font-bold">{commissionRate}% комиссия</span>
                       </div>
-                      <p className="text-zinc-400 text-sm">От прибыли всех твоих рефералов</p>
+                      <p className="text-zinc-400 text-xs">От прибыли рефералов</p>
                     </div>
 
-                    <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl p-5">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Rocket className="w-6 h-6 text-green-400" />
-                        <span className="text-white font-bold text-lg">Пожизненные выплаты</span>
+                    <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl p-4">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Rocket className="w-5 h-5 text-green-400" />
+                        <span className="text-white font-bold">Пожизненно</span>
                       </div>
-                      <p className="text-zinc-400 text-sm">Зарабатывай столько, сколько захочешь</p>
+                      <p className="text-zinc-400 text-xs">Без ограничений</p>
                     </div>
                   </motion.div>
 
@@ -651,8 +481,8 @@ export function ReferralsPage() {
                       onClick={() => setShowBonusModal(false)}
                       className="w-full py-6 text-lg bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 hover:from-purple-700 hover:via-pink-700 hover:to-orange-700 text-white font-black rounded-2xl shadow-lg shadow-pink-500/30 transition-all active:scale-95 uppercase"
                     >
-                      <Sparkles className="w-5 h-5" />
-                      ЗАБЕРУ БОНУС!
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      ОК
                     </Button>
                     
                     <Button 
@@ -666,10 +496,6 @@ export function ReferralsPage() {
                       УЗНАТЬ УСЛОВИЯ
                     </Button>
                   </motion.div>
-
-                  <p className="text-zinc-500 text-xs mt-6 px-4">
-                    * Бонус подлежит отыгрышу в соответствии с условиями программы
-                  </p>
                 </div>
               </div>
             </motion.div>
