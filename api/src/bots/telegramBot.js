@@ -510,6 +510,14 @@ if (!BOT_TOKEN) {
 
       // ✅ ВЫВОД: ШАГ 1 - СУММА
       if (waitingForWithdrawAmount.has(user.id)) {
+        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА СУММЫ
+        if (text === '◀️ Назад') {
+          waitingForWithdrawAmount.delete(user.id);
+          const menu = getMainMenuKeyboard();
+          await ctx.reply('📋 *Выберите действие:*', menu);
+          return;
+        }
+
         const amount = parseFloat(text);
         const balance = await getUserBalance(user.id);
         
@@ -535,6 +543,14 @@ if (!BOT_TOKEN) {
 
       // ✅ ВЫВОД: ШАГ 2 - АДРЕС
       if (waitingForWithdrawAddress.has(user.id)) {
+        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА АДРЕСА
+        if (text === '◀️ Назад') {
+          waitingForWithdrawAddress.delete(user.id);
+          const menu = getMainMenuKeyboard();
+          await ctx.reply('📋 *Выберите действие:*', menu);
+          return;
+        }
+
         const amount = waitingForWithdrawAddress.get(user.id);
         const walletAddress = text.trim();
 
@@ -613,6 +629,14 @@ if (!BOT_TOKEN) {
 
       // ✅ ПОПОЛНЕНИЕ: ШАГ 1 - СУММА
       if (waitingForDeposit.has(user.id)) {
+        // ✅ ОБРАБОТКА КНОПКИ НАЗАД В РЕЖИМЕ ВВОДА СУММЫ
+        if (text === '◀️ Назад') {
+          waitingForDeposit.delete(user.id);
+          const menu = getMainMenuKeyboard();
+          await ctx.reply('📋 *Выберите действие:*', menu);
+          return;
+        }
+
         const amount = parseFloat(text);
         
         if (!validators.validateDepositAmount(amount)) {
