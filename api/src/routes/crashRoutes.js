@@ -417,7 +417,7 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
 
 // ===================================
 // GET /api/v1/crash/last-crashes
-// ✅ ЗАГРУЖАЕТ ИЗ БД, НЕ ИЗ RAM
+// ✅ ИСПРАВЛЕННЫЙ ЗАПРОС БЕЗ DECIMAL
 // ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
@@ -425,6 +425,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     console.log(`📊 [ROUTE] GET /crash/last-crashes`);
     console.log(`${'='.repeat(80)}`);
 
+    // ✅ Используем NOT { crashPoint: null } вместо not: null
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
@@ -436,25 +437,30 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
         totalPlayers: true,
       },
       where: {
-        crashPoint: { not: null }
+        NOT: {
+          crashPoint: null
+        }
       },
       orderBy: {
         createdAt: 'desc',
       },
-      take: 10,
+      take: 50,
     });
 
     console.log(`✅ Найдено ${crashes.length} раундов в БД`);
 
     if (crashes.length > 0) {
       console.log(`\n📍 СПИСОК РАУНДОВ:`);
-      crashes.forEach((crash, idx) => {
+      crashes.slice(0, 5).forEach((crash, idx) => {
         console.log(`  ${idx + 1}. GameID: ${crash.gameId.substring(0, 8)}`);
         console.log(`     - Crash Point: ${crash.crashPoint}x`);
         console.log(`     - Created: ${crash.createdAt.toLocaleTimeString()}`);
         console.log(`     - Wagered: ${crash.totalWagered}, Payouts: ${crash.totalPayouts}`);
         console.log(`     - Players: ${crash.totalPlayers}`);
       });
+      if (crashes.length > 5) {
+        console.log(`  ... и ещё ${crashes.length - 5} раундов`);
+      }
     }
 
     const formattedCrashes = crashes.map((crash) => {
@@ -482,7 +488,8 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     console.error('❌ [ROUTE] Ошибка получения крашей:', error.message);
     res.status(500).json({
       success: false,
-      error: 'Ошибка получения истории крашей'
+      error: 'Ошибка получения истории крашей',
+      details: error.message
     });
   }
 });
@@ -496,7 +503,11 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
 
     const crashes = await prisma.crashRound.findMany({
       select: { crashPoint: true },
-      where: { crashPoint: { not: null } },
+      where: {
+        NOT: {
+          crashPoint: null
+        }
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
