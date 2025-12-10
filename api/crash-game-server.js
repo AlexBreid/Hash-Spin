@@ -1,3 +1,7 @@
+// ========================
+// ✅ ИСПРАВЛЕННЫЙ GAME SERVER
+// ========================
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -67,6 +71,7 @@ function calculateCrashPointFromRandom(randomValue) {
 
 // ========================
 // ХРАНИЛИЩЕ ИСТОРИИ КРАШЕЙ (В ПАМЯТИ)
+// ✅ ПРИМЕЧАНИЕ: Основная история теперь в БД, это только для live-обновлений
 // ========================
 let crashHistory = [];
 
@@ -78,7 +83,7 @@ function addToCrashHistory(gameId, crashPoint, timestamp) {
     timestamp: new Date(timestamp),
   });
   
-  // Храним максимум 50 последних крашей в памяти
+  // Храним максимум 50 последних крашей в памяти (для сокетов)
   if (crashHistory.length > 50) {
     crashHistory = crashHistory.slice(0, 50);
   }
@@ -100,6 +105,7 @@ class GameRoom {
     this.gameLoopInterval = null;
     this.countdownTimer = 5;
     this.roundKeys = this.generateRoundKeys();
+    this.finalizationInProgress = false; // ✅ Флаг для защиты от двойной финализации
   }
 
   generateRoundKeys() {
@@ -138,6 +144,7 @@ class GameRoom {
     this.startTime = Date.now();
     this.status = 'in_progress';
     this.multiplier = 1.0;
+    this.finalizationInProgress = false; // ✅ Сбрасываем флаг для нового раунда
 
     this.players.forEach(p => (p.cashed_out = false));
 
@@ -174,6 +181,13 @@ class GameRoom {
     this.status = 'crashed';
     this.multiplier = this.crashPoint;
 
+    // ✅ ИСПРАВЛЕНИЕ #1: Защита от двойного вызова crash()
+    if (this.finalizationInProgress) {
+      log.error('⚠️ Финализация уже в процессе, пропускаю повторный вызов');
+      return;
+    }
+    this.finalizationInProgress = true;
+
     const losers = [];
     const winners = [];
 
@@ -187,7 +201,7 @@ class GameRoom {
       }
     });
 
-    // ✅ ИСПРАВЛЕНО: Добавляем краш в историю ДО отправки события
+    // ✅ Добавляем краш в историю ДО отправки события
     const crashTimestamp = new Date();
     addToCrashHistory(this.gameId, this.crashPoint, crashTimestamp);
 
@@ -197,7 +211,7 @@ class GameRoom {
       log.error(`Ошибка финализации: ${error.message}`);
     }
 
-    // ✅ ИСПРАВЛЕНО: Отправляем историю вместе с событием краша
+    // ✅ Отправляем событие краша с информацией о победителях
     io.to('crash-room').emit('gameCrashed', {
       crashPoint: this.crashPoint,
       gameId: this.gameId,
@@ -211,9 +225,9 @@ class GameRoom {
       losersCount: losers.length,
     });
 
-    // ✅ НОВОЕ: Отправляем обновленную историю крашей на фронт
+    // ✅ Отправляем обновленную историю крашей на фронт
     io.to('crash-room').emit('crashHistoryUpdated', {
-      history: crashHistory.slice(0, 10), // Отправляем последние 10
+      history: crashHistory.slice(0, 10), // Последние 10
       totalInMemory: crashHistory.length,
     });
 
@@ -271,10 +285,11 @@ class GameRoom {
     try {
       log.info(`📤 Финализирую результаты для ${this.players.size} игроков`);
 
-      for (const player of this.players.values()) {
+      // ✅ ИСПРАВЛЕНИЕ #2: Обрабатываем результаты параллельно, но с контролем
+      const promises = Array.from(this.players.values()).map(async (player) => {
         if (!player.betId) {
           log.error(`❌ Нет betId для player ${player.userId}!`);
-          continue;
+          return;
         }
 
         const isWinner = winners.find(w => w.userId === player.userId);
@@ -286,7 +301,7 @@ class GameRoom {
             userId: player.userId,
             tokenId: player.tokenId,
             betId: player.betId,
-            winnings: isWinner ? parseFloat(player.winnings) : 0,
+            winnings: isWinner ? parseFloat(player.winnings.toString()) : 0,
             exitMultiplier: isWinner ? player.multiplier : null,
             gameId: this.gameId,
             result: isWinner ? 'won' : 'lost',
@@ -323,7 +338,12 @@ class GameRoom {
             log.error(`Response:`, JSON.stringify(error.response.data));
           }
         }
-      }
+      });
+
+      // Ждём завершения всех финализаций
+      await Promise.all(promises);
+
+      log.success('✅ Все ставки финализированы');
     } catch (error) {
       log.error(`Ошибка в finalize: ${error.message}`);
       throw error;
@@ -373,7 +393,7 @@ io.on('connection', socket => {
       countdown: gameRoom.countdownTimer,
     });
 
-    // ✅ НОВОЕ: Отправляем историю при присоединении
+    // ✅ Отправляем историю при присоединении (из памяти, основная в БД)
     socket.emit('crashHistoryUpdated', {
       history: crashHistory.slice(0, 10),
       totalInMemory: crashHistory.length,

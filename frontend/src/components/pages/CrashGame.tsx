@@ -50,6 +50,10 @@ export function CrashGame() {
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
+  // ✅ НОВОЕ: Храним betId в sessionStorage для восстановления при перезагрузке
+  const sessionKeyBetId = `crash_pending_bet_${user?.id}`;
+  const sessionKeyCurrentBet = `crash_current_bet_${user?.id}`;
+
   // CAMERA FOLLOW
   const [cameraY, setCameraY] = useState(0);
   const [targetCameraY, setTargetCameraY] = useState(0);
@@ -57,6 +61,18 @@ export function CrashGame() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
+
+  // ✅ ИСПРАВЛЕНИЕ #1: Восстанавливаем состояние ставки при загрузке
+  useEffect(() => {
+    const storedBetId = sessionStorage.getItem(sessionKeyBetId);
+    const storedBet = sessionStorage.getItem(sessionKeyCurrentBet);
+
+    if (storedBetId && storedBet) {
+      console.log('✅ [RECOVERY] Восстанавливаю ставку из sessionStorage:', storedBetId);
+      setBetPlaced(true);
+      setCurrentBet(parseFloat(storedBet));
+    }
+  }, [sessionKeyBetId, sessionKeyCurrentBet]);
 
   useEffect(() => {
     if (!user || !token) {
@@ -135,8 +151,16 @@ export function CrashGame() {
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
       setGameState(data);
-      if (data.status === 'waiting') setCanCashout(false);
-      else if (data.status === 'flying') setCanCashout(betPlaced);
+      if (data.status === 'waiting') {
+        setCanCashout(false);
+        // ✅ ИСПРАВЛЕНИЕ #2: При возврате в waiting, очищаем sessionStorage
+        if (!betPlaced) {
+          sessionStorage.removeItem(sessionKeyBetId);
+          sessionStorage.removeItem(sessionKeyCurrentBet);
+        }
+      } else if (data.status === 'flying') {
+        setCanCashout(betPlaced);
+      }
     };
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
@@ -154,6 +178,10 @@ export function CrashGame() {
       setCanCashout(false);
       setBetPlaced(false);
 
+      // ✅ ИСПРАВЛЕНИЕ #3: Очищаем sessionStorage при краше
+      sessionStorage.removeItem(sessionKeyBetId);
+      sessionStorage.removeItem(sessionKeyCurrentBet);
+
       const newCrash: CrashHistory = {
         id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
         gameId: data.gameId,
@@ -169,24 +197,38 @@ export function CrashGame() {
     };
 
     const handlePlayerJoined = (data: { playersCount: number }) => setPlayersCount(data.playersCount);
+    
     const handleBetPlaced = (data: any) => {
       setBetPlaced(true);
       setCurrentBet(data.bet);
       setCanCashout(false);
       toast.success(`✅ Ставка: $${data.bet}`);
+      
+      // ✅ ИСПРАВЛЕНИЕ #4: Сохраняем betId в sessionStorage
+      console.log('💾 Сохраняю ставку в sessionStorage');
+      sessionStorage.setItem(sessionKeyBetId, data.betId || 'unknown');
+      sessionStorage.setItem(sessionKeyCurrentBet, data.bet.toString());
     };
+    
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
       const profit = data.winnings - currentBet;
       setBetPlaced(false);
       setCanCashout(false);
+      
+      // ✅ Очищаем sessionStorage после успешного выхода
+      sessionStorage.removeItem(sessionKeyBetId);
+      sessionStorage.removeItem(sessionKeyCurrentBet);
+      
       setTimeout(() => fetchBalances(), 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
     };
+    
     const handleCountdownUpdate = (data: { seconds: number }) => {
       setGameState((prev) => ({ ...prev, countdown: data.seconds, status: 'waiting' }));
       setCameraY(0);
       setTargetCameraY(0);
     };
+    
     const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
 
     crashGameService.on('gameStatus', handleGameStatus);
@@ -208,7 +250,7 @@ export function CrashGame() {
       crashGameService.off('countdownUpdate', handleCountdownUpdate);
       crashGameService.off('error', handleError);
     };
-  }, [betPlaced, currentBet, fetchBalances]);
+  }, [betPlaced, currentBet, fetchBalances, sessionKeyBetId, sessionKeyCurrentBet]);
 
   // CAMERA FOLLOW
   useEffect(() => {
@@ -219,133 +261,127 @@ export function CrashGame() {
   const currentCrashPoint = activeCrash?.crashPoint ?? gameState.crashPoint;
   const currentMult = gameState.status === 'crashed' && currentCrashPoint ? currentCrashPoint : gameState.multiplier;
 
-const drawChart = useCallback(() => {
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  const drawChart = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  const w = canvas.width;
-  const h = canvas.height;
-  const padding = 40;
+    const w = canvas.width;
+    const h = canvas.height;
+    const padding = 40;
 
-  // Очистка
-  ctx.clearRect(0, 0, w, h);
+    // Очистка
+    ctx.clearRect(0, 0, w, h);
 
-  // Фон
-  const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
-  bgGradient.addColorStop(0, '#0f1419');
-  bgGradient.addColorStop(1, '#0a0e17');
-  ctx.fillStyle = bgGradient;
-  ctx.fillRect(0, 0, w, h);
+    // Фон
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
+    bgGradient.addColorStop(0, '#0f1419');
+    bgGradient.addColorStop(1, '#0a0e17');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, w, h);
 
-  // Ничего не рисуем, если игра в ожидании и нет активного значения
-  if (gameState.status === 'waiting') {
-    // Кружок "ожидание"
-    const radius = 40 + Math.sin(Date.now() / 300) * 5;
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(234, 179, 8, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    return;
-  }
-
-  // Текущее значение
-  const currentMult = gameState.status === 'crashed'
-    ? (gameState.crashPoint || 1)
-    : gameState.multiplier;
-
-  // Автоматический максимум: не менее 2x, не более 20x, но всегда немного выше текущего
-  const maxMult = Math.max(2, Math.min(20, currentMult + (currentMult > 10 ? 5 : 2)));
-
-  // Преобразование мультипликатора → Y (сверху вниз!)
-  const multToY = (mult: number) => {
-    return padding + ((maxMult - mult) / maxMult) * (h - padding * 2);
-  };
-
-  // Прогресс кривой: 0 → 1
-  const progress = Math.min(1, (currentMult - 1) / (maxMult - 1));
-  // Нелинейное ускорение: квадратный корень для плавного старта
-  const curveProgress = Math.sqrt(progress);
-  const headX = padding + curveProgress * (w - padding * 2);
-  const headY = multToY(currentMult);
-
-  // === РИСУЕМ КРИВУЮ ===
-
-  // Точки для кривой (по формуле: mult = 1 + (maxMult - 1) * (x / w)^2)
-  const points: { x: number; y: number }[] = [];
-  const steps = 150;
-  for (let i = 0; i <= steps; i++) {
-    const xNorm = i / steps;
-    const x = padding + xNorm * (w - padding * 2);
-    const mult = 1 + (maxMult - 1) * xNorm * xNorm;
-    const y = multToY(mult);
-    points.push({ x, y });
-    if (x >= headX) break;
-  }
-
-  // Заливка под кривой
-  if (points.length > 0) {
-    ctx.beginPath();
-    ctx.moveTo(padding, h - padding);
-    points.forEach((p) => ctx.lineTo(p.x, p.y));
-    ctx.lineTo(points[points.length - 1].x, h - padding);
-    ctx.closePath();
-
-    const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
-    fillGradient.addColorStop(0, gameState.status === 'crashed' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.25)');
-    fillGradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = fillGradient;
-    ctx.fill();
-  }
-
-  // Линия кривой
-  if (points.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
+    // Ничего не рисуем, если игра в ожидании и нет активного значения
+    if (gameState.status === 'waiting') {
+      // Кружок "ожидание"
+      const radius = 40 + Math.sin(Date.now() / 300) * 5;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(234, 179, 8, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      return;
     }
-    ctx.strokeStyle = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-  }
 
-  // === ГОЛОВА (активная точка) ===
-  if (gameState.status === 'flying') {
-    // Пульсирующий круг вокруг
-    const pulseRadius = 14 + Math.sin(Date.now() / 150) * 6;
-    ctx.beginPath();
-    ctx.arc(headX, headY, pulseRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // Текущее значение
+    const currentMult = gameState.status === 'crashed'
+      ? (gameState.crashPoint || 1)
+      : gameState.multiplier;
 
-    // Основная точка
-    ctx.beginPath();
-    ctx.arc(headX, headY, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#22c55e';
-    ctx.fill();
-  }
+    // Автоматический максимум
+    const maxMult = Math.max(2, Math.min(20, currentMult + (currentMult > 10 ? 5 : 2)));
 
-  // === ТЕКСТ "КРАХ" ===
-  if (gameState.status === 'crashed') {
-    ctx.font = 'bold 48px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.95)';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 25;
-    ctx.fillText(`КРАХ @ ${gameState.crashPoint?.toFixed(2)}x`, w / 2, h / 2);
-    ctx.shadowBlur = 0;
-  }
+    // Преобразование мультипликатора → Y (сверху вниз!)
+    const multToY = (mult: number) => {
+      return padding + ((maxMult - mult) / maxMult) * (h - padding * 2);
+    };
 
-  // Запрос следующего кадра
-  animationFrameRef.current = requestAnimationFrame(drawChart);
-}, [gameState]);
+    // Прогресс кривой: 0 → 1
+    const progress = Math.min(1, (currentMult - 1) / (maxMult - 1));
+    const curveProgress = Math.sqrt(progress);
+    const headX = padding + curveProgress * (w - padding * 2);
+    const headY = multToY(currentMult);
+
+    // === РИСУЕМ КРИВУЮ ===
+    const points: { x: number; y: number }[] = [];
+    const steps = 150;
+    for (let i = 0; i <= steps; i++) {
+      const xNorm = i / steps;
+      const x = padding + xNorm * (w - padding * 2);
+      const mult = 1 + (maxMult - 1) * xNorm * xNorm;
+      const y = multToY(mult);
+      points.push({ x, y });
+      if (x >= headX) break;
+    }
+
+    // Заливка под кривой
+    if (points.length > 0) {
+      ctx.beginPath();
+      ctx.moveTo(padding, h - padding);
+      points.forEach((p) => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(points[points.length - 1].x, h - padding);
+      ctx.closePath();
+
+      const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
+      fillGradient.addColorStop(0, gameState.status === 'crashed' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.25)');
+      fillGradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = fillGradient;
+      ctx.fill();
+    }
+
+    // Линия кривой
+    if (points.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.strokeStyle = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+
+    // === ГОЛОВА (активная точка) ===
+    if (gameState.status === 'flying') {
+      const pulseRadius = 14 + Math.sin(Date.now() / 150) * 6;
+      ctx.beginPath();
+      ctx.arc(headX, headY, pulseRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(headX, headY, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#22c55e';
+      ctx.fill();
+    }
+
+    // === ТЕКСТ "КРАХ" ===
+    if (gameState.status === 'crashed') {
+      ctx.font = 'bold 48px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.95)';
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 25;
+      ctx.fillText(`КРАХ @ ${gameState.crashPoint?.toFixed(2)}x`, w / 2, h / 2);
+      ctx.shadowBlur = 0;
+    }
+
+    animationFrameRef.current = requestAnimationFrame(drawChart);
+  }, [gameState]);
 
   useEffect(() => {
     animationFrameRef.current = requestAnimationFrame(drawChart);

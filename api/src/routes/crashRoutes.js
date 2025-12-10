@@ -54,7 +54,6 @@ router.post('/api/v1/crash/start-round', (req, res) => {
         });
       }
 
-      // ✅ Создаём раунд БЕЗ поля status
       const newRound = await prisma.crashRound.create({
         data: {
           gameId,
@@ -78,6 +77,7 @@ router.post('/api/v1/crash/start-round', (req, res) => {
 
 // ===================================
 // POST /api/v1/crash/create-bet
+// ✅ С ТРАНЗАКЦИЕЙ ДЛЯ АТОМАРНОСТИ
 // ===================================
 router.post('/api/v1/crash/create-bet', (req, res) => {
   const verified = verifyGameServerSecret(req, res);
@@ -128,53 +128,59 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         return res.status(400).json({ success: false, error: 'User not found' });
       }
 
-      const deductResult = await deductBetFromBalance(userId, betAmount, tokenId);
-      
-      if (!deductResult.success) {
-        console.log(`❌ [CREATE-BET] ${deductResult.error}`);
-        return res.status(400).json({ 
-          success: false, 
-          error: deductResult.error || 'Insufficient balance'
+      // ✅ ТРАНЗАКЦИЯ: Все операции выполняются вместе или откатываются
+      const result = await prisma.$transaction(async (tx) => {
+        // Вычитаем деньги
+        const deductResult = await deductBetFromBalance(userId, betAmount, tokenId);
+        
+        if (!deductResult.success) {
+          console.log(`❌ [CREATE-BET] ${deductResult.error}`);
+          throw new Error(deductResult.error || 'Insufficient balance');
+        }
+
+        // Создаём ставку с result='PENDING'
+        const newBet = await tx.crashBet.create({
+          data: {
+            userId,
+            roundId: round.id,
+            tokenId,
+            betAmount: betAmount.toString(),
+            exitMultiplier: null,
+            winnings: '0',
+            result: 'PENDING'
+          }
         });
-      }
 
-      const newBet = await prisma.crashBet.create({
-        data: {
-          userId,
-          roundId: round.id,
-          tokenId,
-          betAmount: betAmount.toString(),
-          exitMultiplier: null,
-          winnings: '0',
-          result: 'pending'
-        }
+        // Записываем транзакцию
+        await tx.crashTransaction.create({
+          data: {
+            userId,
+            betId: newBet.id,
+            tokenId,
+            amount: (-betAmount).toString(),
+            type: 'bet_placed'
+          }
+        });
+
+        // Обновляем раунд
+        await tx.crashRound.update({
+          where: { id: round.id },
+          data: {
+            totalPlayers: { increment: 1 },
+            totalWagered: { increment: betAmount }
+          }
+        });
+
+        return { betId: newBet.id, balanceType: deductResult.balanceType };
       });
 
-      await prisma.crashTransaction.create({
-        data: {
-          userId,
-          betId: newBet.id,
-          tokenId,
-          amount: (-betAmount).toString(),
-          type: 'bet_placed'
-        }
-      });
-
-      await prisma.crashRound.update({
-        where: { id: round.id },
-        data: {
-          totalPlayers: { increment: 1 },
-          totalWagered: { increment: betAmount }
-        }
-      });
-
-      console.log(`✅ [CREATE-BET] Ставка создана: ${newBet.id}, сумма: ${betAmount}`);
+      console.log(`✅ [CREATE-BET] Ставка создана: ${result.betId}, сумма: ${betAmount}`);
 
       res.json({ 
         success: true, 
         data: { 
-          betId: newBet.id,
-          balanceType: deductResult.balanceType
+          betId: result.betId,
+          balanceType: result.balanceType
         } 
       });
     } catch (error) {
@@ -186,6 +192,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 
 // ===================================
 // POST /api/v1/crash/cashout-result
+// ✅ С ЗАЩИТОЙ ОТ ДВОЙНОЙ ОБРАБОТКИ
 // ===================================
 router.post('/api/v1/crash/cashout-result', (req, res) => {
   const verified = verifyGameServerSecret(req, res);
@@ -211,6 +218,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid betId format' });
       }
 
+      // Получаем ставку и её текущий статус
       const bet = await prisma.crashBet.findUnique({
         where: { id: betIdInt }
       });
@@ -220,52 +228,70 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         return res.status(404).json({ success: false, error: 'Bet not found' });
       }
 
+      // ✅ ЗАЩИТА: Проверяем, не была ли уже обработана
+      if (bet.result !== 'PENDING') {
+        console.log(`⚠️ [CASHOUT-RESULT] Ставка уже обработана (${bet.result}), пропускаем: ${betIdInt}`);
+        return res.json({ 
+          success: true, 
+          data: { status: 'already_processed', previousResult: bet.result } 
+        });
+      }
+
       console.log(`📝 [CASHOUT-RESULT] Обновляю ставку ${betIdInt}: result=${result}, winnings=${winningsAmount}`);
 
-      await prisma.crashBet.update({
-        where: { id: betIdInt },
-        data: {
-          result,
-          winnings: winningsAmount.toString(),
-          exitMultiplier: exitMultiplier ? parseFloat(exitMultiplier).toString() : null
+      // ✅ ТРАНЗАКЦИЯ: Финализация в одной транзакции
+      const finalResult = await prisma.$transaction(async (tx) => {
+        // Обновляем ставку
+        const updatedBet = await tx.crashBet.update({
+          where: { id: betIdInt },
+          data: {
+            result: result.toUpperCase(),
+            winnings: winningsAmount.toString(),
+            exitMultiplier: exitMultiplier ? parseFloat(exitMultiplier).toString() : null
+          }
+        });
+
+        // Если выиграл - зачисляем деньги
+        if (winningsAmount > 0 && result === 'won') {
+          console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount}`);
+          
+          await creditWinnings(userId, winningsAmount, tokenId, 'MAIN');
+
+          await tx.crashTransaction.create({
+            data: {
+              userId,
+              betId: betIdInt,
+              tokenId,
+              amount: winningsAmount.toString(),
+              type: 'winnings'
+            }
+          });
+        } else {
+          console.log(`❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
         }
-      });
 
-      if (winningsAmount > 0 && result === 'won') {
-        console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount}`);
-        
-        await creditWinnings(userId, winningsAmount, tokenId, 'MAIN');
-
-        await prisma.crashTransaction.create({
-          data: {
-            userId,
-            betId: betIdInt,
-            tokenId,
-            amount: winningsAmount.toString(),
-            type: 'winnings'
-          }
+        // Обновляем раунд
+        const round = await tx.crashRound.findUnique({
+          where: { id: updatedBet.roundId }
         });
-      } else {
-        console.log(`❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
-      }
 
-      const round = await prisma.crashRound.findUnique({
-        where: { id: bet.roundId }
+        if (round) {
+          console.log(`🔄 [CASHOUT-RESULT] Обновляю раунд ${round.gameId}: totalPayouts += ${winningsAmount}`);
+          
+          await tx.crashRound.update({
+            where: { id: round.id },
+            data: {
+              totalPayouts: { increment: winningsAmount },
+              winnersCount: result === 'won' ? { increment: 1 } : undefined
+            }
+          });
+        }
+
+        return updatedBet;
       });
-
-      if (round) {
-        console.log(`🔄 [CASHOUT-RESULT] Обновляю раунд ${round.gameId}: totalPayouts += ${winningsAmount}`);
-        
-        await prisma.crashRound.update({
-          where: { id: round.id },
-          data: {
-            totalPayouts: { increment: winningsAmount }
-          }
-        });
-      }
 
       console.log(`✅ [CASHOUT-RESULT] Касаут обработан для ставки ${betIdInt}`);
-      res.json({ success: true, data: { status: 'finalized' } });
+      res.json({ success: true, data: { status: 'finalized', result: finalResult.result } });
     } catch (error) {
       console.error('❌ [CASHOUT-RESULT] Ошибка:', error.message);
 
@@ -314,7 +340,7 @@ router.get('/api/v1/crash/stats', authenticateToken, async (req, res) => {
     });
 
     const wins = await prisma.crashBet.count({
-      where: { userId, result: 'won' }
+      where: { userId, result: 'WON' }
     });
 
     res.json({ 
@@ -391,7 +417,7 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
 
 // ===================================
 // GET /api/v1/crash/last-crashes
-// ✅ ГЛАВНЫЙ ENDPOINT - ЗАГРУЖАЕТ ПОСЛЕДНИЕ КРАХИ
+// ✅ ЗАГРУЖАЕТ ИЗ БД, НЕ ИЗ RAM
 // ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
@@ -399,10 +425,6 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     console.log(`📊 [ROUTE] GET /crash/last-crashes`);
     console.log(`${'='.repeat(80)}`);
 
-    // ✅ Получаем последние ЗАВЕРШЁННЫЕ раунды
-    // Раунд считается завершённым если:
-    // 1. У него есть хотя бы одна ставка И
-    // 2. crashPoint установлен (что означает краш произошёл)
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
@@ -411,11 +433,15 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
         createdAt: true,
         totalWagered: true,
         totalPayouts: true,
+        totalPlayers: true,
+      },
+      where: {
+        crashPoint: { not: null }
       },
       orderBy: {
-        createdAt: 'desc',  // Сортируем по времени создания (DESC = новые первыми)
+        createdAt: 'desc',
       },
-      take: 10,  // Берём последние 10
+      take: 10,
     });
 
     console.log(`✅ Найдено ${crashes.length} раундов в БД`);
@@ -427,6 +453,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
         console.log(`     - Crash Point: ${crash.crashPoint}x`);
         console.log(`     - Created: ${crash.createdAt.toLocaleTimeString()}`);
         console.log(`     - Wagered: ${crash.totalWagered}, Payouts: ${crash.totalPayouts}`);
+        console.log(`     - Players: ${crash.totalPlayers}`);
       });
     }
 
@@ -436,6 +463,9 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
         gameId: crash.gameId,
         crashPoint: parseFloat(crash.crashPoint.toString()),
         timestamp: crash.createdAt,
+        totalWagered: crash.totalWagered,
+        totalPayouts: crash.totalPayouts,
+        totalPlayers: crash.totalPlayers,
       };
     });
 
@@ -466,6 +496,7 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
 
     const crashes = await prisma.crashRound.findMany({
       select: { crashPoint: true },
+      where: { crashPoint: { not: null } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
