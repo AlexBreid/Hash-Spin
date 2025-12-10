@@ -724,6 +724,11 @@ if (!BOT_TOKEN) {
         }
 
         case '💰 Пополнить': {
+          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ (если остались)
+          waitingForDeposit.delete(user.id);
+          waitingForWithdrawAmount.delete(user.id);
+          waitingForWithdrawAddress.delete(user.id);
+          
           waitingForDeposit.set(user.id, true);
           setStateTimeout(waitingForDeposit, user.id);
           
@@ -745,6 +750,11 @@ if (!BOT_TOKEN) {
         }
 
         case '💸 Вывести': {
+          // ✅ ОЧИЩАЕМ СТАРОЕ СОСТОЯНИЕ (если остались)
+          waitingForDeposit.delete(user.id);
+          waitingForWithdrawAmount.delete(user.id);
+          waitingForWithdrawAddress.delete(user.id);
+          
           const balance = await getUserBalance(user.id);
           if (balance < 1) {
             await ctx.reply('❌ Минимальный баланс для вывода — 1 USDT.');
@@ -871,9 +881,11 @@ if (!BOT_TOKEN) {
   // ====================================
 
   bot.action('back_to_menu', async (ctx) => {
-    waitingForDeposit.delete(ctx.from.id);
-    waitingForWithdrawAmount.delete(ctx.from.id);
-    waitingForWithdrawAddress.delete(ctx.from.id);
+    // ✅ ОЧИЩАЕМ ВСЕ СОСТОЯНИЯ
+    const userId = parseInt(ctx.from.id);
+    waitingForDeposit.delete(userId);
+    waitingForWithdrawAmount.delete(userId);
+    waitingForWithdrawAddress.delete(userId);
     
     try {
       await ctx.deleteMessage();
@@ -889,7 +901,11 @@ if (!BOT_TOKEN) {
   });
 
   bot.action('cancel_deposit', async (ctx) => {
-    waitingForDeposit.delete(ctx.from.id);
+    // ✅ ОЧИЩАЕМ СОСТОЯНИЯ
+    const userId = parseInt(ctx.from.id);
+    waitingForDeposit.delete(userId);
+    waitingForWithdrawAmount.delete(userId);
+    waitingForWithdrawAddress.delete(userId);
     
     try {
       await ctx.deleteMessage();
