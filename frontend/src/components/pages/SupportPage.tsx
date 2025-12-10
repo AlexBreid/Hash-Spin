@@ -188,7 +188,7 @@ export function SupportPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-white mb-1">ПРОГРАММА РЕФЕРАЛОВ</h2>
-                  <p className="text-purple-300 text-sm">30% комиссии с оборота твоих рефералов</p>
+                  <p className="text-purple-300 text-sm">30% от оборота твоих рефералов</p>
                 </div>
               </div>
             </Card>
@@ -231,28 +231,7 @@ export function SupportPage() {
               </div>
             </Card>
 
-            {/* Commission Formula */}
-            <Card className="p-6 border-zinc-700">
-              <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-yellow-400" />
-                Как считается комиссия?
-              </h3>
-              <div className="space-y-4 text-zinc-300">
-                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 p-4 rounded-xl border border-purple-500/30">
-                  <p className="text-white font-semibold mb-2 text-base">(Преимущество казино × Оборот ÷ 2) × 30%</p>
-                  <p className="text-sm text-purple-200">Чем больше оборот твоих рефералов – тем больше твой доход</p>
-                </div>
 
-                <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
-                  <p className="text-white font-semibold text-sm mb-3">Пример:</p>
-                  <div className="space-y-2 text-sm">
-                    <p>Реферал накрутил: <span className="text-yellow-300 font-bold">$10,000</span></p>
-                    <p>Преимущество казино: <span className="text-yellow-300 font-bold">0.05</span> (5%)</p>
-                    <p>Расчёт: (0.05 × $10,000 ÷ 2) × 30% = (250) × 30% = <span className="text-yellow-300 font-bold">$75</span></p>
-                  </div>
-                </div>
-              </div>
-            </Card>
 
             {/* Key Points */}
             <Card className="p-6 bg-green-500/10 border-green-500/20">
