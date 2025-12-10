@@ -214,7 +214,20 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           }
         }
         
-        await handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, assetStr, bot);
+        // ✅ ПРОВЕРЯЕМ: есть ли УЖЕ активный бонус (значит пользователь его выбрал)
+        const userHasActiveBonusSelected = await prisma.userBonus.findFirst({
+          where: {
+            userId: userIdNum,
+            isActive: true,
+            isCompleted: false,
+            expiresAt: { gt: new Date() }
+          }
+        });
+        
+        const bonusWasSelected = !!userHasActiveBonusSelected;
+        console.log(`   🎁 Bonus selected by user: ${bonusWasSelected ? 'YES' : 'NO'}`);
+        
+        await handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, assetStr, bot, bonusWasSelected);
 
       } catch (checkError) {
         console.error(`❌ Check error:`, checkError.message);
@@ -240,13 +253,21 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 }
 
 /**
- * ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
+ * ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ - ПОЛНОСТЬЮ ИСПРАВЛЕНО
+ * bonusWasSelected = true если пользователь выбрал "С БОНУСОМ"
+ * bonusWasSelected = false если выбрал "БЕЗ БОНУСА" или нет реферера
  */
-async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot) {
+async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot, bonusWasSelected = false) {
   console.log(`💾 Creating transaction...`);
   console.log(`   userId: ${userIdNum}, amount: ${amountNum.toFixed(8)}`);
+  console.log(`   🎁 Bonus selected: ${bonusWasSelected ? 'YES' : 'NO'}`);
   
   try {
+    // ✅ ЛОГИКА:
+    // Если выбран бонус → ВСЁ на BONUS счёт (и депозит и бонус)
+    // Если БЕЗ бонуса → депозит на MAIN
+    const balanceType = bonusWasSelected ? 'BONUS' : 'MAIN';
+    
     const result = await prisma.$transaction(async (tx) => {
       const newTx = await tx.transaction.create({
         data: {
@@ -261,19 +282,65 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
       });
       console.log(`   ✅ Transaction created: ${newTx.id}`);
 
+      // ✅ Кладём ДЕПОЗИТ на правильный счёт
       const updatedBalance = await tx.balance.upsert({
-        where: { userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: 'MAIN' } },
-        create: { userId: userIdNum, tokenId: token.id, type: 'MAIN', amount: amountNum.toFixed(8) },
+        where: { userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: balanceType } },
+        create: { userId: userIdNum, tokenId: token.id, type: balanceType, amount: amountNum.toFixed(8) },
         update: { amount: { increment: amountNum } }
       });
-      console.log(`   ✅ Balance updated: ${updatedBalance.amount}`);
+      console.log(`   ✅ ${balanceType} Balance updated (deposit): ${updatedBalance.amount}`);
 
-      if (asset === 'USDT') {
-        try {
-          const bonusResult = await referralService.grantDepositBonus(userIdNum, amountNum, token.id);
-          if (bonusResult) console.log(`   ✅ Bonus granted: ${bonusResult.bonusAmount}`);
-        } catch (e) {
-          console.warn(`⚠️ Bonus failed:`, e.message);
+      // ✅ Если выбран бонус - добавляем 100% бонус НА BONUS СЧЁТ
+      if (bonusWasSelected && asset === 'USDT') {
+        console.log(`   🎁 Adding bonus...`);
+        
+        // Бонус = 100% от депозита (дополнительно на BONUS счёт)
+        const bonusAmount = parseFloat(amountNum.toFixed(8));
+        
+        // Добавляем бонус на BONUS счёт
+        const bonusBalance = await tx.balance.upsert({
+          where: { userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: 'BONUS' } },
+          create: { userId: userIdNum, tokenId: token.id, type: 'BONUS', amount: bonusAmount.toFixed(8) },
+          update: { amount: { increment: bonusAmount } }
+        });
+        
+        console.log(`   ✅ BONUS Balance updated (bonus): ${bonusBalance.amount}`);
+        
+        const totalBonus = balanceType === 'BONUS' 
+          ? (parseFloat(updatedBalance.amount.toString()) + bonusAmount).toFixed(8)
+          : bonusAmount.toFixed(8);
+        console.log(`   📊 ИТОГО на BONUS счёте: ${totalBonus}`);
+        
+        // Получаем информацию для реферальной статистики
+        const user = await tx.user.findUnique({
+          where: { id: userIdNum },
+          select: { referredById: true }
+        });
+        
+        if (user?.referredById) {
+          // Обновляем реферальную статистику
+          await tx.referralStats.upsert({
+            where: {
+              referrerId_refereeId_tokenId: {
+                referrerId: user.referredById,
+                refereeId: userIdNum,
+                tokenId: token.id
+              }
+            },
+            create: {
+              referrerId: user.referredById,
+              refereeId: userIdNum,
+              tokenId: token.id,
+              totalTurnover: '0',
+              turnoverSinceLastPayout: '0',
+              totalCommissionPaid: '0',
+              totalLosses: '0',
+              totalWinnings: '0'
+            },
+            update: {}
+          });
+          
+          console.log(`   ✅ Referral stats updated`);
         }
       }
 
@@ -285,7 +352,19 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
     try {
       const user = await prisma.user.findUnique({ where: { id: userIdNum }, select: { telegramId: true } });
       if (user?.telegramId) {
-        await bot.telegram.sendMessage(user.telegramId, `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}`, { parse_mode: 'Markdown' });
+        let message;
+        if (bonusWasSelected) {
+          const totalBalance = (amountNum * 2).toFixed(8);
+          message = `✅ *Пополнение с БОНУСОМ успешно!*\n\n` +
+            `💰 Депозит: ${amountNum.toFixed(8)} ${asset}\n` +
+            `🎁 Бонус: +${amountNum.toFixed(8)} ${asset}\n` +
+            `📊 Итого на счёте: ${totalBalance} ${asset}\n\n` +
+            `⚡ Необходимо отыграть: ${(amountNum * 10).toFixed(8)} ${asset}`;
+        } else {
+          message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}`;
+        }
+        
+        await bot.telegram.sendMessage(user.telegramId, message, { parse_mode: 'Markdown' });
         console.log(`   ✅ Notification sent`);
       }
     } catch (e) {
