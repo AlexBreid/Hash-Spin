@@ -74,7 +74,6 @@ export function SupportPage() {
                   <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">2</div>
                   <div>
                     <p className="text-white font-semibold">Пополни счёт</p>
-                    <p className="text-zinc-400 text-sm">Минимум $10, максимум бонуса $500</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -102,8 +101,8 @@ export function SupportPage() {
                 <div className="space-y-2">
                   <p className="text-sm"><span className="text-white font-semibold">Пример:</span></p>
                   <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 p-3 rounded-lg border border-orange-500/20">
-                    <p className="text-sm">Ты пополнил счёт на $100</p>
-                    <p className="text-sm">Ты получил бонус +$100</p>
+                    <p className="text-sm">Ты пополнил счёт на $1000</p>
+                    <p className="text-sm">Ты получил бонус +$1000</p>
                     <p className="text-white font-semibold text-sm my-2">Всего на счёте: $200</p>
                     <p className="text-yellow-300 font-semibold text-sm">Нужно отыграть: $200 × 10 = $2,000</p>
                   </div>
@@ -126,9 +125,6 @@ export function SupportPage() {
               <h3 className="font-bold text-lg text-white mb-3">⚠️ Важные условия</h3>
               <ul className="space-y-2 text-sm text-zinc-300">
                 <li>• Бонус действует только один раз на аккаунт</li>
-                <li>• Требуется подтверждение email и телефона</li>
-                <li>• Минимальная ставка: $1</li>
-                <li>• Максимальная ставка при использовании бонуса: $50</li>
                 <li>• Бонус действует 30 дней с момента активации</li>
                 <li>• При нарушении правил бонус будет отменён</li>
               </ul>
