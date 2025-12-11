@@ -16,9 +16,8 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 );
 
 const MAX_WAIT_TIME = 10;
-const HISTORY_LOAD_TIMEOUT = 5000;
 const STORAGE_KEY = 'crash_game_history';
-const MAX_HISTORY_ITEMS = 50;
+const MAX_HISTORY_ITEMS = 10;  // ✅ ТОЛЬКО 10 ПОСЛЕДНИХ!
 
 interface CrashHistory {
   id: string;
@@ -86,23 +85,6 @@ export function CrashGame() {
   const animationFrameRef = useRef<number>();
   const drawChartRef = useRef<() => void>(() => {});
 
-  const loadHistoryFromStorage = useCallback(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as CrashHistory[];
-        setCrashHistory(parsed.sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_HISTORY_ITEMS));
-        setIsHistoryLoaded(true);
-        console.log('✅ История загружена из localStorage:', parsed.length);
-      } else {
-        setIsHistoryLoaded(true);
-      }
-    } catch (error) {
-      console.error('❌ Ошибка загрузки истории из localStorage:', error);
-      setIsHistoryLoaded(true);
-    }
-  }, []);
-
   const saveHistoryToStorage = useCallback((history: CrashHistory[]) => {
     try {
       const toSave = history.slice(0, MAX_HISTORY_ITEMS);
@@ -145,17 +127,15 @@ export function CrashGame() {
     }
   }, [balances]);
 
+  // 🆕 ИСПРАВЛЕНО: ЗАГРУЖАЕМ ИСТОРИЮ СО СЕРВЕРА СРАЗУ БЕЗ ЗАДЕРЖКИ!
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
       return;
     }
 
-    loadHistoryFromStorage();
-
     const init = async () => {
       try {
-        setIsLoading(true);
         console.log('🔌 Подключаюсь к серверу...');
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         console.log('✅ Подключен');
@@ -164,23 +144,26 @@ export function CrashGame() {
         // ✅ Загружаем баланс после подключения
         await fetchBalances();
 
-        console.log('📥 Загружаю историю крашей с API...');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), HISTORY_LOAD_TIMEOUT);
-
+        // 🆕 ЗАГРУЖАЕМ ИСТОРИЮ СО СЕРВЕРА СРАЗУ БЕЗ ЗАДЕРЖКИ И ТАЙМАУТОВ!
+        console.log('📥 ЗАГРУЖАЮ ИСТОРИЮ СО СЕРВЕРА (БЕЗ ЗАДЕРЖКИ)...');
+        
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+          console.log(`📡 Запрашиваю: ${API_URL}/api/v1/crash/last-crashes`);
+          
           const response = await fetch(`${API_URL}/api/v1/crash/last-crashes`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
           });
 
-          clearTimeout(timeoutId);
+          console.log(`📊 Ответ сервера: ${response.status}`);
 
           if (response.ok) {
             const data = await response.json();
+            console.log('📦 Данные с сервера:', data);
+            
             if (data.success && Array.isArray(data.data)) {
+              // ✅ Форматируем и БЕРЁМ ТОЛЬКО ПОСЛЕДНИЕ 10!
               const formatted = data.data
                 .filter((crash: any) => crash.crashPoint != null)
                 .map((crash: any) => ({
@@ -189,42 +172,30 @@ export function CrashGame() {
                   crashPoint: parseFloat(crash.crashPoint.toString()),
                   timestamp: new Date(crash.timestamp).getTime(),
                 }))
-                .slice(0, MAX_HISTORY_ITEMS);
+                .slice(0, MAX_HISTORY_ITEMS);  // ✅ ТОЛЬКО 10!
 
-              setCrashHistory((prev) => {
-                const merged = [...formatted];
-                prev.forEach((local) => {
-                  if (!merged.some((api) => api.gameId === local.gameId)) {
-                    merged.push(local);
-                  }
-                });
+              console.log(`✅ Загружено ${formatted.length} крашей со сервера`);
+              console.log('🎯 Краши:', formatted);
 
-                const sorted = merged
-                  .sort((a, b) => b.timestamp - a.timestamp)
-                  .slice(0, MAX_HISTORY_ITEMS);
-
-                saveHistoryToStorage(sorted);
-                console.log('✅ История обновлена с API:', sorted.length);
-                return sorted;
-              });
+              setCrashHistory(formatted);
+              saveHistoryToStorage(formatted);
+            } else {
+              console.warn('⚠️ Неправильный формат данных:', data);
             }
           } else {
-            console.warn('⚠️ Ошибка загрузки истории, статус:', response.status);
+            console.error(`❌ Ошибка сервера: ${response.status} ${response.statusText}`);
           }
         } catch (error: any) {
-          clearTimeout(timeoutId);
-          if (error.name !== 'AbortError') {
-            console.warn('⚠️ Ошибка загрузки истории:', error);
-          }
+          console.error('❌ Ошибка загрузки истории:', error.message);
         } finally {
+          // ✅ СРАЗУ ГОТОВЫ! Не ждём ничего!
           setIsHistoryLoaded(true);
+          console.log('✅ ИСТОРИЯ ЗАГРУЖЕНА И ГОТОВА К ИСПОЛЬЗОВАНИЮ!');
         }
       } catch (error) {
         console.error('❌ Ошибка подключения:', error);
         toast.error('❌ Ошибка подключения');
         setIsHistoryLoaded(true);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -234,133 +205,7 @@ export function CrashGame() {
       console.log('🧹 Отключаюсь');
       crashGameService.disconnect();
     };
-  }, [user, token, navigate, fetchBalances, loadHistoryFromStorage, saveHistoryToStorage]);
-
-  useEffect(() => {
-    const handleGameStatus = (data: CrashGameState) => {
-      setGameState(data);
-      if (data.status === 'waiting') {
-        setCanCashout(false);
-        if (!betPlaced) {
-          sessionStorage.removeItem(sessionKeys.betId);
-          sessionStorage.removeItem(sessionKeys.currentBet);
-          sessionStorage.removeItem(sessionKeys.balanceType);      // 🆕
-          sessionStorage.removeItem(sessionKeys.userBonusId);      // 🆕
-        }
-      } else if (data.status === 'flying') {
-        setCanCashout(betPlaced);
-      }
-    };
-
-    const handleMultiplierUpdate = (data: { multiplier: number }) => {
-      setGameState((prev) => ({ ...prev, multiplier: data.multiplier, status: 'flying' }));
-      setCanCashout(betPlaced);
-    };
-
-    const handleGameCrashed = (data: any) => {
-      setGameState((prev) => ({
-        ...prev,
-        status: 'crashed',
-        crashPoint: data.crashPoint,
-        gameId: data.gameId,
-      }));
-      setCanCashout(false);
-      setBetPlaced(false);
-
-      sessionStorage.removeItem(sessionKeys.betId);
-      sessionStorage.removeItem(sessionKeys.currentBet);
-      sessionStorage.removeItem(sessionKeys.balanceType);          // 🆕
-      sessionStorage.removeItem(sessionKeys.userBonusId);          // 🆕
-      
-      // 🆕 Очищаем state
-      setBalanceType(null);
-      setUserBonusId(null);
-
-      const newCrash: CrashHistory = {
-        id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
-        gameId: data.gameId,
-        crashPoint: parseFloat(data.crashPoint.toString()),
-        timestamp: Date.now(),
-      };
-
-      setActiveCrash(newCrash);
-
-      setCrashHistory((prev) => {
-        const updated = [newCrash, ...prev].slice(0, MAX_HISTORY_ITEMS);
-        return updated;
-      });
-
-      setTimeout(() => {
-        setActiveCrash(null);
-      }, 1500);
-    };
-
-    const handlePlayerJoined = (data: { playersCount: number }) => setPlayersCount(data.playersCount);
-    
-    const handleBetPlaced = (data: any) => {
-      setBetPlaced(true);
-      const betAmount = data.bet ?? 0;
-      setCurrentBet(betAmount);
-      setCanCashout(false);
-      toast.success(`✅ Ставка: $${betAmount.toFixed(2)}`);
-      
-      // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
-      console.log(`🆕 [BET PLACED] Сохраняю balanceType=${data.balanceType}, userBonusId=${data.userBonusId}`);
-      setBalanceType(data.balanceType || 'MAIN');
-      setUserBonusId(data.userBonusId || null);
-      
-      console.log('💾 Сохраняю ставку в sessionStorage');
-      sessionStorage.setItem(sessionKeys.betId, data.betId || 'unknown');
-      sessionStorage.setItem(sessionKeys.currentBet, betAmount.toString());
-      sessionStorage.setItem(sessionKeys.balanceType, data.balanceType || 'MAIN');    // 🆕
-      sessionStorage.setItem(sessionKeys.userBonusId, data.userBonusId || '');        // 🆕
-    };
-    
-    const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
-      const profit = data.winnings - currentBet;
-      setBetPlaced(false);
-      setCanCashout(false);
-      
-      sessionStorage.removeItem(sessionKeys.betId);
-      sessionStorage.removeItem(sessionKeys.currentBet);
-      sessionStorage.removeItem(sessionKeys.balanceType);          // 🆕
-      sessionStorage.removeItem(sessionKeys.userBonusId);          // 🆕
-      
-      // 🆕 Очищаем state
-      setBalanceType(null);
-      setUserBonusId(null);
-      
-      // ✅ Обновляем баланс после кэшаута
-      setTimeout(() => fetchBalances(), 500);
-      toast.success(`💰 +$${profit.toFixed(2)}`);
-    };
-    
-    const handleCountdownUpdate = (data: { seconds: number }) => {
-      setGameState((prev) => ({ ...prev, countdown: data.seconds, status: 'waiting' }));
-    };
-    
-    const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
-
-    crashGameService.on('gameStatus', handleGameStatus);
-    crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
-    crashGameService.on('gameCrashed', handleGameCrashed);
-    crashGameService.on('playerJoined', handlePlayerJoined);
-    crashGameService.on('betPlaced', handleBetPlaced);
-    crashGameService.on('cashoutSuccess', handleCashoutSuccess);
-    crashGameService.on('countdownUpdate', handleCountdownUpdate);
-    crashGameService.on('error', handleError);
-
-    return () => {
-      crashGameService.off('gameStatus', handleGameStatus);
-      crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
-      crashGameService.off('gameCrashed', handleGameCrashed);
-      crashGameService.off('playerJoined', handlePlayerJoined);
-      crashGameService.off('betPlaced', handleBetPlaced);
-      crashGameService.off('cashoutSuccess', handleCashoutSuccess);
-      crashGameService.off('countdownUpdate', handleCountdownUpdate);
-      crashGameService.off('error', handleError);
-    };
-  }, [betPlaced, currentBet, fetchBalances, sessionKeys, saveHistoryToStorage]);
+  }, [user, token, navigate, fetchBalances, saveHistoryToStorage]);
 
   useEffect(() => {
     if (crashHistory.length > 0) {
@@ -615,6 +460,129 @@ export function CrashGame() {
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
+  // 🆕 ОБРАБОТЧИК СОБЫТИЯ для добавления новых крашей в историю
+  useEffect(() => {
+    const handleGameCrashed = (data: any) => {
+      setGameState((prev) => ({
+        ...prev,
+        status: 'crashed',
+        crashPoint: data.crashPoint,
+        gameId: data.gameId,
+      }));
+      setCanCashout(false);
+      setBetPlaced(false);
+
+      sessionStorage.removeItem(sessionKeys.betId);
+      sessionStorage.removeItem(sessionKeys.currentBet);
+      sessionStorage.removeItem(sessionKeys.balanceType);
+      sessionStorage.removeItem(sessionKeys.userBonusId);
+      
+      setBalanceType(null);
+      setUserBonusId(null);
+
+      const newCrash: CrashHistory = {
+        id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
+        gameId: data.gameId,
+        crashPoint: parseFloat(data.crashPoint.toString()),
+        timestamp: Date.now(),
+      };
+
+      setActiveCrash(newCrash);
+
+      // ✅ ДОБАВЛЯЕМ В НАЧАЛО, ДЕРЖИМ ТОЛЬКО 10!
+      setCrashHistory((prev) => {
+        const updated = [newCrash, ...prev].slice(0, MAX_HISTORY_ITEMS);
+        console.log(`✅ История обновлена: ${updated.length} крашей`);
+        return updated;
+      });
+
+      setTimeout(() => {
+        setActiveCrash(null);
+      }, 1500);
+    };
+
+    const handlePlayerJoined = (data: { playersCount: number }) => setPlayersCount(data.playersCount);
+    
+    const handleBetPlaced = (data: any) => {
+      setBetPlaced(true);
+      const betAmount = data.bet ?? 0;
+      setCurrentBet(betAmount);
+      setCanCashout(false);
+      toast.success(`✅ Ставка: $${betAmount.toFixed(2)}`);
+      
+      setBalanceType(data.balanceType || 'MAIN');
+      setUserBonusId(data.userBonusId || null);
+      
+      sessionStorage.setItem(sessionKeys.betId, data.betId || 'unknown');
+      sessionStorage.setItem(sessionKeys.currentBet, betAmount.toString());
+      sessionStorage.setItem(sessionKeys.balanceType, data.balanceType || 'MAIN');
+      sessionStorage.setItem(sessionKeys.userBonusId, data.userBonusId || '');
+    };
+    
+    const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
+      const profit = data.winnings - currentBet;
+      setBetPlaced(false);
+      setCanCashout(false);
+      
+      sessionStorage.removeItem(sessionKeys.betId);
+      sessionStorage.removeItem(sessionKeys.currentBet);
+      sessionStorage.removeItem(sessionKeys.balanceType);
+      sessionStorage.removeItem(sessionKeys.userBonusId);
+      
+      setBalanceType(null);
+      setUserBonusId(null);
+      
+      setTimeout(() => fetchBalances(), 500);
+      toast.success(`💰 +$${profit.toFixed(2)}`);
+    };
+    
+    const handleCountdownUpdate = (data: { seconds: number }) => {
+      setGameState((prev) => ({ ...prev, countdown: data.seconds, status: 'waiting' }));
+    };
+
+    const handleGameStatus = (data: CrashGameState) => {
+      setGameState(data);
+      if (data.status === 'waiting') {
+        setCanCashout(false);
+        if (!betPlaced) {
+          sessionStorage.removeItem(sessionKeys.betId);
+          sessionStorage.removeItem(sessionKeys.currentBet);
+          sessionStorage.removeItem(sessionKeys.balanceType);
+          sessionStorage.removeItem(sessionKeys.userBonusId);
+        }
+      } else if (data.status === 'flying') {
+        setCanCashout(betPlaced);
+      }
+    };
+
+    const handleMultiplierUpdate = (data: { multiplier: number }) => {
+      setGameState((prev) => ({ ...prev, multiplier: data.multiplier, status: 'flying' }));
+      setCanCashout(betPlaced);
+    };
+    
+    const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
+
+    crashGameService.on('gameStatus', handleGameStatus);
+    crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
+    crashGameService.on('gameCrashed', handleGameCrashed);
+    crashGameService.on('playerJoined', handlePlayerJoined);
+    crashGameService.on('betPlaced', handleBetPlaced);
+    crashGameService.on('cashoutSuccess', handleCashoutSuccess);
+    crashGameService.on('countdownUpdate', handleCountdownUpdate);
+    crashGameService.on('error', handleError);
+
+    return () => {
+      crashGameService.off('gameStatus', handleGameStatus);
+      crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
+      crashGameService.off('gameCrashed', handleGameCrashed);
+      crashGameService.off('playerJoined', handlePlayerJoined);
+      crashGameService.off('betPlaced', handleBetPlaced);
+      crashGameService.off('cashoutSuccess', handleCashoutSuccess);
+      crashGameService.off('countdownUpdate', handleCountdownUpdate);
+      crashGameService.off('error', handleError);
+    };
+  }, [betPlaced, currentBet, fetchBalances, sessionKeys]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white pb-24">
       <div className="fixed inset-0 pointer-events-none">
@@ -833,10 +801,11 @@ export function CrashGame() {
             </AnimatePresence>
           </GlassCard>
 
+          {/* 🆕 ИСТОРИЯ ТОЛЬКО 10 ПОСЛЕДНИХ КРАШЕЙ */}
           <GlassCard className="flex flex-col h-64 overflow-hidden">
             <div className="p-2.5 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0 rounded-t-2xl">
               <TrendingUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span className="text-sm">ИСТОРИЯ</span>
+              <span className="text-sm">ПОСЛЕДНИЕ 10 КРАШЕЙ</span>
               <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
                 {crashHistory.length > 0 ? `${crashHistory.length}` : '—'}
               </span>
@@ -904,7 +873,7 @@ export function CrashGame() {
                     <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center">
                       <div className="text-2xl mb-2">🎮</div>
                       <div className="text-xs">
-                        {isHistoryLoaded ? 'Первый краш...' : 'Загрузка...'}
+                        {isHistoryLoaded ? 'Загружаю историю с сервера...' : 'Подключение...'}
                       </div>
                     </div>
                   </motion.div>
