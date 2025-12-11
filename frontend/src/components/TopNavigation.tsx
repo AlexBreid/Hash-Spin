@@ -18,7 +18,9 @@ interface BalanceItem {
 }
 
 interface WalletData {
-  balance: number;
+  balance: number;  // ОБЪЕДИНЁННЫЙ (MAIN + BONUS)
+  main: number;     // Только MAIN
+  bonus: number;    // Только BONUS
   currency: string;
 }
 
@@ -36,50 +38,59 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     'GET'
   );
 
-  // 2. Первичная загрузка при монтировании (вызов execute)
+  // 2. Первичная загрузка при монтировании
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('Загрузка баланса...'); // DEBUG
+      console.log('📊 Загрузка баланса...'); // DEBUG
       loadBalance()
         .catch(err => {
-          // Устанавливаем дефолтное значение при ошибке
-          console.error('Ошибка загрузки баланса:', err);
-          setWalletData({ balance: 0, currency: 'USDT' }); 
+          console.error('❌ Ошибка загрузки баланса:', err);
+          // Дефолтное значение при ошибке
+          setWalletData({ balance: 0, main: 0, bonus: 0, currency: 'USDT' }); 
         })
         .finally(() => {
-          console.log('Загрузка завершена'); // DEBUG
-          // Завершаем состояние загрузки после первого запроса
+          console.log('✅ Загрузка завершена'); // DEBUG
           setLoading(false);
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, [loadBalance]); 
 
-  // 3. Обновляем данные при получении ответа (Единый источник истины)
+  // 3. Обновляем данные при получении ответа
   useEffect(() => {
-    console.log('balanceData изменился:', balanceData); // DEBUG
+    console.log('📊 balanceData изменился:', balanceData); // DEBUG
     
-    // useFetch возвращает массив напрямую, не объект с success
     if (balanceData && Array.isArray(balanceData) && balanceData.length > 0) {
-      // Находим MAIN баланс, если его нет - берем первый
-      const wallet: BalanceItem = balanceData.find((item: BalanceItem) => item.type === 'MAIN') 
-        || balanceData[0];
+      // Находим MAIN и BONUS
+      const mainBalance = balanceData.find((item: BalanceItem) => item.type === 'MAIN');
+      const bonusBalance = balanceData.find((item: BalanceItem) => item.type === 'BONUS');
       
-      console.log('Установка walletData:', wallet); // DEBUG
+      const mainAmount = mainBalance?.amount || 0;
+      const bonusAmount = bonusBalance?.amount || 0;
+      const totalAmount = mainAmount + bonusAmount;  // ✅ ОБЪЕДИНЁННЫЙ БАЛАНС
+      const symbol = mainBalance?.symbol || 'USDT';
+
+      console.log(`📊 Установка walletData:
+         Main: ${mainAmount.toFixed(8)}
+         Bonus: ${bonusAmount.toFixed(8)}
+         Total: ${totalAmount.toFixed(8)}`); // DEBUG
       
       setWalletData({
-        balance: wallet.amount || 0,
-        currency: wallet.symbol || 'USDT',
+        balance: totalAmount,  // ОБЪЕДИНЁННЫЙ
+        main: mainAmount,      // Только MAIN
+        bonus: bonusAmount,    // Только BONUS
+        currency: symbol,
       });
     } 
     // Если пустой массив
     else if (balanceData && Array.isArray(balanceData) && balanceData.length === 0) {
-        console.log('Пустой массив данных'); // DEBUG
-        setWalletData({
-            balance: 0,
-            currency: 'USDT',
-        });
+      console.log('📊 Пустой массив данных'); // DEBUG
+      setWalletData({
+        balance: 0,
+        main: 0,
+        bonus: 0,
+        currency: 'USDT',
+      });
     }
   }, [balanceData]); 
 
@@ -102,7 +113,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     // Перезагружаем баланс после пополнения
     if (loadBalance) {
       loadBalance().catch(err => {
-        console.error('Ошибка перезагрузки баланса:', err);
+        console.error('❌ Ошибка перезагрузки баланса:', err);
       });
     }
   };
@@ -130,7 +141,6 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
         <div className="flex items-center space-x-3">
           
           {/* Wallet Balance / Loading Placeholder */}
-          {/* ОТОБРАЖАЕМ БАЛАНС, ЕСЛИ ДАННЫЕ УЖЕ УСТАНОВЛЕНЫ */}
           {!loading && walletData ? (
             <div
               style={{
@@ -162,15 +172,30 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                 >
                   Баланс
                 </span>
+                
+                {/* ОБЪЕДИНЁННЫЙ БАЛАНС */}
                 <span
                   style={{
                     fontSize: '14px',
                     fontWeight: '600',
                     color: '#e5e7eb',
+                    marginBottom: '2px'
                   }}
                 >
                   {formatBalance(Math.floor(walletData.balance * 100) / 100)} {walletData.currency}
                 </span>
+
+                {/* ДЕТАЛИ БАЛАНСА (если есть бонус) */}
+                {walletData.bonus > 0 && (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      color: '#fbbf24',
+                    }}
+                  >
+                    💛 Бонус: {formatBalance(walletData.bonus)}
+                  </span>
+                )}
               </div>
             </div>
           ) : loading ? (

@@ -4,19 +4,26 @@ const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
 /**
- * GET /api/v1/balance/get-balances
- * Получить все балансы текущего пользователя
+ * 🎯 ИСПРАВЛЕННЫЙ balanceRouter.js
  * 
- * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
+ * ЛОГИКА:
+ * 1. GET /balance → возвращает ОБА баланса (MAIN + BONUS)
+ * 2. GET /wallet/balance → ALIAS для совместимости с фронтом
+ * 3. POST /update-balance → обновляет конкретный баланс
+ */
+
+/**
+ * GET /api/v1/balance/get-balances
+ * Получить ВСЕ балансы пользователя (MAIN + BONUS)
+ * 
+ * ✅ ИСПРАВЛЕНО: возвращает [MAIN, BONUS] отдельно
  */
 router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) => {
   try {
-    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
     const userId = req.user.userId;
 
-    console.log(`📊 Получаю балансы для пользователя ${userId}`);
+    console.log(`\n📊 [GET-BALANCES] Получаю все балансы для пользователя ${userId}`);
 
-    // Проверка что userId существует
     if (!userId) {
       console.error('❌ userId не найден в req.user');
       return res.status(401).json({
@@ -25,33 +32,33 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
       });
     }
 
-    // Получаем все балансы пользователя
+    // Получаем ВСЕ балансы пользователя
     const balances = await prisma.balance.findMany({
-      where: {
-        userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО ФИЛЬТРУЕТСЯ!
-      },
-      include: {
-        token: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      where: { userId: userId },
+      include: { token: true },
+      orderBy: { createdAt: 'asc' },
     });
 
-    console.log(`✅ Найдено ${balances.length} балансов для пользователя ${userId}`);
+    console.log(`   ✅ Найдено ${balances.length} балансов:`);
+    balances.forEach(b => {
+      console.log(`      - ${b.type}: ${b.amount} ${b.token.symbol}`);
+    });
+
+    // ✅ ИСПРАВЛЕНИЕ: Возвращаем в формате с type
+    const formatted = balances.map(bal => ({
+      id: bal.id,
+      userId: bal.userId,
+      tokenId: bal.tokenId,
+      symbol: bal.token.symbol,
+      type: bal.type,  // ✅ ВАЖНО: type указывает MAIN или BONUS
+      amount: parseFloat(bal.amount.toString()),
+      createdAt: bal.createdAt,
+      updatedAt: bal.updatedAt,
+    }));
 
     res.json({
       success: true,
-      data: balances.map(bal => ({
-        id: bal.id,
-        userId: bal.userId,
-        tokenId: bal.tokenId,
-        type: bal.type,
-        amount: bal.amount.toString(), // Decimal -> String для JSON
-        createdAt: bal.createdAt,
-        updatedAt: bal.updatedAt,
-        token: bal.token,
-      })),
+      data: formatted,
     });
   } catch (error) {
     console.error('❌ Ошибка получения балансов:', error);
@@ -63,10 +70,132 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
 });
 
 /**
- * POST /api/v1/balance/update-balance
- * Обновить баланс пользователя
+ * GET /api/v1/wallet/balance
+ * ALIAS для TopNavigation и других компонентов
+ * Возвращает ВСЕ балансы в одном запросе
  * 
- * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
+ * ✅ Совместимо с useFetch в компонентах
+ */
+router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log(`\n💳 [WALLET-BALANCE] Получаю баланс для UI (userId=${userId})`);
+
+    if (!userId) {
+      console.error('❌ userId не найден в req.user');
+      return res.status(401).json({
+        success: false,
+        error: 'Неверная аутентификация',
+      });
+    }
+
+    // Получаем ВСЕ балансы пользователя
+    const balances = await prisma.balance.findMany({
+      where: { userId: userId },
+      include: { token: true },
+    });
+
+    console.log(`   ✅ Найдено ${balances.length} балансов`);
+
+    // ✅ Возвращаем в формате совместимом с TopNavigation
+    const formatted = balances.map(bal => ({
+      tokenId: bal.tokenId,
+      symbol: bal.token.symbol,
+      amount: parseFloat(bal.amount.toString()),
+      type: bal.type,  // 'MAIN' или 'BONUS'
+    }));
+
+    // Логируем для отладки
+    const main = formatted.find(b => b.type === 'MAIN')?.amount || 0;
+    const bonus = formatted.find(b => b.type === 'BONUS')?.amount || 0;
+    console.log(`   💰 MAIN: ${main.toFixed(8)}, BONUS: ${bonus.toFixed(8)}, TOTAL: ${(main + bonus).toFixed(8)}`);
+
+    res.json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения баланса:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка получения баланса',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/balance/balance/:tokenId
+ * Получить баланс конкретного токена (MAIN + BONUS вместе)
+ * 
+ * ✅ ИСПРАВЛЕНО: возвращает ОБА типа баланса
+ */
+router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const tokenId = parseInt(req.params.tokenId);
+
+    console.log(`\n💵 [BALANCE-QUERY] Получаю баланс токена ${tokenId} для пользователя ${userId}`);
+
+    if (!userId) {
+      console.error('❌ userId не найден в req.user');
+      return res.status(401).json({
+        success: false,
+        error: 'Неверная аутентификация',
+      });
+    }
+
+    // Получаем ОБА типа баланса для этого токена
+    const [mainBalance, bonusBalance] = await Promise.all([
+      prisma.balance.findUnique({
+        where: {
+          userId_tokenId_type: {
+            userId: userId,
+            tokenId: tokenId,
+            type: 'MAIN',
+          },
+        },
+      }),
+      prisma.balance.findUnique({
+        where: {
+          userId_tokenId_type: {
+            userId: userId,
+            tokenId: tokenId,
+            type: 'BONUS',
+          },
+        },
+      }),
+    ]);
+
+    const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
+    const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
+    const totalAmount = mainAmount + bonusAmount;
+
+    console.log(`   💰 Main: ${mainAmount.toFixed(8)}, Bonus: ${bonusAmount.toFixed(8)}, Total: ${totalAmount.toFixed(8)}`);
+
+    res.json({
+      success: true,
+      data: {
+        tokenId: tokenId,
+        main: mainAmount,
+        bonus: bonusAmount,
+        total: totalAmount,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения баланса:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка получения баланса',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/balance/update-balance
+ * Обновить баланс пользователя (MAIN или BONUS)
+ * 
+ * ✅ ИСПРАВЛЕНО: правильная работа с обоими типами
  * 
  * Body:
  * {
@@ -78,11 +207,11 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
  */
 router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res) => {
   try {
-    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
     const userId = req.user.userId;
     const { tokenId, amount, type = 'MAIN', operation = 'add' } = req.body;
 
-    // Проверка что userId существует
+    console.log(`\n💰 [UPDATE-BALANCE] ${operation === 'add' ? 'Добавляю' : 'Вычитаю'} ${amount} на ${type} для пользователя ${userId}`);
+
     if (!userId) {
       console.error('❌ userId не найден в req.user');
       return res.status(401).json({
@@ -106,15 +235,18 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       });
     }
 
-    console.log(
-      `💰 ${operation === 'add' ? 'Добавляю' : 'Вычитаю'} ${amount} для пользователя ${userId} (токен: ${tokenId}, тип: ${type})`
-    );
+    if (!['MAIN', 'BONUS'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: 'type должен быть "MAIN" или "BONUS"',
+      });
+    }
 
     // Получаем или создаем баланс
     let balance = await prisma.balance.findUnique({
       where: {
         userId_tokenId_type: {
-          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
+          userId: userId,
           tokenId: tokenId,
           type: type,
         },
@@ -122,15 +254,16 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     });
 
     if (!balance) {
-      console.log(`📝 Баланс не найден, создаю новый для пользователя ${userId}...`);
+      console.log(`   📝 ${type} баланс не найден, создаю новый...`);
       balance = await prisma.balance.create({
         data: {
-          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
+          userId: userId,
           tokenId: tokenId,
           type: type,
-          amount: operation === 'add' ? amount : 0,
+          amount: operation === 'add' ? amount.toString() : '0',
         },
       });
+      console.log(`   ✅ ${type} баланс создан: ${balance.amount}`);
     } else {
       // Вычисляем новую сумму
       const currentAmount = parseFloat(balance.amount.toString());
@@ -141,19 +274,16 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       } else {
         newAmount = currentAmount - amount;
         
-        // Проверяем, чтобы баланс не стал отрицательным
         if (newAmount < 0) {
-          console.warn(`⚠️ Попытка получить отрицательный баланс для пользователя ${userId}`);
+          console.warn(`   ⚠️ Недостаточно ${type} для вычитания (${currentAmount} < ${amount})`);
           return res.status(400).json({
             success: false,
-            error: 'Недостаточно средств',
+            error: `Недостаточно ${type} баланса`,
           });
         }
       }
 
-      console.log(
-        `🔄 Обновляю баланс пользователя ${userId}: ${currentAmount} → ${newAmount}`
-      );
+      console.log(`   🔄 ${type}: ${currentAmount.toFixed(8)} → ${newAmount.toFixed(8)}`);
 
       balance = await prisma.balance.update({
         where: { id: balance.id },
@@ -163,7 +293,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       });
     }
 
-    console.log(`✅ Баланс пользователя ${userId} обновлён успешно`);
+    console.log(`   ✅ Баланс обновлён: ${balance.amount}\n`);
 
     res.json({
       success: true,
@@ -172,7 +302,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
         userId: balance.userId,
         tokenId: balance.tokenId,
         type: balance.type,
-        amount: balance.amount.toString(),
+        amount: parseFloat(balance.amount.toString()),
         createdAt: balance.createdAt,
         updatedAt: balance.updatedAt,
       },
@@ -187,71 +317,81 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
 });
 
 /**
- * GET /api/v1/balance/balance/:tokenId
- * Получить баланс конкретного токена
+ * POST /api/v1/balance/transfer
+ * 🆕 Передача между MAIN и BONUS
  * 
- * ✅ ИСПРАВЛЕНО: req.user.id → req.user.userId
+ * Body:
+ * {
+ *   tokenId: number,
+ *   amount: number,
+ *   from: 'MAIN' | 'BONUS',
+ *   to: 'MAIN' | 'BONUS'
+ * }
  */
-router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, res) => {
+router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
   try {
-    // ✅ ИСПРАВЛЕНО: Берем userId из authMiddleware (не id!)
     const userId = req.user.userId;
-    const tokenId = parseInt(req.params.tokenId);
-    const type = req.query.type || 'MAIN';
+    const { tokenId, amount, from, to } = req.body;
 
-    // Проверка что userId существует
+    console.log(`\n🔄 [TRANSFER] Передача ${amount} с ${from} на ${to} для пользователя ${userId}`);
+
     if (!userId) {
-      console.error('❌ userId не найден в req.user');
       return res.status(401).json({
         success: false,
         error: 'Неверная аутентификация',
       });
     }
 
-    console.log(`💵 Получаю баланс токена ${tokenId} для пользователя ${userId}`);
-
-    const balance = await prisma.balance.findUnique({
-      where: {
-        userId_tokenId_type: {
-          userId: userId,  // ✅ ТЕПЕРЬ ПРАВИЛЬНО!
-          tokenId: tokenId,
-          type: type,
-        },
-      },
-    });
-
-    if (!balance) {
-      console.log(`⚠️ Баланс не найден, возвращаю 0 для пользователя ${userId}`);
-      return res.json({
-        success: true,
-        data: {
-          userId,
-          tokenId,
-          type,
-          amount: '0',
-        },
+    if (from === to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Не можешь передавать на тот же баланс',
       });
     }
 
-    console.log(`✅ Баланс найден: ${balance.amount}`);
+    // Используем транзакцию для атомарности
+    const result = await prisma.$transaction(async (tx) => {
+      // Снимаем с исходного баланса
+      const fromBalance = await tx.balance.findUnique({
+        where: {
+          userId_tokenId_type: { userId, tokenId, type: from },
+        },
+      });
+
+      if (!fromBalance || parseFloat(fromBalance.amount.toString()) < amount) {
+        throw new Error(`Недостаточно ${from} баланса`);
+      }
+
+      const updated1 = await tx.balance.update({
+        where: { id: fromBalance.id },
+        data: {
+          amount: { decrement: amount },
+        },
+      });
+
+      // Добавляем на целевой баланс
+      const toBalance = await tx.balance.upsert({
+        where: {
+          userId_tokenId_type: { userId, tokenId, type: to },
+        },
+        create: { userId, tokenId, type: to, amount: amount.toString() },
+        update: { amount: { increment: amount } },
+      });
+
+      console.log(`   ✅ Передача успешна: ${from} → ${to}`);
+
+      return { from: updated1, to: toBalance };
+    });
 
     res.json({
       success: true,
-      data: {
-        id: balance.id,
-        userId: balance.userId,
-        tokenId: balance.tokenId,
-        type: balance.type,
-        amount: balance.amount.toString(),
-        createdAt: balance.createdAt,
-        updatedAt: balance.updatedAt,
-      },
+      data: result,
     });
   } catch (error) {
-    console.error('❌ Ошибка получения баланса:', error);
-    res.status(500).json({
+    console.error('❌ Ошибка передачи:', error);
+    res.status(400).json({
       success: false,
-      error: 'Ошибка получения баланса',
+      error: error.message || 'Ошибка передачи баланса',
     });
   }
 });
