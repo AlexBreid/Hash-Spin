@@ -1,11 +1,7 @@
 /**
- * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js
+ * ✅ withdrawalService.js С ПОЛНОЙ ОТЛАДКОЙ
  * 
- * ИСПРАВЛЕНИЕ:
- * ❌ БЫЛО: user_id: withdrawal.user.id (ID в БД вроде 1, 2, 3)
- * ✅ ТЕПЕРЬ: user_id: parseInt(withdrawal.user.telegramId) (ID в Telegram 8475177249)
- * 
- * Это причина ошибки 400!
+ * Выводит ПОЛНЫЕ детали ошибки 400 от API
  */
 
 const axios = require('axios');
@@ -188,8 +184,6 @@ const withdrawalService = {
 
     } catch (error) {
       console.error(`❌ Error creating withdrawal:`, error.message);
-      console.error(`   Stack:`, error.stack);
-
       logger.error('WITHDRAWAL', 'Error creating withdrawal request', {
         error: error.message,
         userId,
@@ -214,7 +208,6 @@ const withdrawalService = {
         throw new Error(`Invalid withdrawalId: ${withdrawalId}`);
       }
 
-      // ✅ ПОЛУЧАЕМ ЗАЯВКУ
       const withdrawal = await prisma.transaction.findUnique({
         where: { id: withdrawalIdNum },
         include: {
@@ -224,7 +217,6 @@ const withdrawalService = {
       });
 
       if (!withdrawal) {
-        console.error(`   ❌ Withdrawal not found: #${withdrawalIdNum}`);
         throw new Error(`Withdrawal #${withdrawalIdNum} not found`);
       }
 
@@ -232,133 +224,125 @@ const withdrawalService = {
         throw new Error(`Transaction #${withdrawalIdNum} is not a withdrawal`);
       }
 
-      console.log(`   ✅ Withdrawal found: ${withdrawal.id}`);
-      console.log(`   Status: ${withdrawal.status}`);
-
       const amount = parseFloat(withdrawal.amount.toString());
       const asset = withdrawal.token.symbol;
-      
-      // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Используем ID В TELEGRAM, А НЕ В БД!
       const userTelegramId = parseInt(withdrawal.user.telegramId);
 
+      console.log(`   ✅ Withdrawal found: ${withdrawal.id}`);
       console.log(`   Amount: ${amount.toFixed(8)}, Asset: ${asset}`);
       console.log(`   User Telegram ID: ${userTelegramId}`);
 
-      // ✅ ПРОВЕРЯЕМ СТАТУС
       if (withdrawal.status !== 'PENDING') {
         throw new Error(`Withdrawal #${withdrawalIdNum} is already ${withdrawal.status}`);
       }
 
-      console.log(`   ✅ Withdrawal status is PENDING`);
-
       if (approve) {
-        // ====================================
-        // ОДОБРЕНИЕ ЗАЯВКИ
-        // ====================================
         console.log(`\n✅ APPROVING WITHDRAWAL...`);
 
-        // ✅ ПРОВЕРЯЕМ что CRYPTO_PAY_TOKEN есть
         if (!CRYPTO_PAY_TOKEN) {
           throw new Error('CRYPTO_PAY_TOKEN not set in environment variables');
         }
 
-        console.log(`   ✅ CRYPTO_PAY_TOKEN is set`);
-
-        // ✅ ПОДГОТАВЛИВАЕМ ПАРАМЕТРЫ
         const transferPayload = {
-          user_id: userTelegramId,  // ✅ TELEGRAM ID, НЕ БД ID!
+          user_id: userTelegramId,
           asset: String(asset).toUpperCase().trim(),
           amount: amount.toFixed(8),
           spend_id: `withdraw_${withdrawalIdNum}_${Date.now()}`,
           comment: `Withdrawal #${withdrawalIdNum}`
         };
 
-        console.log(`   📤 Transfer payload:`, {
-          user_id: transferPayload.user_id,
-          asset: transferPayload.asset,
-          amount: transferPayload.amount,
-          spend_id: transferPayload.spend_id
-        });
-
-        // ✅ ОТПРАВЛЯЕМ TRANSFER
+        console.log(`   📤 Transfer payload:`, transferPayload);
+        console.log(`   📤 API URL: ${CRYPTO_PAY_API}/transfer`);
+        console.log(`   📤 Token set: ${CRYPTO_PAY_TOKEN ? 'YES' : 'NO'}`);
         console.log(`   📤 Sending to Crypto Pay API...`);
 
-        const transferResponse = await axios.post(
-          `${CRYPTO_PAY_API}/transfer`,
-          transferPayload,
-          {
-            headers: {
-              'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
-              'Content-Type': 'application/json'
-            },
-            timeout: 10000
-          }
-        );
-
-        console.log(`   📥 Response status: ${transferResponse.status}`);
-        console.log(`   📥 Response data:`, transferResponse.data);
-
-        if (!transferResponse.data.ok) {
-          const errorMsg = transferResponse.data.error?.description || 
-                          transferResponse.data.error?.message ||
-                          JSON.stringify(transferResponse.data.error);
-          
-          console.error(`   ❌ Transfer API error:`, errorMsg);
-          throw new Error(`Transfer API error: ${errorMsg}`);
-        }
-
-        const transferData = transferResponse.data.result;
-        const transferId = transferData.transfer_id;
-
-        console.log(`   ✅ Transfer created: ${transferId}`);
-
-        // ✅ ОБНОВЛЯЕМ СТАТУС ЗАЯВКИ
-        const updatedWithdrawal = await prisma.transaction.update({
-          where: { id: withdrawalIdNum },
-          data: {
-            status: 'COMPLETED',
-            txHash: transferId,
-            updatedAt: new Date()
-          }
-        });
-
-        console.log(`   ✅ Withdrawal status updated to COMPLETED`);
-
-        // ✅ ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЮ
         try {
-          if (withdrawal.user.telegramId) {
-            await bot.telegram.sendMessage(
-              withdrawal.user.telegramId,
-              `✅ *Ваш вывод одобрен!*\n\n` +
-              `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
-              `🎫 ID: #${withdrawalIdNum}\n` +
-              `🔗 Transfer: \`${transferId}\`\n\n` +
-              `💬 Средства отправлены на ваш кошелёк @CryptoBot\n` +
-              `⏰ Получение: 1-3 минуты`,
-              { parse_mode: 'Markdown' }
-            );
-            console.log(`   ✅ User notification sent`);
+          const transferResponse = await axios.post(
+            `${CRYPTO_PAY_API}/transfer`,
+            transferPayload,
+            {
+              headers: {
+                'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            }
+          );
+
+          console.log(`   📥 Response status: ${transferResponse.status}`);
+          console.log(`   📥 Response OK: ${transferResponse.data.ok}`);
+
+          if (!transferResponse.data.ok) {
+            const errorMsg = transferResponse.data.error?.description || 
+                            transferResponse.data.error?.message ||
+                            JSON.stringify(transferResponse.data.error);
+            throw new Error(`Transfer API error: ${errorMsg}`);
           }
-        } catch (notifyError) {
-          console.warn(`   ⚠️ Failed to notify user: ${notifyError.message}`);
+
+          const transferId = transferResponse.data.result.transfer_id;
+          console.log(`   ✅ Transfer created: ${transferId}`);
+
+          await prisma.transaction.update({
+            where: { id: withdrawalIdNum },
+            data: {
+              status: 'COMPLETED',
+              txHash: transferId,
+              updatedAt: new Date()
+            }
+          });
+
+          console.log(`✅ Withdrawal #${withdrawalIdNum} APPROVED\n`);
+
+          try {
+            if (withdrawal.user.telegramId) {
+              await bot.telegram.sendMessage(
+                withdrawal.user.telegramId,
+                `✅ *Ваш вывод одобрен!*\n\n💰 ${amount.toFixed(8)} ${asset}`
+              );
+            }
+          } catch (e) {
+            console.warn(`⚠️ Failed to notify: ${e.message}`);
+          }
+
+          return { success: true, amount, asset, transferId };
+
+        } catch (axiosError) {
+          // ✅✅✅ ПОЛНАЯ ОТЛАДКА ✅✅✅
+          console.error(`\n${'='.repeat(80)}`);
+          console.error(`❌ AXIOS ERROR DETAILS:`);
+          console.error(`${'='.repeat(80)}`);
+          
+          console.error(`\n📊 RESPONSE INFO:`);
+          console.error(`   Status: ${axiosError.response?.status}`);
+          console.error(`   Status Text: ${axiosError.response?.statusText}`);
+          
+          console.error(`\n📋 RESPONSE HEADERS:`);
+          console.error(JSON.stringify(axiosError.response?.headers || {}, null, 2));
+          
+          console.error(`\n📦 FULL RESPONSE DATA:`);
+          console.error(JSON.stringify(axiosError.response?.data || {}, null, 2));
+          
+          console.error(`\n🔧 REQUEST INFO:`);
+          console.error(`   URL: ${axiosError.config?.url}`);
+          console.error(`   Method: ${axiosError.config?.method}`);
+          
+          console.error(`\n🔑 REQUEST HEADERS:`);
+          console.error(JSON.stringify(axiosError.config?.headers || {}, null, 2));
+          
+          console.error(`\n📮 REQUEST PAYLOAD:`);
+          console.error(JSON.stringify(JSON.parse(axiosError.config?.data || '{}'), null, 2));
+          
+          console.error(`\n💬 ERROR MESSAGE:`);
+          console.error(`   ${axiosError.message}`);
+          
+          console.error(`${'='.repeat(80)}\n`);
+
+          throw axiosError;
         }
-
-        console.log(`✅ Withdrawal #${withdrawalIdNum} APPROVED\n`);
-
-        return {
-          success: true,
-          amount,
-          asset,
-          transferId
-        };
 
       } else {
-        // ====================================
-        // ОТКЛОНЕНИЕ ЗАЯВКИ
-        // ====================================
         console.log(`\n❌ REJECTING WITHDRAWAL...`);
 
-        // ✅ ВОЗВРАЩАЕМ ДЕНЬГИ НА БАЛАНС ПОЛЬЗОВАТЕЛЯ
         const returnedBalance = await prisma.balance.update({
           where: {
             userId_tokenId_type: {
@@ -372,9 +356,6 @@ const withdrawalService = {
           }
         });
 
-        console.log(`   ✅ Money returned to user balance: ${returnedBalance.amount}`);
-
-        // ✅ ОБНОВЛЯЕМ СТАТУС ЗАЯВКИ
         await prisma.transaction.update({
           where: { id: withdrawalIdNum },
           data: {
@@ -383,45 +364,24 @@ const withdrawalService = {
           }
         });
 
-        console.log(`   ✅ Withdrawal status updated to REJECTED`);
+        console.log(`✅ Withdrawal #${withdrawalIdNum} REJECTED\n`);
 
-        // ✅ ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЮ
         try {
           if (withdrawal.user.telegramId) {
             await bot.telegram.sendMessage(
               withdrawal.user.telegramId,
-              `❌ *Ваша заявка на вывод отклонена*\n\n` +
-              `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
-              `🎫 ID: #${withdrawalIdNum}\n\n` +
-              `💬 Деньги возвращены на ваш баланс.\n` +
-              `📞 Свяжитесь с поддержкой, если у вас есть вопросы.`,
-              { parse_mode: 'Markdown' }
+              `❌ *Ваша заявка отклонена*\n\n💰 ${amount.toFixed(8)} ${asset} вернено`
             );
-            console.log(`   ✅ User notification sent`);
           }
-        } catch (notifyError) {
-          console.warn(`   ⚠️ Failed to notify user: ${notifyError.message}`);
+        } catch (e) {
+          console.warn(`⚠️ Failed to notify: ${e.message}`);
         }
 
-        console.log(`✅ Withdrawal #${withdrawalIdNum} REJECTED\n`);
-
-        return {
-          success: true,
-          returnedAmount: amount,
-          asset
-        };
+        return { success: true, returnedAmount: amount, asset };
       }
 
     } catch (error) {
-      console.error(`❌ Error processing withdrawal:`, error.message);
-      console.error(`   Stack:`, error.stack);
-
-      logger.error('WITHDRAWAL', 'Error processing withdrawal', {
-        withdrawalId,
-        approve,
-        error: error.message
-      });
-
+      console.error(`\n❌ FINAL ERROR: ${error.message}\n`);
       throw error;
     }
   }
