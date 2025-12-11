@@ -62,11 +62,10 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
   try {
     const userId = req.user.userId;
     const { difficultyId, betAmount, tokenId } = req.body;
-    const DEFAULT_TOKEN_ID = tokenId || 2; // ID основной валюты (USDT)
+    const DEFAULT_TOKEN_ID = tokenId || 2;
     
     console.log('🎮 Начинаю игру сапёра: пользователь', userId, 'ставка', betAmount);
 
-    // ✅ Валидация
     if (!difficultyId || !betAmount || betAmount <= 0) {
       return res.status(400).json({
         success: false,
@@ -86,12 +85,13 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     }
     console.log(`✅ [MINESWEEPER] Списано ${betAmount} с ${deductResult.balanceType}`);
 
-    // Создаём игру (мины генерируются ВНУТРИ сервиса)
+    // Создаём игру
     const gameData = await minesweeperService.createGame(
       userId,
       DEFAULT_TOKEN_ID,
       difficultyId,
-      betAmount
+      betAmount,
+      deductResult.balanceType  // 🆕 ПЕРЕДАЁМ информацию о балансе ставки!
     );
 
     res.json({
@@ -122,7 +122,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
 
     console.log(`🎮 Открываю клетку: игра ${gameId}, позиция [${x}, ${y}], пользователь ${userId}`);
 
-    // ✅ Валидация
     if (gameId === undefined || x === undefined || y === undefined) {
       return res.status(400).json({
         success: false,
@@ -130,19 +129,20 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
       });
     }
 
-    // ⚠️ ПЕРЕДАЁМ userId в сервис для проверки собственности
     const result = await minesweeperService.revealGameCell(gameId, x, y, userId);
 
     // 🎉 ЕСЛИ ПОЛНАЯ ПОБЕДА - ЗАЧИСЛЯЕМ ВЫИГРЫШ
     if (result.status === 'WON' && result.winAmount) {
       const game = await prisma.minesweeperGame.findUnique({
         where: { id: gameId },
-        select: { tokenId: true },
+        select: { tokenId: true, balanceType: true },  // 🆕 Получаем сохранённый баланстип!
       });
 
       if (game) {
-        await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'MAIN');
-        console.log(`✅ [MINESWEEPER] Выигрыш при полной победе ${result.winAmount} зачислен на MAIN`);
+        // 🆕 ИСПРАВЛЕНО: Используем ПРАВИЛЬНЫЙ балансtип из игры
+        const balanceType = game.balanceType || 'MAIN';
+        await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, balanceType);
+        console.log(`✅ [MINESWEEPER] Выигрыш при полной победе ${result.winAmount} зачислен на ${balanceType}`);
       }
     }
 
@@ -204,14 +204,12 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
 /**
  * 💰 POST кэшаут (забрать выигрыш)
  * POST /api/v1/minesweeper/cashout
- * Body: { gameId: 1, balanceType: 'MAIN' }
- * 
- * ✅ ИСПРАВЛЕНО: Зачисление выигрыша происходит ТОЛЬКО здесь
+ * Body: { gameId: 1 }
  */
 router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { gameId, balanceType } = req.body;
+    const { gameId } = req.body;
 
     console.log(`💸 Кэшаут: игра ${gameId}, пользователь ${userId}`);
 
@@ -222,10 +220,10 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       });
     }
 
-    // Получаем игру для токена
+    // Получаем игру для токена и балансtипа ставки
     const game = await prisma.minesweeperGame.findUnique({
       where: { id: gameId },
-      select: { tokenId: true, userId: true }
+      select: { tokenId: true, userId: true, balanceType: true }
     });
 
     if (!game || game.userId !== userId) {
@@ -235,17 +233,17 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       });
     }
 
-    // Сервис только обновляет статус игры, НЕ зачисляет деньги
+    // Сервис только обновляет статус игры
     const result = await minesweeperService.cashOutGame(gameId, userId);
 
-    // ✅ ЕДИНСТВЕННОЕ МЕСТО, где зачисляется выигрыш при кэшауте
+    // ✅ ИСПРАВЛЕНО: Зачисляем выигрыш на тот же баланс откуда была ставка
     if (result.winAmount) {
-      const targetBalance = balanceType || 'MAIN';
+      const balanceType = game.balanceType || 'MAIN';  // 🆕 Используем ПРАВИЛЬНЫЙ балансtип!
       const winAmountNum = parseFloat(result.winAmount);
       
       if (winAmountNum > 0) {
-        await creditWinnings(userId, winAmountNum, game.tokenId, targetBalance);
-        console.log(`✅ [MINESWEEPER] Кэшаут: выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+        await creditWinnings(userId, winAmountNum, game.tokenId, balanceType);
+        console.log(`✅ [MINESWEEPER] Кэшаут: выигрыш ${result.winAmount} зачислен на ${balanceType}`);
       }
     }
 

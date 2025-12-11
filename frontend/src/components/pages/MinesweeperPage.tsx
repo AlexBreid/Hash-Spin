@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/card';
@@ -44,7 +44,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [maxMultiplier, setMaxMultiplier] = useState<number>(0);
   const [potentialWin, setPotentialWin] = useState<string>('0');
   
-  // ✅ ИСПРАВЛЕНО: Хранить оба баланса
   const [mainBalance, setMainBalance] = useState<number>(0);
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
@@ -68,60 +67,85 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [step]);
 
-  // ✅ ИСПРАВЛЕНО: Загружать оба баланса БЕЗ ЦИКЛА
-  // Функция для загрузки баланса
-  const loadBalance = useCallback(async () => {
+  // ✅ ИСПРАВЛЕНО: БЕЗ ЦИКЛА - Загружаем баланс и сложности ОДИН РАЗ при монтировании
+  useEffect(() => {
+    console.log('📊 [MINESWEEPER] Инициализирую компонент...');
+    
+    // Загрузка баланса
+    const loadBalance = async () => {
+      try {
+        console.log('📊 [MINESWEEPER] Загружаю баланс...');
+        const response = await getBalance();
+        const data = response.data || response;
+
+        if (Array.isArray(data)) {
+          console.log(`📊 [MINESWEEPER] Получено ${data.length} балансов:`, data);
+
+          const main = data.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
+          const bonus = data.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
+          const total = main + bonus;
+
+          console.log(`💰 [MINESWEEPER] Main: ${main}, Bonus: ${bonus}, Total: ${total}`);
+
+          setMainBalance(main);
+          setBonusBalance(bonus);
+          setTotalBalance(total);
+        }
+      } catch (err) {
+        console.error('❌ [MINESWEEPER] Ошибка загрузки баланса:', err);
+        toast.error('Не удалось загрузить баланс');
+        setMainBalance(0);
+        setBonusBalance(0);
+        setTotalBalance(0);
+      } finally {
+        setBalanceLoading(false);
+      }
+    };
+
+    // Загрузка сложностей
+    const loadDifficulties = async () => {
+      try {
+        console.log('📊 [MINESWEEPER] Загружаю сложности...');
+        const response = await getDifficulties();
+        const data = response.data || response;
+        
+        if (Array.isArray(data)) {
+          console.log(`✅ [MINESWEEPER] Получено ${data.length} сложностей`);
+          setDifficulties(data);
+        }
+      } catch (err) {
+        console.error('❌ [MINESWEEPER] Ошибка загрузки сложностей:', err);
+        toast.error('Не удалось загрузить сложности');
+      }
+    };
+
+    // Запускаем обе функции параллельно
+    loadBalance();
+    loadDifficulties();
+
+  }, []); // ✅ ПУСТО - загружается ТОЛЬКО ОДИН РАЗ!
+
+  // Функция для обновления баланса (вызывается после событий)
+  const refreshBalance = async () => {
     try {
-      console.log('📊 [MINESWEEPER] Загружаю баланс...');
       const response = await getBalance();
       const data = response.data || response;
 
       if (Array.isArray(data)) {
-        console.log(`📊 [MINESWEEPER] Получено ${data.length} балансов:`, data);
-
-        // Находим MAIN и BONUS
         const main = data.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
         const bonus = data.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
         const total = main + bonus;
-
-        console.log(`💰 [MINESWEEPER] Main: ${main}, Bonus: ${bonus}, Total: ${total}`);
 
         setMainBalance(main);
         setBonusBalance(bonus);
         setTotalBalance(total);
       }
     } catch (err) {
-      console.error('❌ [MINESWEEPER] Ошибка загрузки баланса:', err);
-      toast.error('Не удалось загрузить баланс');
-      setMainBalance(0);
-      setBonusBalance(0);
-      setTotalBalance(0);
-    } finally {
-      setBalanceLoading(false);
+      console.error('❌ [MINESWEEPER] Ошибка обновления баланса:', err);
     }
-  }, [getBalance]);
+  };
 
-  // Загружаем баланс ТОЛЬКО ОДИН РАЗ при монтировании
-  useEffect(() => {
-    loadBalance();
-  }, []); // ✅ ПУСТО - загружается один раз!
-
-  // Загрузить сложности
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await getDifficulties();
-        const data = response.data || response;
-        setDifficulties(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('❌ [MINESWEEPER] Ошибка загрузки сложностей:', err);
-        toast.error('Не удалось загрузить сложности');
-      }
-    };
-    load();
-  }, [getDifficulties]);
-
-  const handleStartGame = useCallback(async () => {
+  const handleStartGame = async () => {
     if (!selectedDifficulty) {
       toast.error('Выберите сложность');
       return;
@@ -133,7 +157,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    // ✅ ИСПРАВЛЕНО: Проверяем объединённый баланс
     if (amount > totalBalance) {
       toast.error(`Недостаточно средств (доступно: ${totalBalance.toFixed(2)} USDT)`);
       return;
@@ -164,9 +187,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setStep('PLAYING');
       toast.success('Игра начата!');
 
-      // ✅ Обновляем баланс после ставки
+      // Обновляем баланс после ставки
       setTimeout(() => {
-        loadBalance();
+        refreshBalance();
       }, 500);
     } catch (err: any) {
       console.error('❌ [MINESWEEPER] Ошибка начала игры:', err);
@@ -174,9 +197,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedDifficulty, betAmount, totalBalance, startGame, loadBalance]);
+  };
 
-  const handleRevealCell = useCallback(async (x: number, y: number) => {
+  const handleRevealCell = async (x: number, y: number) => {
     if (gameStatus !== 'PLAYING' || !gameId || cellLoading) return;
 
     setCellLoading(true);
@@ -215,9 +238,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         setStep('REVEAL_BOARD');
         toast.success(`🎉 Вы открыли всё поле! Выигрыш: ${result.winAmount} USDT`);
 
-        // ✅ Обновляем баланс после победы
         setTimeout(() => {
-          loadBalance();
+          refreshBalance();
         }, 1000);
       } else if (result.status === 'LOST') {
         setGameStatus('LOST');
@@ -227,9 +249,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         setStep('REVEAL_BOARD');
         toast.error('💣 Вы попали в мину!');
 
-        // ✅ Обновляем баланс после проигрыша
         setTimeout(() => {
-          loadBalance();
+          refreshBalance();
         }, 1000);
       }
     } catch (err: any) {
@@ -238,9 +259,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     } finally {
       setCellLoading(false);
     }
-  }, [gameId, gameStatus, cellLoading, revealCell, loadBalance]);
+  };
 
-  const handleCashOut = useCallback(async () => {
+  const handleCashOut = async () => {
     if (!gameId) return;
     try {
       console.log(`💸 [MINESWEEPER] Кэшаут игры ${gameId}`);
@@ -259,15 +280,14 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setStep('REVEAL_BOARD');
       toast.success(`💸 Вы забрали ${result.winAmount} USDT`);
 
-      // ✅ Обновляем баланс после кэшаута
       setTimeout(() => {
-        loadBalance();
+        refreshBalance();
       }, 500);
     } catch (err: any) {
       console.error('❌ [MINESWEEPER] Ошибка кэшаута:', err);
       toast.error(err.message || 'Ошибка кэшаута');
     }
-  }, [gameId, cashOut, loadBalance]);
+  };
 
   const getCellContent = (cell?: GridCell) => {
     if (!cell || !cell.revealed) return '';
@@ -275,7 +295,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     return '💰';
   };
 
-  const resetGame = useCallback(() => {
+  const resetGame = () => {
     setStep('SELECT');
     setGameId(null);
     setGrid([]);
@@ -286,7 +306,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     setMaxMultiplier(0);
     setPotentialWin('0');
     setOpenedCells(new Map());
-  }, []);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
@@ -481,7 +501,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         <div className="minesweeper-content">
           {step === 'SELECT' && (
             <Card className="card-animated p-4 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
-              {/* ✅ ИСПРАВЛЕНО: Компактный хедер с балансом */}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold">🎮 Выберите уровень</h2>
                 <div className="flex items-center gap-2 bg-gray-700/50 px-3 py-1 rounded-lg">

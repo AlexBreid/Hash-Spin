@@ -1,4 +1,4 @@
-// minesweeperService.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// minesweeperService.js - ИСПРАВЛЕННАЯ ВЕРСИЯ С ВЕЙДЖЕРОМ
 const prisma = require('../../prismaClient');
 const { Decimal } = require('@prisma/client');
 
@@ -11,25 +11,22 @@ class MinesweeperService {
         if (revealedCount <= 0) return 1.0;
         
         const gridSize = 6;
-        const totalSafeCells = (gridSize * gridSize) - minesCount; // Количество безопасных клеток
+        const totalSafeCells = (gridSize * gridSize) - minesCount;
 
-        // Экспоненциальный базовый множитель по сложности
         let baseMultiplier;
-        if (minesCount === 6) {   // EASY: 30 безопасных клеток
+        if (minesCount === 6) {
             baseMultiplier = 0.08;
-        } else if (minesCount === 12) { // MEDIUM: 24 безопасных клеток
+        } else if (minesCount === 12) {
             baseMultiplier = 0.15;
-        } else if (minesCount === 18) { // HARD: 18 безопасных клеток
+        } else if (minesCount === 18) {
             baseMultiplier = 0.25;
         } else {
             baseMultiplier = 0.15;
         }
 
-        // ЭКСПОНЕНЦИАЛЬНЫЙ РОСТ: х^2 вместо линейного
         const exponentialGrowth = Math.pow(revealedCount / totalSafeCells, 1.5);
         let multiplier = 1.0 + (revealedCount * baseMultiplier * (1 + exponentialGrowth * 2));
         
-        // БОНУС за опасность: чем больше мин, тем выше множитель
         const dangerBonus = 1.0 + (minesCount / 36) * 0.5;
         multiplier *= dangerBonus;
         
@@ -64,7 +61,6 @@ class MinesweeperService {
             }))
         );
 
-        // Случайно расставляем мины
         const minesPositions = [];
         while (minesPositions.length < minesCount) {
             const x = Math.floor(Math.random() * gridSize);
@@ -75,7 +71,6 @@ class MinesweeperService {
             }
         }
 
-        // Считаем соседние мины для каждой пустой клетки
         for (let y = 0; y < gridSize; y++) {
             for (let x = 0; x < gridSize; x++) {
                 if (!grid[y][x].mine) {
@@ -96,7 +91,6 @@ class MinesweeperService {
         return { grid, minesPositions };
     }
     
-    // Проверяем победу (все безопасные клетки открыты)
     checkWin(grid) {
         const gridSize = 6;
         for (let y = 0; y < gridSize; y++) {
@@ -109,7 +103,6 @@ class MinesweeperService {
         return true;
     }
     
-    // Считаем открытые безопасные клетки
     countRevealedCells(grid) {
         let count = 0;
         for (let y = 0; y < grid.length; y++) {
@@ -148,8 +141,9 @@ class MinesweeperService {
     
     /**
      * 🕹️ Создаём новую игру
+     * 🆕 СОХРАНЯЕМ balanceType в игре!
      */
-    async createGame(userId, tokenId, difficultyId, betAmount) {
+    async createGame(userId, tokenId, difficultyId, betAmount, balanceType = 'MAIN') {
         try {
             const difficulty = await prisma.minesweeperDifficulty.findUnique({
                 where: { id: difficultyId },
@@ -159,10 +153,10 @@ class MinesweeperService {
                 throw new Error('❌ Сложность не найдена');
             }
 
-            // Генерируем ПОЛНОЕ ПОЛЕ на сервере (с минами)
             const { grid, minesPositions } = this.generateField(difficulty.minesCount);
             const initialMultiplier = 1.0;
 
+            // 🆕 СОХРАНЯЕМ balanceType в БД!
             const game = await prisma.minesweeperGame.create({
                 data: {
                     userId,
@@ -174,19 +168,18 @@ class MinesweeperService {
                     status: 'PLAYING',
                     multiplier: initialMultiplier,
                     revealedCells: 0,
+                    balanceType,  // 🆕 ДОБАВЛЕНО!
                 },
             });
 
-            console.log(`✅ Игра создана: ID ${game.id}, ставка ${betAmount}, мин ${difficulty.minesCount}`);
+            console.log(`✅ Игра создана: ID ${game.id}, ставка ${betAmount}, баланс ${balanceType}, мин ${difficulty.minesCount}`);
 
-            // Отправляем фронту ПУСТОЕ ПОЛЕ
             const emptyGrid = Array(6).fill(null).map(() =>
                 Array(6).fill(null).map(() => ({
                     revealed: false,
                 }))
             );
 
-            // 🆕 Получаем макс множитель для этой сложности
             const maxMultiplier = this.getMaxMultiplier(difficulty.minesCount);
             const nextMultiplier = this.getNextMultiplier(0, difficulty.minesCount);
 
@@ -209,7 +202,6 @@ class MinesweeperService {
      */
     async revealGameCell(gameId, x, y, userId) {
         try {
-            // Проверяем что игра принадлежит пользователю
             const game = await prisma.minesweeperGame.findUnique({
                 where: { id: gameId },
                 include: { difficulty: true },
@@ -227,16 +219,13 @@ class MinesweeperService {
                 throw new Error('❌ Игра уже завершена');
             }
 
-            // ✅ Валидация координат
             if (x < 0 || x >= 6 || y < 0 || y >= 6 || !Number.isInteger(x) || !Number.isInteger(y)) {
                 throw new Error('❌ Некорректные координаты');
             }
             
-            // ВОССТАНАВЛИВАЕМ ПОЛНОЕ ПОЛЕ с минами на СЕРВЕРЕ
             let grid = JSON.parse(game.gameState);
             let betAmount = new Decimal(game.betAmount);
 
-            // Проверяем что клетка еще не открывалась
             if (grid[y][x].revealed) {
                 throw new Error('❌ Клетка уже открыта');
             }
@@ -244,12 +233,10 @@ class MinesweeperService {
             const cell = grid[y][x];
             const isMine = cell.mine;
 
-            // ОТКРЫВАЕМ ТОЛЬКО ЭТУ КЛЕТКУ НА СЕРВЕРЕ
             grid[y][x].revealed = true;
 
             // ❌ ПОПАЛИ В МИНУ
             if (isMine) {
-                // Открываем ВСЕ мины на сервере
                 const minesPositions = JSON.parse(game.minesPositions);
                 for (const [mx, my] of minesPositions) {
                     grid[my][mx].revealed = true;
@@ -266,7 +253,6 @@ class MinesweeperService {
 
                 console.log(`❌ Игра ${gameId}: попадание в мину в позиции [${x}, ${y}]`);
                 
-                // Отправляем ПОЛНОЕ РАСКРЫТОЕ ПОЛЕ
                 const fullRevealedGrid = this.prepareFullRevealedGrid(grid);
                 
                 return {
@@ -286,11 +272,10 @@ class MinesweeperService {
             // ✅ БЕЗОПАСНАЯ КЛЕТКА - продолжаем игру
             const revealedCount = this.countRevealedCells(grid);
             const currentMultiplier = this.getMultiplier(revealedCount, game.difficulty.minesCount);
-            const nextMultiplier = this.getNextMultiplier(revealedCount, game.difficulty.minesCount); // 🆕
-            const maxMultiplier = this.getMaxMultiplier(game.difficulty.minesCount); // 🆕
+            const nextMultiplier = this.getNextMultiplier(revealedCount, game.difficulty.minesCount);
+            const maxMultiplier = this.getMaxMultiplier(game.difficulty.minesCount);
             const potentialWin = betAmount.mul(currentMultiplier);
             
-            // Проверяем победу
             const isWon = this.checkWin(grid);
             
             const updateData = {
@@ -342,8 +327,8 @@ class MinesweeperService {
                 x,
                 y,
                 currentMultiplier,
-                nextMultiplier, // 🆕 СЛЕДУЮЩИЙ МНОЖИТЕЛЬ
-                maxMultiplier, // 🆕 МАКСИМАЛЬНЫЙ МНОЖИТЕЛЬ
+                nextMultiplier,
+                maxMultiplier,
                 potentialWin: potentialWin.toString(),
                 winAmount: null,
                 fullGrid: null,
@@ -391,7 +376,7 @@ class MinesweeperService {
             let grid = JSON.parse(game.gameState);
             const fullRevealedGrid = this.prepareFullRevealedGrid(grid);
 
-            console.log(`💸 Игра ${gameId}: Кэшаут на ${game.multiplier}X. Выигрыш: ${winAmount}`);
+            console.log(`💸 Игра ${gameId}: Кэшаут на ${game.multiplier}X. Выигрыш: ${winAmount}, баланс: ${game.balanceType}`);
             
             return {
                 status: 'CASHED_OUT',
