@@ -15,6 +15,7 @@ const validators = require('../utils/validators');
 const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
+const withdrawalService = require('../services/withdrawalService');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FRONTEND_URL = process.env.FRONTEND_URL;
@@ -844,34 +845,47 @@ if (!BOT_TOKEN) {
 
       if (waitingForWithdrawAmount.has(user.id)) {
         if (text === '◀️ Назад') {
-          waitingForWithdrawAmount.delete(user.id);
-          const menu = getMainMenuKeyboard(user.isAdmin);
-          await ctx.reply('📋 *Выберите действие:*', menu);
-          return;
+            waitingForWithdrawAmount.delete(user.id);
+            const menu = getMainMenuKeyboard(user.isAdmin);
+            await ctx.reply('📋 *Выберите действие:*', menu);
+            return;
         }
 
         const amount = parseFloat(text);
         const balance = await getUserBalance(user.id);
         
         if (!validators.validateWithdrawAmount(amount) || amount > balance) {
-          await ctx.reply(
+            await ctx.reply(
             `❌ Некорректная сумма. Доступно: ${balance.toFixed(8)} USDT.\n\nПопробуйте снова:`,
             getBackButton()
-          );
-          return;
+            );
+            return;
         }
         
         waitingForWithdrawAmount.delete(user.id);
-        waitingForWithdrawAddress.set(user.id, amount);
-        setStateTimeout(waitingForWithdrawAddress, user.id);
+        
+        // ✅ НОВОЕ: Прямой вывод через Transfer API (без ввода адреса!)
+        console.log(`\n💸 User ${user.id} requested withdrawal of ${amount.toFixed(8)} USDT`);
         
         await ctx.reply(
-          `✅ Сумма: ${amount.toFixed(8)} USDT\n\nТеперь введите адрес кошелька:`,
-          getBackButton()
+            `💰 *Ваша заявка на вывод*\n\n` +
+            `Сумма: ${amount.toFixed(8)} USDT\n` +
+            `Способ: Прямой перевод на ваш кошелёк\n\n` +
+            `⏳ Подтвердите операцию:`,
+            {
+            reply_markup: {
+                inline_keyboard: [
+                [{ text: '✅ Подтвердить', callback_data: `confirm_withdraw_${amount}` }],
+                [{ text: '❌ Отмена', callback_data: 'back_to_menu' }]
+                ]
+            },
+            parse_mode: 'Markdown'
+            }
         );
+        
         logger.info('BOT', `User entered withdraw amount`, { userId: user.id, amount: amount.toFixed(8) });
         return;
-      }
+        }
 
       if (waitingForWithdrawAddress.has(user.id)) {
         if (text === '◀️ Назад') {
@@ -1079,36 +1093,37 @@ if (!BOT_TOKEN) {
         }
 
         case '💸 Вывести': {
-          waitingForDeposit.delete(user.id);
-          waitingForWithdrawAmount.delete(user.id);
-          waitingForWithdrawAddress.delete(user.id);
-          
-          const balance = await getUserBalance(user.id);
-          if (balance < 1) {
-            await ctx.reply('❌ Минимальный баланс для вывода — 1 USDT.');
-            return;
-          }
-          
-          waitingForWithdrawAmount.set(user.id, true);
-          setStateTimeout(waitingForWithdrawAmount, user.id);
-          
-          await ctx.reply(
-            `💸 *Выберите сумму для вывода:*`,
-            {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: '10 USDT', callback_data: 'withdraw_10' }],
-                  [{ text: '50 USDT', callback_data: 'withdraw_50' }],
-                  [{ text: '100 USDT', callback_data: 'withdraw_100' }],
-                  [{ text: 'Другая сумма', callback_data: 'withdraw_custom' }],
-                  [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
-                ]
-              },
-              parse_mode: 'Markdown'
+            waitingForDeposit.delete(user.id);
+            waitingForWithdrawAmount.delete(user.id);
+            waitingForWithdrawAddress.delete(user.id);
+            
+            const balance = await getUserBalance(user.id);
+            if (balance < 1) {
+                await ctx.reply('❌ Минимальный баланс для вывода — 1 USDT.');
+                return;
             }
-          );
-          break;
-        }
+            
+            waitingForWithdrawAmount.set(user.id, true);
+            setStateTimeout(waitingForWithdrawAmount, user.id);
+            
+            await ctx.reply(
+                `💸 *Выберите сумму для вывода:*\n\n💡 Средства будут отправлены прямо на ваш кошелёк!`,
+                {
+                reply_markup: {
+                    inline_keyboard: [
+                    [{ text: '10 USDT', callback_data: 'withdraw_10' }],
+                    [{ text: '50 USDT', callback_data: 'withdraw_50' }],
+                    [{ text: '100 USDT', callback_data: 'withdraw_100' }],
+                    [{ text: 'Другая сумма', callback_data: 'withdraw_custom' }],
+                    [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+                    ]
+                },
+                parse_mode: 'Markdown'
+                }
+            );
+            break;
+            }
+
 
         case '📥 Мои выводы': {
           const userTx = await prisma.transaction.findMany({
@@ -1502,68 +1517,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  bot.action(/withdraw_(\d+)/, async (ctx) => {
-    try {
-      const amount = parseFloat(ctx.match[1]);
-      
-      if (!validators.validateWithdrawAmount(amount)) {
-        await ctx.answerCbQuery('❌ Некорректная сумма');
-        return;
-      }
-      
-      const user = await prisma.user.findUnique({ 
-        where: { telegramId: ctx.from.id.toString() } 
-      });
-      
-      if (!user) {
-        return await ctx.answerCbQuery('Пользователь не найден.');
-      }
-
-      const balance = await getUserBalance(user.id);
-      if (balance < amount) {
-        await ctx.answerCbQuery('❌ Недостаточно средств.');
-        return;
-      }
-
-      waitingForWithdrawAddress.set(user.id, amount);
-      setStateTimeout(waitingForWithdrawAddress, user.id);
-      
-      try {
-        await ctx.deleteMessage();
-      } catch (e) {}
-      
-      await ctx.reply(
-        `✅ Сумма: ${amount.toFixed(8)} USDT\n\nТеперь введите адрес кошелька:`,
-        getBackButton()
-      );
-    } catch (error) {
-      logger.error('BOT', `Error in withdraw callback`, { error: error.message });
-      await ctx.answerCbQuery('❌ Ошибка');
-    }
-  });
-
-  bot.action('withdraw_custom', async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
-    
-    if (!user) {
-      return await ctx.answerCbQuery('Пользователь не найден.');
-    }
-
-    const balance = await getUserBalance(user.id);
-    waitingForWithdrawAmount.set(user.id, true);
-    setStateTimeout(waitingForWithdrawAmount, user.id);
-    
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {}
-    
-    await ctx.reply(
-      `Введите сумму вывода (минимум 1 USDT, максимум ${balance.toFixed(8)} USDT):`,
-      getBackButton()
-    );
-  });
 
   bot.action('admin_show_withdrawals', async (ctx) => {
     const user = await prisma.user.findUnique({ 
@@ -1680,123 +1633,155 @@ if (!BOT_TOKEN) {
     });
     await ctx.answerCbQuery();
   });
-
-  bot.action(/approve_withdrawal_(\d+)/, async (ctx) => {
+  bot.action(/confirm_withdraw_(\d+(?:\.\d+)?)/, async (ctx) => {
+  try {
+    const amountStr = ctx.match[1];
+    const amount = parseFloat(amountStr);
+    
+    if (!validators.validateWithdrawAmount(amount)) {
+      await ctx.answerCbQuery('❌ Некорректная сумма');
+      return;
+    }
+    
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
     });
-
-    if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
+    
+    if (!user) {
+      await ctx.answerCbQuery('❌ Пользователь не найден');
       return;
     }
 
-    const withdrawalId = parseInt(ctx.match[1]);
-
-    const withdrawal = await prisma.transaction.findUnique({
-      where: { id: withdrawalId }
-    });
-
-    if (!withdrawal) {
-      await ctx.answerCbQuery('❌ Заявка не найдена');
+    // ✅ Проверяем баланс ещё раз
+    const balance = await getUserBalance(user.id);
+    if (balance < amount) {
+      await ctx.answerCbQuery('❌ Недостаточно средств');
+      await ctx.reply(`❌ Доступно только ${balance.toFixed(8)} USDT`);
       return;
     }
 
-    await prisma.transaction.update({
-      where: { id: withdrawalId },
-      data: { status: 'COMPLETED', txHash: `APPROVED_${Date.now()}` }
-    });
+    await ctx.answerCbQuery('⏳ Обработка...');
 
-    const userRecord = await prisma.user.findUnique({ 
-      where: { id: withdrawal.userId }, 
-      select: { telegramId: true } 
-    });
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {}
 
-    if (userRecord?.telegramId) {
-      try {
-        await bot.telegram.sendMessage(
-          userRecord.telegramId,
-          `✅ *Вывод одобрен!*\n\n` +
-          `💰 ${parseFloat(withdrawal.amount.toString()).toFixed(8)} USDT\n` +
-          `📍 ${withdrawal.walletAddress}\n` +
-          `⏰ Средства поступят в течение 24 часов.`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (e) {
-        logger.warn('BOT', `Failed to notify user`, { error: e.message });
-      }
+    // ✅ Создаём заявку на вывод через новый сервис
+    console.log(`\n💸 Creating withdrawal request for user ${user.id}: ${amount.toFixed(8)} USDT`);
+    
+    const result = await withdrawalService.createWithdrawalRequest(bot, user.id, amount, 'USDT');
+
+    if (!result.success) {
+      console.error(`❌ Withdrawal creation failed:`, result.error);
+      await ctx.reply(
+        result.userMessage || '❌ Ошибка при создании заявки на вывод\n\nПопробуйте позже.',
+        getMainMenuKeyboard(user.isAdmin)
+      );
+      return;
     }
 
-    await ctx.answerCbQuery('✅ Вывод одобрен');
-    await ctx.reply('✅ Заявка #' + withdrawalId + ' одобрена');
+    console.log(`✅ Withdrawal request created: #${result.withdrawalId}`);
+
+    // Пользователю уже отправлено сообщение в withdrawalService.createWithdrawalRequest
+    await ctx.reply(
+      `📋 Заявка в обработке. Администратор одобрит её в течение нескольких минут.`,
+      getMainMenuKeyboard(user.isAdmin)
+    );
+
+  } catch (error) {
+    logger.error('BOT', `Error in confirm_withdraw callback`, { error: error.message });
+    await ctx.answerCbQuery('❌ Ошибка');
+    await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
+  }
+});
+
+bot.action(/approve_withdrawal_(\d+)/, async (ctx) => {
+  const user = await prisma.user.findUnique({ 
+    where: { telegramId: ctx.from.id.toString() } 
   });
 
-  bot.action(/reject_withdrawal_(\d+)/, async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
+  if (!user || !user.isAdmin) {
+    await ctx.answerCbQuery('❌ Нет доступа');
+    return;
+  }
 
-    if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
-      return;
+  const withdrawalId = parseInt(ctx.match[1]);
+
+  try {
+    await ctx.answerCbQuery('⏳ Обработка...');
+
+    console.log(`\n✅ Admin approving withdrawal #${withdrawalId}`);
+
+    // ✅ Используем новый сервис для обработки
+    const result = await withdrawalService.processWithdrawal(bot, withdrawalId, true);
+
+    console.log(`✅ Withdrawal approved:`, result);
+    
+    await ctx.reply(
+      `✅ Заявка #${withdrawalId} одобрена!\n\n` +
+      `💰 Сумма: ${result.amount.toFixed(8)} ${result.asset}\n` +
+      `🔗 Transfer ID: \`${result.transferId}\`\n\n` +
+      `Средства отправлены пользователю.`,
+      { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+    );
+
+  } catch (error) {
+    logger.error('BOT', `Error approving withdrawal`, { error: error.message });
+    
+    let errorMsg = error.message;
+    if (error.message.includes('Transfer failed')) {
+      errorMsg = 'Ошибка при отправке средств. Проверьте баланс платформы!';
     }
 
-    const withdrawalId = parseInt(ctx.match[1]);
+    await ctx.answerCbQuery('❌ Ошибка');
+    await ctx.reply(
+      `❌ Ошибка при одобрении заявки:\n\n${errorMsg}\n\n` +
+      `Заявка остаётся в статусе PENDING.`,
+      getMainMenuKeyboard(user.isAdmin)
+    );
+  }
+});
 
-    const withdrawal = await prisma.transaction.findUnique({
-      where: { id: withdrawalId }
-    });
+// Замени bot.action(/reject_withdrawal_(\d+)/) на этот:
 
-    if (!withdrawal) {
-      await ctx.answerCbQuery('❌ Заявка не найдена');
-      return;
-    }
-
-    const token = await prisma.cryptoToken.findUnique({ where: { symbol: 'USDT' } });
-
-    await prisma.$transaction(async (tx) => {
-      await tx.transaction.update({
-        where: { id: withdrawalId },
-        data: { status: 'REJECTED' }
-      });
-
-      if (token) {
-        await tx.balance.update({
-          where: { 
-            userId_tokenId_type: { 
-              userId: withdrawal.userId, 
-              tokenId: token.id, 
-              type: 'MAIN' 
-            } 
-          },
-          data: { amount: { increment: parseFloat(withdrawal.amount.toString()) } }
-        });
-      }
-    });
-
-    const userRecord = await prisma.user.findUnique({ 
-      where: { id: withdrawal.userId }, 
-      select: { telegramId: true } 
-    });
-
-    if (userRecord?.telegramId) {
-      try {
-        await bot.telegram.sendMessage(
-          userRecord.telegramId,
-          `❌ *Вывод отклонен*\n\n` +
-          `💰 ${parseFloat(withdrawal.amount.toString()).toFixed(8)} USDT\n` +
-          `💬 Средства вернулись на ваш счет.\n\n` +
-          `Свяжитесь с поддержкой для уточнения деталей.`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (e) {
-        logger.warn('BOT', `Failed to notify user`, { error: e.message });
-      }
-    }
-
-    await ctx.answerCbQuery('✅ Вывод отклонен');
-    await ctx.reply('❌ Заявка #' + withdrawalId + ' отклонена');
+bot.action(/reject_withdrawal_(\d+)/, async (ctx) => {
+  const user = await prisma.user.findUnique({ 
+    where: { telegramId: ctx.from.id.toString() } 
   });
+
+  if (!user || !user.isAdmin) {
+    await ctx.answerCbQuery('❌ Нет доступа');
+    return;
+  }
+
+  const withdrawalId = parseInt(ctx.match[1]);
+
+  try {
+    await ctx.answerCbQuery('⏳ Обработка...');
+
+    console.log(`\n❌ Admin rejecting withdrawal #${withdrawalId}`);
+
+    // ✅ Используем новый сервис для отклонения
+    const result = await withdrawalService.processWithdrawal(bot, withdrawalId, false);
+
+    console.log(`✅ Withdrawal rejected:`, result);
+    
+    await ctx.reply(
+      `❌ Заявка #${withdrawalId} отклонена\n\n` +
+      `💰 ${result.returnedAmount.toFixed(8)} ${result.asset} вернено на счёт пользователя`,
+      { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+    );
+
+  } catch (error) {
+    logger.error('BOT', `Error rejecting withdrawal`, { error: error.message });
+    
+    await ctx.answerCbQuery('❌ Ошибка');
+    await ctx.reply(
+      `❌ Ошибка при отклонении заявки:\n\n${error.message}`,
+      getMainMenuKeyboard(user.isAdmin)
+    );
+  }
+});
 
   bot.action(/reply_ticket_action_(.+)/, async (ctx) => {
     const user = await prisma.user.findUnique({ 
