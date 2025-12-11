@@ -1773,7 +1773,11 @@ if (!BOT_TOKEN) {
     
     for (const w of pendingWithdrawals) {
       const amount = parseFloat(w.amount.toString());
-      const shortAddr = w.walletAddress.length > 15 ? `${w.walletAddress.slice(0,10)}...` : w.walletAddress;
+      let shortAddr = '—';
+if (w.walletAddress) {
+  const addr = w.walletAddress.toString().trim();
+  shortAddr = addr.length > 15 ? `${addr.slice(0,10)}...` : addr;
+}
       
       msg += `ID: #${w.id}\n` +
              `👤 User: ${w.userId}\n` +
