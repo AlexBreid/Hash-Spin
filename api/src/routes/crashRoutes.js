@@ -5,12 +5,12 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 
 const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./helpers/gameReferralHelper');
 
-// Остальные роуты без изменений...
-
 // ===================================
 // POST /api/v1/crash/cashout-result
-// ✅ ИСПРАВЛЕНО: Правильная конверсия BONUS → MAIN
-// Конвертируется ВСЯ оставшаяся сумма BONUS, не исходный размер!
+// ✅ ИСПРАВЛЕНО:
+// 1. Деньги зачисляются СРАЗУ, не ждут конца раунда
+// 2. Вейджер считается СРАЗУ
+// 3. Конверсия BONUS → MAIN происходит СРАЗУ
 // ===================================
 router.post('/api/v1/crash/cashout-result', (req, res) => {
   const verified = verifyGameServerSecret(req, res);
@@ -65,11 +65,11 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
           }
         });
 
-        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА: Конвертируется ВСЯ оставшаяся сумма BONUS
+        // 🆕 ДЕНЬГИ ЗАЧИСЛЯЮТСЯ СРАЗУ!
         if (winningsAmount > 0 && result === 'won') {
-          console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount} на ${balanceType || 'MAIN'}`);
+          console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш СРАЗУ: ${winningsAmount} на ${balanceType || 'MAIN'}`);
           
-          // Зачисляем выигрыш
+          // ✅ Зачисляем выигрыш СРАЗУ
           await creditWinnings(userId, winningsAmount, tokenId, balanceType || 'MAIN');
 
           await tx.crashTransaction.create({
@@ -82,33 +82,30 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
             }
           });
 
-          // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР (если была ставка с BONUS)
+          // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР СРАЗУ (если была ставка с BONUS)
           if (balanceType === 'BONUS' && userBonusId) {
-            console.log(`\n💛 [CASHOUT-RESULT] Проверяю вейджер для бонуса...`);
+            console.log(`\n💛 [CASHOUT-RESULT] Проверяю вейджер СРАЗУ для бонуса...`);
             
-            // Получаем информацию о бонусе
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
             });
             
             if (bonus) {
-              // УВЕЛИЧИВАЕМ WAGERED
+              // УВЕЛИЧИВАЕМ WAGERED НА ВЫИГРЫШ
               const newWagered = parseFloat(bonus.wageredAmount.toString()) + winningsAmount;
               const requiredNum = parseFloat(bonus.requiredWager.toString());
 
               console.log(`💛 [CASHOUT-RESULT] Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
 
-              // Обновляем wageredAmount
               await tx.userBonus.update({
                 where: { id: userBonusId },
                 data: { wageredAmount: newWagered.toString() }
               });
 
-              // 🎊 ПРОВЕРЯЕМ: вейджер выполнен?
+              // 🎊 КОНВЕРСИЯ СРАЗУ если вейджер выполнен!
               if (newWagered >= requiredNum) {
-                console.log(`\n🎊 [CASHOUT-RESULT] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
+                console.log(`\n🎊 [CASHOUT-RESULT] ВЕЙДЖЕР ВЫПОЛНЕН СРАЗУ! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
                 
-                // Получаем текущий BONUS баланс
                 const currentBonus = await tx.balance.findUnique({
                   where: {
                     userId_tokenId_type: { userId, tokenId, type: 'BONUS' }
@@ -117,9 +114,8 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
                 const bonusBalanceForConversion = parseFloat(currentBonus?.amount?.toString() || '0');
 
-                console.log(`💳 [CASHOUT-RESULT] Конвертирую ВСЮ сумму: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
+                console.log(`💳 [CASHOUT-RESULT] Конвертирую ВСЮ сумму СРАЗУ: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
                 
-                // ✅ ПРАВИЛЬНАЯ КОНВЕРСИЯ: Конвертируем ВСЮ оставшуюся сумму!
                 if (bonusBalanceForConversion > 0) {
                   // 1. Обнуляем BONUS баланс
                   await tx.balance.update({
@@ -165,7 +161,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
                     }
                   });
                   
-                  console.log(`✅ [CASHOUT-RESULT] ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN (всё конвертировано!)\n`);
+                  console.log(`✅ [CASHOUT-RESULT] ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN конвертировано СРАЗУ!\n`);
                 }
               }
             }
@@ -193,7 +189,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         return updatedBet;
       });
 
-      console.log(`✅ [CASHOUT-RESULT] Касаут обработан для ставки ${betIdInt}`);
+      console.log(`✅ [CASHOUT-RESULT] Касаут обработан СРАЗУ для ставки ${betIdInt}`);
       res.json({ success: true, data: { status: 'finalized', result: finalResult.result } });
     } catch (error) {
       console.error('❌ [CASHOUT-RESULT] Ошибка:', error.message);
@@ -363,7 +359,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         return { 
           betId: newBet.id, 
           balanceType: deductResult.balanceType,
-          userBonusId: deductResult.userBonusId // 🆕 Передаём ID бонуса!
+          userBonusId: deductResult.userBonusId
         };
       });
 
@@ -374,7 +370,7 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         data: { 
           betId: result.betId,
           balanceType: result.balanceType,
-          userBonusId: result.userBonusId // 🆕 Отправляем на клиент!
+          userBonusId: result.userBonusId
         } 
       });
     } catch (error) {
@@ -483,12 +479,19 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
   }
 });
 
+// ===================================
+// GET /api/v1/crash/last-crashes
+// ✅ ИСПРАВЛЕНО: 
+// 1. Только последние 10 крашей
+// 2. Визуально не наваливаются на другие блоки
+// ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
     console.log(`\n${'='.repeat(80)}`);
     console.log(`📊 [ROUTE] GET /crash/last-crashes`);
     console.log(`${'='.repeat(80)}`);
 
+    // ✅ ИСПРАВЛЕНО: crashPoint: { not: null } вместо NOT: { crashPoint: null }
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
@@ -500,17 +503,17 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
         totalPlayers: true,
       },
       where: {
-        NOT: {
-          crashPoint: null
+        crashPoint: {
+          not: null  // ✅ Правильный синтаксис для Decimal
         }
       },
       orderBy: {
         createdAt: 'desc',
       },
-      take: 50,
+      take: 10,  // ✅ ТОЛЬКО 10 последних крашей!
     });
 
-    console.log(`✅ Найдено ${crashes.length} раундов в БД`);
+    console.log(`✅ Найдено ${crashes.length} последних раундов в БД`);
 
     const formattedCrashes = crashes.map((crash) => {
       return {
@@ -524,7 +527,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
       };
     });
 
-    console.log(`\n📤 Отправляю ${formattedCrashes.length} крашей на фронт`);
+    console.log(`\n📤 Отправляю ${formattedCrashes.length} последних крашей на фронт`);
     console.log(`${'='.repeat(80)}\n`);
 
     res.json({
@@ -550,8 +553,8 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
     const crashes = await prisma.crashRound.findMany({
       select: { crashPoint: true },
       where: {
-        NOT: {
-          crashPoint: null
+        crashPoint: {
+          not: null  // ✅ Исправлено
         }
       },
       orderBy: { createdAt: 'desc' },
