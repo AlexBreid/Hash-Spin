@@ -1,13 +1,11 @@
 /**
- * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ ReferralService.js
- * КОПИРУЙ ВЕСЬ КОД В src/services/ReferralService.js
+ * ✅ ИСПРАВЛЕННЫЙ ReferralService.js
  * 
- * ✅ ИСПРАВЛЕНИЯ:
- * 1. ✅ toFixed(8) для ВСЕХ денег
- * 2. ✅ ПРАВИЛЬНАЯ формула комиссии для воркеров
- * 3. ✅ Database transactions везде
- * 4. ✅ Логирование через logger
- * 5. ✅ Валидация везде
+ * ✨ НОВАЯ ЛОГИКА БОНУСА:
+ * 1. ✅ Бонус доступен один раз, но в ЛЮБОЕ время (не обязательно первый депозит)
+ * 2. ✅ При пополнении вопрос: "Использовать бонус?" (если он ещё доступен)
+ * 3. ✅ После использования - больше нельзя использовать
+ * 4. ✅ Все остальные исправления остаются
  */
 
 const prisma = require('../../prismaClient');
@@ -16,16 +14,16 @@ const validators = require('../utils/validators');
 
 // Конфигурация
 const CONFIG = {
-  // Бонус реферала
+  // Бонус реферала (используется один раз в любое время)
   DEPOSIT_BONUS_PERCENT: 100,        // +100% к депозиту
   WAGERING_MULTIPLIER: 10,           // x10 для отыгрыша
   BONUS_EXPIRY_DAYS: 7,              // Бонус сгорает через 7 дней
   
-  // ✅ ИСПРАВЛЕННАЯ: Комиссия обычных рефералов
+  // Комиссия обычных рефералов
   HOUSE_EDGE: 0.03,                  // 3% преимущество казино
   REGULAR_COMMISSION_RATE: 0.30,     // 30% от дохода казино
   
-  // ✅ НОВОЕ: Комиссия воркеров (5% от чистого профита)
+  // Комиссия воркеров
   WORKER_PROFIT_SHARE: 0.05,         // 5% от профита
   
   // Оптимизация
@@ -36,15 +34,105 @@ const CONFIG = {
 class ReferralService {
   
   /**
-   * 🎁 Начислить бонус рефералу при первом депозите
-   * @param {number} userId - ID реферала
-   * @param {number} depositAmount - Сумма депозита
-   * @param {number} tokenId - ID токена
-   * @returns {Object|null} - Информация о бонусе или null
+   * 🎁 НОВОЕ: Проверить доступность бонуса (может ли пользователь использовать бонус?)
+   * @param {number} userId
+   * @param {number} tokenId
+   * @returns {Object} { canUseBonus, reason, bonusInfo }
    */
-  async grantDepositBonus(userId, depositAmount, tokenId) {
+  async checkBonusAvailability(userId, tokenId = 2) {
     try {
-      // ✅ ВАЛИДАЦИЯ ВХОДНЫХ ДАННЫХ
+      const userIdNum = parseInt(userId);
+      const tokenIdNum = parseInt(tokenId);
+      
+      if (!validators.validateUserId(userIdNum)) {
+        return { canUseBonus: false, reason: 'Invalid userId' };
+      }
+      
+      // 1. Проверяем у пользователя реферера
+      const user = await prisma.user.findUnique({
+        where: { id: userIdNum },
+        select: { referredById: true }
+      });
+      
+      if (!user?.referredById) {
+        return { 
+          canUseBonus: false, 
+          reason: 'No referrer assigned',
+          bonusInfo: null
+        };
+      }
+      
+      // 2. Ищем активный бонус
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: {
+          userId: userIdNum,
+          tokenId: tokenIdNum,
+          isActive: true,
+          isCompleted: false
+        },
+        include: { bonus: true }
+      });
+      
+      if (activeBonus) {
+        // Бонус уже активен
+        return {
+          canUseBonus: true,
+          reason: 'Bonus already active',
+          bonusInfo: {
+            grantedAmount: activeBonus.grantedAmount.toString(),
+            requiredWager: activeBonus.requiredWager.toString(),
+            expiresAt: activeBonus.expiresAt
+          }
+        };
+      }
+      
+      // 3. Ищем уже использованный бонус
+      const usedBonus = await prisma.userBonus.findFirst({
+        where: {
+          userId: userIdNum,
+          tokenId: tokenIdNum,
+          isCompleted: true
+        }
+      });
+      
+      if (usedBonus) {
+        return {
+          canUseBonus: false,
+          reason: 'Bonus already used',
+          bonusInfo: null
+        };
+      }
+      
+      // 4. Бонус доступен для использования
+      logger.info('REFERRAL', `Bonus is available for user`, { userId: userIdNum });
+      
+      return {
+        canUseBonus: true,
+        reason: 'Bonus available for use',
+        bonusInfo: {
+          bonusPercent: CONFIG.DEPOSIT_BONUS_PERCENT,
+          wageringMultiplier: CONFIG.WAGERING_MULTIPLIER,
+          expiryDays: CONFIG.BONUS_EXPIRY_DAYS
+        }
+      };
+      
+    } catch (error) {
+      logger.error('REFERRAL', 'Failed to check bonus availability', { error: error.message });
+      return { canUseBonus: false, reason: error.message };
+    }
+  }
+  
+  /**
+   * 🎁 НОВОЕ: Выдать бонус при пополнении (если пользователь выбрал)
+   * Работает в ЛЮБОЕ время, не только на первый депозит
+   * @param {number} userId
+   * @param {number} depositAmount
+   * @param {number} tokenId
+   * @param {number} referrerId
+   * @returns {Object|null}
+   */
+  async grantDepositBonus(userId, depositAmount, tokenId, referrerId = null) {
+    try {
       const userIdNum = parseInt(userId);
       const depositAmountNum = parseFloat(depositAmount);
       const tokenIdNum = parseInt(tokenId);
@@ -64,11 +152,7 @@ class ReferralService {
         return null;
       }
       
-      logger.info('REFERRAL', `Checking bonus for userId=${userIdNum}`, { 
-        depositAmount: depositAmountNum.toFixed(8) 
-      });
-      
-      // 1. Получаем пользователя с реферером
+      // 1. Получаем пользователя
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
         select: { 
@@ -80,23 +164,29 @@ class ReferralService {
         }
       });
       
-      if (!user || !user.referredById) {
+      // Если referrer не передан, используем из БД
+      const finalReferrerId = referrerId || user?.referredById;
+      
+      if (!user || !finalReferrerId) {
         logger.warn('REFERRAL', `User ${userIdNum} has no referrer`);
         return null;
       }
       
-      // 2. Проверяем, это первый депозит?
-      const depositCount = await prisma.transaction.count({
-        where: {
-          userId: userIdNum,
-          type: 'DEPOSIT',
-          status: 'COMPLETED'
-        }
-      });
+      // 2. НОВОЕ: Проверяем доступность бонуса
+      const bonusAvailability = await this.checkBonusAvailability(userIdNum, tokenIdNum);
       
-      if (depositCount > 1) {
-        logger.warn('REFERRAL', `User ${userIdNum} already has ${depositCount} deposits`);
+      if (!bonusAvailability.canUseBonus || bonusAvailability.reason === 'Bonus already used') {
+        logger.warn('REFERRAL', `Bonus not available`, { 
+          userId: userIdNum, 
+          reason: bonusAvailability.reason 
+        });
         return null;
+      }
+      
+      // Если бонус уже активен, не создаём новый
+      if (bonusAvailability.reason === 'Bonus already active') {
+        logger.debug('REFERRAL', `Bonus already active for user`, { userId: userIdNum });
+        return bonusAvailability.bonusInfo;
       }
       
       // 3. Получаем/создаём бонусную программу
@@ -108,7 +198,7 @@ class ReferralService {
         bonusProgram = await prisma.bonus.create({
           data: {
             name: 'Referral Welcome Bonus',
-            description: '+100% к первому депозиту по реферальной ссылке',
+            description: '+100% к депозиту через реферальную ссылку',
             wageringMultiplier: CONFIG.WAGERING_MULTIPLIER,
             maxBonusAmount: '10000',
             depositBonusPercent: CONFIG.DEPOSIT_BONUS_PERCENT
@@ -143,7 +233,7 @@ class ReferralService {
             wageredAmount: '0',
             isActive: true,
             isCompleted: false,
-            referrerId: user.referredById,
+            referrerId: finalReferrerId,
             expiresAt: new Date(Date.now() + CONFIG.BONUS_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
           }
         });
@@ -167,7 +257,7 @@ class ReferralService {
         // Записываем реферальную транзакцию
         await tx.referralTransaction.create({
           data: {
-            referrerId: user.referredById,
+            referrerId: finalReferrerId,
             refereeId: userIdNum,
             tokenId: tokenIdNum,
             eventType: 'DEPOSIT_BONUS',
@@ -181,13 +271,13 @@ class ReferralService {
         await tx.referralStats.upsert({
           where: {
             referrerId_refereeId_tokenId: {
-              referrerId: user.referredById,
+              referrerId: finalReferrerId,
               refereeId: userIdNum,
               tokenId: tokenIdNum
             }
           },
           create: {
-            referrerId: user.referredById,
+            referrerId: finalReferrerId,
             refereeId: userIdNum,
             tokenId: tokenIdNum,
             totalTurnover: '0',
@@ -204,7 +294,7 @@ class ReferralService {
       
       logger.info('REFERRAL', `Bonus granted`, {
         userId: userIdNum,
-        referrerId: user.referredById,
+        referrerId: finalReferrerId,
         bonusAmount: bonusAmount.toFixed(8),
         requiredWager: requiredWager.toFixed(8)
       });
@@ -213,7 +303,7 @@ class ReferralService {
         bonusAmount: bonusAmount.toFixed(8),
         requiredWager: requiredWager.toFixed(8),
         expiresAt: result.expiresAt,
-        referrerId: user.referredById,
+        referrerId: finalReferrerId,
         referrerUsername: user.referrer?.username
       };
       
@@ -517,7 +607,6 @@ class ReferralService {
   
   /**
    * 💸 ВЫПЛАТИТЬ КОМИССИЮ РЕФЕРЕРУ
-   * ✅ ИСПРАВЛЕНИЕ #6: ПРАВИЛЬНАЯ ФОРМУЛА
    */
   async payoutReferrerCommission(referrerId, refereeId, tokenId) {
     try {
@@ -581,7 +670,6 @@ class ReferralService {
       } 
       else {
         // ОБЫЧНЫЙ РЕФЕРАЛ: 30% от дохода казино
-        // ✅ ПРАВИЛЬНАЯ ФОРМУЛА: commission = (turnover * HOUSE_EDGE) * RATE
         const casinoIncome = parseFloat((turnover * CONFIG.HOUSE_EDGE).toFixed(8));
         commission = parseFloat((casinoIncome * CONFIG.REGULAR_COMMISSION_RATE).toFixed(8));
         
@@ -676,7 +764,6 @@ class ReferralService {
   
   /**
    * 🔄 Массовая выплата комиссий (для CRON)
-   * ✅ ИСПРАВЛЕНИЕ: Гарантирует что totalPaid всегда число
    */
   async processAllPendingCommissions(tokenId = 2) {
     try {
@@ -691,7 +778,7 @@ class ReferralService {
       
       logger.info('REFERRAL', `Found pending payouts`, { count: pendingStats.length });
       
-      let totalPaidNum = 0; // ✅ ИСПРАВЛЕНИЕ: используем число вместо строки
+      let totalPaidNum = 0;
       let successCount = 0;
       let workerCount = 0;
       let regularCount = 0;
@@ -705,7 +792,6 @@ class ReferralService {
           );
           
           if (result) {
-            // ✅ ИСПРАВЛЕНИЕ: Парсим комиссию и добавляем как число
             const commissionNum = typeof result.commission === 'string' 
               ? parseFloat(result.commission) 
               : parseFloat(result.commission);
@@ -728,11 +814,10 @@ class ReferralService {
         }
       }
       
-      // ✅ ИСПРАВЛЕНИЕ: Возвращаем totalPaid как число (не строку)
       const result = {
         processed: pendingStats.length,
         success: successCount,
-        totalPaid: parseFloat(totalPaidNum.toFixed(8)), // число!
+        totalPaid: parseFloat(totalPaidNum.toFixed(8)),
         breakdown: {
           workers: workerCount,
           regular: regularCount
