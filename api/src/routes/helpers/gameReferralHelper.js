@@ -1,20 +1,30 @@
 /**
- * 🎯 ИСПРАВЛЕННЫЙ gameReferralHelper.js
+ * 🎯 ПРАВИЛЬНЫЙ gameReferralHelper.js
  * 
- * ЛОГИКА БАЛАНСА С ВЕЙДЖЕРОМ:
- * 1. При ставке: BONUS → MAIN (приоритет бонусу)
- * 2. При выигрыше: На тот же баланс откуда взяли ставку
- * 3. ОТЫГРЫШ: Ставка считается в wageredAmount (UserBonus)
- * 4. После отыгрыша: BONUS → MAIN (конверсия)
+ * ИСПРАВЛЕННАЯ ЛОГИКА КОНВЕРСИИ:
+ * - При выполнении вейджера конвертируется ВСЯ оставшаяся сумма на BONUS
+ * - НЕ исходный размер бонуса, а то что осталось в балансе!
  * 
- * 🆕 ОБНОВЛЕНО: Теперь возвращает userBonusId!
+ * ПРИМЕР:
+ * Пополнение: 10 USDT
+ * Бонус (100%): 10 USDT
+ * BONUS баланс: 20 USDT
+ * Вейджер: 20 * 10 = 200 USDT
+ * 
+ * После игр:
+ * BONUS баланс: 150 USDT (было 20, выиграли 130)
+ * wageredAmount: 250 USDT (достаточно!)
+ * 
+ * Конверсия:
+ * ✅ Всю 150 USDT конвертируем в MAIN!
+ * (не просто 20, а всю оставшуюся сумму)
  */
 
 const referralService = require('../../services/ReferralService');
 const prisma = require('../../../prismaClient');
 
 /**
- * 💰 Получить оба баланса пользователя с объединённой суммой
+ * 💰 Получить оба баланса пользователя
  */
 async function getUserBalances(userId, tokenId) {
   try {
@@ -62,7 +72,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
     if (bonusAmount >= betAmount) {
       console.log(`   ✅ BONUS >= ставке, ИСПОЛЬЗУЕМ BONUS`);
       
-      // 🆕 Получи ID активного бонуса
+      // Получи ID активного бонуса
       const activeBonus = await prisma.userBonus.findFirst({
         where: {
           userId,
@@ -77,7 +87,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
         balanceType: 'BONUS', 
         balance: bonusBalance, 
         amount: bonusAmount,
-        userBonusId: activeBonus?.id || null  // 🆕 ID ДЛЯ ВЕЙДЖЕРА
+        userBonusId: activeBonus?.id || null
       };
     }
 
@@ -97,7 +107,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
         balanceType: 'MAIN', 
         balance: mainBalance, 
         amount: mainAmount,
-        userBonusId: null  // 🆕 ДОБАВЛЕНО
+        userBonusId: null
       };
     }
 
@@ -121,7 +131,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
 }
 
 /**
- * 🎰 Отследить ставку для реферальной системы И ВЕЙДЖЕРА
+ * 🎰 Отследить ставку для реферальной системы
  */
 async function trackBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
   try {
@@ -130,38 +140,6 @@ async function trackBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
     // Отследить в реферальной системе
     await referralService.processBet(userId, betAmount, tokenId, balanceType);
     
-    // 🆕 ЕСЛИ СТАВКА С БОНУСА - ОБНОВЛЯЕМ WAGERED AMOUNT
-    if (balanceType === 'BONUS') {
-      console.log(`   💛 [UPDATE WAGER] Обновляю wageredAmount для бонусов...`);
-      
-      const activeBonus = await prisma.userBonus.findFirst({
-        where: {
-          userId,
-          tokenId,
-          isActive: true,
-          isCompleted: false,
-          expiresAt: { gt: new Date() }
-        }
-      });
-
-      if (activeBonus) {
-        const newWagered = parseFloat(activeBonus.wageredAmount.toString()) + betAmount;
-        const requiredWager = parseFloat(activeBonus.requiredWager.toString());
-
-        console.log(`   💛 Текущий вейджер: ${newWagered.toFixed(8)} / ${requiredWager.toFixed(8)}`);
-
-        await prisma.userBonus.update({
-          where: { id: activeBonus.id },
-          data: { wageredAmount: newWagered.toString() }
-        });
-
-        if (newWagered >= requiredWager) {
-          console.log(`   ✅ ВЕЙДЖЕР ВЫПОЛНЕН!`);
-          await convertBonusToMain(userId, tokenId, activeBonus.id);
-        }
-      }
-    }
-    
     console.log(`   ✅ [TRACK BET] Отслежено`);
   } catch (error) {
     console.warn(`⚠️ [TRACK BET] Error:`, error.message);
@@ -169,73 +147,7 @@ async function trackBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
 }
 
 /**
- * 🆕 КОНВЕРСИЯ БОНУСА В MAIN
- */
-async function convertBonusToMain(userId, tokenId, bonusId) {
-  try {
-    console.log(`\n💳 [CONVERT BONUS] userId=${userId}, bonusId=${bonusId}`);
-
-    const bonusBalance = await prisma.balance.findUnique({
-      where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } }
-    });
-
-    if (!bonusBalance) {
-      console.log(`⚠️ [CONVERT BONUS] Бонусный баланс не найден`);
-      return;
-    }
-
-    const bonusAmount = parseFloat(bonusBalance.amount.toString());
-    console.log(`   💛 Конвертирую ${bonusAmount.toFixed(8)} BONUS → MAIN`);
-
-    await prisma.$transaction(async (tx) => {
-      // Обнуляем BONUS
-      await tx.balance.update({
-        where: { id: bonusBalance.id },
-        data: { amount: 0 }
-      });
-
-      // Добавляем в MAIN
-      await tx.balance.upsert({
-        where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } },
-        create: {
-          userId,
-          tokenId,
-          type: 'MAIN',
-          amount: bonusAmount.toString()
-        },
-        update: {
-          amount: { increment: bonusAmount }
-        }
-      });
-
-      // Отмечаем бонус как завершённый
-      await tx.userBonus.update({
-        where: { id: bonusId },
-        data: { isCompleted: true }
-      });
-
-      // Записываем транзакцию
-      await tx.transaction.create({
-        data: {
-          userId,
-          tokenId,
-          type: 'BONUS_TO_MAIN',
-          amount: bonusAmount.toString(),
-          status: 'COMPLETED'
-        }
-      });
-    });
-
-    console.log(`   ✅ [CONVERT BONUS] ${bonusAmount.toFixed(8)} переведено в MAIN\n`);
-
-  } catch (error) {
-    console.error(`❌ [CONVERT BONUS] Error:`, error.message);
-  }
-}
-
-/**
  * 💳 Списать ставку с правильного баланса
- * 🆕 Теперь ВОЗВРАЩАЕТ userBonusId для отыгрыша!
  */
 async function deductBetFromBalance(userId, betAmount, tokenId) {
   console.log(`\n💳 [DEDUCT BET] Списание ставки...`);
@@ -274,7 +186,7 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
     const newBalance = parseFloat(updated.amount.toString());
     console.log(`   ✅ Списано! Новый баланс: ${newBalance.toFixed(8)}`);
 
-    // Отслеживаем для реферальной системы И ВЕЙДЖЕРА
+    // Отслеживаем для реферальной системы
     await trackBet(userId, betAmount, tokenId, balanceType);
 
     console.log(`✅ [DEDUCT BET] УСПЕХ: ${balanceType}, userBonusId=${userBonusId}\n`);
@@ -284,7 +196,7 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
       balanceType,
       newBalance,
       fromBonus: balanceType === 'BONUS',
-      userBonusId  // 🆕 ВОЗВРАЩАЕМ ID БОНУСА!
+      userBonusId
     };
 
   } catch (error) {
@@ -323,40 +235,8 @@ async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') 
 
     const newBalance = parseFloat(updated.amount.toString());
     console.log(`✅ [CREDIT WINNINGS] Выигрыш на ${balanceType}: ${newBalance.toFixed(8)}`);
-
-    // 🆕 ЕСЛИ ВЫИГРЫШ НА БОНУСЕ - ОБНОВЛЯЕМ ВЕЙДЖЕР
-    if (balanceType === 'BONUS') {
-      console.log(`   💛 [UPDATE WAGER] Выигрыш считается как отыграемая сумма`);
-      
-      const activeBonus = await prisma.userBonus.findFirst({
-        where: {
-          userId,
-          tokenId,
-          isActive: true,
-          isCompleted: false,
-          expiresAt: { gt: new Date() }
-        }
-      });
-
-      if (activeBonus) {
-        const newWagered = parseFloat(activeBonus.wageredAmount.toString()) + winAmount;
-        const requiredWager = parseFloat(activeBonus.requiredWager.toString());
-
-        console.log(`   💛 Новый вейджер: ${newWagered.toFixed(8)} / ${requiredWager.toFixed(8)}`);
-
-        await prisma.userBonus.update({
-          where: { id: activeBonus.id },
-          data: { wageredAmount: newWagered.toString() }
-        });
-
-        if (newWagered >= requiredWager) {
-          console.log(`   ✅ ВЕЙДЖЕР ВЫПОЛНЕН!`);
-          await convertBonusToMain(userId, tokenId, activeBonus.id);
-        }
-      }
-    }
-
     console.log();
+
     return { success: true, newBalance };
 
   } catch (error) {
@@ -366,7 +246,7 @@ async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') 
 }
 
 /**
- * 📊 Получить баланс для отображения (ОБЪЕДИНЁННЫЙ)
+ * 📊 Получить баланс для отображения
  */
 async function getDisplayBalance(userId, tokenId) {
   return getUserBalances(userId, tokenId);
@@ -426,6 +306,5 @@ module.exports = {
   trackBet,
   deductBetFromBalance,
   creditWinnings,
-  convertBonusToMain,
   logBalanceState
 };

@@ -53,7 +53,6 @@ router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
 
 /**
  * 🎮 POST создать новую игру
- * Body: { difficultyId: 1, betAmount: 10, tokenId: 2 }
  */
 router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => {
   try {
@@ -98,7 +97,7 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
       data: {
         ...gameData,
         balanceType: deductResult.balanceType,
-        userBonusId: deductResult.userBonusId  // 🆕 Передаём ID бонуса для отыгрыша
+        userBonusId: deductResult.userBonusId
       },
     });
     
@@ -113,7 +112,7 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
 
 /**
  * 🎮 POST открыть клетку
- * Body: { gameId: 1, x: 0, y: 0, balanceType: 'BONUS', userBonusId: 1 }
+ * ✅ ПРАВИЛЬНАЯ ЛОГИКА: Конвертируется ВСЯ оставшаяся сумма BONUS
  */
 router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) => {
   try {
@@ -141,74 +140,123 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
       });
 
       if (game) {
-        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
-        if (balanceType === 'BONUS' && userBonusId) {
-          // Обновляем wageredAmount при выигрыше
-          await prisma.userBonus.update({
-            where: { id: userBonusId },
-            data: {
-              wageredAmount: {
-                increment: parseFloat(result.winAmount)
-              }
+        // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS
+        await prisma.$transaction(async (tx) => {
+          const winAmountNum = parseFloat(result.winAmount);
+
+          // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
+          if (balanceType === 'BONUS' && userBonusId) {
+            console.log(`\n💛 [REVEAL] Выигрыш с BONUS баланса: ${winAmountNum}`);
+            
+            // Получаем информацию о бонусе
+            const bonus = await tx.userBonus.findUnique({
+              where: { id: userBonusId }
+            });
+            
+            if (!bonus) {
+              throw new Error('Бонус не найден');
             }
-          });
-          console.log(`💛 [REVEAL] Выигрыш добавлен в wageredAmount`);
-          
-          // Проверяем выполнился ли вейджер
-          const bonus = await prisma.userBonus.findUnique({
-            where: { id: userBonusId }
-          });
-          
-          const wageredNum = parseFloat(bonus.wageredAmount.toString());
-          const requiredNum = parseFloat(bonus.requiredWager.toString());
-          
-          if (wageredNum >= requiredNum) {
-            // 🎊 Вейджер выполнен! Конвертируем в MAIN
-            console.log(`🎊 [REVEAL] Вейджер выполнен! ${wageredNum} >= ${requiredNum}`);
-            
-            const bonusAmount = parseFloat(bonus.grantedAmount.toString());
-            
-            // Обнуляем BONUS
-            await prisma.balance.update({
+
+            // УВЕЛИЧИВАЕМ WAGERED
+            const newWagered = parseFloat(bonus.wageredAmount.toString()) + winAmountNum;
+            const requiredNum = parseFloat(bonus.requiredWager.toString());
+
+            console.log(`💛 [REVEAL] Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
+
+            // Обновляем wageredAmount
+            await tx.userBonus.update({
+              where: { id: userBonusId },
+              data: { wageredAmount: newWagered.toString() }
+            });
+
+            // Кредитим выигрыш на BONUS
+            const currentBonus = await tx.balance.findUnique({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+              }
+            });
+
+            const bonusBalanceAfterWin = parseFloat(currentBonus?.amount?.toString() || '0') + winAmountNum;
+
+            await tx.balance.upsert({
               where: {
                 userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
               },
-              data: { amount: 0 }
+              update: {
+                amount: { increment: winAmountNum }
+              },
+              create: {
+                userId,
+                tokenId: game.tokenId,
+                type: 'BONUS',
+                amount: winAmountNum.toString()
+              }
             });
+
+            console.log(`💛 [REVEAL] BONUS баланс после выигрыша: ${bonusBalanceAfterWin.toFixed(8)}`);
+
+            // 🎊 ПРОВЕРЯЕМ: вейджер выполнен?
+            if (newWagered >= requiredNum) {
+              console.log(`\n🎊 [REVEAL] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
+              
+              // ✅ ПРАВИЛЬНАЯ КОНВЕРСИЯ: Конвертируем ВСЮ оставшуюся сумму!
+              console.log(`💳 [REVEAL] Конвертирую ВСЮ сумму: ${bonusBalanceAfterWin.toFixed(8)} BONUS → MAIN`);
+              
+              // 1. Обнуляем BONUS баланс
+              await tx.balance.update({
+                where: {
+                  userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+                },
+                data: { amount: 0 }
+              });
+              
+              // 2. Добавляем ВСЮ сумму в MAIN
+              await tx.balance.upsert({
+                where: {
+                  userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
+                },
+                update: {
+                  amount: { increment: bonusBalanceAfterWin }
+                },
+                create: {
+                  userId,
+                  tokenId: game.tokenId,
+                  type: 'MAIN',
+                  amount: bonusBalanceAfterWin.toString()
+                }
+              });
+              
+              // 3. Отмечаем бонус завершённым
+              await tx.userBonus.update({
+                where: { id: userBonusId },
+                data: { 
+                  isCompleted: true,
+                  isActive: false
+                }
+              });
+              
+              console.log(`✅ [REVEAL] ${bonusBalanceAfterWin.toFixed(8)} BONUS → MAIN (всё конвертировано!)\n`);
+            }
+          } else {
+            // Обычное зачисление на MAIN (без бонуса)
+            console.log(`✅ [REVEAL] Выигрыш ${winAmountNum} на MAIN`);
             
-            // Добавляем в MAIN
-            await prisma.balance.upsert({
+            await tx.balance.upsert({
               where: {
                 userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
               },
               update: {
-                amount: { increment: bonusAmount }
+                amount: { increment: winAmountNum }
               },
               create: {
                 userId,
                 tokenId: game.tokenId,
                 type: 'MAIN',
-                amount: bonusAmount.toString()
+                amount: winAmountNum.toString()
               }
             });
-            
-            // Отмечаем бонус как завершённый
-            await prisma.userBonus.update({
-              where: { id: userBonusId },
-              data: { isCompleted: true }
-            });
-            
-            console.log(`✅ [REVEAL] ${bonusAmount} BONUS → MAIN`);
-          } else {
-            // Вейджер НЕ выполнен - выигрыш остаётся на BONUS
-            console.log(`💛 [REVEAL] Вейджер НЕ выполнен: ${wageredNum} / ${requiredNum}`);
-            await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'BONUS');
           }
-        } else {
-          // Обычное зачисление на MAIN
-          await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'MAIN');
-          console.log(`✅ [REVEAL] Выигрыш ${result.winAmount} на MAIN`);
-        }
+        });
       }
     }
 
@@ -268,7 +316,7 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
 
 /**
  * 💰 POST кэшаут (забрать выигрыш)
- * Body: { gameId: 1, balanceType: 'MAIN', userBonusId: 1 }
+ * ✅ ПРАВИЛЬНАЯ ЛОГИКА: Конвертируется ВСЯ оставшаяся сумма BONUS
  */
 router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) => {
   try {
@@ -303,70 +351,121 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       const winAmountNum = parseFloat(result.winAmount);
       
       if (winAmountNum > 0) {
-        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
-        if (balanceType === 'BONUS' && userBonusId) {
-          // Обновляем wageredAmount
-          await prisma.userBonus.update({
-            where: { id: userBonusId },
-            data: {
-              wageredAmount: {
-                increment: winAmountNum
-              }
+        // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS
+        await prisma.$transaction(async (tx) => {
+          // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
+          if (balanceType === 'BONUS' && userBonusId) {
+            console.log(`\n💛 [CASHOUT] Выигрыш с BONUS баланса: ${winAmountNum}`);
+            
+            // Получаем информацию о бонусе
+            const bonus = await tx.userBonus.findUnique({
+              where: { id: userBonusId }
+            });
+            
+            if (!bonus) {
+              throw new Error('Бонус не найден');
             }
-          });
-          
-          // Проверяем вейджер
-          const bonus = await prisma.userBonus.findUnique({
-            where: { id: userBonusId }
-          });
-          
-          const wageredNum = parseFloat(bonus.wageredAmount.toString());
-          const requiredNum = parseFloat(bonus.requiredWager.toString());
-          
-          if (wageredNum >= requiredNum) {
-            // 🎊 Вейджер выполнен!
-            console.log(`🎊 [CASHOUT] Вейджер выполнен! Конвертирую BONUS → MAIN`);
-            
-            const bonusAmount = parseFloat(bonus.grantedAmount.toString());
-            
-            await prisma.balance.update({
+
+            // УВЕЛИЧИВАЕМ WAGERED
+            const newWagered = parseFloat(bonus.wageredAmount.toString()) + winAmountNum;
+            const requiredNum = parseFloat(bonus.requiredWager.toString());
+
+            console.log(`💛 [CASHOUT] Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
+
+            // Обновляем wageredAmount
+            await tx.userBonus.update({
+              where: { id: userBonusId },
+              data: { wageredAmount: newWagered.toString() }
+            });
+
+            // Кредитим выигрыш на BONUS
+            const currentBonus = await tx.balance.findUnique({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+              }
+            });
+
+            const bonusBalanceAfterWin = parseFloat(currentBonus?.amount?.toString() || '0') + winAmountNum;
+
+            await tx.balance.upsert({
               where: {
                 userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
               },
-              data: { amount: 0 }
+              update: {
+                amount: { increment: winAmountNum }
+              },
+              create: {
+                userId,
+                tokenId: game.tokenId,
+                type: 'BONUS',
+                amount: winAmountNum.toString()
+              }
             });
+
+            console.log(`💛 [CASHOUT] BONUS баланс после выигрыша: ${bonusBalanceAfterWin.toFixed(8)}`);
+
+            // 🎊 ПРОВЕРЯЕМ: вейджер выполнен?
+            if (newWagered >= requiredNum) {
+              console.log(`\n🎊 [CASHOUT] ВЕЙДЖЕР ВЫПОЛНЕН! Конвертирую ВСЮ сумму`);
+              
+              // ✅ ПРАВИЛЬНАЯ КОНВЕРСИЯ: Конвертируем ВСЮ оставшуюся сумму!
+              console.log(`💳 [CASHOUT] Конвертирую ВСЮ сумму: ${bonusBalanceAfterWin.toFixed(8)} BONUS → MAIN`);
+              
+              // 1. Обнуляем BONUS баланс
+              await tx.balance.update({
+                where: {
+                  userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+                },
+                data: { amount: 0 }
+              });
+              
+              // 2. Добавляем ВСЮ сумму в MAIN
+              await tx.balance.upsert({
+                where: {
+                  userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
+                },
+                update: {
+                  amount: { increment: bonusBalanceAfterWin }
+                },
+                create: {
+                  userId,
+                  tokenId: game.tokenId,
+                  type: 'MAIN',
+                  amount: bonusBalanceAfterWin.toString()
+                }
+              });
+              
+              // 3. Отмечаем бонус завершённым
+              await tx.userBonus.update({
+                where: { id: userBonusId },
+                data: { 
+                  isCompleted: true,
+                  isActive: false
+                }
+              });
+              
+              console.log(`✅ [CASHOUT] ${bonusBalanceAfterWin.toFixed(8)} BONUS → MAIN (всё конвертировано!)\n`);
+            }
+          } else {
+            // На MAIN как обычно
+            console.log(`✅ [CASHOUT] Выигрыш ${winAmountNum} на MAIN`);
             
-            await prisma.balance.upsert({
+            await tx.balance.upsert({
               where: {
                 userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
               },
               update: {
-                amount: { increment: bonusAmount }
+                amount: { increment: winAmountNum }
               },
               create: {
                 userId,
                 tokenId: game.tokenId,
                 type: 'MAIN',
-                amount: bonusAmount.toString()
+                amount: winAmountNum.toString()
               }
             });
-            
-            await prisma.userBonus.update({
-              where: { id: userBonusId },
-              data: { isCompleted: true }
-            });
-            
-            console.log(`✅ [CASHOUT] ${bonusAmount} BONUS → MAIN`);
-          } else {
-            // Выигрыш на BONUS
-            await creditWinnings(userId, winAmountNum, game.tokenId, 'BONUS');
-            console.log(`💛 [CASHOUT] Выигрыш на BONUS, вейджер: ${wageredNum} / ${requiredNum}`);
           }
-        } else {
-          // На MAIN как обычно
-          await creditWinnings(userId, winAmountNum, game.tokenId, 'MAIN');
-          console.log(`✅ [CASHOUT] Выигрыш ${result.winAmount} на MAIN`);
-        }
+        });
       }
     }
 

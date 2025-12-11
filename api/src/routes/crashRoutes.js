@@ -9,13 +9,14 @@ const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./hel
 
 // ===================================
 // POST /api/v1/crash/cashout-result
-// ✅ ИСПРАВЛЕНО: Передаём правильный balanceType при зачислении
+// ✅ ИСПРАВЛЕНО: Правильная конверсия BONUS → MAIN
+// Конвертируется ВСЯ оставшаяся сумма BONUS, не исходный размер!
 // ===================================
 router.post('/api/v1/crash/cashout-result', (req, res) => {
   const verified = verifyGameServerSecret(req, res);
   if (verified !== true) return;
 
-  const { userId, tokenId, betId, winnings, exitMultiplier, gameId, result, balanceType } = req.body;
+  const { userId, tokenId, betId, winnings, exitMultiplier, gameId, result, balanceType, userBonusId } = req.body;
 
   if (!betId || !userId || !tokenId) {
     console.log('❌ [CASHOUT-RESULT] Отсутствуют обязательные поля');
@@ -64,10 +65,11 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
           }
         });
 
-        // 🆕 ИСПРАВЛЕНО: Используем правильный balanceType при зачислении
+        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА: Конвертируется ВСЯ оставшаяся сумма BONUS
         if (winningsAmount > 0 && result === 'won') {
           console.log(`💰 [CASHOUT-RESULT] Зачисляю выигрыш: ${winningsAmount} на ${balanceType || 'MAIN'}`);
           
+          // Зачисляем выигрыш
           await creditWinnings(userId, winningsAmount, tokenId, balanceType || 'MAIN');
 
           await tx.crashTransaction.create({
@@ -79,6 +81,95 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
               type: 'winnings'
             }
           });
+
+          // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР (если была ставка с BONUS)
+          if (balanceType === 'BONUS' && userBonusId) {
+            console.log(`\n💛 [CASHOUT-RESULT] Проверяю вейджер для бонуса...`);
+            
+            // Получаем информацию о бонусе
+            const bonus = await tx.userBonus.findUnique({
+              where: { id: userBonusId }
+            });
+            
+            if (bonus) {
+              // УВЕЛИЧИВАЕМ WAGERED
+              const newWagered = parseFloat(bonus.wageredAmount.toString()) + winningsAmount;
+              const requiredNum = parseFloat(bonus.requiredWager.toString());
+
+              console.log(`💛 [CASHOUT-RESULT] Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
+
+              // Обновляем wageredAmount
+              await tx.userBonus.update({
+                where: { id: userBonusId },
+                data: { wageredAmount: newWagered.toString() }
+              });
+
+              // 🎊 ПРОВЕРЯЕМ: вейджер выполнен?
+              if (newWagered >= requiredNum) {
+                console.log(`\n🎊 [CASHOUT-RESULT] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
+                
+                // Получаем текущий BONUS баланс
+                const currentBonus = await tx.balance.findUnique({
+                  where: {
+                    userId_tokenId_type: { userId, tokenId, type: 'BONUS' }
+                  }
+                });
+
+                const bonusBalanceForConversion = parseFloat(currentBonus?.amount?.toString() || '0');
+
+                console.log(`💳 [CASHOUT-RESULT] Конвертирую ВСЮ сумму: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
+                
+                // ✅ ПРАВИЛЬНАЯ КОНВЕРСИЯ: Конвертируем ВСЮ оставшуюся сумму!
+                if (bonusBalanceForConversion > 0) {
+                  // 1. Обнуляем BONUS баланс
+                  await tx.balance.update({
+                    where: {
+                      userId_tokenId_type: { userId, tokenId, type: 'BONUS' }
+                    },
+                    data: { amount: 0 }
+                  });
+                  
+                  // 2. Добавляем ВСЮ сумму в MAIN
+                  await tx.balance.upsert({
+                    where: {
+                      userId_tokenId_type: { userId, tokenId, type: 'MAIN' }
+                    },
+                    update: {
+                      amount: { increment: bonusBalanceForConversion }
+                    },
+                    create: {
+                      userId,
+                      tokenId,
+                      type: 'MAIN',
+                      amount: bonusBalanceForConversion.toString()
+                    }
+                  });
+
+                  // 3. Создаём запись о конверсии
+                  await tx.crashTransaction.create({
+                    data: {
+                      userId,
+                      betId: betIdInt,
+                      tokenId,
+                      amount: bonusBalanceForConversion.toString(),
+                      type: 'bonus_conversion'
+                    }
+                  });
+                  
+                  // 4. Отмечаем бонус завершённым
+                  await tx.userBonus.update({
+                    where: { id: userBonusId },
+                    data: { 
+                      isCompleted: true,
+                      isActive: false
+                    }
+                  });
+                  
+                  console.log(`✅ [CASHOUT-RESULT] ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN (всё конвертировано!)\n`);
+                }
+              }
+            }
+          }
         } else {
           console.log(`❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
         }
@@ -269,7 +360,11 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
           }
         });
 
-        return { betId: newBet.id, balanceType: deductResult.balanceType };
+        return { 
+          betId: newBet.id, 
+          balanceType: deductResult.balanceType,
+          userBonusId: deductResult.userBonusId // 🆕 Передаём ID бонуса!
+        };
       });
 
       console.log(`✅ [CREATE-BET] Ставка создана: ${result.betId}, сумма: ${betAmount}`);
@@ -278,7 +373,8 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         success: true, 
         data: { 
           betId: result.betId,
-          balanceType: result.balanceType
+          balanceType: result.balanceType,
+          userBonusId: result.userBonusId // 🆕 Отправляем на клиент!
         } 
       });
     } catch (error) {
