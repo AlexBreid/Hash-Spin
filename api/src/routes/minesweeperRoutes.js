@@ -8,7 +8,6 @@ const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./hel
 
 /**
  * 🎮 GET все сложности
- * GET /api/v1/minesweeper/difficulties
  */
 router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
   try {
@@ -54,7 +53,6 @@ router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
 
 /**
  * 🎮 POST создать новую игру
- * POST /api/v1/minesweeper/start
  * Body: { difficultyId: 1, betAmount: 10, tokenId: 2 }
  */
 router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => {
@@ -63,26 +61,23 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     const { difficultyId, betAmount, tokenId } = req.body;
     const DEFAULT_TOKEN_ID = tokenId || 2;
     
-    console.log('🎮 [START] Начинаю игру сапёра');
+    console.log('🎮 [MINESWEEPER START] Начинаю игру');
     console.log('   userId:', userId);
-    console.log('   difficultyId:', difficultyId);
     console.log('   betAmount:', betAmount);
-    console.log('   tokenId:', DEFAULT_TOKEN_ID);
 
     if (!difficultyId || !betAmount || betAmount <= 0) {
-      console.log('❌ [START] Некорректные параметры');
       return res.status(400).json({
         success: false,
-        message: 'Некорректные параметры (difficultyId, betAmount)',
+        message: 'Некорректные параметры',
       });
     }
 
-    // 🆕 Списываем ставку и получаем информацию о балансе
+    // 💳 Списываем ставку
     console.log('💳 [START] Списываю ставку...');
     const deductResult = await deductBetFromBalance(userId, parseFloat(betAmount), DEFAULT_TOKEN_ID);
     
     if (!deductResult.success) {
-      console.log(`❌ [START] Ошибка списания: ${deductResult.error}`);
+      console.log(`❌ [START] ${deductResult.error}`);
       return res.status(400).json({
         success: false,
         message: deductResult.error || 'Недостаточно средств',
@@ -90,81 +85,130 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     }
     console.log(`✅ [START] Списано ${betAmount} с ${deductResult.balanceType}`);
 
-    // Создаём игру
-    console.log('🎮 [START] Создаю игру в БД...');
-    let gameData;
-    try {
-      gameData = await minesweeperService.createGame(
-        userId,
-        DEFAULT_TOKEN_ID,
-        difficultyId,
-        betAmount
-        // ❌ НЕ ПЕРЕДАЁМ balanceType сюда!
-      );
-      console.log('✅ [START] Игра создана:', gameData.gameId);
-    } catch (error) {
-      console.error('❌ [START] Ошибка создания игры в сервисе:', error.message);
-      console.error('   Stack:', error.stack);
-      throw error;
-    }
+    // 🎮 Создаём игру
+    const gameData = await minesweeperService.createGame(
+      userId,
+      DEFAULT_TOKEN_ID,
+      difficultyId,
+      betAmount
+    );
 
-    const response = {
+    res.json({
       success: true,
       data: {
         ...gameData,
-        balanceType: deductResult.balanceType  // 🆕 ПЕРЕДАЁМ в ОТВЕТЕ фронту
+        balanceType: deductResult.balanceType,
+        userBonusId: deductResult.userBonusId  // 🆕 Передаём ID бонуса для отыгрыша
       },
-    };
-    
-    console.log('📤 [START] Отправляю ответ');
-    res.json(response);
+    });
     
   } catch (error) {
-    console.error('❌ [START] КРИТИЧЕСКАЯ ОШИБКА:', error.message);
-    console.error('   Full error:', error);
-    
+    console.error('❌ [START] ОШИБКА:', error.message);
     res.status(500).json({
       success: false,
       message: error.message || 'Ошибка создания игры',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
 
 /**
  * 🎮 POST открыть клетку
- * POST /api/v1/minesweeper/reveal
- * Body: { gameId: 1, x: 0, y: 0, balanceType: 'MAIN' }
+ * Body: { gameId: 1, x: 0, y: 0, balanceType: 'BONUS', userBonusId: 1 }
  */
 router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { gameId, x, y, balanceType } = req.body;  // 🆕 Получаем balanceType от фронта
+    const { gameId, x, y, balanceType, userBonusId } = req.body;
 
-    console.log(`🎮 [REVEAL] Открываю клетку: игра ${gameId}, позиция [${x}, ${y}]`);
+    console.log(`🎮 [REVEAL] Клетка [${x}, ${y}]`);
 
     if (gameId === undefined || x === undefined || y === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Некорректные параметры (gameId, x, y)',
+        message: 'Некорректные параметры',
       });
     }
 
     const result = await minesweeperService.revealGameCell(gameId, x, y, userId);
 
-    // 🎉 ЕСЛИ ПОЛНАЯ ПОБЕДА - ЗАЧИСЛЯЕМ ВЫИГРЫШ
+    // 🎉 ПОЛНАЯ ПОБЕДА - ЗАЧИСЛИТЬ ВЫИГРЫШ
     if (result.status === 'WON' && result.winAmount) {
       console.log(`🎉 [REVEAL] Полная победа! Выигрыш: ${result.winAmount}`);
+      
       const game = await prisma.minesweeperGame.findUnique({
         where: { id: gameId },
         select: { tokenId: true },
       });
 
       if (game) {
-        // 🆕 Используем balanceType из запроса (фронт сохранил его)
-        const targetBalance = balanceType || 'MAIN';
-        await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, targetBalance);
-        console.log(`✅ [REVEAL] Выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
+        if (balanceType === 'BONUS' && userBonusId) {
+          // Обновляем wageredAmount при выигрыше
+          await prisma.userBonus.update({
+            where: { id: userBonusId },
+            data: {
+              wageredAmount: {
+                increment: parseFloat(result.winAmount)
+              }
+            }
+          });
+          console.log(`💛 [REVEAL] Выигрыш добавлен в wageredAmount`);
+          
+          // Проверяем выполнился ли вейджер
+          const bonus = await prisma.userBonus.findUnique({
+            where: { id: userBonusId }
+          });
+          
+          const wageredNum = parseFloat(bonus.wageredAmount.toString());
+          const requiredNum = parseFloat(bonus.requiredWager.toString());
+          
+          if (wageredNum >= requiredNum) {
+            // 🎊 Вейджер выполнен! Конвертируем в MAIN
+            console.log(`🎊 [REVEAL] Вейджер выполнен! ${wageredNum} >= ${requiredNum}`);
+            
+            const bonusAmount = parseFloat(bonus.grantedAmount.toString());
+            
+            // Обнуляем BONUS
+            await prisma.balance.update({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+              },
+              data: { amount: 0 }
+            });
+            
+            // Добавляем в MAIN
+            await prisma.balance.upsert({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
+              },
+              update: {
+                amount: { increment: bonusAmount }
+              },
+              create: {
+                userId,
+                tokenId: game.tokenId,
+                type: 'MAIN',
+                amount: bonusAmount.toString()
+              }
+            });
+            
+            // Отмечаем бонус как завершённый
+            await prisma.userBonus.update({
+              where: { id: userBonusId },
+              data: { isCompleted: true }
+            });
+            
+            console.log(`✅ [REVEAL] ${bonusAmount} BONUS → MAIN`);
+          } else {
+            // Вейджер НЕ выполнен - выигрыш остаётся на BONUS
+            console.log(`💛 [REVEAL] Вейджер НЕ выполнен: ${wageredNum} / ${requiredNum}`);
+            await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'BONUS');
+          }
+        } else {
+          // Обычное зачисление на MAIN
+          await creditWinnings(userId, parseFloat(result.winAmount), game.tokenId, 'MAIN');
+          console.log(`✅ [REVEAL] Выигрыш ${result.winAmount} на MAIN`);
+        }
       }
     }
 
@@ -173,7 +217,7 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
       data: result,
     });
   } catch (error) {
-    console.error('❌ [REVEAL] Ошибка открытия клетки:', error.message);
+    console.error('❌ [REVEAL] ОШИБКА:', error.message);
     res.status(400).json({
       success: false,
       message: error.message || 'Ошибка открытия клетки',
@@ -183,7 +227,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
 
 /**
  * 🎮 GET история игр
- * GET /api/v1/minesweeper/history?limit=20
  */
 router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) => {
   try {
@@ -215,7 +258,7 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
       })),
     });
   } catch (error) {
-    console.error('❌ Ошибка получения истории:', error.message);
+    console.error('❌ Ошибка истории:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения истории',
@@ -225,15 +268,14 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
 
 /**
  * 💰 POST кэшаут (забрать выигрыш)
- * POST /api/v1/minesweeper/cashout
- * Body: { gameId: 1, balanceType: 'MAIN' }
+ * Body: { gameId: 1, balanceType: 'MAIN', userBonusId: 1 }
  */
 router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { gameId, balanceType } = req.body;  // 🆕 Получаем balanceType от фронта
+    const { gameId, balanceType, userBonusId } = req.body;
 
-    console.log(`💸 [CASHOUT] Кэшаут: игра ${gameId}`);
+    console.log(`💸 [CASHOUT] Игра ${gameId}`);
 
     if (!gameId) {
       return res.status(400).json({
@@ -256,14 +298,75 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 
     const result = await minesweeperService.cashOutGame(gameId, userId);
 
-    // ✅ Зачисляем выигрыш на правильный баланс
+    // ✅ Зачисляем выигрыш
     if (result.winAmount) {
-      const targetBalance = balanceType || 'MAIN';  // 🆕 Используем balanceType от фронта
       const winAmountNum = parseFloat(result.winAmount);
       
       if (winAmountNum > 0) {
-        await creditWinnings(userId, winAmountNum, game.tokenId, targetBalance);
-        console.log(`✅ [CASHOUT] Выигрыш ${result.winAmount} зачислен на ${targetBalance}`);
+        // 🆕 ПРАВИЛЬНАЯ ЛОГИКА ВЕЙДЖЕРА
+        if (balanceType === 'BONUS' && userBonusId) {
+          // Обновляем wageredAmount
+          await prisma.userBonus.update({
+            where: { id: userBonusId },
+            data: {
+              wageredAmount: {
+                increment: winAmountNum
+              }
+            }
+          });
+          
+          // Проверяем вейджер
+          const bonus = await prisma.userBonus.findUnique({
+            where: { id: userBonusId }
+          });
+          
+          const wageredNum = parseFloat(bonus.wageredAmount.toString());
+          const requiredNum = parseFloat(bonus.requiredWager.toString());
+          
+          if (wageredNum >= requiredNum) {
+            // 🎊 Вейджер выполнен!
+            console.log(`🎊 [CASHOUT] Вейджер выполнен! Конвертирую BONUS → MAIN`);
+            
+            const bonusAmount = parseFloat(bonus.grantedAmount.toString());
+            
+            await prisma.balance.update({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'BONUS' }
+              },
+              data: { amount: 0 }
+            });
+            
+            await prisma.balance.upsert({
+              where: {
+                userId_tokenId_type: { userId, tokenId: game.tokenId, type: 'MAIN' }
+              },
+              update: {
+                amount: { increment: bonusAmount }
+              },
+              create: {
+                userId,
+                tokenId: game.tokenId,
+                type: 'MAIN',
+                amount: bonusAmount.toString()
+              }
+            });
+            
+            await prisma.userBonus.update({
+              where: { id: userBonusId },
+              data: { isCompleted: true }
+            });
+            
+            console.log(`✅ [CASHOUT] ${bonusAmount} BONUS → MAIN`);
+          } else {
+            // Выигрыш на BONUS
+            await creditWinnings(userId, winAmountNum, game.tokenId, 'BONUS');
+            console.log(`💛 [CASHOUT] Выигрыш на BONUS, вейджер: ${wageredNum} / ${requiredNum}`);
+          }
+        } else {
+          // На MAIN как обычно
+          await creditWinnings(userId, winAmountNum, game.tokenId, 'MAIN');
+          console.log(`✅ [CASHOUT] Выигрыш ${result.winAmount} на MAIN`);
+        }
       }
     }
 
@@ -272,7 +375,7 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       data: result,
     });
   } catch (error) {
-    console.error('❌ [CASHOUT] Ошибка кэшаута:', error.message);
+    console.error('❌ [CASHOUT] ОШИБКА:', error.message);
     res.status(400).json({
       success: false,
       message: error.message || 'Ошибка кэшаута',
@@ -281,8 +384,7 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 });
 
 /**
- * 🆕 GET баланс (оба типа)
- * GET /api/v1/minesweeper/balance
+ * 🆕 GET баланс
  */
 router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) => {
   try {
@@ -296,7 +398,7 @@ router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) =>
       data: balances
     });
   } catch (error) {
-    console.error('❌ Ошибка получения баланса:', error.message);
+    console.error('❌ Ошибка баланса:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения баланса',
