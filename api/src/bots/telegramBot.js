@@ -47,9 +47,11 @@ function generateTicketId() {
   return 'TK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 }
 
-// ====================================
-// SCHEDULE DEPOSIT CHECK
-// ====================================
+/**
+ * ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ scheduleDepositCheck
+ * КОПИРУЙ ЦЕЛИКОМ (заменить старую функцию в telegramBot.js)
+ */
+
 async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USDT', withBonus = false) {
   console.log(`\n📋 [DEPOSIT CHECK] Starting deposit check...`);
   console.log(`   userId: ${userId} (${typeof userId})`);
@@ -180,8 +182,37 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           return;
         }
 
-        const invoice = response.data.result.items[0];
-        console.log(`✅ Got invoice: status=${invoice.status}, amount=${invoice.amount}`);
+        // ✅ КРИТИЧЕСКИЙ БАТЧ: Найти инвойс ПО ID, а не просто первый!
+        const invoice = response.data.result.items.find(inv => inv.invoice_id === invoiceIdNum);
+        
+        if (!invoice) {
+          console.log(`⏳ Requested invoice #${invoiceIdNum} not found yet (check #${checkCount})`);
+          if (checkCount < maxChecks) setTimeout(checkDeposit, checkInterval);
+          return;
+        }
+
+        // ✅ ПРОВЕРКА: Сумма должна совпадать!
+        const invoiceAmount = parseFloat(String(invoice.amount).trim());
+        if (invoiceAmount !== amountNum) {
+          console.error(`❌ SECURITY: Invoice amount mismatch!`);
+          console.error(`   Expected: ${amountNum.toFixed(8)}`);
+          console.error(`   Got: ${invoiceAmount.toFixed(8)}`);
+          console.error(`   Invoice ID: ${invoiceIdNum}`);
+          logger.error('BOT', 'SECURITY: Invoice amount mismatch detected', {
+            invoiceId: invoiceIdNum,
+            expectedAmount: amountNum.toFixed(8),
+            receivedAmount: invoiceAmount.toFixed(8),
+            userId: userIdNum
+          });
+          // Не обрабатываем! Это может быть атака или ошибка
+          if (checkCount < maxChecks) {
+            console.log(`   ⏳ Amount mismatch, retrying...`);
+            setTimeout(checkDeposit, checkInterval);
+          }
+          return;
+        }
+        
+        console.log(`✅ Got invoice: status=${invoice.status}, amount=${invoice.amount}, id=${invoice.invoice_id}`);
 
         const statusLower = String(invoice.status).toLowerCase();
         const isPaid = ['paid', 'completed'].includes(statusLower);
@@ -241,19 +272,81 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
   }
 }
 
-/**
- * ✅ HANDLE DEPOSIT WITH TOKEN - ПОЛНОСТЬЮ ИСПРАВЛЕНО
- */
 async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot, bonusWasSelected = false) {
   console.log(`💾 Creating transaction...`);
   console.log(`   userId: ${userIdNum}, amount: ${amountNum.toFixed(8)}`);
   console.log(`   🎁 Bonus selected: ${bonusWasSelected ? 'YES' : 'NO'}`);
   
   try {
+    // ✅ ДОПОЛНИТЕЛЬНАЯ ВАЛИДАЦИЯ: Проверить что инвойс действительно существует в БД
+    const pendingDepositInfo = await prisma.pendingDeposit.findUnique({
+      where: { invoiceId: invoiceIdNum.toString() }
+    });
+
+    if (!pendingDepositInfo) {
+      const error = `No pending deposit found for invoice ${invoiceIdNum}`;
+      console.error(`❌ SECURITY: ${error}`);
+      logger.error('BOT', 'SECURITY: Pending deposit not found', { invoiceId: invoiceIdNum, userId: userIdNum });
+      throw new Error(error);
+    }
+
+    // ✅ ПРОВЕРКА: Пользователь совпадает
+    if (pendingDepositInfo.userId !== userIdNum) {
+      const error = `User mismatch for invoice ${invoiceIdNum}: expected ${pendingDepositInfo.userId}, got ${userIdNum}`;
+      console.error(`❌ SECURITY: ${error}`);
+      logger.error('BOT', 'SECURITY: User mismatch for invoice', { 
+        invoiceId: invoiceIdNum,
+        expectedUser: pendingDepositInfo.userId,
+        actualUser: userIdNum
+      });
+      throw new Error(error);
+    }
+
+    // ✅ ПРОВЕРКА: Сумма совпадает
+    const dbAmount = parseFloat(String(pendingDepositInfo.amount).trim());
+    if (dbAmount !== amountNum) {
+      const error = `Amount mismatch for invoice ${invoiceIdNum}: expected ${dbAmount.toFixed(8)}, got ${amountNum.toFixed(8)}`;
+      console.error(`❌ SECURITY: ${error}`);
+      logger.error('BOT', 'SECURITY: Amount mismatch for invoice', { 
+        invoiceId: invoiceIdNum,
+        expectedAmount: dbAmount.toFixed(8),
+        actualAmount: amountNum.toFixed(8)
+      });
+      throw new Error(error);
+    }
+
+    // ✅ ПРОВЕРКА: Статус правильный
+    if (pendingDepositInfo.status !== 'pending') {
+      const error = `Invalid pending deposit status: ${pendingDepositInfo.status}`;
+      console.error(`❌ SECURITY: ${error}`);
+      logger.error('BOT', 'SECURITY: Invalid deposit status', { 
+        invoiceId: invoiceIdNum,
+        status: pendingDepositInfo.status
+      });
+      throw new Error(error);
+    }
+
+    console.log(`✅ All validations passed for invoice ${invoiceIdNum}`);
+    
     const balanceType = bonusWasSelected ? 'BONUS' : 'MAIN';
     console.log(`   💰 Deposit goes to: ${balanceType}`);
     
     const result = await prisma.$transaction(async (tx) => {
+      // ✅ ЕЩЕ РАЗ проверяем что статус pending (race condition protection)
+      const freshRecord = await tx.pendingDeposit.findUnique({
+        where: { invoiceId: invoiceIdNum.toString() }
+      });
+
+      if (freshRecord?.status !== 'pending') {
+        throw new Error(`Deposit already processed for invoice ${invoiceIdNum}`);
+      }
+
+      // ✅ Помечаем как обрабатываемый ДО того как что-то делаем
+      await tx.pendingDeposit.update({
+        where: { invoiceId: invoiceIdNum.toString() },
+        data: { status: 'processing' }
+      });
+
       const newTx = await tx.transaction.create({
         data: {
           userId: userIdNum,
@@ -335,7 +428,6 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
       if (user?.telegramId) {
         let message;
         if (bonusWasSelected) {
-          // ✅ ИСПРАВЛЕНИЕ: Расчет от СУММЫ ПОСТУПЛЕНИЯ (депозит + бонус)
           const depositAmount = parseFloat(amountNum.toFixed(8));
           const bonusAmount = parseFloat(amountNum.toFixed(8));
           const totalReceived = parseFloat((depositAmount + bonusAmount).toFixed(8));
@@ -359,7 +451,10 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
     }
 
     try {
-      await prisma.pendingDeposit.update({ where: { invoiceId: invoiceIdNum.toString() }, data: { status: 'processed' } });
+      await prisma.pendingDeposit.update({ 
+        where: { invoiceId: invoiceIdNum.toString() }, 
+        data: { status: 'processed' } 
+      });
     } catch (e) {
       console.warn(`⚠️ Mark processed:`, e.message);
     }
@@ -369,7 +464,10 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
     logger.error('BOT', `Error handling deposit`, { error: error.message, stack: error.stack });
     
     try {
-      await prisma.pendingDeposit.update({ where: { invoiceId: invoiceIdNum.toString() }, data: { status: 'failed' } });
+      await prisma.pendingDeposit.update({ 
+        where: { invoiceId: invoiceIdNum.toString() }, 
+        data: { status: 'failed' } 
+      });
     } catch (e) {
       console.warn(`⚠️ Mark failed:`, e.message);
     }
