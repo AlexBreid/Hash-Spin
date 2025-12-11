@@ -20,6 +20,13 @@ interface GridCell {
   isMine?: boolean;
 }
 
+interface BalanceItem {
+  tokenId: number;
+  symbol: string;
+  amount: number;
+  type: 'MAIN' | 'BONUS';
+}
+
 export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { token } = useAuth();
 
@@ -33,10 +40,15 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [gameStatus, setGameStatus] = useState<'PLAYING' | 'WON' | 'LOST' | 'CASHED_OUT'>('PLAYING');
   const [winAmount, setWinAmount] = useState<string | null>(null);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
-  const [nextMultiplier, setNextMultiplier] = useState<number>(1.0); // 🆕
-  const [maxMultiplier, setMaxMultiplier] = useState<number>(0); // 🆕
+  const [nextMultiplier, setNextMultiplier] = useState<number>(1.0);
+  const [maxMultiplier, setMaxMultiplier] = useState<number>(0);
   const [potentialWin, setPotentialWin] = useState<string>('0');
-  const [balance, setBalance] = useState<number>(0);
+  
+  // ✅ ИСПРАВЛЕНО: Хранить оба баланса
+  const [mainBalance, setMainBalance] = useState<number>(0);
+  const [bonusBalance, setBonusBalance] = useState<number>(0);
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+  
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [cellLoading, setCellLoading] = useState(false);
   const [openedCells, setOpenedCells] = useState<Map<string, boolean>>(new Map());
@@ -56,24 +68,40 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [step]);
 
-  // Загрузить баланс
+  // ✅ ИСПРАВЛЕНО: Загружать оба баланса
   useEffect(() => {
     const loadBalance = async () => {
       try {
+        console.log('📊 [MINESWEEPER] Загружаю баланс...');
         const response = await getBalance();
         const data = response.data || response;
+
         if (Array.isArray(data)) {
-          const usdt = data.find((b: any) => b.symbol === 'USDT' && b.type === 'MAIN');
-          setBalance(usdt?.amount ?? 0);
+          console.log(`📊 [MINESWEEPER] Получено ${data.length} балансов:`, data);
+
+          // Находим MAIN и BONUS
+          const main = data.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
+          const bonus = data.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
+          const total = main + bonus;
+
+          console.log(`💰 [MINESWEEPER] Main: ${main}, Bonus: ${bonus}, Total: ${total}`);
+
+          setMainBalance(main);
+          setBonusBalance(bonus);
+          setTotalBalance(total);
         }
       } catch (err) {
+        console.error('❌ [MINESWEEPER] Ошибка загрузки баланса:', err);
         toast.error('Не удалось загрузить баланс');
+        setMainBalance(0);
+        setBonusBalance(0);
+        setTotalBalance(0);
       } finally {
         setBalanceLoading(false);
       }
     };
     loadBalance();
-  }, []);
+  }, [getBalance]);
 
   // Загрузить сложности
   useEffect(() => {
@@ -83,11 +111,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         const data = response.data || response;
         setDifficulties(Array.isArray(data) ? data : []);
       } catch (err) {
+        console.error('❌ [MINESWEEPER] Ошибка загрузки сложностей:', err);
         toast.error('Не удалось загрузить сложности');
       }
     };
     load();
-  }, []);
+  }, [getDifficulties]);
 
   const handleStartGame = useCallback(async () => {
     if (!selectedDifficulty) {
@@ -101,13 +130,15 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    if (amount > balance) {
-      toast.error('Недостаточно средств');
+    // ✅ ИСПРАВЛЕНО: Проверяем объединённый баланс
+    if (amount > totalBalance) {
+      toast.error(`Недостаточно средств (доступно: ${totalBalance.toFixed(2)} USDT)`);
       return;
     }
 
     setLoading(true);
     try {
+      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}`);
       const response = await startGame({
         difficultyId: selectedDifficulty.id,
         betAmount: amount,
@@ -124,18 +155,23 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setGrid(gameData.grid);
       setOpenedCells(new Map());
       setCurrentMultiplier(parseFloat(gameData.currentMultiplier) || 1.0);
-      setNextMultiplier(parseFloat(gameData.nextMultiplier) || 1.0); // 🆕
-      setMaxMultiplier(parseFloat(gameData.maxMultiplier) || 0); // 🆕
+      setNextMultiplier(parseFloat(gameData.nextMultiplier) || 1.0);
+      setMaxMultiplier(parseFloat(gameData.maxMultiplier) || 0);
       setPotentialWin(gameData.potentialWin?.toString() || '0');
       setStep('PLAYING');
       toast.success('Игра начата!');
+
+      // ✅ Обновляем баланс после ставки
+      setTimeout(() => {
+        getBalance();
+      }, 500);
     } catch (err: any) {
-      console.error('Ошибка начала игры:', err);
+      console.error('❌ [MINESWEEPER] Ошибка начала игры:', err);
       toast.error(err.message || 'Не удалось начать игру');
     } finally {
       setLoading(false);
     }
-  }, [selectedDifficulty, betAmount, balance, startGame]);
+  }, [selectedDifficulty, betAmount, totalBalance, startGame, getBalance]);
 
   const handleRevealCell = useCallback(async (x: number, y: number) => {
     if (gameStatus !== 'PLAYING' || !gameId || cellLoading) return;
@@ -163,8 +199,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setOpenedCells(prev => new Map(prev).set(cellKey, !result.isMine));
 
       setCurrentMultiplier(parseFloat(result.currentMultiplier) || 1.0);
-      setNextMultiplier(parseFloat(result.nextMultiplier) || 1.0); // 🆕
-      setMaxMultiplier(parseFloat(result.maxMultiplier) || 0); // 🆕
+      setNextMultiplier(parseFloat(result.nextMultiplier) || 1.0);
+      setMaxMultiplier(parseFloat(result.maxMultiplier) || 0);
       setPotentialWin(result.potentialWin?.toString() || '0');
 
       if (result.status === 'WON') {
@@ -175,6 +211,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         }
         setStep('REVEAL_BOARD');
         toast.success(`🎉 Вы открыли всё поле! Выигрыш: ${result.winAmount} USDT`);
+
+        // ✅ Обновляем баланс после победы
+        setTimeout(() => {
+          getBalance();
+        }, 1000);
       } else if (result.status === 'LOST') {
         setGameStatus('LOST');
         if (result.fullGrid) {
@@ -182,17 +223,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         }
         setStep('REVEAL_BOARD');
         toast.error('💣 Вы попали в мину!');
+
+        // ✅ Обновляем баланс после проигрыша
+        setTimeout(() => {
+          getBalance();
+        }, 1000);
       }
     } catch (err: any) {
+      console.error('❌ [MINESWEEPER] Ошибка открытия клетки:', err);
       toast.error(err.message || 'Ошибка открытия клетки');
     } finally {
       setCellLoading(false);
     }
-  }, [gameId, gameStatus, cellLoading, revealCell]);
+  }, [gameId, gameStatus, cellLoading, revealCell, getBalance]);
 
   const handleCashOut = useCallback(async () => {
     if (!gameId) return;
     try {
+      console.log(`💸 [MINESWEEPER] Кэшаут игры ${gameId}`);
       const response = await cashOut({ gameId });
       const result = response.data || response;
 
@@ -207,10 +255,16 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       }
       setStep('REVEAL_BOARD');
       toast.success(`💸 Вы забрали ${result.winAmount} USDT`);
+
+      // ✅ Обновляем баланс после кэшаута
+      setTimeout(() => {
+        getBalance();
+      }, 500);
     } catch (err: any) {
+      console.error('❌ [MINESWEEPER] Ошибка кэшаута:', err);
       toast.error(err.message || 'Ошибка кэшаута');
     }
-  }, [gameId, cashOut]);
+  }, [gameId, cashOut, getBalance]);
 
   const getCellContent = (cell?: GridCell) => {
     if (!cell || !cell.revealed) return '';
@@ -434,8 +488,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
             <Card className="card-animated p-6 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
               <h2 className="text-xl font-bold mb-4">Выберите уровень</h2>
 
+              {/* ✅ ИСПРАВЛЕНО: Показываем объединённый баланс */}
               <div className="balance-box p-4 rounded-xl mb-6">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <Coins size={18} className="text-yellow-400" />
                   <span className="text-sm text-gray-300">Ваш баланс</span>
                 </div>
@@ -444,7 +499,17 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                     <Loader className="animate-spin" size={20} />
                   </div>
                 ) : (
-                  <p className="text-2xl font-bold text-yellow-400">{balance.toFixed(2)} USDT</p>
+                  <>
+                    {/* Объединённый баланс */}
+                    <p className="text-2xl font-bold text-yellow-400 mb-2">{totalBalance.toFixed(2)} USDT</p>
+                    
+                    {/* Детали (если есть бонус) */}
+                    {bonusBalance > 0 && (
+                      <p className="text-xs text-amber-300">
+                        💛 Бонус: {bonusBalance.toFixed(8)} | 🔵 Основной: {mainBalance.toFixed(8)}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -471,7 +536,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                           <p className="text-sm text-gray-400">
                             💣 {diff.minesCount} мин • 🎯 6×6 поле
                           </p>
-                          {/* 🆕 ИСПРАВЛЕНО: Правильный расчет макс множителя */}
                           <p className="text-xs text-green-400 mt-1">
                             Макс. ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(2)}
                           </p>

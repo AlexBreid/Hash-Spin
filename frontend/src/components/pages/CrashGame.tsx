@@ -27,6 +27,13 @@ interface CrashHistory {
   timestamp: number;
 }
 
+interface BalanceItem {
+  tokenId: number;
+  symbol: string;
+  amount: number;
+  type: 'MAIN' | 'BONUS';
+}
+
 export function CrashGame() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
@@ -48,12 +55,16 @@ export function CrashGame() {
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
   
+  // ✅ ИСПРАВЛЕНО: Хранить оба баланса
+  const [mainBalance, setMainBalance] = useState<number>(0);
+  const [bonusBalance, setBonusBalance] = useState<number>(0);
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+  
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
   const [activeCrash, setActiveCrash] = useState<CrashHistory | null>(null);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
 
-  // ✅ ИСПРАВЛЕНИЕ #1: useMemo для стабильных ключей
   const sessionKeys = useMemo(() => ({
     betId: `crash_pending_bet_${user?.id}`,
     currentBet: `crash_current_bet_${user?.id}`,
@@ -63,7 +74,6 @@ export function CrashGame() {
   const animationFrameRef = useRef<number>();
   const drawChartRef = useRef<() => void>(() => {});
 
-  // ЛОКАЛЬНОЕ ХРАНИЛИЩЕ ИСТОРИИ
   const loadHistoryFromStorage = useCallback(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -91,7 +101,6 @@ export function CrashGame() {
     }
   }, []);
 
-  // ✅ ИСПРАВЛЕНИЕ #2: Отдельный useEffect для восстановления ставки
   useEffect(() => {
     const storedBetId = sessionStorage.getItem(sessionKeys.betId);
     const storedBet = sessionStorage.getItem(sessionKeys.currentBet);
@@ -103,7 +112,21 @@ export function CrashGame() {
     }
   }, [sessionKeys.betId, sessionKeys.currentBet]);
 
-  // ✅ ИСПРАВЛЕНИЕ #3: Убрать crashHistory из зависимостей
+  // ✅ ИСПРАВЛЕНО: Обновляем балансы из useBalance hook
+  useEffect(() => {
+    if (balances && Array.isArray(balances)) {
+      const main = balances.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
+      const bonus = balances.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
+      const total = main + bonus;
+
+      console.log(`💰 [CRASH] Балансы обновлены: Main=${main}, Bonus=${bonus}, Total=${total}`);
+
+      setMainBalance(main);
+      setBonusBalance(bonus);
+      setTotalBalance(total);
+    }
+  }, [balances]);
+
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
@@ -119,6 +142,8 @@ export function CrashGame() {
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         console.log('✅ Подключен');
         toast.success('🚀 Подключено!');
+        
+        // ✅ Загружаем баланс после подключения
         await fetchBalances();
 
         console.log('📥 Загружаю историю крашей с API...');
@@ -188,7 +213,6 @@ export function CrashGame() {
     };
   }, [user, token, navigate, fetchBalances, loadHistoryFromStorage, saveHistoryToStorage]);
 
-  // ОБРАБОТЧИКИ СОБЫТИЯ ИГРЫ
   useEffect(() => {
     const handleGameStatus = (data: CrashGameState) => {
       setGameState(data);
@@ -230,7 +254,6 @@ export function CrashGame() {
 
       setActiveCrash(newCrash);
 
-      // ✅ ИСПРАВЛЕНИЕ #4: Сохранять историю в отдельном useEffect
       setCrashHistory((prev) => {
         const updated = [newCrash, ...prev].slice(0, MAX_HISTORY_ITEMS);
         return updated;
@@ -245,7 +268,7 @@ export function CrashGame() {
     
     const handleBetPlaced = (data: any) => {
       setBetPlaced(true);
-      const betAmount = data.bet ?? 0; // ✅ ИСПРАВЛЕНИЕ #5: Проверка на undefined
+      const betAmount = data.bet ?? 0;
       setCurrentBet(betAmount);
       setCanCashout(false);
       toast.success(`✅ Ставка: $${betAmount.toFixed(2)}`);
@@ -263,6 +286,7 @@ export function CrashGame() {
       sessionStorage.removeItem(sessionKeys.betId);
       sessionStorage.removeItem(sessionKeys.currentBet);
       
+      // ✅ Обновляем баланс после кэшаута
       setTimeout(() => fetchBalances(), 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
     };
@@ -294,14 +318,12 @@ export function CrashGame() {
     };
   }, [betPlaced, currentBet, fetchBalances, sessionKeys, saveHistoryToStorage]);
 
-  // ✅ ИСПРАВЛЕНИЕ #6: Отдельный useEffect для сохранения истории
   useEffect(() => {
     if (crashHistory.length > 0) {
       saveHistoryToStorage(crashHistory);
     }
   }, [crashHistory, saveHistoryToStorage]);
 
-  // РИСОВАНИЕ ГРАФИКА
   const currentCrashPoint = activeCrash?.crashPoint ?? gameState.crashPoint;
   const displayMultiplier = gameState.status === 'crashed' && currentCrashPoint 
     ? currentCrashPoint 
@@ -477,12 +499,10 @@ export function CrashGame() {
     }
   }, [gameState, displayMultiplier]);
 
-  // ✅ ИСПРАВЛЕНИЕ #7: Используем ref для избежания пересоздания drawChart
   useEffect(() => {
     drawChartRef.current = drawChart;
   }, [drawChart]);
 
-  // ✅ ИСПРАВЛЕНИЕ #8: Правильное управление requestAnimationFrame
   useEffect(() => {
     const animate = () => {
       drawChartRef.current();
@@ -502,6 +522,11 @@ export function CrashGame() {
     const amount = parseFloat(inputBet);
     if (!amount || amount <= 0) {
       toast.error('❌ Введите сумму ставки');
+      return;
+    }
+    // ✅ ИСПРАВЛЕНО: Проверяем объединённый баланс
+    if (amount > totalBalance) {
+      toast.error(`❌ Недостаточно средств (доступно: ${totalBalance.toFixed(2)} $)`);
       return;
     }
     if (gameState.status !== 'waiting') {
@@ -531,7 +556,6 @@ export function CrashGame() {
     }
   };
 
-  // ✅ ИСПРАВЛЕНИЕ #9: Дебаунс для кнопок ÷2 и ×2
   const handleBetChange = useCallback((multiplier: number) => {
     setInputBet((prev) => {
       const newVal = parseFloat(prev || '0') * multiplier;
@@ -539,7 +563,6 @@ export function CrashGame() {
     });
   }, []);
 
-  const mainBalance = parseFloat(balances.find((b) => b.type === 'MAIN')?.amount?.toString() || '0');
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
@@ -573,10 +596,14 @@ export function CrashGame() {
               </div>
             </div>
 
+            {/* ✅ ИСПРАВЛЕНО: Показываем объединённый баланс */}
             <GlassCard className="px-3 py-2 flex items-center gap-2 !rounded-full">
               <div className="text-right">
-                <p className="text-xs text-gray-400">$</p>
-                <p className="text-sm font-black text-emerald-300">${mainBalance.toFixed(2)}</p>
+                <p className="text-xs text-gray-400">Всего</p>
+                <p className="text-sm font-black text-emerald-300">${totalBalance.toFixed(2)}</p>
+                {bonusBalance > 0 && (
+                  <p className="text-xs text-amber-300">💛 +${bonusBalance.toFixed(2)}</p>
+                )}
               </div>
               <motion.button 
                 whileHover={{ rotate: 180 }}
