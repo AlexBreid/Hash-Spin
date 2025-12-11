@@ -287,7 +287,7 @@ const withdrawalService = {
             where: { id: withdrawalIdNum },
             data: {
               status: 'COMPLETED',
-              txHash: transferId,
+              txHash: String(transferId),  // ✅ ИСПРАВЛЕНО: преобразуем в строку!
               updatedAt: new Date()
             }
           });
