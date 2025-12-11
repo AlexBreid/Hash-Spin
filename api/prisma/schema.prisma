@@ -483,6 +483,7 @@ model MinesweeperGame {
     @@index([status])
 }
 
+// ✅ ИСПРАВЛЕНО: Добавлено поле withBonus для сохранения выбора пользователя
 model PendingDeposit {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -490,6 +491,7 @@ model PendingDeposit {
   amount    Float
   asset     String   @default("USDT")
   status    String   @default("pending")
+  withBonus Boolean  @default(false)  // ✅ НОВОЕ: сохраняем выбор бонуса (true = с бонусом, false = без бонуса)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

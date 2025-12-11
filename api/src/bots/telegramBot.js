@@ -1,12 +1,9 @@
 /**
  * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ telegramBot.js
- * КОПИРУЙ ВЕСЬ КОД В src/routes/telegramBot.js
- * 
- * ✅ ИСПРАВЛЕНИЯ:
- * 1. ✅ После выбора бонуса сообщение удаляется
- * 2. ✅ Сразу создается инвойс
- * 3. ✅ Нет зацикливания
- * 4. ✅ Правильная обработка всех callback'ов
+ * ИСПРАВЛЕНИЯ:
+ * 1. ✅ Сохранение выбора бонуса в БД (withBonus)
+ * 2. ✅ Правильное распределение депозита (MAIN или BONUS)
+ * 3. ✅ Правильный расчет отыгрыша от СУММЫ ПОСТУПЛЕНИЯ
  */
 
 const { Telegraf } = require('telegraf');
@@ -51,17 +48,17 @@ function generateTicketId() {
 }
 
 // ====================================
-// ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ С ПОЛНЫМ ЛОГИРОВАНИЕМ
+// SCHEDULE DEPOSIT CHECK
 // ====================================
-async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USDT') {
+async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USDT', withBonus = false) {
   console.log(`\n📋 [DEPOSIT CHECK] Starting deposit check...`);
   console.log(`   userId: ${userId} (${typeof userId})`);
   console.log(`   invoiceId: ${invoiceId} (${typeof invoiceId})`);
   console.log(`   amount: ${amount} (${typeof amount})`);
   console.log(`   asset: ${asset}`);
+  console.log(`   🎁 withBonus: ${withBonus}`);
   
   try {
-    // ✅ СТРОГАЯ ВАЛИДАЦИЯ
     if (!userId || !invoiceId || !amount || !asset) {
       const missingParams = {
         userId: !userId ? '❌ MISSING' : '✅',
@@ -74,7 +71,6 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
       return;
     }
 
-    // ✅ ПРЕОБРАЗОВАНИЕ ТИПОВ
     let userIdNum, invoiceIdNum, amountNum;
 
     try {
@@ -115,21 +111,21 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
     }
     console.log(`   ✅ asset validated: ${assetStr}`);
 
-    // ✅ СОХРАНЕНИЕ В БД
     try {
       const pendingDeposit = await prisma.pendingDeposit.upsert({
         where: { invoiceId: invoiceIdNum.toString() },
         create: {
           userId: userIdNum,
           invoiceId: invoiceIdNum.toString(),
-          amount: amountNum.toFixed(8),
+          amount: amountNum,
           asset: assetStr,
           status: 'pending',
+          withBonus: withBonus,
           createdAt: new Date()
         },
-        update: { updatedAt: new Date(), status: 'pending' }
+        update: { updatedAt: new Date(), status: 'pending', withBonus: withBonus }
       });
-      console.log(`   ✅ Saved to DB: id = ${pendingDeposit.id}`);
+      console.log(`   ✅ Saved to DB: id = ${pendingDeposit.id}, withBonus = ${withBonus}`);
     } catch (dbError) {
       console.error(`❌ Database error:`, dbError.message);
       logger.error('BOT', 'Failed to save pending deposit', { error: dbError.message });
@@ -137,7 +133,7 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 
     console.log(`✅ Parameters validated, starting polling...\n`);
     logger.info('BOT', `Scheduled deposit check`, { 
-      userId: userIdNum, invoiceId: invoiceIdNum, amount: amountNum.toFixed(8), asset: assetStr
+      userId: userIdNum, invoiceId: invoiceIdNum, amount: amountNum.toFixed(8), asset: assetStr, withBonus: withBonus
     });
 
     let checkCount = 0;
@@ -198,7 +194,6 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 
         console.log(`\n🎉 INVOICE PAID! Creating transaction...\n`);
         
-        // ✅ ПОЛУЧАЕМ ТОКЕН ПЕРЕД ИСПОЛЬЗОВАНИЕМ
         let token = await prisma.cryptoToken.findUnique({ where: { symbol: assetStr } });
         
         if (!token) {
@@ -214,18 +209,12 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
           }
         }
         
-        // ✅ ПРОВЕРЯЕМ: есть ли УЖЕ активный бонус (значит пользователь его выбрал)
-        const userHasActiveBonusSelected = await prisma.userBonus.findFirst({
-          where: {
-            userId: userIdNum,
-            isActive: true,
-            isCompleted: false,
-            expiresAt: { gt: new Date() }
-          }
+        const pendingDepositInfo = await prisma.pendingDeposit.findUnique({
+          where: { invoiceId: invoiceIdNum.toString() }
         });
-        
-        const bonusWasSelected = !!userHasActiveBonusSelected;
-        console.log(`   🎁 Bonus selected by user: ${bonusWasSelected ? 'YES' : 'NO'}`);
+
+        const bonusWasSelected = !!pendingDepositInfo?.withBonus;
+        console.log(`   🎁 Bonus was selected (from DB): ${bonusWasSelected ? 'YES' : 'NO'}`);
         
         await handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, assetStr, bot, bonusWasSelected);
 
@@ -253,9 +242,7 @@ async function scheduleDepositCheck(bot, userId, invoiceId, amount, asset = 'USD
 }
 
 /**
- * ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ - ПОЛНОСТЬЮ ИСПРАВЛЕНО
- * bonusWasSelected = true если пользователь выбрал "С БОНУСОМ"
- * bonusWasSelected = false если выбрал "БЕЗ БОНУСА" или нет реферера
+ * ✅ HANDLE DEPOSIT WITH TOKEN - ПОЛНОСТЬЮ ИСПРАВЛЕНО
  */
 async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum, asset, bot, bonusWasSelected = false) {
   console.log(`💾 Creating transaction...`);
@@ -263,10 +250,8 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
   console.log(`   🎁 Bonus selected: ${bonusWasSelected ? 'YES' : 'NO'}`);
   
   try {
-    // ✅ ЛОГИКА:
-    // Если выбран бонус → ВСЁ на BONUS счёт (и депозит и бонус)
-    // Если БЕЗ бонуса → депозит на MAIN
     const balanceType = bonusWasSelected ? 'BONUS' : 'MAIN';
+    console.log(`   💰 Deposit goes to: ${balanceType}`);
     
     const result = await prisma.$transaction(async (tx) => {
       const newTx = await tx.transaction.create({
@@ -282,7 +267,6 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
       });
       console.log(`   ✅ Transaction created: ${newTx.id}`);
 
-      // ✅ Кладём ДЕПОЗИТ на правильный счёт
       const updatedBalance = await tx.balance.upsert({
         where: { userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: balanceType } },
         create: { userId: userIdNum, tokenId: token.id, type: balanceType, amount: amountNum.toFixed(8) },
@@ -290,35 +274,30 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
       });
       console.log(`   ✅ ${balanceType} Balance updated (deposit): ${updatedBalance.amount}`);
 
-      // ✅ Если выбран бонус - добавляем 100% бонус НА BONUS СЧЁТ
       if (bonusWasSelected && asset === 'USDT') {
-        console.log(`   🎁 Adding bonus...`);
+        console.log(`   🎁 Adding 100% bonus...`);
         
-        // Бонус = 100% от депозита (дополнительно на BONUS счёт)
         const bonusAmount = parseFloat(amountNum.toFixed(8));
         
-        // Добавляем бонус на BONUS счёт
         const bonusBalance = await tx.balance.upsert({
           where: { userId_tokenId_type: { userId: userIdNum, tokenId: token.id, type: 'BONUS' } },
           create: { userId: userIdNum, tokenId: token.id, type: 'BONUS', amount: bonusAmount.toFixed(8) },
           update: { amount: { increment: bonusAmount } }
         });
         
-        console.log(`   ✅ BONUS Balance updated (bonus): ${bonusBalance.amount}`);
+        console.log(`   ✅ BONUS Balance updated (bonus part): ${bonusBalance.amount}`);
         
         const totalBonus = balanceType === 'BONUS' 
           ? (parseFloat(updatedBalance.amount.toString()) + bonusAmount).toFixed(8)
           : bonusAmount.toFixed(8);
         console.log(`   📊 ИТОГО на BONUS счёте: ${totalBonus}`);
         
-        // Получаем информацию для реферальной статистики
         const user = await tx.user.findUnique({
           where: { id: userIdNum },
           select: { referredById: true }
         });
         
         if (user?.referredById) {
-          // Обновляем реферальную статистику
           await tx.referralStats.upsert({
             where: {
               referrerId_refereeId_tokenId: {
@@ -342,6 +321,8 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
           
           console.log(`   ✅ Referral stats updated`);
         }
+      } else if (!bonusWasSelected) {
+        console.log(`   💎 No bonus selected, deposit on MAIN only`);
       }
 
       return newTx;
@@ -354,14 +335,20 @@ async function handleDepositWithToken(token, userIdNum, invoiceIdNum, amountNum,
       if (user?.telegramId) {
         let message;
         if (bonusWasSelected) {
-          const totalBalance = (amountNum * 2).toFixed(8);
+          // ✅ ИСПРАВЛЕНИЕ: Расчет от СУММЫ ПОСТУПЛЕНИЯ (депозит + бонус)
+          const depositAmount = parseFloat(amountNum.toFixed(8));
+          const bonusAmount = parseFloat(amountNum.toFixed(8));
+          const totalReceived = parseFloat((depositAmount + bonusAmount).toFixed(8));
+          const wageringRequired = parseFloat((totalReceived * 10).toFixed(8));
+          
           message = `✅ *Пополнение с БОНУСОМ успешно!*\n\n` +
-            `💰 Депозит: ${amountNum.toFixed(8)} ${asset}\n` +
-            `🎁 Бонус: +${amountNum.toFixed(8)} ${asset}\n` +
-            `📊 Итого на счёте: ${totalBalance} ${asset}\n\n` +
-            `⚡ Необходимо отыграть: ${(amountNum * 10).toFixed(8)} ${asset}`;
+            `💰 Ваш депозит: ${depositAmount.toFixed(8)} ${asset}\n` +
+            `🎁 Бонус казино: +${bonusAmount.toFixed(8)} ${asset}\n` +
+            `📊 Всего поступило: ${totalReceived.toFixed(8)} ${asset}\n\n` +
+            `⚡ Требуется отыграть: ${wageringRequired.toFixed(8)} ${asset}\n` +
+            `(это 10x от всей поступившей суммы)`;
         } else {
-          message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}`;
+          message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}\n\n💎 Бонус не выбран, деньги готовы к игре.`;
         }
         
         await bot.telegram.sendMessage(user.telegramId, message, { parse_mode: 'Markdown' });
@@ -648,7 +635,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ОБРАБОТКА ОТВЕТОВ АДМИНИСТРАТОРА НА ТИКЕТЫ
       if (adminWaitingForReply.has(user.id)) {
         const ticketId = adminWaitingForReply.get(user.id);
         let ticketUser = null;
@@ -697,7 +683,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ОБРАБОТКА СООБЩЕНИЙ ДЛЯ ТИКЕТОВ ПОДДЕРЖКИ
       if (waitingForTicketMessage.has(user.id)) {
         const ticketType = waitingForTicketMessage.get(user.id);
         const ticketId = generateTicketId();
@@ -759,7 +744,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ВЫВОД: ШАГ 1 - СУММА
       if (waitingForWithdrawAmount.has(user.id)) {
         if (text === '◀️ Назад') {
           waitingForWithdrawAmount.delete(user.id);
@@ -791,7 +775,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ВЫВОД: ШАГ 2 - АДРЕС
       if (waitingForWithdrawAddress.has(user.id)) {
         if (text === '◀️ Назад') {
           waitingForWithdrawAddress.delete(user.id);
@@ -883,7 +866,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ПОПОЛНЕНИЕ: ШАГ 1 - СУММА
       if (waitingForDeposit.has(user.id)) {
         if (text === '◀️ Назад') {
           waitingForDeposit.delete(user.id);
@@ -933,7 +915,7 @@ if (!BOT_TOKEN) {
             return;
           }
           
-          scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+          scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', false);
           
           await ctx.reply(
             `✅ *Инвойс создан*\n\n` +
@@ -955,7 +937,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ОСНОВНЫЕ КОМАНДЫ
       switch (text) {
         case '🎰 Казино': {
           const oneTimeToken = await generateOneTimeToken(user.id);
@@ -1210,9 +1191,6 @@ if (!BOT_TOKEN) {
     await ctx.answerCbQuery();
   });
 
-  // ====================================
-  // CONFIRM DEPOSIT CALLBACK - ✅ ИСПРАВЛЕНО
-  // ====================================
   bot.action(/confirm_deposit_(\d+(?:\.\d+)?)_(yes|no)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1233,7 +1211,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ✅ ИСПРАВЛЕНИЕ: Удаляем старое сообщение ПЕРЕД созданием инвойса
       try {
         await ctx.deleteMessage();
       } catch (e) {
@@ -1251,13 +1228,12 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+      scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', useBonus);
 
       const bonusText = useBonus 
         ? `\n\n🎁 *С БОНУСОМ:*\n• +${amount.toFixed(8)} USDT бонуса\n• Отыграй в 10x\n• Действует 7 дней`
         : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
 
-      // ✅ ИСПРАВЛЕНИЕ: Отправляем НОВОЕ сообщение вместо старого
       await ctx.reply(
         `✅ *Инвойс создан*\n\nСумма: ${amount.toFixed(8)} USDT${bonusText}`,
         {
@@ -1279,9 +1255,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // ====================================
-  // DEPOSIT QUICK AMOUNTS
-  // ====================================
   bot.action('deposit_custom', async (ctx) => {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
@@ -1318,7 +1291,6 @@ if (!BOT_TOKEN) {
         where: { userId: user.id, type: 'DEPOSIT', status: 'COMPLETED' }
       });
 
-      // ✅ ИСПРАВЛЕНИЕ: Удаляем сообщение ПЕРЕД отправкой нового
       try {
         await ctx.deleteMessage();
       } catch (e) {}
@@ -1343,7 +1315,7 @@ if (!BOT_TOKEN) {
           return await ctx.answerCbQuery();
         }
         
-        scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT');
+        scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', false);
         
         await ctx.reply(
           `✅ *Инвойс создан*\n\n💰 Сумма: ${amount.toFixed(8)} USDT\n⏳ Статус: Ожидание оплаты`,
@@ -1367,9 +1339,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // ====================================
-  // CHECK INVOICE
-  // ====================================
   bot.action(/check_invoice_(\d+)/, async (ctx) => {
     try {
       const invoiceId = parseInt(ctx.match[1]);
@@ -1435,9 +1404,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // ====================================
-  // WITHDRAW AMOUNTS
-  // ====================================
   bot.action(/withdraw_(\d+)/, async (ctx) => {
     try {
       const amount = parseFloat(ctx.match[1]);
@@ -1501,9 +1467,6 @@ if (!BOT_TOKEN) {
     );
   });
 
-  // ====================================
-  // ADMIN PANEL CALLBACKS
-  // ====================================
   bot.action('admin_show_withdrawals', async (ctx) => {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
@@ -1765,9 +1728,6 @@ if (!BOT_TOKEN) {
     await ctx.answerCbQuery();
   });
 
-  // ====================================
-  // SUPPORT TICKET CALLBACKS
-  // ====================================
   bot.action('support_general', async (ctx) => {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
