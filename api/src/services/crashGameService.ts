@@ -57,7 +57,6 @@ class CrashGameService {
         });
 
         this.socket.on('connect', () => {
-          console.log('✅ Подключен к Game Server');
           
           this.socket!.emit('joinGame', {
             userId,
@@ -143,8 +142,6 @@ class CrashGameService {
   async cashout(balanceType?: string, userBonusId?: string | null): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
     
-    console.log(`💸 [SERVICE] Отправляю cashout с balanceType=${balanceType || 'MAIN'}, userBonusId=${userBonusId || null}`);
-    
     // 🆕 Отправляем данные вместе с кэшаутом!
     this.socket.emit('cashout', {
       balanceType: balanceType || 'MAIN',
@@ -191,9 +188,7 @@ class CrashGameService {
         b.timestamp.getTime() - a.timestamp.getTime()
       );
 
-      console.log(`✅ [SERVICE] Загружено ${sorted.length} крашей`);
-
-      return sorted;
+        return sorted;
     } catch (error) {
       console.error('❌ [SERVICE] Ошибка загрузки крашей:', error);
       return [];

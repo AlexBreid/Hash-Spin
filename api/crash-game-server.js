@@ -369,11 +369,6 @@ class GameRoom {
         userBonusId: player.userBonusId || null
       };
 
-      log.info(`\n${'='.repeat(80)}`);
-      log.info(`💸 [IMMEDIATE CASHOUT] ${player.userName} вышел на ${player.multiplier}x`);
-      log.info(`📤 Отправляю СРАЗУ на бэк:`, JSON.stringify(payload));
-      log.info(`${'='.repeat(80)}\n`);
-
       const response = await axios.post(
         url,
         payload,
