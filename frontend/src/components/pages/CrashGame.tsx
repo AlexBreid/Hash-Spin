@@ -34,6 +34,12 @@ interface BalanceItem {
   type: 'MAIN' | 'BONUS';
 }
 
+interface BalanceData {
+  tokenId: number;
+  amount: number;
+  type: 'MAIN' | 'BONUS';
+}
+
 export function CrashGame() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
@@ -60,6 +66,10 @@ export function CrashGame() {
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
   
+  // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
+  const [balanceType, setBalanceType] = useState<string | null>(null);
+  const [userBonusId, setUserBonusId] = useState<string | null>(null);
+  
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
   const [activeCrash, setActiveCrash] = useState<CrashHistory | null>(null);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
@@ -68,6 +78,8 @@ export function CrashGame() {
   const sessionKeys = useMemo(() => ({
     betId: `crash_pending_bet_${user?.id}`,
     currentBet: `crash_current_bet_${user?.id}`,
+    balanceType: `crash_balance_type_${user?.id}`,     // 🆕
+    userBonusId: `crash_user_bonus_id_${user?.id}`,   // 🆕
   }), [user?.id]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,19 +116,25 @@ export function CrashGame() {
   useEffect(() => {
     const storedBetId = sessionStorage.getItem(sessionKeys.betId);
     const storedBet = sessionStorage.getItem(sessionKeys.currentBet);
+    const storedBalanceType = sessionStorage.getItem(sessionKeys.balanceType);     // 🆕
+    const storedUserBonusId = sessionStorage.getItem(sessionKeys.userBonusId);     // 🆕
 
     if (storedBetId && storedBet) {
       console.log('✅ [RECOVERY] Восстанавливаю ставку из sessionStorage:', storedBetId);
       setBetPlaced(true);
       setCurrentBet(parseFloat(storedBet));
+      
+      // 🆕 Восстанавливаем balanceType и userBonusId
+      if (storedBalanceType) setBalanceType(storedBalanceType);
+      if (storedUserBonusId) setUserBonusId(storedUserBonusId);
     }
-  }, [sessionKeys.betId, sessionKeys.currentBet]);
+  }, [sessionKeys.betId, sessionKeys.currentBet, sessionKeys.balanceType, sessionKeys.userBonusId]);
 
   // ✅ ИСПРАВЛЕНО: Обновляем балансы из useBalance hook
   useEffect(() => {
     if (balances && Array.isArray(balances)) {
-      const main = balances.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
-      const bonus = balances.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
+      const main = parseFloat((balances.find((b: any) => b.type === 'MAIN')?.amount ?? 0).toString());
+      const bonus = parseFloat((balances.find((b: any) => b.type === 'BONUS')?.amount ?? 0).toString());
       const total = main + bonus;
 
       console.log(`💰 [CRASH] Балансы обновлены: Main=${main}, Bonus=${bonus}, Total=${total}`);
@@ -190,16 +208,21 @@ export function CrashGame() {
                 return sorted;
               });
             }
+          } else {
+            console.warn('⚠️ Ошибка загрузки истории, статус:', response.status);
           }
         } catch (error: any) {
           clearTimeout(timeoutId);
           if (error.name !== 'AbortError') {
             console.warn('⚠️ Ошибка загрузки истории:', error);
           }
+        } finally {
+          setIsHistoryLoaded(true);
         }
       } catch (error) {
         console.error('❌ Ошибка подключения:', error);
         toast.error('❌ Ошибка подключения');
+        setIsHistoryLoaded(true);
       } finally {
         setIsLoading(false);
       }
@@ -221,6 +244,8 @@ export function CrashGame() {
         if (!betPlaced) {
           sessionStorage.removeItem(sessionKeys.betId);
           sessionStorage.removeItem(sessionKeys.currentBet);
+          sessionStorage.removeItem(sessionKeys.balanceType);      // 🆕
+          sessionStorage.removeItem(sessionKeys.userBonusId);      // 🆕
         }
       } else if (data.status === 'flying') {
         setCanCashout(betPlaced);
@@ -244,6 +269,12 @@ export function CrashGame() {
 
       sessionStorage.removeItem(sessionKeys.betId);
       sessionStorage.removeItem(sessionKeys.currentBet);
+      sessionStorage.removeItem(sessionKeys.balanceType);          // 🆕
+      sessionStorage.removeItem(sessionKeys.userBonusId);          // 🆕
+      
+      // 🆕 Очищаем state
+      setBalanceType(null);
+      setUserBonusId(null);
 
       const newCrash: CrashHistory = {
         id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
@@ -273,9 +304,16 @@ export function CrashGame() {
       setCanCashout(false);
       toast.success(`✅ Ставка: $${betAmount.toFixed(2)}`);
       
+      // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
+      console.log(`🆕 [BET PLACED] Сохраняю balanceType=${data.balanceType}, userBonusId=${data.userBonusId}`);
+      setBalanceType(data.balanceType || 'MAIN');
+      setUserBonusId(data.userBonusId || null);
+      
       console.log('💾 Сохраняю ставку в sessionStorage');
       sessionStorage.setItem(sessionKeys.betId, data.betId || 'unknown');
       sessionStorage.setItem(sessionKeys.currentBet, betAmount.toString());
+      sessionStorage.setItem(sessionKeys.balanceType, data.balanceType || 'MAIN');    // 🆕
+      sessionStorage.setItem(sessionKeys.userBonusId, data.userBonusId || '');        // 🆕
     };
     
     const handleCashoutSuccess = (data: { multiplier: number; winnings: number }) => {
@@ -285,6 +323,12 @@ export function CrashGame() {
       
       sessionStorage.removeItem(sessionKeys.betId);
       sessionStorage.removeItem(sessionKeys.currentBet);
+      sessionStorage.removeItem(sessionKeys.balanceType);          // 🆕
+      sessionStorage.removeItem(sessionKeys.userBonusId);          // 🆕
+      
+      // 🆕 Очищаем state
+      setBalanceType(null);
+      setUserBonusId(null);
       
       // ✅ Обновляем баланс после кэшаута
       setTimeout(() => fetchBalances(), 500);
@@ -547,6 +591,12 @@ export function CrashGame() {
   const handleCashout = async () => {
     try {
       setIsLoading(true);
+      
+      // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId при кэшауте!
+      console.log(`💸 [CASHOUT] Кэшаут с balanceType=${balanceType}, userBonusId=${userBonusId}`);
+      
+      // ✅ crashGameService.cashout() не принимает параметры
+      // Данные передаются через событие
       await crashGameService.cashout();
     } catch (e) {
       console.error('Cashout error:', e);
@@ -577,14 +627,17 @@ export function CrashGame() {
         <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-3 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={() => navigate('/')}
                 className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-300" />
-              </motion.button>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-300" />
+                </motion.div>
+              </button>
               <div>
                 <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-1">
                   <Flame className="w-6 h-6 text-orange-500 animate-bounce" />
@@ -605,14 +658,17 @@ export function CrashGame() {
                   <p className="text-xs text-amber-300">💛 +${bonusBalance.toFixed(2)}</p>
                 )}
               </div>
-              <motion.button 
-                whileHover={{ rotate: 180 }}
-                transition={{ duration: 0.5 }}
+              <button 
                 onClick={() => fetchBalances()} 
                 className="p-1.5 hover:bg-white/20 rounded-lg"
               >
-                <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-              </motion.button>
+                <motion.div
+                  whileHover={{ rotate: 180 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                </motion.div>
+              </button>
             </GlassCard>
           </div>
         </header>
@@ -645,40 +701,45 @@ export function CrashGame() {
                     <h2 className="text-lg font-black text-white">ОЖИДАНИЕ</h2>
                     <div className="w-40 h-2 bg-black/50 rounded-full overflow-hidden border border-white/20">
                       <motion.div
-                        className="h-full bg-gradient-to-r from-yellow-400 to-orange-500"
+                        style={{ 
+                          height: '100%',
+                          background: 'linear-gradient(to right, #facc15, #f97316)'
+                        }}
                         initial={{ width: '0%' }}
                         animate={{ width: `${waitingProgress}%` }}
                         transition={{ duration: 0.5 }}
                       />
                     </div>
                     <motion.div 
-                      className="text-3xl font-black text-yellow-300 font-mono"
                       key={gameState.countdown}
                       initial={{ scale: 1.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
+                      className="text-3xl font-black text-yellow-300 font-mono"
                     >
                       {gameState.countdown.toFixed(0)}s
                     </motion.div>
                   </div>
                 </motion.div>
               ) : (
-                <motion.div
-                  key="playing"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
-                >
                   <motion.div
-                    className={`text-5xl font-black font-mono leading-none drop-shadow-2xl ${
-                      gameState.status === 'crashed' ? 'text-red-500' : 'text-emerald-300'
-                    }`}
-                    animate={gameState.status === 'crashed' ? { scale: [1, 1.1, 1] } : {}}
-                    transition={{ duration: 0.5 }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
                   >
-                    {displayMultiplier.toFixed(2)}x
+                    <div
+                      className={`text-5xl font-black font-mono leading-none drop-shadow-2xl ${
+                        gameState.status === 'crashed' ? 'text-red-500' : 'text-emerald-300'
+                      }`}
+                    >
+                      <motion.div
+                        animate={gameState.status === 'crashed' ? { scale: [1, 1.1, 1] } : {}}
+                        transition={{ duration: 0.5 }}
+                      >
+                        {displayMultiplier.toFixed(2)}x
+                      </motion.div>
+                    </div>
                   </motion.div>
-                </motion.div>
               )}
             </AnimatePresence>
 
@@ -819,18 +880,19 @@ export function CrashGame() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
                         transition={{ delay: idx * 0.02 }}
-                        className={`p-2 rounded-lg border ${bgColor} flex-shrink-0`}
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span className="text-base flex-shrink-0">{emoji}</span>
-                            <span className={`text-base font-black font-mono ${textColor} truncate`}>
-                              {crash.crashPoint.toFixed(2)}x
+                        <div className={`p-2 rounded-lg border ${bgColor} flex-shrink-0`}>
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-base flex-shrink-0">{emoji}</span>
+                              <span className={`text-base font-black font-mono ${textColor} truncate`}>
+                                {crash.crashPoint.toFixed(2)}x
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                              {new Date(crash.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
-                            {new Date(crash.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
                         </div>
                       </motion.div>
                     );
@@ -839,11 +901,12 @@ export function CrashGame() {
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-center py-12 text-gray-500 flex flex-col items-center justify-center"
                   >
-                    <div className="text-2xl mb-2">🎮</div>
-                    <div className="text-xs">
-                      {isHistoryLoaded ? 'Первый краш...' : 'Загрузка...'}
+                    <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center">
+                      <div className="text-2xl mb-2">🎮</div>
+                      <div className="text-xs">
+                        {isHistoryLoaded ? 'Первый краш...' : 'Загрузка...'}
+                      </div>
                     </div>
                   </motion.div>
                 )}

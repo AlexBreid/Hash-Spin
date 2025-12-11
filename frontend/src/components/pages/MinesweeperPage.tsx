@@ -48,6 +48,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
   
+  // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
+  const [balanceType, setBalanceType] = useState<string | null>(null);
+  const [userBonusId, setUserBonusId] = useState<string | null>(null);
+  
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [cellLoading, setCellLoading] = useState(false);
   const [openedCells, setOpenedCells] = useState<Map<string, boolean>>(new Map());
@@ -67,11 +71,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     }
   }, [step]);
 
-  // ✅ ИСПРАВЛЕНО: БЕЗ ЦИКЛА - Загружаем баланс и сложности ОДИН РАЗ при монтировании
   useEffect(() => {
     console.log('📊 [MINESWEEPER] Инициализирую компонент...');
     
-    // Загрузка баланса
     const loadBalance = async () => {
       try {
         console.log('📊 [MINESWEEPER] Загружаю баланс...');
@@ -102,7 +104,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       }
     };
 
-    // Загрузка сложностей
     const loadDifficulties = async () => {
       try {
         console.log('📊 [MINESWEEPER] Загружаю сложности...');
@@ -119,13 +120,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       }
     };
 
-    // Запускаем обе функции параллельно
     loadBalance();
     loadDifficulties();
 
-  }, []); // ✅ ПУСТО - загружается ТОЛЬКО ОДИН РАЗ!
+  }, []);
 
-  // Функция для обновления баланса (вызывается после событий)
   const refreshBalance = async () => {
     try {
       const response = await getBalance();
@@ -177,6 +176,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         throw new Error('Сервер вернул повреждённые данные');
       }
 
+      // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
+      console.log(`🆕 [START] Сохраняю balanceType=${gameData.balanceType}, userBonusId=${gameData.userBonusId}`);
+      setBalanceType(gameData.balanceType);
+      setUserBonusId(gameData.userBonusId);
+
       setGameId(gameData.gameId);
       setGrid(gameData.grid);
       setOpenedCells(new Map());
@@ -187,7 +191,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setStep('PLAYING');
       toast.success('Игра начата!');
 
-      // Обновляем баланс после ставки
       setTimeout(() => {
         refreshBalance();
       }, 500);
@@ -206,7 +209,17 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     const cellKey = `${x}-${y}`;
     
     try {
-      const response = await revealCell({ gameId, x, y });
+      // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId!
+      console.log(`🎮 [REVEAL] Отправляю: gameId=${gameId}, x=${x}, y=${y}, balanceType=${balanceType}, userBonusId=${userBonusId}`);
+      
+      const response = await revealCell({ 
+        gameId, 
+        x, 
+        y,
+        balanceType,    // 🆕
+        userBonusId     // 🆕
+      });
+      
       const result = response.data || response;
 
       if (!result) {
@@ -264,8 +277,15 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const handleCashOut = async () => {
     if (!gameId) return;
     try {
-      console.log(`💸 [MINESWEEPER] Кэшаут игры ${gameId}`);
-      const response = await cashOut({ gameId });
+      // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId!
+      console.log(`💸 [CASHOUT] Кэшаут игры ${gameId}, balanceType=${balanceType}, userBonusId=${userBonusId}`);
+      
+      const response = await cashOut({ 
+        gameId,
+        balanceType,    // 🆕
+        userBonusId     // 🆕
+      });
+      
       const result = response.data || response;
 
       if (!result || typeof result.winAmount !== 'string') {
@@ -306,6 +326,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     setMaxMultiplier(0);
     setPotentialWin('0');
     setOpenedCells(new Map());
+    
+    // 🆕 Очищаем balanceType и userBonusId
+    setBalanceType(null);
+    setUserBonusId(null);
   };
 
   return (
