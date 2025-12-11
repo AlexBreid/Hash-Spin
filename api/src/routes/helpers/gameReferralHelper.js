@@ -66,28 +66,14 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
     const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
     console.log(`   💛 BONUS баланс: ${bonusAmount.toFixed(8)}`);
 
-    // Если бонус достаточно и есть активный бонус для отыгрыша
+    // ✅ ИСПРАВЛЕНО: Если бонус достаточно - ИСПОЛЬЗУЕМ ЕГО (БЕЗ проверки ActiveBonus)
+    // Бонус на счёте = бонус для игры
     if (bonusAmount >= betAmount) {
       console.log(`   ✅ BONUS >= ставке (${bonusAmount.toFixed(8)} >= ${betAmount})`);
-
-      const activeBonus = await prisma.userBonus.findFirst({
-        where: {
-          userId,
-          tokenId,
-          isActive: true,
-          isCompleted: false,
-          expiresAt: { gt: new Date() }
-        }
-      });
-
-      if (activeBonus) {
-        console.log(`   ✅ Активный бонус найден: ${activeBonus.id}`);
-        return { balanceType: 'BONUS', balance: bonusBalance, amount: bonusAmount };
-      } else {
-        console.log(`   ⚠️ Активный бонус НЕ найден, используем MAIN`);
-      }
+      console.log(`   💛 ИСПОЛЬЗУЕМ BONUS БЕЗ ПРОВЕРКИ ACTIVEBONUS!`);
+      return { balanceType: 'BONUS', balance: bonusBalance, amount: bonusAmount };
     } else {
-      console.log(`   ❌ BONUS < ставке (${bonusAmount.toFixed(8)} < ${betAmount})`);
+      console.log(`   ❌ BONUS < ставке (${bonusAmount.toFixed(8)} < ${betAmount}), проверяю MAIN`);
     }
 
     // 2️⃣ Используем основной баланс
