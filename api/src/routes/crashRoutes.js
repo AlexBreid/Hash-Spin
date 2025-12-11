@@ -491,7 +491,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     console.log(`📊 [ROUTE] GET /crash/last-crashes`);
     console.log(`${'='.repeat(80)}`);
 
-    // ✅ ИСПРАВЛЕНО: crashPoint: { not: null } вместо NOT: { crashPoint: null }
+    // ✅ ИСПРАВЛЕНО: crashPoint gt 0 вместо NOT: { crashPoint: null }
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
@@ -504,7 +504,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
       },
       where: {
         crashPoint: {
-          not: null  // ✅ Правильный синтаксис для Decimal
+          gt: 0  // ✅ Правильный синтаксис для Decimal - только > 0
         }
       },
       orderBy: {
@@ -554,7 +554,7 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
       select: { crashPoint: true },
       where: {
         crashPoint: {
-          not: null  // ✅ Исправлено
+          gt: 0  // ✅ Исправлено
         }
       },
       orderBy: { createdAt: 'desc' },
