@@ -297,6 +297,7 @@ class GameRoom {
         try {
           const url = `${BACKEND_URL}${API_VERSION}/crash/cashout-result`;
 
+          // 🆕 ДОБАВЛЯЕМ balanceType и userBonusId в payload!
           const payload = {
             userId: player.userId,
             tokenId: player.tokenId,
@@ -305,9 +306,11 @@ class GameRoom {
             exitMultiplier: isWinner ? player.multiplier : null,
             gameId: this.gameId,
             result: isWinner ? 'won' : 'lost',
+            balanceType: player.balanceType || 'MAIN',      // 🆕
+            userBonusId: player.userBonusId || null         // 🆕
           };
 
-          log.info(`📤 Отправляю результат ${player.userName}:`, JSON.stringify(payload));
+          log.info(`📤 Отправляю результат ${player.userName} (balanceType=${player.balanceType}):`, JSON.stringify(payload));
 
           const response = await axios.post(
             url,
@@ -380,6 +383,8 @@ io.on('connection', socket => {
       cashed_out: false,
       result: null,
       betId: null,
+      balanceType: 'MAIN',       // 🆕 ДОБАВЛЕНО
+      userBonusId: null,         // 🆕 ДОБАВЛЕНО
     });
 
     log.info(`${userName} присоединился. Всего: ${gameRoom.players.size}`);
@@ -478,12 +483,16 @@ io.on('connection', socket => {
       player.bet = amount;
       player.tokenId = tokenId;
       player.betId = createBetResponse.data.data.betId;
+      player.balanceType = createBetResponse.data.data.balanceType;    // 🆕 СОХРАНЯЕМ
+      player.userBonusId = createBetResponse.data.data.userBonusId;    // 🆕 СОХРАНЯЕМ
 
-      log.success(`Ставка принята: betId=${player.betId}, tokenId=${player.tokenId}`);
+      log.success(`Ставка принята: betId=${player.betId}, tokenId=${player.tokenId}, balanceType=${player.balanceType}`);
 
       socket.emit('betPlaced', {
         bet: amount,
         gameId: gameRoom.gameId,
+        balanceType: player.balanceType,      // 🆕 ОТПРАВЛЯЕМ
+        userBonusId: player.userBonusId       // 🆕 ОТПРАВЛЯЕМ
       });
 
       io.to('crash-room').emit('betsUpdated', {
@@ -498,7 +507,8 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('cashout', () => {
+  // 🆕 ИСПРАВЛЕННЫЙ HANDLER: Получает balanceType и userBonusId
+  socket.on('cashout', (data) => {
     const player = gameRoom.players.get(socket.id);
 
     if (!player) {
@@ -519,6 +529,13 @@ io.on('connection', socket => {
     player.cashed_out = true;
     player.multiplier = gameRoom.multiplier;
     player.winnings = player.bet * gameRoom.multiplier;
+
+    // 🆕 СОХРАНЯЕМ данные кэшаута (если они приходят)
+    if (data) {
+      player.balanceType = data.balanceType || player.balanceType || 'MAIN';
+      player.userBonusId = data.userBonusId || player.userBonusId || null;
+      console.log(`💸 [CASHOUT] ${player.userName}: balanceType=${player.balanceType}, userBonusId=${player.userBonusId}`);
+    }
 
     socket.emit('cashoutSuccess', {
       multiplier: gameRoom.multiplier,

@@ -140,9 +140,16 @@ class CrashGameService {
     });
   }
 
-  async cashout(): Promise<void> {
+  // 🆕 ИСПРАВЛЕННЫЙ МЕТОД: Отправляет balanceType и userBonusId
+  async cashout(balanceType?: string, userBonusId?: string | null): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit('cashout');
+    
+    console.log(`💸 [SERVICE] Отправляю cashout с balanceType=${balanceType || 'MAIN'}, userBonusId=${userBonusId || null}`);
+    
+    this.socket.emit('cashout', {
+      balanceType: balanceType || 'MAIN',
+      userBonusId: userBonusId || null
+    });
   }
 
   async fetchLastCrashes(): Promise<CrashHistory[]> {

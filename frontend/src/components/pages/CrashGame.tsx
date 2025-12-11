@@ -595,9 +595,8 @@ export function CrashGame() {
       // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId при кэшауте!
       console.log(`💸 [CASHOUT] Кэшаут с balanceType=${balanceType}, userBonusId=${userBonusId}`);
       
-      // ✅ crashGameService.cashout() не принимает параметры
-      // Данные передаются через событие
-      await crashGameService.cashout();
+      // ✅ ИСПРАВЛЕНО: Передаём balanceType и userBonusId в cashout
+      await crashGameService.cashout(balanceType || 'MAIN', userBonusId);
     } catch (e) {
       console.error('Cashout error:', e);
       toast.error('❌ Ошибка');
