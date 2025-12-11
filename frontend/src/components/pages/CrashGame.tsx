@@ -17,20 +17,13 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 
 const MAX_WAIT_TIME = 10;
 const STORAGE_KEY = 'crash_game_history';
-const MAX_HISTORY_ITEMS = 10;  // ✅ ТОЛЬКО 10 ПОСЛЕДНИХ!
+const MAX_HISTORY_ITEMS = 10;
 
 interface CrashHistory {
   id: string;
   gameId?: string;
   crashPoint: number;
   timestamp: number;
-}
-
-interface BalanceItem {
-  tokenId: number;
-  symbol: string;
-  amount: number;
-  type: 'MAIN' | 'BONUS';
 }
 
 interface BalanceData {
@@ -60,12 +53,10 @@ export function CrashGame() {
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
   
-  // ✅ ИСПРАВЛЕНО: Хранить оба баланса
   const [mainBalance, setMainBalance] = useState<number>(0);
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
   
-  // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
   const [balanceType, setBalanceType] = useState<string | null>(null);
   const [userBonusId, setUserBonusId] = useState<string | null>(null);
   
@@ -77,8 +68,8 @@ export function CrashGame() {
   const sessionKeys = useMemo(() => ({
     betId: `crash_pending_bet_${user?.id}`,
     currentBet: `crash_current_bet_${user?.id}`,
-    balanceType: `crash_balance_type_${user?.id}`,     // 🆕
-    userBonusId: `crash_user_bonus_id_${user?.id}`,   // 🆕
+    balanceType: `crash_balance_type_${user?.id}`,
+    userBonusId: `crash_user_bonus_id_${user?.id}`,
   }), [user?.id]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -98,21 +89,19 @@ export function CrashGame() {
   useEffect(() => {
     const storedBetId = sessionStorage.getItem(sessionKeys.betId);
     const storedBet = sessionStorage.getItem(sessionKeys.currentBet);
-    const storedBalanceType = sessionStorage.getItem(sessionKeys.balanceType);     // 🆕
-    const storedUserBonusId = sessionStorage.getItem(sessionKeys.userBonusId);     // 🆕
+    const storedBalanceType = sessionStorage.getItem(sessionKeys.balanceType);
+    const storedUserBonusId = sessionStorage.getItem(sessionKeys.userBonusId);
 
     if (storedBetId && storedBet) {
       console.log('✅ [RECOVERY] Восстанавливаю ставку из sessionStorage:', storedBetId);
       setBetPlaced(true);
       setCurrentBet(parseFloat(storedBet));
       
-      // 🆕 Восстанавливаем balanceType и userBonusId
       if (storedBalanceType) setBalanceType(storedBalanceType);
       if (storedUserBonusId) setUserBonusId(storedUserBonusId);
     }
   }, [sessionKeys.betId, sessionKeys.currentBet, sessionKeys.balanceType, sessionKeys.userBonusId]);
 
-  // ✅ ИСПРАВЛЕНО: Обновляем балансы из useBalance hook
   useEffect(() => {
     if (balances && Array.isArray(balances)) {
       const main = parseFloat((balances.find((b: any) => b.type === 'MAIN')?.amount ?? 0).toString());
@@ -127,7 +116,6 @@ export function CrashGame() {
     }
   }, [balances]);
 
-  // 🆕 ИСПРАВЛЕНО: ЗАГРУЖАЕМ ИСТОРИЮ СО СЕРВЕРА СРАЗУ БЕЗ ЗАДЕРЖКИ!
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
@@ -136,16 +124,33 @@ export function CrashGame() {
 
     const init = async () => {
       try {
+        console.log('🔄 [INIT] Сбрасываю состояние игры...');
+        setGameState({
+          gameId: '',
+          status: 'waiting',
+          multiplier: 1.0,
+          crashPoint: null,
+          countdown: 0,
+        });
+        setBetPlaced(false);
+        setCanCashout(false);
+        setCurrentBet(0);
+        setBalanceType(null);
+        setUserBonusId(null);
+        
+        sessionStorage.removeItem(sessionKeys.betId);
+        sessionStorage.removeItem(sessionKeys.currentBet);
+        sessionStorage.removeItem(sessionKeys.balanceType);
+        sessionStorage.removeItem(sessionKeys.userBonusId);
+        
         console.log('🔌 Подключаюсь к серверу...');
         await crashGameService.connect(user.id, user.firstName || `User${user.id}`, token);
         console.log('✅ Подключен');
         toast.success('🚀 Подключено!');
         
-        // ✅ Загружаем баланс после подключения
         await fetchBalances();
 
-        // 🆕 ЗАГРУЖАЕМ ИСТОРИЮ СО СЕРВЕРА СРАЗУ БЕЗ ЗАДЕРЖКИ И ТАЙМАУТОВ!
-        console.log('📥 ЗАГРУЖАЮ ИСТОРИЮ СО СЕРВЕРА (БЕЗ ЗАДЕРЖКИ)...');
+        console.log('📥 ЗАГРУЖАЮ ИСТОРИЮ СО СЕРВЕРА (skip:2 - БЕЗОПАСНО)...');
         
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -163,7 +168,6 @@ export function CrashGame() {
             console.log('📦 Данные с сервера:', data);
             
             if (data.success && Array.isArray(data.data)) {
-              // ✅ Форматируем и БЕРЁМ ТОЛЬКО ПОСЛЕДНИЕ 10!
               const formatted = data.data
                 .filter((crash: any) => crash.crashPoint != null)
                 .map((crash: any) => ({
@@ -172,9 +176,10 @@ export function CrashGame() {
                   crashPoint: parseFloat(crash.crashPoint.toString()),
                   timestamp: new Date(crash.timestamp).getTime(),
                 }))
-                .slice(0, MAX_HISTORY_ITEMS);  // ✅ ТОЛЬКО 10!
+                .slice(0, MAX_HISTORY_ITEMS);
 
-              console.log(`✅ Загружено ${formatted.length} крашей со сервера`);
+              console.log(`✅ Загружено ${formatted.length} БЕЗОПАСНЫХ крашей со сервера`);
+              console.log('🛡️  Безопасность: Последние 2 краша пропущены (skip:2 на бэке)');
               console.log('🎯 Краши:', formatted);
 
               setCrashHistory(formatted);
@@ -188,7 +193,6 @@ export function CrashGame() {
         } catch (error: any) {
           console.error('❌ Ошибка загрузки истории:', error.message);
         } finally {
-          // ✅ СРАЗУ ГОТОВЫ! Не ждём ничего!
           setIsHistoryLoaded(true);
           console.log('✅ ИСТОРИЯ ЗАГРУЖЕНА И ГОТОВА К ИСПОЛЬЗОВАНИЮ!');
         }
@@ -205,7 +209,7 @@ export function CrashGame() {
       console.log('🧹 Отключаюсь');
       crashGameService.disconnect();
     };
-  }, [user, token, navigate, fetchBalances, saveHistoryToStorage]);
+  }, [user, token, navigate, fetchBalances, saveHistoryToStorage, sessionKeys]);
 
   useEffect(() => {
     if (crashHistory.length > 0) {
@@ -413,7 +417,6 @@ export function CrashGame() {
       toast.error('❌ Введите сумму ставки');
       return;
     }
-    // ✅ ИСПРАВЛЕНО: Проверяем объединённый баланс
     if (amount > totalBalance) {
       toast.error(`❌ Недостаточно средств (доступно: ${totalBalance.toFixed(2)} $)`);
       return;
@@ -436,11 +439,7 @@ export function CrashGame() {
   const handleCashout = async () => {
     try {
       setIsLoading(true);
-      
-      // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId при кэшауте!
-      console.log(`💸 [CASHOUT] Кэшаут с balanceType=${balanceType}, userBonusId=${userBonusId}`);
-      
-      // ✅ ИСПРАВЛЕНО: Передаём balanceType и userBonusId в cashout
+      console.log(`💸 [CASHOUT] balanceType=${balanceType}, userBonusId=${userBonusId}`);
       await crashGameService.cashout(balanceType || 'MAIN', userBonusId);
     } catch (e) {
       console.error('Cashout error:', e);
@@ -460,7 +459,6 @@ export function CrashGame() {
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
   const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
 
-  // 🆕 ОБРАБОТЧИК СОБЫТИЯ для добавления новых крашей в историю
   useEffect(() => {
     const handleGameCrashed = (data: any) => {
       setGameState((prev) => ({
@@ -489,7 +487,6 @@ export function CrashGame() {
 
       setActiveCrash(newCrash);
 
-      // ✅ ДОБАВЛЯЕМ В НАЧАЛО, ДЕРЖИМ ТОЛЬКО 10!
       setCrashHistory((prev) => {
         const updated = [newCrash, ...prev].slice(0, MAX_HISTORY_ITEMS);
         console.log(`✅ История обновлена: ${updated.length} крашей`);
@@ -616,7 +613,6 @@ export function CrashGame() {
               </div>
             </div>
 
-            {/* ✅ ИСПРАВЛЕНО: Показываем объединённый баланс */}
             <GlassCard className="px-3 py-2 flex items-center gap-2 !rounded-full">
               <div className="text-right">
                 <p className="text-xs text-gray-400">Всего</p>
@@ -801,7 +797,6 @@ export function CrashGame() {
             </AnimatePresence>
           </GlassCard>
 
-          {/* 🆕 ИСТОРИЯ ТОЛЬКО 10 ПОСЛЕДНИХ КРАШЕЙ */}
           <GlassCard className="flex flex-col h-64 overflow-hidden">
             <div className="p-2.5 border-b border-white/10 flex items-center gap-2 font-bold sticky top-0 bg-black/60 z-10 flex-shrink-0 rounded-t-2xl">
               <TrendingUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />

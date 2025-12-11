@@ -482,16 +482,17 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
 // ===================================
 // GET /api/v1/crash/last-crashes
 // ✅ ИСПРАВЛЕНО: 
-// 1. Только последние 10 крашей
-// 2. Визуально не наваливаются на другие блоки
+// 1. Загружаем со сервера БЕЗ ОПАСНОСТИ
+// 2. Пропускаем последние 2 краша (они могут быть будущими)
+// 3. Показываем ТОЛЬКО уже выпавшие краши
 // ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
     console.log(`\n${'='.repeat(80)}`);
-    console.log(`📊 [ROUTE] GET /crash/last-crashes`);
+    console.log(`📊 [ROUTE] GET /crash/last-crashes (с смещением skip: 2)`);
     console.log(`${'='.repeat(80)}`);
 
-    // ✅ ИСПРАВЛЕНО: crashPoint gt 0 вместо NOT: { crashPoint: null }
+    // ✅ БЕРЁМ 12, ПРОПУСКАЕМ 2 (будущие), ВОЗВРАЩАЕМ 10
     const crashes = await prisma.crashRound.findMany({
       select: {
         id: true,
@@ -504,16 +505,18 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
       },
       where: {
         crashPoint: {
-          gt: 0  // ✅ Правильный синтаксис для Decimal - только > 0
+          gt: 0  // ✅ Только выпавшие краши (crashPoint > 0)
         }
       },
       orderBy: {
         createdAt: 'desc',
       },
-      take: 10,  // ✅ ТОЛЬКО 10 последних крашей!
+      take: 12,      // ✅ БЕРЁМ 12
+      skip: 2,       // ✅ ПРОПУСКАЕМ 2 (последние = могут быть будущими)
     });
 
-    console.log(`✅ Найдено ${crashes.length} последних раундов в БД`);
+    console.log(`✅ Найдено ${crashes.length} раундов (после смещения skip:2)`);
+    console.log(`🛡️  Безопасность: последние 2 краша пропущены (могут быть будущими)`);
 
     const formattedCrashes = crashes.map((crash) => {
       return {
@@ -527,7 +530,7 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
       };
     });
 
-    console.log(`\n📤 Отправляю ${formattedCrashes.length} последних крашей на фронт`);
+    console.log(`📡 Отправляю ${formattedCrashes.length} БЕЗОПАСНЫХ крашей на фронт`);
     console.log(`${'='.repeat(80)}\n`);
 
     res.json({
@@ -548,17 +551,18 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
 
 router.get('/api/v1/crash/statistics', async (req, res) => {
   try {
-    console.log(`📈 [ROUTE] GET /crash/statistics - загружаю статистику...`);
+    console.log(`📈 [ROUTE] GET /crash/statistics (с смещением skip: 2)`);
 
     const crashes = await prisma.crashRound.findMany({
       select: { crashPoint: true },
       where: {
         crashPoint: {
-          gt: 0  // ✅ Исправлено
+          gt: 0
         }
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 102,     // ✅ Берём 102 (100 + 2 для пропуска)
+      skip: 2,       // ✅ Пропускаем 2 будущих
     });
 
     if (crashes.length === 0) {
