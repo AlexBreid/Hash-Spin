@@ -98,7 +98,6 @@ class CrashGameService {
       this.emit('gameCrashed', data);
     });
 
-    // ✅ НОВОЕ: Обработка события обновления истории от сервера
     this.socket.on('crashHistoryUpdated', (data: { history: CrashHistory[]; totalInMemory: number }) => {
       console.log(`📊 [SERVICE] crashHistoryUpdated получено от сервера: ${data.history.length} крашей`);
       this.emit('crashHistoryUpdated', data);
@@ -140,12 +139,13 @@ class CrashGameService {
     });
   }
 
-  // 🆕 ИСПРАВЛЕННЫЙ МЕТОД: Отправляет balanceType и userBonusId
+  // 🆕 ИСПРАВЛЕННЫЙ МЕТОД: Отправляет балансстроку и бонусId
   async cashout(balanceType?: string, userBonusId?: string | null): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
     
     console.log(`💸 [SERVICE] Отправляю cashout с balanceType=${balanceType || 'MAIN'}, userBonusId=${userBonusId || null}`);
     
+    // 🆕 Отправляем данные вместе с кэшаутом!
     this.socket.emit('cashout', {
       balanceType: balanceType || 'MAIN',
       userBonusId: userBonusId || null

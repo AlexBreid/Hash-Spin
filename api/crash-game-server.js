@@ -1,5 +1,6 @@
 // ========================
 // ✅ ИСПРАВЛЕННЫЙ GAME SERVER
+// ИСПРАВЛЕНИЕ: cashout отправляется СРАЗУ на бэк
 // ========================
 
 const express = require('express');
@@ -105,7 +106,7 @@ class GameRoom {
     this.gameLoopInterval = null;
     this.countdownTimer = 5;
     this.roundKeys = this.generateRoundKeys();
-    this.finalizationInProgress = false; // ✅ Флаг для защиты от двойной финализации
+    this.finalizationInProgress = false;
   }
 
   generateRoundKeys() {
@@ -144,7 +145,7 @@ class GameRoom {
     this.startTime = Date.now();
     this.status = 'in_progress';
     this.multiplier = 1.0;
-    this.finalizationInProgress = false; // ✅ Сбрасываем флаг для нового раунда
+    this.finalizationInProgress = false;
 
     this.players.forEach(p => (p.cashed_out = false));
 
@@ -181,7 +182,6 @@ class GameRoom {
     this.status = 'crashed';
     this.multiplier = this.crashPoint;
 
-    // ✅ ИСПРАВЛЕНИЕ #1: Защита от двойного вызова crash()
     if (this.finalizationInProgress) {
       log.error('⚠️ Финализация уже в процессе, пропускаю повторный вызов');
       return;
@@ -201,7 +201,6 @@ class GameRoom {
       }
     });
 
-    // ✅ Добавляем краш в историю ДО отправки события
     const crashTimestamp = new Date();
     addToCrashHistory(this.gameId, this.crashPoint, crashTimestamp);
 
@@ -211,7 +210,6 @@ class GameRoom {
       log.error(`Ошибка финализации: ${error.message}`);
     }
 
-    // ✅ Отправляем событие краша с информацией о победителях
     io.to('crash-room').emit('gameCrashed', {
       crashPoint: this.crashPoint,
       gameId: this.gameId,
@@ -225,9 +223,8 @@ class GameRoom {
       losersCount: losers.length,
     });
 
-    // ✅ Отправляем обновленную историю крашей на фронт
     io.to('crash-room').emit('crashHistoryUpdated', {
-      history: crashHistory.slice(0, 10), // Последние 10
+      history: crashHistory.slice(0, 10),
       totalInMemory: crashHistory.length,
     });
 
@@ -285,7 +282,6 @@ class GameRoom {
     try {
       log.info(`📤 Финализирую результаты для ${this.players.size} игроков`);
 
-      // ✅ ИСПРАВЛЕНИЕ #2: Обрабатываем результаты параллельно, но с контролем
       const promises = Array.from(this.players.values()).map(async (player) => {
         if (!player.betId) {
           log.error(`❌ Нет betId для player ${player.userId}!`);
@@ -297,7 +293,6 @@ class GameRoom {
         try {
           const url = `${BACKEND_URL}${API_VERSION}/crash/cashout-result`;
 
-          // 🆕 ДОБАВЛЯЕМ balanceType и userBonusId в payload!
           const payload = {
             userId: player.userId,
             tokenId: player.tokenId,
@@ -306,8 +301,8 @@ class GameRoom {
             exitMultiplier: isWinner ? player.multiplier : null,
             gameId: this.gameId,
             result: isWinner ? 'won' : 'lost',
-            balanceType: player.balanceType || 'MAIN',      // 🆕
-            userBonusId: player.userBonusId || null         // 🆕
+            balanceType: player.balanceType || 'MAIN',
+            userBonusId: player.userBonusId || null
           };
 
           log.info(`📤 Отправляю результат ${player.userName} (balanceType=${player.balanceType}):`, JSON.stringify(payload));
@@ -343,13 +338,64 @@ class GameRoom {
         }
       });
 
-      // Ждём завершения всех финализаций
       await Promise.all(promises);
 
       log.success('✅ Все ставки финализированы');
     } catch (error) {
       log.error(`Ошибка в finalize: ${error.message}`);
       throw error;
+    }
+  }
+
+  // 🆕 НЕМЕДЛЕННАЯ ФИНАЛИЗАЦИЯ при кэшауте (ДО конца раунда!)
+  async finalizeSingleCashout(player) {
+    if (!player.betId) {
+      log.error(`❌ Нет betId для player ${player.userId}!`);
+      return;
+    }
+
+    try {
+      const url = `${BACKEND_URL}${API_VERSION}/crash/cashout-result`;
+
+      const payload = {
+        userId: player.userId,
+        tokenId: player.tokenId,
+        betId: player.betId,
+        winnings: parseFloat(player.winnings.toString()),
+        exitMultiplier: parseFloat(player.multiplier.toString()),
+        gameId: this.gameId,
+        result: 'won',  // 🆕 Всегда 'won' при кэшауте!
+        balanceType: player.balanceType || 'MAIN',
+        userBonusId: player.userBonusId || null
+      };
+
+      log.info(`\n${'='.repeat(80)}`);
+      log.info(`💸 [IMMEDIATE CASHOUT] ${player.userName} вышел на ${player.multiplier}x`);
+      log.info(`📤 Отправляю СРАЗУ на бэк:`, JSON.stringify(payload));
+      log.info(`${'='.repeat(80)}\n`);
+
+      const response = await axios.post(
+        url,
+        payload,
+        {
+          headers: {
+            'X-Server-Secret': SERVER_SECRET,
+            'Content-Type': 'application/json'
+          },
+          timeout: 5000,
+        }
+      );
+
+      if (response.data.success) {
+        log.success(`✅ [IMMEDIATE CASHOUT] Деньги зачислены СРАЗУ для ${player.userName}`);
+      } else {
+        log.error(`❌ Server error for ${player.userId}: ${response.data.error}`);
+      }
+    } catch (error) {
+      log.error(`❌ Ошибка при кэшауте ${player.userId}: ${error.message}`);
+      if (error.response?.data) {
+        log.error(`Response:`, JSON.stringify(error.response.data));
+      }
     }
   }
 }
@@ -383,8 +429,8 @@ io.on('connection', socket => {
       cashed_out: false,
       result: null,
       betId: null,
-      balanceType: 'MAIN',       // 🆕 ДОБАВЛЕНО
-      userBonusId: null,         // 🆕 ДОБАВЛЕНО
+      balanceType: 'MAIN',
+      userBonusId: null,
     });
 
     log.info(`${userName} присоединился. Всего: ${gameRoom.players.size}`);
@@ -398,7 +444,6 @@ io.on('connection', socket => {
       countdown: gameRoom.countdownTimer,
     });
 
-    // ✅ Отправляем историю при присоединении (из памяти, основная в БД)
     socket.emit('crashHistoryUpdated', {
       history: crashHistory.slice(0, 10),
       totalInMemory: crashHistory.length,
@@ -483,16 +528,16 @@ io.on('connection', socket => {
       player.bet = amount;
       player.tokenId = tokenId;
       player.betId = createBetResponse.data.data.betId;
-      player.balanceType = createBetResponse.data.data.balanceType;    // 🆕 СОХРАНЯЕМ
-      player.userBonusId = createBetResponse.data.data.userBonusId;    // 🆕 СОХРАНЯЕМ
+      player.balanceType = createBetResponse.data.data.balanceType;
+      player.userBonusId = createBetResponse.data.data.userBonusId;
 
       log.success(`Ставка принята: betId=${player.betId}, tokenId=${player.tokenId}, balanceType=${player.balanceType}`);
 
       socket.emit('betPlaced', {
         bet: amount,
         gameId: gameRoom.gameId,
-        balanceType: player.balanceType,      // 🆕 ОТПРАВЛЯЕМ
-        userBonusId: player.userBonusId       // 🆕 ОТПРАВЛЯЕМ
+        balanceType: player.balanceType,
+        userBonusId: player.userBonusId
       });
 
       io.to('crash-room').emit('betsUpdated', {
@@ -507,8 +552,8 @@ io.on('connection', socket => {
     }
   });
 
-  // 🆕 ИСПРАВЛЕННЫЙ HANDLER: Получает balanceType и userBonusId
-  socket.on('cashout', (data) => {
+  // 🆕 ИСПРАВЛЕННЫЙ HANDLER: Отправляет результат СРАЗУ!
+  socket.on('cashout', async (data) => {
     const player = gameRoom.players.get(socket.id);
 
     if (!player) {
@@ -530,7 +575,6 @@ io.on('connection', socket => {
     player.multiplier = gameRoom.multiplier;
     player.winnings = player.bet * gameRoom.multiplier;
 
-    // 🆕 СОХРАНЯЕМ данные кэшаута (если они приходят)
     if (data) {
       player.balanceType = data.balanceType || player.balanceType || 'MAIN';
       player.userBonusId = data.userBonusId || player.userBonusId || null;
@@ -549,6 +593,9 @@ io.on('connection', socket => {
     });
 
     log.success(`💰 ${player.userName} вышел на ${gameRoom.multiplier}x с ${player.winnings}`);
+
+    // 🆕 ОТПРАВЛЯЕМ РЕЗУЛЬТАТ СРАЗУ!
+    await gameRoom.finalizeSingleCashout(player);
   });
 
   socket.on('disconnect', () => {
