@@ -1,7 +1,10 @@
 /**
- * ✅ withdrawalService.js С ПОЛНОЙ ОТЛАДКОЙ
+ * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js
  * 
- * Выводит ПОЛНЫЕ детали ошибки 400 от API
+ * ОШИБКА: "You cannot attach a comment to a transfer with an app 
+ *          that has been created less than 30 days ago."
+ * 
+ * РЕШЕНИЕ: Убрать "comment" из TRANSFER payload
  */
 
 const axios = require('axios');
@@ -243,17 +246,16 @@ const withdrawalService = {
           throw new Error('CRYPTO_PAY_TOKEN not set in environment variables');
         }
 
+        // ✅ УБРАЛИ COMMENT!
         const transferPayload = {
           user_id: userTelegramId,
           asset: String(asset).toUpperCase().trim(),
           amount: amount.toFixed(8),
-          spend_id: `withdraw_${withdrawalIdNum}_${Date.now()}`,
-          comment: `Withdrawal #${withdrawalIdNum}`
+          spend_id: `withdraw_${withdrawalIdNum}_${Date.now()}`
+          // ❌ УДАЛЕНО: comment: `Withdrawal #${withdrawalIdNum}`
         };
 
         console.log(`   📤 Transfer payload:`, transferPayload);
-        console.log(`   📤 API URL: ${CRYPTO_PAY_API}/transfer`);
-        console.log(`   📤 Token set: ${CRYPTO_PAY_TOKEN ? 'YES' : 'NO'}`);
         console.log(`   📤 Sending to Crypto Pay API...`);
 
         try {
@@ -270,7 +272,6 @@ const withdrawalService = {
           );
 
           console.log(`   📥 Response status: ${transferResponse.status}`);
-          console.log(`   📥 Response OK: ${transferResponse.data.ok}`);
 
           if (!transferResponse.data.ok) {
             const errorMsg = transferResponse.data.error?.description || 
@@ -297,50 +298,37 @@ const withdrawalService = {
             if (withdrawal.user.telegramId) {
               await bot.telegram.sendMessage(
                 withdrawal.user.telegramId,
-                `✅ *Ваш вывод одобрен!*\n\n💰 ${amount.toFixed(8)} ${asset}`
+                `✅ *Ваш вывод одобрен!*\n\n` +
+                `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
+                `🎫 ID: #${withdrawalIdNum}\n` +
+                `🔗 Transfer: \`${transferId}\`\n\n` +
+                `💬 Средства отправлены на ваш кошелёк @CryptoBot\n` +
+                `⏰ Получение: 1-3 минуты`,
+                { parse_mode: 'Markdown' }
               );
+              console.log(`   ✅ User notification sent`);
             }
-          } catch (e) {
-            console.warn(`⚠️ Failed to notify: ${e.message}`);
+          } catch (notifyError) {
+            console.warn(`   ⚠️ Failed to notify user: ${notifyError.message}`);
           }
 
           return { success: true, amount, asset, transferId };
 
         } catch (axiosError) {
-          // ✅✅✅ ПОЛНАЯ ОТЛАДКА ✅✅✅
           console.error(`\n${'='.repeat(80)}`);
           console.error(`❌ AXIOS ERROR DETAILS:`);
           console.error(`${'='.repeat(80)}`);
-          
-          console.error(`\n📊 RESPONSE INFO:`);
-          console.error(`   Status: ${axiosError.response?.status}`);
-          console.error(`   Status Text: ${axiosError.response?.statusText}`);
-          
-          console.error(`\n📋 RESPONSE HEADERS:`);
-          console.error(JSON.stringify(axiosError.response?.headers || {}, null, 2));
-          
           console.error(`\n📦 FULL RESPONSE DATA:`);
           console.error(JSON.stringify(axiosError.response?.data || {}, null, 2));
-          
-          console.error(`\n🔧 REQUEST INFO:`);
-          console.error(`   URL: ${axiosError.config?.url}`);
-          console.error(`   Method: ${axiosError.config?.method}`);
-          
-          console.error(`\n🔑 REQUEST HEADERS:`);
-          console.error(JSON.stringify(axiosError.config?.headers || {}, null, 2));
-          
-          console.error(`\n📮 REQUEST PAYLOAD:`);
-          console.error(JSON.stringify(JSON.parse(axiosError.config?.data || '{}'), null, 2));
-          
           console.error(`\n💬 ERROR MESSAGE:`);
           console.error(`   ${axiosError.message}`);
-          
           console.error(`${'='.repeat(80)}\n`);
 
           throw axiosError;
         }
 
       } else {
+        // REJECT
         console.log(`\n❌ REJECTING WITHDRAWAL...`);
 
         const returnedBalance = await prisma.balance.update({
@@ -370,11 +358,17 @@ const withdrawalService = {
           if (withdrawal.user.telegramId) {
             await bot.telegram.sendMessage(
               withdrawal.user.telegramId,
-              `❌ *Ваша заявка отклонена*\n\n💰 ${amount.toFixed(8)} ${asset} вернено`
+              `❌ *Ваша заявка на вывод отклонена*\n\n` +
+              `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
+              `🎫 ID: #${withdrawalIdNum}\n\n` +
+              `💬 Деньги возвращены на ваш баланс.\n` +
+              `📞 Свяжитесь с поддержкой, если у вас есть вопросы.`,
+              { parse_mode: 'Markdown' }
             );
+            console.log(`   ✅ User notification sent`);
           }
-        } catch (e) {
-          console.warn(`⚠️ Failed to notify: ${e.message}`);
+        } catch (notifyError) {
+          console.warn(`   ⚠️ Failed to notify user: ${notifyError.message}`);
         }
 
         return { success: true, returnedAmount: amount, asset };
