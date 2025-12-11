@@ -1,17 +1,11 @@
 /**
  * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js
  * 
- * ПРОБЛЕМА:
- * ❌ Ошибка: "Platform balance not available"
+ * ИСПРАВЛЕНИЕ:
+ * ❌ БЫЛО: user_id: withdrawal.user.id (ID в БД вроде 1, 2, 3)
+ * ✅ ТЕПЕРЬ: user_id: parseInt(withdrawal.user.telegramId) (ID в Telegram 8475177249)
  * 
- * ПРИЧИНА:
- * ❌ Пытается проверить баланс платформы (админа)
- * ❌ Баланс платформы не существует в БД
- * 
- * РЕШЕНИЕ:
- * ✅ Удалили проверку баланса платформы
- * ✅ Отправляем TRANSFER напрямую
- * ✅ Баланс проверяется только у пользователя
+ * Это причина ошибки 400!
  */
 
 const axios = require('axios');
@@ -21,30 +15,12 @@ const logger = require('../utils/logger');
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 
-// ====================================
-// ОСНОВНОЙ СЕРВИС ВЫВОДОВ
-// ====================================
-
 const withdrawalService = {
-  /**
-   * ✅ СОЗДАНИЕ ЗАЯВКИ НА ВЫВОД
-   * 
-   * Параметры:
-   * - bot: Telegraf instance
-   * - userId: ID пользователя
-   * - amount: Сумма в USDT
-   * - asset: "USDT"
-   * 
-   * Возвращает:
-   * - { success: true, withdrawalId: 123 }
-   * - { success: false, error: "...", userMessage: "..." }
-   */
   async createWithdrawalRequest(bot, userId, amount, asset = 'USDT') {
     console.log(`\n💸 [WITHDRAWAL] Creating withdrawal request...`);
     console.log(`   userId: ${userId}, amount: ${amount.toFixed(8)}, asset: ${asset}`);
 
     try {
-      // ✅ ПАРСИМ И ВАЛИДИРУЕМ
       const userIdNum = parseInt(userId);
       if (isNaN(userIdNum) || userIdNum <= 0) {
         throw new Error(`Invalid userId: ${userId}`);
@@ -62,7 +38,6 @@ const withdrawalService = {
 
       console.log(`   ✅ Parameters validated`);
 
-      // ✅ ПРОВЕРЯЕМ ПОЛЬЗОВАТЕЛЯ
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
         select: { id: true, telegramId: true, isBlocked: true }
@@ -88,7 +63,6 @@ const withdrawalService = {
 
       console.log(`   ✅ User found and not blocked: ${user.id}`);
 
-      // ✅ ПОЛУЧАЕМ ТОКЕН
       const token = await prisma.cryptoToken.findUnique({
         where: { symbol: assetStr }
       });
@@ -104,7 +78,6 @@ const withdrawalService = {
 
       console.log(`   ✅ Token found: ${token.symbol}`);
 
-      // ✅ ПРОВЕРЯЕМ БАЛАНС ПОЛЬЗОВАТЕЛЯ
       const userBalance = await prisma.balance.findFirst({
         where: {
           userId: userIdNum,
@@ -127,7 +100,6 @@ const withdrawalService = {
 
       console.log(`   ✅ Balance check passed`);
 
-      // ✅ СОЗДАЁМ ЗАЯВКУ В БД (статус PENDING)
       const withdrawal = await prisma.transaction.create({
         data: {
           userId: userIdNum,
@@ -142,8 +114,6 @@ const withdrawalService = {
 
       console.log(`   ✅ Withdrawal record created: #${withdrawal.id}`);
 
-      // ✅ РЕЗЕРВИРУЕМ БАЛАНС (уменьшаем баланс пользователя)
-      // Деньги будут вычтены из аккаунта до момента одобрения администратором
       const updatedBalance = await prisma.balance.update({
         where: {
           userId_tokenId_type: {
@@ -159,7 +129,6 @@ const withdrawalService = {
 
       console.log(`   ✅ Balance reserved: ${updatedBalance.amount}`);
 
-      // ✅ ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЮ
       try {
         if (user.telegramId) {
           await bot.telegram.sendMessage(
@@ -177,7 +146,6 @@ const withdrawalService = {
         console.warn(`   ⚠️ Failed to send notification: ${notifyError.message}`);
       }
 
-      // ✅ ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНАМ
       try {
         const admins = await prisma.user.findMany({
           where: { isAdmin: true },
@@ -236,18 +204,6 @@ const withdrawalService = {
     }
   },
 
-  /**
-   * ✅ ОБРАБОТКА ЗАЯВКИ НА ВЫВОД (APPROVE или REJECT)
-   * 
-   * Параметры:
-   * - bot: Telegraf instance
-   * - withdrawalId: ID заявки
-   * - approve: true = одобрить, false = отклонить
-   * 
-   * Возвращает:
-   * - { amount, asset, transferId } если одобрено
-   * - { returnedAmount, asset } если отклонено
-   */
   async processWithdrawal(bot, withdrawalId, approve = true) {
     console.log(`\n💸 [WITHDRAWAL] Processing withdrawal #${withdrawalId}...`);
     console.log(`   Action: ${approve ? 'APPROVE' : 'REJECT'}`);
@@ -281,6 +237,12 @@ const withdrawalService = {
 
       const amount = parseFloat(withdrawal.amount.toString());
       const asset = withdrawal.token.symbol;
+      
+      // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Используем ID В TELEGRAM, А НЕ В БД!
+      const userTelegramId = parseInt(withdrawal.user.telegramId);
+
+      console.log(`   Amount: ${amount.toFixed(8)}, Asset: ${asset}`);
+      console.log(`   User Telegram ID: ${userTelegramId}`);
 
       // ✅ ПРОВЕРЯЕМ СТАТУС
       if (withdrawal.status !== 'PENDING') {
@@ -295,29 +257,54 @@ const withdrawalService = {
         // ====================================
         console.log(`\n✅ APPROVING WITHDRAWAL...`);
 
-        // ✅ СОЗДАЁМ TRANSFER ЧЕРЕЗ CRYPTO PAY API
-        console.log(`   📤 Creating Crypto Pay transfer...`);
+        // ✅ ПРОВЕРЯЕМ что CRYPTO_PAY_TOKEN есть
+        if (!CRYPTO_PAY_TOKEN) {
+          throw new Error('CRYPTO_PAY_TOKEN not set in environment variables');
+        }
+
+        console.log(`   ✅ CRYPTO_PAY_TOKEN is set`);
+
+        // ✅ ПОДГОТАВЛИВАЕМ ПАРАМЕТРЫ
+        const transferPayload = {
+          user_id: userTelegramId,  // ✅ TELEGRAM ID, НЕ БД ID!
+          asset: String(asset).toUpperCase().trim(),
+          amount: amount.toFixed(8),
+          spend_id: `withdraw_${withdrawalIdNum}_${Date.now()}`,
+          comment: `Withdrawal #${withdrawalIdNum}`
+        };
+
+        console.log(`   📤 Transfer payload:`, {
+          user_id: transferPayload.user_id,
+          asset: transferPayload.asset,
+          amount: transferPayload.amount,
+          spend_id: transferPayload.spend_id
+        });
+
+        // ✅ ОТПРАВЛЯЕМ TRANSFER
+        console.log(`   📤 Sending to Crypto Pay API...`);
 
         const transferResponse = await axios.post(
           `${CRYPTO_PAY_API}/transfer`,
-          {
-            user_id: withdrawal.user.id,
-            asset: asset,
-            amount: amount.toFixed(8),
-            spend_id: `withdraw_${withdrawalIdNum}_${Date.now()}`,
-            comment: `Withdrawal #${withdrawalIdNum}`
-          },
+          transferPayload,
           {
             headers: {
               'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
               'Content-Type': 'application/json'
-            }
+            },
+            timeout: 10000
           }
         );
 
+        console.log(`   📥 Response status: ${transferResponse.status}`);
+        console.log(`   📥 Response data:`, transferResponse.data);
+
         if (!transferResponse.data.ok) {
-          console.error(`   ❌ Transfer API error:`, transferResponse.data);
-          throw new Error(`Transfer failed: ${transferResponse.data.error?.message || 'Unknown error'}`);
+          const errorMsg = transferResponse.data.error?.description || 
+                          transferResponse.data.error?.message ||
+                          JSON.stringify(transferResponse.data.error);
+          
+          console.error(`   ❌ Transfer API error:`, errorMsg);
+          throw new Error(`Transfer API error: ${errorMsg}`);
         }
 
         const transferData = transferResponse.data.result;
