@@ -409,15 +409,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         .card-animated {
           animation: slideInDown 0.6s ease-out;
         }
-        .balance-box {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
-          border: 2px solid rgba(59, 130, 246, 0.3);
-          transition: all 0.3s ease;
-        }
-        .balance-box:hover {
-          border-color: rgba(59, 130, 246, 0.6);
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
-        }
+
         .difficulty-btn {
           transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
@@ -485,35 +477,26 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
         <div className="minesweeper-content">
           {step === 'SELECT' && (
-            <Card className="card-animated p-6 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
-              <h2 className="text-xl font-bold mb-4">Выберите уровень</h2>
-
-              {/* ✅ ИСПРАВЛЕНО: Показываем объединённый баланс */}
-              <div className="balance-box p-4 rounded-xl mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Coins size={18} className="text-yellow-400" />
-                  <span className="text-sm text-gray-300">Ваш баланс</span>
+            <Card className="card-animated p-4 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
+              {/* ✅ ИСПРАВЛЕНО: Компактный хедер с балансом */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">🎮 Выберите уровень</h2>
+                <div className="flex items-center gap-2 bg-gray-700/50 px-3 py-1 rounded-lg">
+                  <Coins size={16} className="text-yellow-400" />
+                  {balanceLoading ? (
+                    <Loader className="animate-spin" size={16} />
+                  ) : (
+                    <>
+                      <span className="text-sm font-bold text-yellow-400">{totalBalance.toFixed(2)}</span>
+                      {bonusBalance > 0 && (
+                        <span className="text-xs text-amber-300">💛+{bonusBalance.toFixed(2)}</span>
+                      )}
+                    </>
+                  )}
                 </div>
-                {balanceLoading ? (
-                  <div className="text-lg font-bold text-yellow-400 flex items-center gap-2">
-                    <Loader className="animate-spin" size={20} />
-                  </div>
-                ) : (
-                  <>
-                    {/* Объединённый баланс */}
-                    <p className="text-2xl font-bold text-yellow-400 mb-2">{totalBalance.toFixed(2)} USDT</p>
-                    
-                    {/* Детали (если есть бонус) */}
-                    {bonusBalance > 0 && (
-                      <p className="text-xs text-amber-300">
-                        💛 Бонус: {bonusBalance.toFixed(8)} | 🔵 Основной: {mainBalance.toFixed(8)}
-                      </p>
-                    )}
-                  </>
-                )}
               </div>
 
-              <div className="space-y-3 mb-6">
+              <div className="space-y-2 mb-4">
                 {difficulties.length === 0 ? (
                   <div className="text-center py-8">
                     <Loader className="animate-spin inline mr-2" size={24} />
@@ -524,34 +507,36 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                     <button
                       key={diff.id}
                       onClick={() => setSelectedDifficulty(diff)}
-                      className={`difficulty-btn w-full p-4 rounded-xl border transition-all ${
+                      className={`difficulty-btn w-full p-3 rounded-lg border transition-all text-sm ${
                         selectedDifficulty?.id === diff.id
                           ? 'selected border-yellow-400 bg-yellow-500/15'
                           : 'border-gray-600 bg-gray-700/30 hover:border-gray-500 hover:bg-gray-700/50'
                       }`}
                     >
-                      <div className="flex justify-between items-center">
-                        <div className="text-left">
-                          <p className="font-bold text-lg">{diff.name}</p>
-                          <p className="text-sm text-gray-400">
-                            💣 {diff.minesCount} мин • 🎯 6×6 поле
-                          </p>
-                          <p className="text-xs text-green-400 mt-1">
-                            Макс. ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(2)}
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="text-left min-w-0">
+                          <p className="font-bold">{diff.name}</p>
+                          <p className="text-xs text-gray-400">
+                            💣 {diff.minesCount} мин • 6×6
                           </p>
                         </div>
-                        <Trophy
-                          size={24}
-                          className={selectedDifficulty?.id === diff.id ? 'text-yellow-400' : 'text-gray-500'}
-                        />
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <Trophy
+                            size={18}
+                            className={selectedDifficulty?.id === diff.id ? 'text-yellow-400' : 'text-gray-500'}
+                          />
+                          <p className="text-xs text-green-400 mt-1">
+                            ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(1)}
+                          </p>
+                        </div>
                       </div>
                     </button>
                   ))
                 )}
               </div>
 
-              <div className="mb-6">
-                <label className="block text-sm text-gray-300 mb-2">Ставка (USDT)</label>
+              <div className="mb-4">
+                <label className="block text-xs text-gray-300 mb-2 font-bold">Ставка (USDT)</label>
                 <Input
                   type="number"
                   min="1"
@@ -566,11 +551,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
               <Button
                 onClick={handleStartGame}
                 disabled={!selectedDifficulty || loading || balanceLoading || difficulties.length === 0}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 rounded-lg transition-all transform hover:scale-105 active:scale-95"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
               >
                 {loading ? (
                   <>
-                    <Loader className="animate-spin mr-2 inline" size={18} />
+                    <Loader className="animate-spin mr-2 inline" size={16} />
                     Создание игры...
                   </>
                 ) : (
