@@ -1,12 +1,7 @@
 /**
- * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ withdrawalService.js
+ * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js С ПОЛНЫМ ЛОГИРОВАНИЕМ
  * 
- * ГЛАВНЫЕ ИСПРАВЛЕНИЯ:
- * 1. ✅ transfer API требует TELEGRAM USER ID, не app user_id!
- * 2. ✅ spend_id должен быть уникальным (не повторяться!)
- * 3. ✅ comment опциональный параметр
- * 4. ✅ Нужно включить Transfer в @CryptoBot security settings!
- * 5. ✅ Все Decimal конвертированы
+ * Добавляем полный response логирование для отладки 400 ошибок
  */
 
 const prisma = require('../../prismaClient');
@@ -27,7 +22,6 @@ class WithdrawalService {
     console.log(`   amount: ${amount} ${asset}`);
 
     try {
-      // ✅ ВАЛИДАЦИЯ
       const userIdNum = parseInt(userId);
       const amountNum = parseFloat(amount);
 
@@ -46,7 +40,6 @@ class WithdrawalService {
         return { success: false, userMessage: '❌ Некорректный актив', error: 'Invalid asset' };
       }
 
-      // Получаем пользователя
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
         select: { id: true, telegramId: true }
@@ -57,7 +50,6 @@ class WithdrawalService {
         return { success: false, userMessage: '❌ Пользователь не найден', error: 'User not found' };
       }
 
-      // Получаем токен
       const token = await prisma.cryptoToken.findUnique({
         where: { symbol: asset }
       });
@@ -67,7 +59,6 @@ class WithdrawalService {
         return { success: false, userMessage: `❌ Токен ${asset} не найден`, error: 'Token not found' };
       }
 
-      // Проверяем баланс
       const balance = await prisma.balance.findUnique({
         where: {
           userId_tokenId_type: {
@@ -91,11 +82,8 @@ class WithdrawalService {
 
       console.log(`   ✅ Validation passed`);
       console.log(`   💰 Current balance: ${currentBalance.toFixed(8)}`);
-      console.log(`   👤 Telegram ID: ${user.telegramId}`);
 
-      // ✅ TRANSACTION: Создаём заявку и резервируем средства
       const withdrawal = await prisma.$transaction(async (tx) => {
-        // Создаём транзакцию
         const newTx = await tx.transaction.create({
           data: {
             userId: userIdNum,
@@ -110,7 +98,6 @@ class WithdrawalService {
 
         console.log(`   ✅ Transaction created: ID=${newTx.id}`);
 
-        // Уменьшаем баланс (резервируем средства)
         if (balance) {
           await tx.balance.update({
             where: { id: balance.id },
@@ -135,7 +122,6 @@ class WithdrawalService {
         asset
       });
 
-      // Уведомляем администраторов
       try {
         const admins = await prisma.user.findMany({
           where: { isAdmin: true },
@@ -188,7 +174,7 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ ИСПРАВЛЕННАЯ: Обработать заявку на вывод
+   * ✅ Обработать заявку на вывод
    */
   async processWithdrawal(bot, withdrawalId, approve = true) {
     console.log(`\n💸 [WITHDRAWAL] Processing withdrawal #${withdrawalId}`);
@@ -202,7 +188,6 @@ class WithdrawalService {
         throw new Error('Invalid withdrawal ID');
       }
 
-      // Получаем заявку
       const withdrawal = await prisma.transaction.findUnique({
         where: { id: withdrawalIdNum },
         include: {
@@ -237,11 +222,9 @@ class WithdrawalService {
       console.log(`   User Telegram ID: ${telegramId}`);
 
       if (approve) {
-        // ✅ ОДОБРИТЬ ВЫВОД
         console.log(`\n✅ APPROVING withdrawal...`);
         return await this._approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       } else {
-        // ✅ ОТКЛОНИТЬ ВЫВОД
         console.log(`\n❌ REJECTING withdrawal...`);
         return await this._rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       }
@@ -258,14 +241,7 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ ИСПРАВЛЕННАЯ: Одобрить вывод (Transfer API)
-   * 
-   * КЛЮЧЕВЫЕ ПАРАМЕТРЫ:
-   * - user_id: TELEGRAM USER ID (не app user id!)
-   * - asset: "USDT", "TON", "BTC", "ETH", "LTC", "BNB", "TRX", "USDC"
-   * - amount: Строка! "10.50000000"
-   * - spend_id: Уникальный ID (не повторяется!)
-   * - comment: Опциональный (что-то вроде "Вывод #29")
+   * ✅ Одобрить вывод (с ПОЛНЫМ логированием)
    */
   async _approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
@@ -273,44 +249,68 @@ class WithdrawalService {
       console.log(`   📍 Target: Telegram User #${telegramId}`);
       console.log(`   💰 Amount: ${amount.toFixed(8)} ${asset}`);
 
-      // ⚠️ ВАЖНО: spend_id должен быть УНИКАЛЬНЫМ и не повторяться!
-      // Используем комбинацию timestamp + random
       const randomSuffix = Math.random().toString(36).substring(2, 8);
       const spendId = `w${withdrawal.id}t${Date.now()}${randomSuffix}`;
 
       console.log(`   📝 spend_id: ${spendId}`);
 
-      // ✅ ПРАВИЛЬНЫЙ PAYLOAD для transfer API
+      // ✅ ПРОСТОЙ payload - без опциональных полей
       const payload = {
-        user_id: telegramId,           // ✅ TELEGRAM USER ID!
-        asset: asset,                  // ✅ "USDT", "TON", и т.д.
-        amount: amount.toFixed(8),     // ✅ Строка!
-        spend_id: spendId,             // ✅ Уникальный ID
-        comment: `SafariX Casino Withdraw #${withdrawal.id}`  // ✅ Опционально
+        user_id: telegramId,
+        asset: asset,
+        amount: amount.toFixed(8),
+        spend_id: spendId
       };
 
       console.log(`   📤 Payload:`, JSON.stringify(payload, null, 2));
 
-      // Отправляем на Crypto Pay API
-      const transferResponse = await axios.post(
-        `${CRYPTO_PAY_API}/transfer`,
-        payload,
-        {
-          headers: {
-            'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
-            'Content-Type': 'application/json'
-          },
-          timeout: 15000
-        }
-      );
+      console.log(`\n📡 Отправляем запрос на ${CRYPTO_PAY_API}/transfer`);
+      console.log(`   Headers:`, {
+        'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN ? '***' : 'NOT SET',
+        'Content-Type': 'application/json'
+      });
 
-      console.log(`\n   ✅ API Response Status: ${transferResponse.status}`);
-      console.log(`   📋 Response:`, JSON.stringify(transferResponse.data, null, 2));
+      let transferResponse;
+      try {
+        transferResponse = await axios.post(
+          `${CRYPTO_PAY_API}/transfer`,
+          payload,
+          {
+            headers: {
+              'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
+              'Content-Type': 'application/json'
+            },
+            timeout: 15000
+          }
+        );
 
-      // Проверяем ответ
+        console.log(`\n✅ API Response Status: ${transferResponse.status}`);
+        console.log(`📋 Full Response:`, JSON.stringify(transferResponse.data, null, 2));
+
+      } catch (axiosError) {
+        // ✅ ПОЛНОЕ ЛОГИРОВАНИЕ ОШИБКИ
+        console.error(`\n❌ AXIOS ERROR:`);
+        console.error(`   Status: ${axiosError.response?.status}`);
+        console.error(`   Status Text: ${axiosError.response?.statusText}`);
+        console.error(`   Response Data:`, JSON.stringify(axiosError.response?.data, null, 2));
+        console.error(`   Response Headers:`, axiosError.response?.headers);
+        console.error(`   Error Message: ${axiosError.message}`);
+
+        // Логируем для анализа
+        logger.error('WITHDRAWAL', 'Crypto Pay API Error', {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          message: axiosError.message
+        });
+
+        throw axiosError;
+      }
+
       if (!transferResponse.data.ok) {
         const errorMsg = transferResponse.data.error?.message || 'Unknown error';
         console.error(`❌ API Error: ${errorMsg}`);
+        console.error(`Full error object:`, transferResponse.data.error);
         throw new Error(`Transfer failed: ${errorMsg}`);
       }
 
@@ -322,12 +322,8 @@ class WithdrawalService {
       const transferResult = transferResponse.data.result;
       const transferId = transferResult.transfer_id || transferResult.id;
 
-      console.log(`   ✅ Transfer successful!`);
+      console.log(`\n✅ Transfer successful!`);
       console.log(`   🔗 Transfer ID: ${transferId}`);
-
-      // ===================================
-      // ОБНОВЛЯЕМ СТАТУС В БД
-      // ===================================
 
       console.log(`\n💾 Updating database...`);
 
@@ -356,7 +352,6 @@ class WithdrawalService {
         telegramId: telegramId
       });
 
-      // Уведомляем пользователя
       try {
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -379,7 +374,6 @@ class WithdrawalService {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
 
-      // ✅ Возвращаем результат (amount уже число)
       return {
         success: true,
         withdrawalId: withdrawal.id,
@@ -401,18 +395,13 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ ИСПРАВЛЕННАЯ: Отклонить вывод (FAILED статус)
+   * ✅ Отклонить вывод
    */
   async _rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
       console.log(`🚫 Rejecting withdrawal...`);
 
-      // ===================================
-      // ВОЗВРАЩАЕМ СРЕДСТВА И ОБНОВЛЯЕМ СТАТУС
-      // ===================================
-
       await prisma.$transaction(async (tx) => {
-        // ✅ FAILED статус
         await tx.transaction.update({
           where: { id: withdrawal.id },
           data: {
@@ -423,7 +412,6 @@ class WithdrawalService {
 
         console.log(`   ✅ Transaction updated: status=FAILED`);
 
-        // Возвращаем средства на баланс
         await tx.balance.upsert({
           where: {
             userId_tokenId_type: {
@@ -454,7 +442,6 @@ class WithdrawalService {
         userId: userId
       });
 
-      // Уведомляем пользователя
       try {
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -478,7 +465,6 @@ class WithdrawalService {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
 
-      // ✅ Возвращаем результат (amount уже число)
       return {
         success: true,
         withdrawalId: withdrawal.id,
