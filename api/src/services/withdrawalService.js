@@ -1,13 +1,12 @@
 /**
  * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ withdrawalService.js
  * 
- * ИСПРАВЛЕНИЯ:
- * 1. ✅ Правильный статус FAILED (не REJECTED)
- * 2. ✅ Адрес кошелька в payload для Crypto Pay API
- * 3. ✅ Использование transaction API вместо transfer
- * 4. ✅ Все Decimal объекты конвертированы
- * 5. ✅ Полная обработка ошибок
- * 6. ✅ spend_id правильно генерируется
+ * ГЛАВНЫЕ ИСПРАВЛЕНИЯ:
+ * 1. ✅ transfer API требует TELEGRAM USER ID, не app user_id!
+ * 2. ✅ spend_id должен быть уникальным (не повторяться!)
+ * 3. ✅ comment опциональный параметр
+ * 4. ✅ Нужно включить Transfer в @CryptoBot security settings!
+ * 5. ✅ Все Decimal конвертированы
  */
 
 const prisma = require('../../prismaClient');
@@ -92,6 +91,7 @@ class WithdrawalService {
 
       console.log(`   ✅ Validation passed`);
       console.log(`   💰 Current balance: ${currentBalance.toFixed(8)}`);
+      console.log(`   👤 Telegram ID: ${user.telegramId}`);
 
       // ✅ TRANSACTION: Создаём заявку и резервируем средства
       const withdrawal = await prisma.$transaction(async (tx) => {
@@ -111,12 +111,14 @@ class WithdrawalService {
         console.log(`   ✅ Transaction created: ID=${newTx.id}`);
 
         // Уменьшаем баланс (резервируем средства)
-        await tx.balance.update({
-          where: { id: balance.id },
-          data: {
-            amount: { decrement: amountNum }
-          }
-        });
+        if (balance) {
+          await tx.balance.update({
+            where: { id: balance.id },
+            data: {
+              amount: { decrement: amountNum }
+            }
+          });
+        }
 
         console.log(`   ✅ Balance reduced by ${amountNum.toFixed(8)}`);
 
@@ -128,6 +130,7 @@ class WithdrawalService {
       logger.info('WITHDRAWAL', 'Withdrawal request created', {
         withdrawalId: withdrawal.id,
         userId: userIdNum,
+        telegramId: user.telegramId,
         amount: amountNum.toFixed(8),
         asset
       });
@@ -185,7 +188,7 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ Обработать заявку на вывод (одобрить/отклонить)
+   * ✅ ИСПРАВЛЕННАЯ: Обработать заявку на вывод
    */
   async processWithdrawal(bot, withdrawalId, approve = true) {
     console.log(`\n💸 [WITHDRAWAL] Processing withdrawal #${withdrawalId}`);
@@ -225,21 +228,22 @@ class WithdrawalService {
 
       const amount = parseFloat(withdrawal.amount.toString());
       const userId = withdrawal.user.id;
+      const telegramId = parseInt(withdrawal.user.telegramId);
       const tokenId = withdrawal.tokenId;
       const asset = withdrawal.token.symbol;
 
       console.log(`   ✅ Withdrawal found: #${withdrawalIdNum}`);
       console.log(`   Amount: ${amount.toFixed(8)} ${asset}`);
-      console.log(`   User: ${userId}`);
+      console.log(`   User Telegram ID: ${telegramId}`);
 
       if (approve) {
         // ✅ ОДОБРИТЬ ВЫВОД
         console.log(`\n✅ APPROVING withdrawal...`);
-        return await this._approveWithdrawal(bot, withdrawal, amount, userId, tokenId, asset);
+        return await this._approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       } else {
         // ✅ ОТКЛОНИТЬ ВЫВОД
         console.log(`\n❌ REJECTING withdrawal...`);
-        return await this._rejectWithdrawal(bot, withdrawal, amount, userId, tokenId, asset);
+        return await this._rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       }
     } catch (error) {
       console.error(`❌ Critical error in processWithdrawal:`, error.message);
@@ -254,152 +258,72 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ ИСПРАВЛЕННАЯ: Одобрить вывод (с правильным API payload)
+   * ✅ ИСПРАВЛЕННАЯ: Одобрить вывод (Transfer API)
+   * 
+   * КЛЮЧЕВЫЕ ПАРАМЕТРЫ:
+   * - user_id: TELEGRAM USER ID (не app user id!)
+   * - asset: "USDT", "TON", "BTC", "ETH", "LTC", "BNB", "TRX", "USDC"
+   * - amount: Строка! "10.50000000"
+   * - spend_id: Уникальный ID (не повторяется!)
+   * - comment: Опциональный (что-то вроде "Вывод #29")
    */
-  async _approveWithdrawal(bot, withdrawal, amount, userId, tokenId, asset) {
+  async _approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
-      console.log(`📤 Sending to Crypto Pay API...`);
+      console.log(`📤 Sending to Crypto Pay API transfer endpoint...`);
+      console.log(`   📍 Target: Telegram User #${telegramId}`);
+      console.log(`   💰 Amount: ${amount.toFixed(8)} ${asset}`);
 
-      // ===================================
-      // ПОЛУЧАЕМ АДРЕС КОШЕЛЬКА
-      // ===================================
-      
-      // Пробуем получить адрес из предыдущих успешных выводов
-      let walletAddress = null;
+      // ⚠️ ВАЖНО: spend_id должен быть УНИКАЛЬНЫМ и не повторяться!
+      // Используем комбинацию timestamp + random
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const spendId = `w${withdrawal.id}t${Date.now()}${randomSuffix}`;
 
-      const previousWithdrawal = await prisma.transaction.findFirst({
-        where: {
-          userId: userId,
-          type: 'WITHDRAW',
-          status: 'COMPLETED',
-          walletAddress: { not: null }
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { walletAddress: true }
-      });
+      console.log(`   📝 spend_id: ${spendId}`);
 
-      if (previousWithdrawal?.walletAddress) {
-        walletAddress = previousWithdrawal.walletAddress.toString().trim();
-      }
-
-      // Если нет адреса - пробуем из профиля пользователя
-      if (!walletAddress) {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { walletAddress: true }
-        });
-
-        if (user?.walletAddress) {
-          walletAddress = user.walletAddress.toString().trim();
-        }
-      }
-
-      if (!walletAddress) {
-        console.error(`❌ No wallet address found for user ${userId}`);
-        throw new Error('Wallet address not provided');
-      }
-
-      console.log(`   📍 Wallet: ${walletAddress.substring(0, 15)}...`);
-
-      // ===================================
-      // ОТПРАВЛЯЕМ НА CRYPTO PAY API
-      // ===================================
-
-      const spendId = `withdraw_${withdrawal.id}_${Date.now()}`;
-
-      // ✅ ПРАВИЛЬНЫЙ PAYLOAD с адресом!
+      // ✅ ПРАВИЛЬНЫЙ PAYLOAD для transfer API
       const payload = {
-        user_id: userId,
-        asset: asset,
-        amount: amount.toFixed(8),
-        spend_id: spendId,
-        address: walletAddress  // ✅ КЛЮЧЕВОЕ ПОЛЕ!
+        user_id: telegramId,           // ✅ TELEGRAM USER ID!
+        asset: asset,                  // ✅ "USDT", "TON", и т.д.
+        amount: amount.toFixed(8),     // ✅ Строка!
+        spend_id: spendId,             // ✅ Уникальный ID
+        comment: `SafariX Casino Withdraw #${withdrawal.id}`  // ✅ Опционально
       };
 
-      console.log(`   📤 API Endpoint: ${CRYPTO_PAY_API}/transfer`);
       console.log(`   📤 Payload:`, JSON.stringify(payload, null, 2));
 
-      let transferId = null;
-      let success = false;
-
-      try {
-        // Пытаемся /transfer endpoint
-        const transferResponse = await axios.post(
-          `${CRYPTO_PAY_API}/transfer`,
-          payload,
-          {
-            headers: {
-              'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
-              'Content-Type': 'application/json'
-            },
-            timeout: 15000
-          }
-        );
-
-        console.log(`   ✅ API Status: ${transferResponse.status}`);
-        console.log(`   📋 Response:`, JSON.stringify(transferResponse.data, null, 2));
-
-        if (transferResponse.data.ok && transferResponse.data.result) {
-          transferId = transferResponse.data.result.transfer_id || 
-                      transferResponse.data.result.id ||
-                      spendId;
-          success = true;
-          console.log(`   ✅ Transfer ID: ${transferId}`);
-        } else {
-          throw new Error(`API returned ok=false: ${JSON.stringify(transferResponse.data)}`);
+      // Отправляем на Crypto Pay API
+      const transferResponse = await axios.post(
+        `${CRYPTO_PAY_API}/transfer`,
+        payload,
+        {
+          headers: {
+            'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000
         }
-      } catch (transferError) {
-        console.warn(`⚠️ /transfer failed: ${transferError.message}`);
+      );
 
-        // Fallback: попытаемся /spendCoin (для spend на уже созданный адрес)
-        console.log(`   🔄 Trying fallback: /spendCoin...`);
+      console.log(`\n   ✅ API Response Status: ${transferResponse.status}`);
+      console.log(`   📋 Response:`, JSON.stringify(transferResponse.data, null, 2));
 
-        try {
-          const spendPayload = {
-            user_id: userId,
-            asset: asset,
-            amount: amount.toFixed(8),
-            spend_id: spendId
-          };
-
-          console.log(`   📤 Spend payload:`, JSON.stringify(spendPayload, null, 2));
-
-          const spendResponse = await axios.post(
-            `${CRYPTO_PAY_API}/spendCoin`,
-            spendPayload,
-            {
-              headers: {
-                'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN,
-                'Content-Type': 'application/json'
-              },
-              timeout: 15000
-            }
-          );
-
-          console.log(`   ✅ Spend API Status: ${spendResponse.status}`);
-          console.log(`   📋 Response:`, JSON.stringify(spendResponse.data, null, 2));
-
-          if (spendResponse.data.ok) {
-            transferId = spendResponse.data.result?.transaction_id || spendId;
-            success = true;
-            console.log(`   ✅ Transaction ID: ${transferId}`);
-          } else {
-            throw new Error(`Spend API returned ok=false: ${JSON.stringify(spendResponse.data)}`);
-          }
-        } catch (spendError) {
-          console.error(`❌ Both /transfer and /spendCoin failed!`);
-          console.error(`   Transfer error: ${transferError.message}`);
-          console.error(`   Spend error: ${spendError.message}`);
-
-          throw new Error(
-            `Crypto Pay API Error: ${transferError.response?.data?.error?.message || transferError.message}`
-          );
-        }
+      // Проверяем ответ
+      if (!transferResponse.data.ok) {
+        const errorMsg = transferResponse.data.error?.message || 'Unknown error';
+        console.error(`❌ API Error: ${errorMsg}`);
+        throw new Error(`Transfer failed: ${errorMsg}`);
       }
 
-      if (!success) {
-        throw new Error('Failed to send withdrawal to Crypto Pay API');
+      if (!transferResponse.data.result) {
+        console.error(`❌ No result in API response`);
+        throw new Error('No transfer result returned');
       }
+
+      const transferResult = transferResponse.data.result;
+      const transferId = transferResult.transfer_id || transferResult.id;
+
+      console.log(`   ✅ Transfer successful!`);
+      console.log(`   🔗 Transfer ID: ${transferId}`);
 
       // ===================================
       // ОБНОВЛЯЕМ СТАТУС В БД
@@ -413,7 +337,6 @@ class WithdrawalService {
           data: {
             status: 'COMPLETED',
             txHash: String(transferId),
-            walletAddress: walletAddress,
             updatedAt: new Date()
           }
         });
@@ -421,16 +344,16 @@ class WithdrawalService {
         console.log(`   ✅ Transaction updated`);
         console.log(`      Status: COMPLETED`);
         console.log(`      TxHash: ${transferId}`);
-        console.log(`      Wallet: ${walletAddress}`);
       });
 
       console.log(`\n✅ Withdrawal approved: #${withdrawal.id}\n`);
 
-      logger.info('WITHDRAWAL', 'Withdrawal approved', {
+      logger.info('WITHDRAWAL', 'Withdrawal approved and transferred', {
         withdrawalId: withdrawal.id,
         transferId: String(transferId),
         amount: amount.toFixed(8),
-        userId: userId
+        asset: asset,
+        telegramId: telegramId
       });
 
       // Уведомляем пользователя
@@ -443,12 +366,11 @@ class WithdrawalService {
         if (user?.telegramId) {
           await bot.telegram.sendMessage(
             user.telegramId,
-            `✅ *Заявка на вывод одобрена!*\n\n` +
+            `✅ *Заявка на вывод одобрена и выполнена!*\n\n` +
             `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
-            `📍 На адрес: \`${walletAddress}\`\n` +
-            `🔗 TX: \`${transferId}\`\n` +
+            `🔗 TX ID: \`${transferId}\`\n` +
             `⏰ Дата: ${new Date().toLocaleString()}\n\n` +
-            `Средства переводятся на ваш кошелёк.`,
+            `Средства отправлены на ваш кошелёк.`,
             { parse_mode: 'Markdown' }
           );
           console.log(`   ✅ User notified`);
@@ -457,20 +379,20 @@ class WithdrawalService {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
 
-      // ✅ Конвертируем Decimal в число перед возвратом
+      // ✅ Возвращаем результат (amount уже число)
       return {
         success: true,
         withdrawalId: withdrawal.id,
         amount: amount,
         asset: asset,
-        transferId: String(transferId),
-        walletAddress: walletAddress
+        transferId: String(transferId)
       };
 
     } catch (error) {
-      console.error(`\n❌ Error in _approveWithdrawal:`, error.message);
+      console.error(`\n❌ Error in _approveWithdrawal: ${error.message}`);
       logger.error('WITHDRAWAL', 'Failed to approve withdrawal', {
         withdrawalId: withdrawal.id,
+        telegramId: telegramId,
         error: error.message
       });
 
@@ -479,10 +401,9 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ ИСПРАВЛЕННАЯ: Отклонить вывод
-   * Использует FAILED (не REJECTED)
+   * ✅ ИСПРАВЛЕННАЯ: Отклонить вывод (FAILED статус)
    */
-  async _rejectWithdrawal(bot, withdrawal, amount, userId, tokenId, asset) {
+  async _rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
       console.log(`🚫 Rejecting withdrawal...`);
 
@@ -491,11 +412,11 @@ class WithdrawalService {
       // ===================================
 
       await prisma.$transaction(async (tx) => {
-        // ✅ ИСПРАВЛЕНИЕ: Используем FAILED (правильный статус)
+        // ✅ FAILED статус
         await tx.transaction.update({
           where: { id: withdrawal.id },
           data: {
-            status: 'FAILED',  // ✅ ПРАВИЛЬНО!
+            status: 'FAILED',
             updatedAt: new Date()
           }
         });
@@ -557,7 +478,7 @@ class WithdrawalService {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
 
-      // ✅ Конвертируем Decimal в число перед возвратом
+      // ✅ Возвращаем результат (amount уже число)
       return {
         success: true,
         withdrawalId: withdrawal.id,
