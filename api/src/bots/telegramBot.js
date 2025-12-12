@@ -1,5 +1,5 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ - ОДИН ФАЙЛ (~1700 строк)
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ - ОДИН ФАЙЛ (~1700 строк) - ИСПРАВЛЕННАЯ ВЕРСИЯ
  * 
  * Содержит ВСЁ:
  * - /start команда
@@ -10,6 +10,9 @@
  * - Система поддержки с тикетами
  * - ВСЕ callback handlers
  * - Проверка платежей
+ * 
+ * ИСПРАВЛЕНИЯ:
+ * ✅ reject_withdrawal - конвертация Decimal в число
  * 
  * Просто скопируйте в: src/bots/telegramBot.js и используйте!
  */
@@ -1599,9 +1602,11 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal approved`);
       
+      const amount = parseFloat(result.amount.toString());
+      
       await ctx.reply(
         `✅ Заявка #${withdrawalId} одобрена!\n\n` +
-        `💰 Сумма: ${result.amount.toFixed(8)} ${result.asset}\n` +
+        `💰 Сумма: ${amount.toFixed(8)} ${result.asset}\n` +
         `🔗 Transfer ID: \`${result.transferId}\`\n\n` +
         `Средства отправлены пользователю.`,
         { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
@@ -1639,9 +1644,12 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal rejected`);
       
+      // ✅ ИСПРАВЛЕНИЕ: конвертируем Decimal в число
+      const returnedAmount = parseFloat(result.returnedAmount.toString());
+      
       await ctx.reply(
         `❌ Заявка #${withdrawalId} отклонена\n\n` +
-        `💰 ${result.returnedAmount.toFixed(8)} ${result.asset} вернено на счёт пользователя`,
+        `💰 ${returnedAmount.toFixed(8)} ${result.asset} вернено на счёт пользователя`,
         { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
       );
 
