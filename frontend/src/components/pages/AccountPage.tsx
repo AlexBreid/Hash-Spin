@@ -270,7 +270,7 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 ГЛАВНЫЙ КОМПОНЕНТ (ОБЛЕГЧЁННАЯ ВЕРСИЯ)
+// 📱 ГЛАВНЫЙ КОМПОНЕНТ
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AccountPage() {
@@ -298,14 +298,19 @@ export function AccountPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('🔄 Загружаю профиль и активный бонус...');
+      console.log('🔄 Загружаю профиль и бонус...');
+      
+      // Загружаем профиль
       fetchProfile().catch((err: Error) => {
         console.error('❌ Profile error:', err.message);
         setError('Failed to load profile');
         setLoading(false);
       });
+      
+      // Загружаем бонус (с фалбэком если эндпоинта нет)
       fetchActiveBonus().catch((err: Error) => {
-        console.warn('⚠️ No active bonus:', err.message);
+        console.warn('⚠️ No active bonus (это нормально):', err.message);
+        // Не вызываем setError, просто продолжаем
       });
     }
   }, [fetchProfile, fetchActiveBonus]);
@@ -480,17 +485,52 @@ export function AccountPage() {
               color={accentColor}
               delay={0.3}
             />
+            <MetricCard
+              icon={<Flame className="w-8 h-8" style={{ margin: '0 auto', color: '#fbbf24' }} />}
+              label="Выигрышей"
+              value={winningBets > 0 ? winningBets.toLocaleString('ru-RU') : '0'}
+              color="#fbbf24"
+              delay={0.35}
+            />
             {largestWin && safeLargestWin > 0 && (
               <MetricCard
-                icon={<Flame className="w-8 h-8" style={{ margin: '0 auto', color: '#fbbf24' }} />}
+                icon={<Zap className="w-8 h-8" style={{ margin: '0 auto', color: '#ec4899' }} />}
                 label="Максимальный выигрыш"
                 value={safeLargestWin.toFixed(2)}
                 unit="USDT"
-                color="#fbbf24"
-                delay={0.35}
+                color="#ec4899"
+                delay={0.4}
               />
             )}
           </div>
+
+          {/* ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            style={{
+              background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(6, 182, 212, 0.02))',
+              border: '2px solid rgba(14, 165, 233, 0.2)',
+              borderRadius: '16px',
+              padding: '24px',
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 8px 0' }}>Процент побед</p>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981', margin: '0' }}>
+                  {totalGames > 0 ? ((winningBets / totalGames) * 100).toFixed(1) : '0'}%
+                </p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 8px 0' }}>Поражений</p>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444', margin: '0' }}>
+                  {lossCount > 0 ? lossCount.toLocaleString('ru-RU') : '0'}
+                </p>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     );
