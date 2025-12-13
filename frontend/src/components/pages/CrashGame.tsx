@@ -613,13 +613,11 @@ export function CrashGame() {
               </div>
             </div>
 
+            {/* ✅ ТОЛЬКО ОБЪЕДИНЁННЫЙ БАЛАНС БЕЗ УПОМИНАНИЯ БОНУСА */}
             <GlassCard className="px-3 py-2 flex items-center gap-2 !rounded-full">
               <div className="text-right">
-                <p className="text-xs text-gray-400">Всего</p>
+                <p className="text-xs text-gray-400">Баланс</p>
                 <p className="text-sm font-black text-emerald-300">${totalBalance.toFixed(2)}</p>
-                {bonusBalance > 0 && (
-                  <p className="text-xs text-amber-300">💛 +${bonusBalance.toFixed(2)}</p>
-                )}
               </div>
               <button 
                 onClick={() => fetchBalances()} 

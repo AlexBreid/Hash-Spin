@@ -6,6 +6,8 @@ import {
   Loader2,
   Flame,
   Trophy,
+  Zap,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -26,6 +28,14 @@ interface UserProfile {
     gameType: string;
   };
   createdAt: string;
+}
+
+interface ActiveBonus {
+  id: string;
+  grantedAmount: string;
+  requiredWager: string;
+  wageredAmount: string;
+  expiresAt: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -105,6 +115,161 @@ const MetricCard = ({ icon, label, value, unit = '', color = '#0ea5e9', delay = 
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
+  const wagered = toNumber(bonus.wageredAmount);
+  const required = toNumber(bonus.requiredWager);
+  const granted = toNumber(bonus.grantedAmount);
+  const remaining = Math.max(0, required - wagered);
+  const progress = Math.min((wagered / required) * 100, 100);
+  
+  const expiresAt = new Date(bonus.expiresAt);
+  const now = new Date();
+  const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      style={{
+        background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))',
+        border: '2px solid #fbbf2440',
+        borderRadius: '20px',
+        padding: '24px',
+        marginBottom: '32px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '32px' }}>🎁</div>
+        <div>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', margin: '0 0 4px 0' }}>
+            Активный бонус
+          </h3>
+          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0' }}>
+            Отыграйте требуемую сумму чтобы вывести выигрыш
+          </p>
+        </div>
+      </div>
+
+      {/* ИНФОРМАЦИЯ О БОНУСЕ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.1)',
+          border: '1px solid #10b98140',
+          borderRadius: '12px',
+          padding: '12px',
+          textAlign: 'center',
+        }}>
+          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 4px 0' }}>Размер бонуса</p>
+          <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', margin: '0' }}>
+            {granted.toFixed(2)} USDT
+          </p>
+        </div>
+
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid #3b82f640',
+          borderRadius: '12px',
+          padding: '12px',
+          textAlign: 'center',
+        }}>
+          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 4px 0' }}>Осталось отыграть</p>
+          <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#3b82f6', margin: '0' }}>
+            {remaining.toFixed(2)} USDT
+          </p>
+        </div>
+      </div>
+
+      {/* ПРОГРЕСС-БАР С КРАСИВОЙ АНИМАЦИЕЙ */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0', fontWeight: '600' }}>
+            Прогресс отыгрыша
+          </p>
+          <p style={{ fontSize: '12px', color: '#fbbf24', margin: '0', fontWeight: 'bold' }}>
+            {progress.toFixed(0)}%
+          </p>
+        </div>
+
+        {/* КРАСИВЫЙ ПРОГРЕСС-БАР */}
+        <div style={{
+          width: '100%',
+          height: '12px',
+          background: 'rgba(0, 0, 0, 0.3)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          border: '1px solid rgba(251, 191, 36, 0.2)',
+          position: 'relative',
+        }}>
+          <motion.div
+            initial={{ width: '0%' }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            style={{
+              height: '100%',
+              background: 'linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)',
+              borderRadius: '10px',
+              boxShadow: '0 0 20px rgba(251, 191, 36, 0.6)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* БЛЕСК ЭФФЕКТ */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
+                animation: 'shine 2s infinite',
+              }}
+            />
+          </motion.div>
+        </div>
+
+        {/* ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+          <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0' }}>
+            Отыграно: {wagered.toFixed(2)} / {required.toFixed(2)} USDT
+          </p>
+          <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0' }}>
+            10x от {granted.toFixed(2)} USDT
+          </p>
+        </div>
+      </div>
+
+      {/* ВРЕМЯ ДО ИСТЕЧЕНИЯ */}
+      <div style={{
+        background: 'rgba(239, 68, 68, 0.1)',
+        border: '1px solid #ef444440',
+        borderRadius: '12px',
+        padding: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+      }}>
+        <Clock size={16} style={{ color: '#ef4444' }} />
+        <p style={{ fontSize: '13px', color: '#ef4444', margin: '0', fontWeight: '600' }}>
+          ⏰ Осталось {daysLeft} дн{daysLeft !== 1 ? '' : 'я'}
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes shine {
+          0% { left: -100%; }
+          100% { left: 100%; }
+        }
+      `}</style>
+    </motion.div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 📱 ГЛАВНЫЙ КОМПОНЕНТ (ОБЛЕГЧЁННАЯ ВЕРСИЯ)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -112,12 +277,14 @@ export function AccountPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [activeBonus, setActiveBonus] = useState<ActiveBonus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const hasLoadedRef = useRef(false);
 
   const { data, loading: profileLoading, error: profileError, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
+  const { data: bonusData, execute: fetchActiveBonus } = useFetch('USER_GET_active_bonus', 'GET');
 
   const mainBg = '#0a0f1a';
   const accentColor = '#0ea5e9';
@@ -131,14 +298,17 @@ export function AccountPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('🔄 Загружаю профиль...');
+      console.log('🔄 Загружаю профиль и активный бонус...');
       fetchProfile().catch((err: Error) => {
         console.error('❌ Profile error:', err.message);
         setError('Failed to load profile');
         setLoading(false);
       });
+      fetchActiveBonus().catch((err: Error) => {
+        console.warn('⚠️ No active bonus:', err.message);
+      });
     }
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchActiveBonus]);
 
   // ✅ Обработка ответа профиля
   useEffect(() => {
@@ -156,6 +326,19 @@ export function AccountPage() {
       setLoading(false);
     }
   }, [data]);
+
+  // ✅ Обработка ответа активного бонуса
+  useEffect(() => {
+    if (bonusData) {
+      console.log('✅ Bonus data:', bonusData);
+      
+      if (bonusData.success && bonusData.data) {
+        setActiveBonus(bonusData.data as ActiveBonus);
+      } else if (bonusData.id) {
+        setActiveBonus(bonusData as ActiveBonus);
+      }
+    }
+  }, [bonusData]);
 
   useEffect(() => {
     if (profileError) {
@@ -282,6 +465,11 @@ export function AccountPage() {
               </p>
             </div>
           </motion.div>
+
+          {/* 🎁 АКТИВНЫЙ БОНУС (ЕСЛИ ЕСТЬ) */}
+          {activeBonus && (
+            <BonusCard bonus={activeBonus} />
+          )}
 
           {/* ОСНОВНЫЕ МЕТРИКИ */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>

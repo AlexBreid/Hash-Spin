@@ -173,29 +173,16 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                   Баланс
                 </span>
                 
-                {/* ОБЪЕДИНЁННЫЙ БАЛАНС */}
+                {/* ✅ ИСПРАВЛЕНИЕ: ТОЛЬКО ОБЪЕДИНЁННЫЙ БАЛАНС БЕЗ УПОМИНАНИЯ БОНУСА */}
                 <span
                   style={{
                     fontSize: '14px',
                     fontWeight: '600',
                     color: '#e5e7eb',
-                    marginBottom: '2px'
                   }}
                 >
                   {formatBalance(Math.floor(walletData.balance * 100) / 100)} {walletData.currency}
                 </span>
-
-                {/* ДЕТАЛИ БАЛАНСА (если есть бонус) */}
-                {walletData.bonus > 0 && (
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      color: '#fbbf24',
-                    }}
-                  >
-                    💛 Бонус: {formatBalance(walletData.bonus)}
-                  </span>
-                )}
               </div>
             </div>
           ) : loading ? (

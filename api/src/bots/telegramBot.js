@@ -1588,7 +1588,16 @@ if (!BOT_TOKEN) {
 
     const pendingWithdrawals = await prisma.transaction.findMany({
       where: { type: 'WITHDRAW', status: 'PENDING' },
-      select: { id: true, userId: true, amount: true, walletAddress: true, createdAt: true },
+      select: { 
+        id: true, 
+        userId: true, 
+        amount: true, 
+        walletAddress: true, 
+        createdAt: true,
+        user: {
+          select: { username: true }
+        }
+      },
       orderBy: { createdAt: 'desc' },
       take: 10
     });
@@ -1603,6 +1612,9 @@ if (!BOT_TOKEN) {
     
     for (const w of pendingWithdrawals) {
       const amount = parseFloat(w.amount.toString());
+      // ✅ ИСПРАВЛЕНИЕ: Показываем имя пользователя вместо ID
+      const userDisplayName = w.user?.username ? `@${w.user.username}` : `ID: ${w.userId}`;
+      
       let shortAddr = '—';
       if (w.walletAddress) {
         const addr = w.walletAddress.toString().trim();
@@ -1610,7 +1622,7 @@ if (!BOT_TOKEN) {
       }
       
       msg += `ID: #${w.id}\n` +
-             `👤 User: ${w.userId}\n` +
+             `👤 ${userDisplayName}\n` +
              `💰 ${amount.toFixed(8)} USDT\n` +
              `📍 ${shortAddr}\n\n`;
     }
