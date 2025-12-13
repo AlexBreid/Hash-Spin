@@ -111,20 +111,10 @@ class ReferralService {
       console.log(`   ⏰ Истекает: ${expiresAt.toISOString()}`);
 
       const result = await prisma.$transaction(async (tx) => {
-        // 1️⃣ ОЧИЩАЕМ MAIN баланс (депозит НЕ идёт в MAIN!)
-        const mainBalance = await tx.balance.findUnique({
-          where: { userId_tokenId_type: { userId: userIdNum, tokenId, type: 'MAIN' } }
-        });
+        // ✅ ВАЖНО: НЕ ТРОГАЕМ MAIN баланс! Там могут быть другие деньги!
+        // Только работаем с BONUS балансом для бонуса
 
-        if (mainBalance) {
-          await tx.balance.update({
-            where: { id: mainBalance.id },
-            data: { amount: '0' }
-          });
-          console.log(`   ✅ MAIN баланс очищен (был: ${parseFloat(mainBalance.amount.toString()).toFixed(8)})`);
-        }
-
-        // 2️⃣ СОЗДАЁМ UserBonus запись
+        // 1️⃣ СОЗДАЁМ UserBonus запись
         // ✅ ИСПРАВЛЕНИЕ: Убираем неправильный user relation!
         const userBonus = await tx.userBonus.create({
           data: {
@@ -142,7 +132,8 @@ class ReferralService {
 
         console.log(`   ✅ UserBonus создан: ID=${userBonus.id}`);
 
-        // 3️⃣ КЛАДЁМ ВСЮ СУММУ на BONUS баланс (депозит + бонус)
+        // 2️⃣ КЛАДЁМ ВСЮ СУММУ на BONUS баланс (депозит + бонус)
+        // ✅ НЕ трогаем MAIN! Только добавляем в BONUS!
         await tx.balance.upsert({
           where: { userId_tokenId_type: { userId: userIdNum, tokenId, type: 'BONUS' } },
           create: {
@@ -157,6 +148,7 @@ class ReferralService {
         });
 
         console.log(`   ✅ BONUS баланс: ${totalAmount.toFixed(8)} USDT`);
+        console.log(`   ℹ️ MAIN баланс не трогали (могут быть другие деньги)`);
 
         return {
           userBonusId: userBonus.id,
@@ -238,6 +230,8 @@ class ReferralService {
 
   /**
    * ⚡ ПРОВЕРИТЬ И АННУЛИРОВАТЬ БОНУС если баланс < 0.20 USDT
+   * ✅ ИСПРАВЛЕНИЕ: Не возвращаем в MAIN (там могут быть другие деньги)
+   * Просто аннулируем бонус и берём потери на себя
    */
   async checkAndAnnulateBonusIfLow(userId, tokenId, userBonusId) {
     console.log(`\n⚡ [CHECK ANNULATE] userId=${userId}, userBonusId=${userBonusId}`);
@@ -278,39 +272,18 @@ class ReferralService {
         console.log(`\n⚠️ [ANNULATE] BONUS balance too low! Annulating bonus...`);
 
         await prisma.$transaction(async (tx) => {
-          if (currentBonusAmount > 0) {
-            console.log(`   💳 Returning ${currentBonusAmount.toFixed(8)} to MAIN`);
+          // ✅ ИСПРАВЛЕНИЕ: НЕ возвращаем в MAIN!
+          // Просто очищаем BONUS баланс (потеря на казино)
+          console.log(`   🗑️ Clearing BONUS balance (${currentBonusAmount.toFixed(8)} USDT lost)`);
 
-            await tx.balance.update({
-              where: { id: bonusBalance.id },
-              data: { amount: '0' }
-            });
+          await tx.balance.update({
+            where: { id: bonusBalance.id },
+            data: { amount: '0' }
+          });
 
-            await tx.balance.upsert({
-              where: {
-                userId_tokenId_type: { userId, tokenId, type: 'MAIN' }
-              },
-              update: {
-                amount: { increment: currentBonusAmount }
-              },
-              create: {
-                userId,
-                tokenId,
-                type: 'MAIN',
-                amount: currentBonusAmount.toFixed(8)
-              }
-            });
+          console.log(`   ✅ BONUS cleared`);
 
-            console.log(`   ✅ Returned to MAIN`);
-          } else {
-            console.log(`   ℹ️ BONUS balance is 0`);
-            
-            await tx.balance.update({
-              where: { id: bonusBalance.id },
-              data: { amount: '0' }
-            });
-          }
-
+          // Аннулируем сам бонус
           await tx.userBonus.update({
             where: { id: userBonusId },
             data: {
@@ -328,13 +301,13 @@ class ReferralService {
         logger.info('REFERRAL', 'Bonus annulated due to low balance', {
           userId,
           userBonusId,
-          returnedAmount: currentBonusAmount.toFixed(8)
+          lostAmount: currentBonusAmount.toFixed(8)
         });
 
         return {
           annulated: true,
-          returnedAmount: currentBonusAmount,
-          reason: 'Balance below minimum'
+          lostAmount: currentBonusAmount,
+          reason: 'Balance below minimum (потеря казино)'
         };
       }
 
@@ -350,6 +323,7 @@ class ReferralService {
 
   /**
    * 👥 ПРОВЕРИТЬ ДОСТУПНОСТЬ БОНУСА
+   * ✅ ИСПРАВЛЕНИЕ: Проверяем и активные и завершённые бонусы
    */
   async checkBonusAvailability(userId) {
     try {
@@ -367,6 +341,7 @@ class ReferralService {
         return { canUseBonus: false, reason: 'No referrer' };
       }
 
+      // ✅ ИСПРАВЛЕНИЕ: Проверяем АКТИВНЫЙ бонус
       const activeBonus = await prisma.userBonus.findFirst({
         where: {
           userId: userIdNum,
@@ -376,9 +351,24 @@ class ReferralService {
       });
 
       if (activeBonus) {
+        console.log(`   ⚠️ User ${userIdNum} has active bonus #${activeBonus.id}`);
         return { canUseBonus: false, reason: 'Active bonus exists' };
       }
 
+      // ✅ НОВОЕ: Проверяем ЗАВЕРШЁННЫЕ бонусы (пользователь уже использовал бонус)
+      const completedBonus = await prisma.userBonus.findFirst({
+        where: {
+          userId: userIdNum,
+          isCompleted: true
+        }
+      });
+
+      if (completedBonus) {
+        console.log(`   ⚠️ User ${userIdNum} already used bonus in past (completed #${completedBonus.id})`);
+        return { canUseBonus: false, reason: 'Bonus already used' };
+      }
+
+      console.log(`   ✅ User ${userIdNum} can use bonus`);
       return { canUseBonus: true };
     } catch (error) {
       logger.error('REFERRAL', 'Error checking bonus availability', { error: error.message });

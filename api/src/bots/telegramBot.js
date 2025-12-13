@@ -954,7 +954,18 @@ if (!BOT_TOKEN) {
         }
 
         case '👤 Профиль': {
-          const userBal = await getUserBalance(user.id);
+          // ✅ ИСПРАВЛЕНИЕ: Получаем оба баланса и объединяем их
+          const mainBalance = await prisma.balance.findUnique({
+            where: { userId_tokenId_type: { userId: user.id, tokenId: 2, type: 'MAIN' } }
+          });
+          const bonusBalance = await prisma.balance.findUnique({
+            where: { userId_tokenId_type: { userId: user.id, tokenId: 2, type: 'BONUS' } }
+          });
+
+          const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
+          const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
+          const totalBalance = mainAmount + bonusAmount;
+
           const badges = [];
           if (user.isAdmin) badges.push('👑 АДМИН');
           if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
@@ -974,15 +985,19 @@ if (!BOT_TOKEN) {
             const wagered = parseFloat(activeBonus.wageredAmount.toString());
             const required = parseFloat(activeBonus.requiredWager.toString());
             const progress = Math.min((wagered / required) * 100, 100);
+            const daysLeft = Math.ceil((activeBonus.expiresAt - new Date()) / (1000 * 60 * 60 * 24));
             bonusStatus = `\n\n🎁 *АКТИВНЫЙ БОНУС:*\n` +
               `⚡ Отыграно: ${progress.toFixed(0)}%\n` +
-              `⏰ Дней осталось: ${Math.ceil((activeBonus.expiresAt - new Date()) / (1000 * 60 * 60 * 24))}`;
+              `⏰ Дней осталось: ${daysLeft}`;
           }
           
+          // ✅ Показываем объединённый баланс
+          const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
+
           await ctx.reply(
             `👤 *Профиль*\n\n` +
-            `${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
-            `💰 Баланс: ${userBal.toFixed(8)} USDT` +
+            `${userDisplayName}\n` +
+            `💰 Баланс: ${totalBalance.toFixed(8)} USDT` +
             (badges.length ? `\n${badges.join(' | ')}` : '') +
             bonusStatus,
             { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
@@ -1454,9 +1469,13 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal request created: #${result.withdrawalId}`);
 
+      // ✅ ИСПРАВЛЕНИЕ: Показываем имя пользователя вместо ID
+      const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
+
       await ctx.reply(
         `📋 Заявка на вывод ${amount.toFixed(8)} USDT создана.\n\n` +
         `🎫 ID: #${result.withdrawalId}\n` +
+        `👤 Пользователь: ${userDisplayName}\n` +
         `⏳ Статус: На рассмотрении\n\n` +
         `Администратор одобрит её в течение нескольких минут.`,
         getMainMenuKeyboard(user.isAdmin)
@@ -1465,6 +1484,7 @@ if (!BOT_TOKEN) {
       logger.info('BOT', 'Withdrawal request created successfully', { 
         withdrawalId: result.withdrawalId,
         userId: user.id,
+        username: user.username || 'no_username',
         amount: amount.toFixed(8)
       });
 
