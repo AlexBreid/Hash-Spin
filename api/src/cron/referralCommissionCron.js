@@ -1,74 +1,91 @@
 /**
- * ✅ ИСПРАВЛЕННЫЙ CRON для обработки реферальных комиссий
- * КОПИРУЙ В: src/cron/referralCommissionCron.js
+ * ✅ referralCommissionCron.js - ИСПРАВЛЕННЫЙ
+ * 
+ * ГЛАВНОЕ: Используем processAllPendingCommissions из ReferralService
+ * которое считает комиссии на основе newTurnoverSinceLastPayout
  */
 
 const prisma = require('../../prismaClient');
 const logger = require('../utils/logger');
 const referralService = require('../services/ReferralService');
 
-// Конфигурация
 const CRON_INTERVAL_MS = 60 * 60 * 1000; // 1 час
 const DEFAULT_TOKEN_ID = 2; // USDT
 
 let cronInterval = null;
+let initialTimeout = null;
 
 /**
  * 🔄 Обработать все накопленные комиссии
  */
 async function processCommissions() {
-  console.log(`\n⏰ [CRON] Starting referral commission payout...`);
-  console.log(`📅 [CRON] Time: ${new Date().toISOString()}`);
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`⏰ [CRON] Starting referral commission payout`);
+  console.log(`📅 Time: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(80)}`);
   
   try {
-    // ✅ ИСПРАВЛЕНИЕ: processAllPendingCommissions теперь существует!
+    // ⭐ Вызываем исправленный метод
     const result = await referralService.processAllPendingCommissions(DEFAULT_TOKEN_ID);
     
-    // ✅ Проверяем что result существует и имеет нужные свойства
     if (!result) {
       logger.warn('CRON', 'processAllPendingCommissions returned null');
       return { processed: 0, success: 0, totalPaid: '0' };
     }
     
-    // ✅ Приводим totalPaid к числу перед toFixed
     const totalPaidNum = typeof result.totalPaid === 'string' 
       ? parseFloat(result.totalPaid) 
       : result.totalPaid;
     
-    const totalPaidFixed = parseFloat(totalPaidNum.toFixed(8));
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`✅ [CRON] Commission payout COMPLETED`);
+    console.log(`${'='.repeat(80)}`);
+    console.log(`📊 Processed: ${result.processed}`);
+    console.log(`✅ Success: ${result.success}`);
+    console.log(`💰 Total paid: ${totalPaidNum.toFixed(8)} USDT`);
+    console.log(`🟢 Regular: ${result.breakdown?.regular || 0} (${result.breakdown?.regularAmount?.toFixed(8) || '0'} USDT)`);
+    console.log(`🔴 Workers: ${result.breakdown?.workers || 0} (${result.breakdown?.workersAmount?.toFixed(8) || '0'} USDT)`);
+    console.log(`${'='.repeat(80)}\n`);
     
-    console.log(`✅ [CRON] Commission payout completed:`);
-    console.log(`   📊 Processed: ${result.processed}`);
-    console.log(`   ✅ Success: ${result.success}`);
-    console.log(`   💰 Total paid: ${totalPaidFixed.toFixed(4)} USDT`);
-    console.log(`   📦 Breakdown - Workers: ${result.breakdown?.workers || 0}, Regular: ${result.breakdown?.regular || 0}`);
+    logger.info('CRON', 'Commission processing completed', {
+      processed: result.processed,
+      success: result.success,
+      totalPaid: totalPaidNum.toFixed(8),
+      breakdown: result.breakdown
+    });
     
     return {
       ...result,
-      totalPaid: totalPaidFixed.toFixed(8)
+      totalPaid: totalPaidNum.toFixed(8)
     };
+    
   } catch (error) {
-    logger.error('CRON', `Error processing commissions: ${error.message}`);
-    console.error(`❌ [CRON] Error processing commissions:`, error);
+    console.error(`\n❌ [CRON] CRITICAL ERROR:`, error.message);
+    logger.error('CRON', `Error processing commissions: ${error.message}`, {
+      stack: error.stack
+    });
     return { processed: 0, success: 0, totalPaid: '0', error: error.message };
   }
 }
 
 /**
- * 🚀 Запустить CRON job
+ * 🚀 Запустить CRON
  */
 function startReferralCron(intervalMs = CRON_INTERVAL_MS) {
   if (cronInterval) {
     logger.warn('CRON', 'Referral cron already running');
     console.log('⚠️ [CRON] Referral cron already running');
-    return;
+    return { cronInterval, initialTimeout };
   }
   
-  logger.info('CRON', `Starting referral commission cron (interval: ${intervalMs / 1000}s)`);
-  console.log(`🚀 [CRON] Starting referral commission cron (interval: ${intervalMs / 1000}s)`);
+  logger.info('CRON', `Starting referral commission cron (interval: ${(intervalMs / 1000 / 60).toFixed(0)} min)`);
+  console.log(`🚀 [CRON] Starting referral commission cron`);
+  console.log(`   Interval: ${(intervalMs / 1000 / 60).toFixed(0)} minutes`);
+  console.log(`   First run: in 5 minutes\n`);
   
-  // Первый запуск через 5 минут после старта сервера
-  const initialTimeout = setTimeout(() => {
+  // Первый запуск через 5 минут
+  initialTimeout = setTimeout(() => {
+    console.log(`⏱️ [CRON] Running first scheduled commission check...\n`);
     processCommissions().catch(error => {
       logger.error('CRON', `Error in initial commission processing: ${error.message}`);
       console.error(error);
@@ -84,58 +101,73 @@ function startReferralCron(intervalMs = CRON_INTERVAL_MS) {
   }, intervalMs);
   
   logger.info('CRON', 'Referral commission cron started successfully');
-  console.log('✅ [CRON] Referral commission cron started');
+  console.log('✅ [CRON] Referral commission cron initialized\n');
   
   return { cronInterval, initialTimeout };
 }
 
 /**
- * 🛑 Остановить CRON job
+ * 🛑 Остановить CRON
  */
 function stopReferralCron() {
   if (cronInterval) {
     clearInterval(cronInterval);
     cronInterval = null;
-    logger.info('CRON', 'Referral commission cron stopped');
-    console.log('🛑 [CRON] Referral commission cron stopped');
   }
+  
+  if (initialTimeout) {
+    clearTimeout(initialTimeout);
+    initialTimeout = null;
+  }
+  
+  logger.info('CRON', 'Referral commission cron stopped');
+  console.log('🛑 [CRON] Referral commission cron stopped');
 }
 
 /**
- * 🔧 Проверить истёкшие бонусы
- * Рекомендуется запускать раз в день
+ * 🧹 Очистить истёкшие бонусы (запускать раз в день)
  */
 async function cleanupExpiredBonuses() {
-  console.log(`\n🧹 [CRON] Cleaning up expired bonuses...`);
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`🧹 [CRON] Cleaning up expired bonuses...`);
+  console.log(`${'='.repeat(80)}`);
+  
   logger.info('CRON', 'Starting expired bonuses cleanup');
   
   try {
-    // Находим истёкшие бонусы
     const expiredBonuses = await prisma.userBonus.findMany({
       where: {
         isActive: true,
         isCompleted: false,
         expiresAt: { lt: new Date() }
       },
-      select: { id: true, userId: true, tokenId: true }
+      select: { id: true, userId: true, tokenId: true, grantedAmount: true }
     });
     
-    console.log(`📊 [CRON] Found ${expiredBonuses.length} expired bonuses`);
-    logger.info('CRON', `Found ${expiredBonuses.length} expired bonuses to cleanup`);
+    console.log(`📊 Found ${expiredBonuses.length} expired bonuses`);
+    
+    if (expiredBonuses.length === 0) {
+      console.log('✅ No expired bonuses');
+      return { cleaned: 0 };
+    }
     
     let cleaned = 0;
+    let totalLost = 0;
     
     for (const bonus of expiredBonuses) {
       try {
-        // ✅ Используем transaction для атомарности
         await prisma.$transaction(async (tx) => {
           // Помечаем как неактивный
           await tx.userBonus.update({
             where: { id: bonus.id },
-            data: { isActive: false }
+            data: {
+              isActive: false,
+              isCompleted: true,
+              completedAt: new Date()
+            }
           });
           
-          // Обнуляем бонусный баланс для этого пользователя
+          // Обнуляем бонусный баланс
           await tx.balance.updateMany({
             where: {
               userId: bonus.userId,
@@ -147,32 +179,41 @@ async function cleanupExpiredBonuses() {
         });
         
         cleaned++;
+        const grantedAmount = parseFloat(bonus.grantedAmount.toString());
+        totalLost += grantedAmount;
+        
+        console.log(`   ✅ Expired: User ${bonus.userId}, Bonus ${grantedAmount.toFixed(8)}`);
         logger.debug('CRON', `Expired bonus ${bonus.id} for user ${bonus.userId}`);
-        console.log(`   🗑️ Expired bonus ${bonus.id} for user ${bonus.userId}`);
+        
       } catch (error) {
-        logger.error('CRON', `Error cleaning up bonus ${bonus.id}: ${error.message}`);
         console.error(`   ❌ Error cleaning bonus ${bonus.id}:`, error.message);
+        logger.error('CRON', `Error cleaning up bonus ${bonus.id}: ${error.message}`);
       }
     }
     
-    console.log(`✅ [CRON] Cleanup completed: ${cleaned} bonuses cleaned`);
+    console.log(`\n✅ [CRON] Cleanup completed: ${cleaned} bonuses cleaned`);
+    console.log(`💸 Total lost: ${totalLost.toFixed(8)} USDT`);
+    console.log(`${'='.repeat(80)}\n`);
+    
     logger.info('CRON', `Cleanup completed: ${cleaned} bonuses cleaned`);
     
-    return { cleaned };
+    return { cleaned, totalLost };
+    
   } catch (error) {
+    console.error(`\n❌ [CRON] Error cleaning up bonuses:`, error.message);
     logger.error('CRON', `Error cleaning up bonuses: ${error.message}`);
-    console.error(`❌ [CRON] Error cleaning up bonuses:`, error);
     throw error;
   }
 }
 
 /**
- * 🔍 Проверить статус CRON
+ * 🔍 Получить статус CRON
  */
 function getCronStatus() {
   return {
     isRunning: cronInterval !== null,
-    lastCheck: new Date().toISOString()
+    lastCheck: new Date().toISOString(),
+    interval: `${(CRON_INTERVAL_MS / 1000 / 60).toFixed(0)} minutes`
   };
 }
 

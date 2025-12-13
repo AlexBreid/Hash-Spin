@@ -1,6 +1,9 @@
 /**
  * ✅ ReferralService.js - ИСПРАВЛЕННЫЙ
  * 
+ * ПРОБЛЕМА: Считал комиссии с нуля каждый раз, перебирая ВСЕ ставки
+ * РЕШЕНИЕ: Используем ReferralStats для отслеживания уже обработанного оборота
+ * 
  * КОМИССИИ:
  * 1. REGULAR: (House Edge × Turnover / 2) × Commission Rate
  * 2. WORKER: 5% от потерь казино (суммы которую проебали рефералы)
@@ -8,6 +11,7 @@
 
 const prisma = require('../../prismaClient');
 const logger = require('../utils/logger');
+const Decimal = require('decimal.js');
 
 class ReferralService {
   static CONFIG = {
@@ -30,7 +34,10 @@ class ReferralService {
     // КОМИССИИ
     HOUSE_EDGE: 0.03,           // 3% HE для REGULAR комиссии
     REGULAR_COMMISSION_RATE: 0.30,  // 0.30% от (HE × Turnover / 2)
-    WORKER_PROFIT_SHARE: 5.0    // 5% от потерь
+    WORKER_PROFIT_SHARE: 5.0,   // 5% от потерь
+    
+    // ПОРОГ ВЫПЛАТЫ
+    COMMISSION_PAYOUT_THRESHOLD: 1  // Выплачивать только если > 1 USDT
   };
 
   /**
@@ -136,7 +143,7 @@ class ReferralService {
   }
 
   /**
-   * 🎰 ОБРАБОТАТЬ СТАВКУ
+   * 🎰 ОБРАБОТАТЬ СТАВКУ И ДОБАВИТЬ В СТАТИСТИКУ
    */
   async processBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
     try {
@@ -152,6 +159,51 @@ class ReferralService {
         return;
       }
 
+      // ⭐ ДОБАВЛЯЕМ В СТАТИСТИКУ РЕФЕРАЛОВ
+      const user = await prisma.user.findUnique({
+        where: { id: userIdNum },
+        select: { referredById: true }
+      });
+
+      if (user?.referredById) {
+        // Получаем текущую статистику
+        const stats = await prisma.referralStats.findUnique({
+          where: {
+            referrerId_refereeId_tokenId: {
+              referrerId: user.referredById,
+              refereeId: userIdNum,
+              tokenId
+            }
+          }
+        });
+
+        if (stats) {
+          // Обновляем существующую запись
+          await prisma.referralStats.update({
+            where: { id: stats.id },
+            data: {
+              totalTurnover: { increment: betNum },
+              newTurnoverSinceLastPayout: { increment: betNum }  // ⭐ НОВЫЙ ОБОРОТ
+            }
+          });
+        } else {
+          // Создаем новую запись
+          await prisma.referralStats.create({
+            data: {
+              referrerId: user.referredById,
+              refereeId: userIdNum,
+              tokenId,
+              totalTurnover: betNum,
+              newTurnoverSinceLastPayout: betNum,
+              totalCommissionPaid: '0',
+              totalLosses: '0',
+              totalWinnings: '0'
+            }
+          });
+        }
+      }
+
+      // Обновляем бонус если это бонусная ставка
       if (balanceType === 'BONUS') {
         const activeBonus = await prisma.userBonus.findFirst({
           where: {
@@ -172,6 +224,32 @@ class ReferralService {
       }
     } catch (error) {
       logger.warn('REFERRAL', 'Error processing bet', { error: error.message });
+    }
+  }
+
+  /**
+   * 📊 ОБНОВИТЬ РЕЗУЛЬТАТЫ ИГРЫ (ПОТЕРИ/ВЫИГРЫШИ)
+   */
+  async recordGameResult(referrerId, refereeId, tokenId, losses, winnings) {
+    try {
+      const lossesNum = parseFloat(losses);
+      const winningsNum = parseFloat(winnings);
+
+      if (isNaN(lossesNum) || isNaN(winningsNum)) return;
+
+      await prisma.referralStats.updateMany({
+        where: {
+          referrerId,
+          refereeId,
+          tokenId
+        },
+        data: {
+          totalLosses: { increment: lossesNum },
+          totalWinnings: { increment: winningsNum }
+        }
+      });
+    } catch (error) {
+      logger.warn('REFERRAL', 'Error recording game result', { error: error.message });
     }
   }
 
@@ -285,9 +363,9 @@ class ReferralService {
   }
 
   /**
-   * 👥 ПОЛУЧИТЬ СТАТИСТИКУ РЕФЕРЕРА
+   * 👥 ПОЛУЧИТЬ СТАТИСТИКУ РЕФЕРЕРА (ИЗ БАЗЫ, БЕЗ ПЕРЕСЧЕТА)
    * 🟢 REGULAR: (House Edge × Turnover / 2) × Commission Rate
-   * 🔴 WORKER: 5% от потерь казино (суммы которую проебали рефералы)
+   * 🔴 WORKER: 5% от потерь казино
    */
   async getReferrerStats(userId) {
     try {
@@ -301,125 +379,51 @@ class ReferralService {
 
       if (!user) return null;
 
-      const referrals = await prisma.user.findMany({
-        where: { referredById: userIdNum },
-        select: { id: true }
+      // ⭐ Получаем ВСЮ статистику из БД (она уже пересчитана в CRON)
+      const stats = await prisma.referralStats.findMany({
+        where: { referrerId: userIdNum }
       });
 
-      const referralIds = referrals.map(r => r.id);
+      let totalTurnover = new Decimal(0);
+      let totalCommissionPaid = new Decimal(0);
+      let totalLosses = new Decimal(0);
+      let pendingCommission = new Decimal(0);
 
-      if (user.referrerType === 'REGULAR') {
-        // 🟢 REGULAR: (HE × Turnover / 2) × Commission Rate
-        console.log(`\n👤 [STATS] REGULAR реферер ${userIdNum}`);
-        console.log(`   Формула: (HE × Turnover / 2) × CommRate`);
+      for (const stat of stats) {
+        totalTurnover = totalTurnover.plus(stat.totalTurnover);
+        totalCommissionPaid = totalCommissionPaid.plus(stat.totalCommissionPaid);
+        totalLosses = totalLosses.plus(stat.totalLosses || 0);
 
-        let totalTurnover = 0;
-        let totalCommissionPaid = 0;
-
-        for (const refId of referralIds) {
-          // Получаем ставки из CRASH игр
-          const crashBets = await prisma.crashBet.aggregate({
-            where: { userId: refId },
-            _sum: { betAmount: true }
-          });
-
-          // Получаем ставки из обычных игр
-          const otherBets = await prisma.bet.aggregate({
-            where: { userId: refId },
-            _sum: { betAmount: true }
-          });
-
-          const crashTurnover = parseFloat(crashBets._sum.betAmount?.toString() || '0');
-          const otherTurnover = parseFloat(otherBets._sum.betAmount?.toString() || '0');
-          const turnover = crashTurnover + otherTurnover;
-
-          if (turnover <= 0) continue;
-
-          totalTurnover += turnover;
-
-          // Формула: (HE × Turnover / 2) × CommRate
-          const houseEdge = ReferralService.CONFIG.HOUSE_EDGE;        // 0.03
-          const commissionRate = ReferralService.CONFIG.REGULAR_COMMISSION_RATE;  // 0.30
-          const commission = (houseEdge * turnover / 2) * (commissionRate / 100);
-          
-          totalCommissionPaid += commission;
-
-          console.log(`   Реферал ${refId}: Turnover=${turnover.toFixed(2)}, Commission=${commission.toFixed(8)}`);
+        // Считаем ожидаемую комиссию на основе типа реферера
+        if (user.referrerType === 'REGULAR') {
+          const turnover = new Decimal(stat.newTurnoverSinceLastPayout || 0);
+          const houseEdge = new Decimal(ReferralService.CONFIG.HOUSE_EDGE);
+          const commissionRate = new Decimal(ReferralService.CONFIG.REGULAR_COMMISSION_RATE);
+          const commission = houseEdge
+            .times(turnover)
+            .dividedBy(2)
+            .times(commissionRate)
+            .dividedBy(100);
+          pendingCommission = pendingCommission.plus(commission);
+        } else if (user.referrerType === 'WORKER') {
+          const losses = new Decimal(stat.totalLosses || 0);
+          const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
+          const commission = losses.times(workerShare).dividedBy(100);
+          pendingCommission = pendingCommission.plus(commission);
         }
-
-        console.log(`   ✅ Total: Turnover=${totalTurnover.toFixed(2)}, Paid=${totalCommissionPaid.toFixed(8)}\n`);
-
-        return {
-          referralsCount: referralIds.length,
-          totalTurnover: parseFloat(totalTurnover.toFixed(8)),
-          totalCommissionPaid: parseFloat(totalCommissionPaid.toFixed(8)),
-          potentialCommission: parseFloat(totalCommissionPaid.toFixed(8)),
-          commissionRate: ReferralService.CONFIG.REGULAR_COMMISSION_RATE,
-          referrerType: 'REGULAR'
-        };
-
-      } else if (user.referrerType === 'WORKER') {
-        // 🔴 WORKER: 5% от потерь казино
-        console.log(`\n👷 [STATS] WORKER реферер ${userIdNum}`);
-        console.log(`   Формула: 5% от потерь рефералов`);
-
-        let totalTurnover = 0;
-        let totalLosses = 0;
-        let totalCommissionPaid = 0;
-
-        for (const refId of referralIds) {
-          // CRASH ставки
-          const crashStats = await prisma.crashBet.aggregate({
-            where: { userId: refId },
-            _sum: { betAmount: true, winnings: true }
-          });
-
-          const crashBetAmount = parseFloat(crashStats._sum.betAmount?.toString() || '0');
-          const crashWinnings = parseFloat(crashStats._sum.winnings?.toString() || '0');
-
-          // Обычные ставки
-          const otherStats = await prisma.bet.aggregate({
-            where: { userId: refId },
-            _sum: { betAmount: true, payoutAmount: true }
-          });
-
-          const otherBetAmount = parseFloat(otherStats._sum.betAmount?.toString() || '0');
-          const otherPayout = parseFloat(otherStats._sum.payoutAmount?.toString() || '0');
-
-          const totalBet = crashBetAmount + otherBetAmount;
-          const totalWon = crashWinnings + otherPayout;
-
-          if (totalBet <= 0) continue;
-
-          totalTurnover += totalBet;
-
-          // Потери казино = выигрыши игрока минус ставки
-          // Если игрок выиграл больше чем поставил - казино потеряло
-          const losses = Math.max(totalWon - totalBet, 0);
-          
-          if (losses <= 0) continue;
-
-          totalLosses += losses;
-
-          // 5% от потерь
-          const workerProfit = losses * (ReferralService.CONFIG.WORKER_PROFIT_SHARE / 100);
-          totalCommissionPaid += workerProfit;
-
-          console.log(`   Реферал ${refId}: Bet=${totalBet.toFixed(2)}, Won=${totalWon.toFixed(2)}, Losses=${losses.toFixed(2)}, Worker5%=${workerProfit.toFixed(8)}`);
-        }
-
-        console.log(`   ✅ Total: Turnover=${totalTurnover.toFixed(2)}, Losses=${totalLosses.toFixed(2)}, Paid=${totalCommissionPaid.toFixed(8)}\n`);
-
-        return {
-          referralsCount: referralIds.length,
-          totalTurnover: parseFloat(totalTurnover.toFixed(8)),
-          totalLosses: parseFloat(totalLosses.toFixed(8)),
-          totalCommissionPaid: parseFloat(totalCommissionPaid.toFixed(8)),
-          potentialCommission: parseFloat(totalCommissionPaid.toFixed(8)),
-          commissionRate: ReferralService.CONFIG.WORKER_PROFIT_SHARE,
-          referrerType: 'WORKER'
-        };
       }
+
+      return {
+        referralsCount: stats.length,
+        totalTurnover: parseFloat(totalTurnover.toString()),
+        totalCommissionPaid: parseFloat(totalCommissionPaid.toString()),
+        totalLosses: parseFloat(totalLosses.toString()),
+        potentialCommission: parseFloat(pendingCommission.toString()),
+        commissionRate: user.referrerType === 'REGULAR' 
+          ? ReferralService.CONFIG.REGULAR_COMMISSION_RATE
+          : ReferralService.CONFIG.WORKER_PROFIT_SHARE,
+        referrerType: user.referrerType
+      };
 
     } catch (error) {
       logger.error('REFERRAL', 'Error getting referrer stats', { error: error.message });
@@ -479,148 +483,149 @@ class ReferralService {
 
   /**
    * 💰 ОБРАБОТАТЬ ВСЕ НАКОПЛЕННЫЕ КОМИССИИ
-   * 🟢 REGULAR: (HE × Turnover / 2) × CommRate
-   * 🔴 WORKER: 5% от потерь
+   * ⭐ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Считаем на основе newTurnoverSinceLastPayout
+   * 
+   * 🟢 REGULAR: (HE × newTurnover / 2) × CommRate
+   * 🔴 WORKER: 5% от totalLosses
    */
   async processAllPendingCommissions(tokenId = 2) {
     console.log(`\n💰 [PROCESS COMMISSIONS] Starting...`);
+    console.log(`📅 Time: ${new Date().toISOString()}`);
     
     try {
-      const referrers = await prisma.user.findMany({
-        where: { referrerType: { in: ['REGULAR', 'WORKER'] } },
-        select: { id: true, referrerType: true }
+      // ⭐ Находим ВСЕ статистики, где есть новый оборот
+      const allStats = await prisma.referralStats.findMany({
+        where: { tokenId },
+        include: {
+          referrer: { select: { id: true, referrerType: true } },
+          referee: { select: { id: true } }
+        }
       });
+
+      console.log(`📊 [PROCESS] Found ${allStats.length} referral pairs`);
 
       let processed = 0;
       let success = 0;
-      let totalPaid = 0;
-
       const breakdown = { workers: 0, workersAmount: 0, regular: 0, regularAmount: 0 };
 
-      for (const referrer of referrers) {
+      for (const stat of allStats) {
         try {
-          const referrals = await prisma.user.findMany({
-            where: { referredById: referrer.id },
-            select: { id: true }
-          });
+          const referrerType = stat.referrer.referrerType;
+          let commission = new Decimal(0);
 
-          let referrerCommission = 0;
-
-          if (referrer.referrerType === 'REGULAR') {
-            // 🟢 REGULAR: (HE × Turnover / 2) × CommRate
-            for (const referral of referrals) {
-              const crashBets = await prisma.crashBet.aggregate({
-                where: { userId: referral.id },
-                _sum: { betAmount: true }
-              });
-
-              const otherBets = await prisma.bet.aggregate({
-                where: { userId: referral.id },
-                _sum: { betAmount: true }
-              });
-
-              const crashTurnover = parseFloat(crashBets._sum.betAmount?.toString() || '0');
-              const otherTurnover = parseFloat(otherBets._sum.betAmount?.toString() || '0');
-              const turnover = crashTurnover + otherTurnover;
-
-              if (turnover <= 0) continue;
-
-              const houseEdge = ReferralService.CONFIG.HOUSE_EDGE;
-              const commissionRate = ReferralService.CONFIG.REGULAR_COMMISSION_RATE;
-              const commission = (houseEdge * turnover / 2) * (commissionRate / 100);
+          if (referrerType === 'REGULAR') {
+            // 🟢 REGULAR: (HE × newTurnover / 2) × CommRate
+            const turnover = new Decimal(stat.newTurnoverSinceLastPayout || 0);
+            
+            if (turnover.greaterThan(0)) {
+              const houseEdge = new Decimal(ReferralService.CONFIG.HOUSE_EDGE);
+              const commissionRate = new Decimal(ReferralService.CONFIG.REGULAR_COMMISSION_RATE);
               
-              referrerCommission += commission;
+              commission = houseEdge
+                .times(turnover)
+                .dividedBy(2)
+                .times(commissionRate)
+                .dividedBy(100);
+
+              console.log(`   🟢 REGULAR ${stat.referrer.id}: Turnover=${turnover.toFixed(2)}, Commission=${commission.toFixed(8)}`);
             }
 
-            if (referrerCommission > 0) {
+          } else if (referrerType === 'WORKER') {
+            // 🔴 WORKER: 5% от totalLosses
+            const losses = new Decimal(stat.totalLosses || 0);
+            
+            if (losses.greaterThan(0)) {
+              const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
+              commission = losses.times(workerShare).dividedBy(100);
+
+              console.log(`   🔴 WORKER ${stat.referrer.id}: Losses=${losses.toFixed(2)}, Commission=${commission.toFixed(8)}`);
+            }
+          }
+
+          // Только если комиссия выше порога
+          if (commission.greaterThanOrEqualTo(ReferralService.CONFIG.COMMISSION_PAYOUT_THRESHOLD)) {
+            // ⭐ Выплачиваем и обнуляем новый оборот
+            const result = await prisma.$transaction(async (tx) => {
+              // Добавляем комиссию в баланс реферера
+              await tx.balance.upsert({
+                where: {
+                  userId_tokenId_type: {
+                    userId: stat.referrer.id,
+                    tokenId,
+                    type: 'MAIN'
+                  }
+                },
+                create: {
+                  userId: stat.referrer.id,
+                  tokenId,
+                  type: 'MAIN',
+                  amount: commission.toFixed(18)
+                },
+                update: {
+                  amount: { increment: commission.toFixed(18) }
+                }
+              });
+
+              // ⭐ ГЛАВНОЕ: Обнулить новый оборот и обновить totalCommissionPaid
+              await tx.referralStats.update({
+                where: { id: stat.id },
+                data: {
+                  newTurnoverSinceLastPayout: 0,  // ⭐ ОБНУЛИТЬ!
+                  totalCommissionPaid: { increment: commission.toFixed(18) },
+                  lastPayoutAt: new Date()
+                }
+              });
+
+              // Логируем транзакцию
+              await tx.transaction.create({
+                data: {
+                  userId: stat.referrer.id,
+                  tokenId,
+                  type: 'REFERRAL_COMMISSION',
+                  status: 'COMPLETED',
+                  amount: commission.toFixed(18),
+                  txHash: `REF-${stat.id}-${Date.now()}`,
+                  createdAt: new Date()
+                }
+              });
+
+              return commission;
+            });
+
+            success++;
+
+            if (referrerType === 'REGULAR') {
               breakdown.regular++;
-              breakdown.regularAmount += referrerCommission;
-            }
-
-          } else if (referrer.referrerType === 'WORKER') {
-            // 🔴 WORKER: 5% от потерь
-            for (const referral of referrals) {
-              const crashStats = await prisma.crashBet.aggregate({
-                where: { userId: referral.id },
-                _sum: { betAmount: true, winnings: true }
-              });
-
-              const otherStats = await prisma.bet.aggregate({
-                where: { userId: referral.id },
-                _sum: { betAmount: true, payoutAmount: true }
-              });
-
-              const crashBetAmount = parseFloat(crashStats._sum.betAmount?.toString() || '0');
-              const crashWinnings = parseFloat(crashStats._sum.winnings?.toString() || '0');
-              const otherBetAmount = parseFloat(otherStats._sum.betAmount?.toString() || '0');
-              const otherPayout = parseFloat(otherStats._sum.payoutAmount?.toString() || '0');
-
-              const totalBet = crashBetAmount + otherBetAmount;
-              const totalWon = crashWinnings + otherPayout;
-              
-              if (totalBet <= 0) continue;
-
-              const losses = Math.max(totalWon - totalBet, 0);
-              if (losses <= 0) continue;
-
-              const workerProfit = losses * (ReferralService.CONFIG.WORKER_PROFIT_SHARE / 100);
-              referrerCommission += workerProfit;
-            }
-
-            if (referrerCommission > 0) {
+              breakdown.regularAmount += parseFloat(result.toString());
+            } else {
               breakdown.workers++;
-              breakdown.workersAmount += referrerCommission;
+              breakdown.workersAmount += parseFloat(result.toString());
             }
+          } else {
+            console.log(`   ⏭️ Commission ${commission.toFixed(8)} < threshold ${ReferralService.CONFIG.COMMISSION_PAYOUT_THRESHOLD}, skipped`);
           }
-
-          if (referrerCommission <= 0) {
-            processed++;
-            continue;
-          }
-
-          await prisma.balance.upsert({
-            where: {
-              userId_tokenId_type: {
-                userId: referrer.id,
-                tokenId,
-                type: 'MAIN'
-              }
-            },
-            create: {
-              userId: referrer.id,
-              tokenId,
-              type: 'MAIN',
-              amount: referrerCommission.toFixed(8)
-            },
-            update: {
-              amount: { increment: referrerCommission }
-            }
-          });
 
           processed++;
-          success++;
-          totalPaid += referrerCommission;
-
-          console.log(`   ✅ ${referrer.referrerType} ${referrer.id}: ${referrerCommission.toFixed(8)} USDT`);
 
         } catch (error) {
-          console.error(`   ❌ Error processing referrer ${referrer.id}:`, error.message);
+          console.error(`   ❌ Error processing referrer ${stat.referrer.id}:`, error.message);
           processed++;
         }
       }
 
-      console.log(`\n📊 [PROCESS COMMISSIONS] Completed:`);
-      console.log(`   Total: ${processed}, Success: ${success}`);
-      console.log(`   Paid: ${totalPaid.toFixed(8)} USDT`);
-      console.log(`   REGULAR: ${breakdown.regular} (${breakdown.regularAmount.toFixed(8)} USDT)`);
-      console.log(`   WORKER: ${breakdown.workers} (${breakdown.workersAmount.toFixed(8)} USDT)\n`);
+      console.log(`\n✅ [PROCESS COMMISSIONS] Completed:`);
+      console.log(`   📊 Processed: ${processed}`);
+      console.log(`   ✅ Paid: ${success}`);
+      console.log(`   🟢 Regular: ${breakdown.regular} (${breakdown.regularAmount.toFixed(8)} USDT)`);
+      console.log(`   🔴 Workers: ${breakdown.workers} (${breakdown.workersAmount.toFixed(8)} USDT)\n`);
 
       return {
         processed,
         success,
-        totalPaid: totalPaid.toFixed(8),
+        totalPaid: (breakdown.regularAmount + breakdown.workersAmount).toFixed(8),
         breakdown
       };
+
     } catch (error) {
       console.error(`❌ [PROCESS COMMISSIONS] Error:`, error.message);
       logger.error('REFERRAL', 'Error processing all commissions', { error: error.message });
