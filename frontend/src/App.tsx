@@ -19,8 +19,8 @@ import { WithdrawPage } from './components/pages/WithdrawPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
-import { BonusModal } from './components/modals/BonusModal';
-import { BonusFloatingButton } from './components/modals/BonusFloatingButton';
+import { BonusModal } from './components/modals/Bonusmodal';
+import { BonusFloatingButton } from './components/modals/Bonusfloatingbutton';
 
 const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper'];
 
