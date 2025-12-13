@@ -1,12 +1,15 @@
 /**
- * ✅ TELEGRAM БОТ С КРАСИВЫМИ УСЛОВИЯМИ БОНУСА
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ С ИНТЕГРИРОВАННОЙ РЕФЕРАЛКОЙ И КРАСИВЫМИ БОНУСАМИ
  * 
  * НОВОЕ:
- * ✨ Когда выбираешь "С БОНУСОМ", сначала показываются красиво оформленные условия
- * ✅ Две кнопки: "ПРИНИМАЮ УСЛОВИЯ" и "ОТКАЗАТЬСЯ"
- * 💰 После согласия - создаётся инвойс
+ * ✨ Полная интеграция рефералки в /start
+ * ✅ Автоматическая привязка реферера при регистрации
+ * 🎁 Бонус выдается при первом депозите
+ * 📊 Реферальная статистика и комиссии
+ * 🔗 Красивая реферальная ссылка в профиле
+ * ✨ Красивые условия бонуса при депозите
  * 
- * Скопируй содержимое в: src/bots/telegramBot.js
+ * Замени содержимое src/bots/telegramBot.js на этот код
  */
 
 const { Telegraf } = require('telegraf');
@@ -25,6 +28,96 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 🎁 ФУНКЦИИ РЕФЕРАЛКИ
+// ════════════════════════════════════════════════════════════════════════════════
+
+function parseReferralCode(payload) {
+  if (!payload || typeof payload !== 'string') return null;
+  const trimmed = payload.trim();
+  if (trimmed.startsWith('ref_')) {
+    return trimmed.substring(4).trim();
+  }
+  if (trimmed.length > 0 && trimmed.length <= 50) {
+    return trimmed;
+  }
+  return null;
+}
+
+function generateReferralLink(botUsername, referralCode) {
+  return `https://t.me/${botUsername}?start=ref_${referralCode}`;
+}
+
+async function applyReferrer(newUserId, referralCode) {
+  try {
+    if (!referralCode || typeof referralCode !== 'string') {
+      return { success: false, reason: 'Invalid referral code format' };
+    }
+
+    console.log(`[REFERRAL] 🔍 Searching for referrer with code: ${referralCode}`);
+
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true, username: true, telegramId: true }
+    });
+
+    if (!referrer) {
+      console.log(`[REFERRAL] ❌ Referrer not found with code: ${referralCode}`);
+      return { success: false, reason: 'Referrer not found' };
+    }
+
+    if (referrer.id === newUserId) {
+      console.log(`[REFERRAL] ⚠️ User tried to refer himself`);
+      return { success: false, reason: 'Cannot refer yourself' };
+    }
+
+    await prisma.user.update({
+      where: { id: newUserId },
+      data: { referredById: referrer.id }
+    });
+
+    console.log(`[REFERRAL] ✅ Successfully applied referrer ${referrer.id} to user ${newUserId}`);
+    logger.info('REFERRAL', 'Referrer applied to new user', {
+      newUserId,
+      referrerId: referrer.id,
+      referrerUsername: referrer.username
+    });
+
+    return {
+      success: true,
+      referrerId: referrer.id,
+      referrerUsername: referrer.username,
+      referrerTelegramId: referrer.telegramId
+    };
+
+  } catch (error) {
+    console.error(`[REFERRAL] ❌ Error applying referrer: ${error.message}`);
+    logger.error('REFERRAL', 'Error applying referrer', {
+      newUserId,
+      referralCode,
+      error: error.message
+    });
+    return { success: false, reason: error.message };
+  }
+}
+
+async function notifyReferrerAboutNewReferee(bot, referrerTelegramId, newUserUsername) {
+  try {
+    const userDisplay = newUserUsername ? `@${newUserUsername}` : 'новый пользователь';
+    await bot.telegram.sendMessage(
+      referrerTelegramId,
+      `🎉 *Новый реферал!*\n\n` +
+      `👤 ${userDisplay} присоединился к вашей сети!\n\n` +
+      `💰 Когда он пополнит счёт - вы получите комиссию.\n\n` +
+      `📊 Проверить статистику: нажмите "👥 Рефералы"`,
+      { parse_mode: 'Markdown' }
+    );
+    console.log(`[REFERRAL] ✅ Notification sent to referrer ${referrerTelegramId}`);
+  } catch (error) {
+    console.warn(`[REFERRAL] ⚠️ Failed to notify referrer: ${error.message}`);
+  }
+}
 
 // ====================================
 // СОСТОЯНИЯ (Maps)
@@ -458,7 +551,7 @@ if (!BOT_TOKEN) {
   }
 
   // ====================================
-  // /start КОМАНДА
+  // /start КОМАНДА С РЕФЕРАЛКОЙ
   // ====================================
 
   bot.start(async (ctx) => {
@@ -476,11 +569,14 @@ if (!BOT_TOKEN) {
       let isNewUser = false;
       let rawPassword = null;
       let referralApplied = false;
+      let referrerInfo = null;
 
       const startPayload = ctx.startPayload;
       let referralCode = null;
-      if (startPayload && startPayload.startsWith('ref_')) {
-        referralCode = startPayload.replace('ref_', '');
+      
+      if (startPayload) {
+        referralCode = parseReferralCode(startPayload);
+        console.log(`[START] 📋 Parsed referral code: ${referralCode}`);
       }
 
       if (!user) {
@@ -489,21 +585,31 @@ if (!BOT_TOKEN) {
         rawPassword = pwd;
         isNewUser = true;
         
+        console.log(`[START] ✅ New user registered: ${user.id}`);
         logger.info('BOT', `New user registered`, { userId: user.id, telegramId });
 
         if (referralCode) {
-          const referrer = await prisma.user.findUnique({
-            where: { referralCode },
-            select: { id: true }
-          });
-
-          if (referrer && referrer.id !== user.id) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { referredById: referrer.id }
-            });
+          console.log(`[START] 🎁 Applying referrer with code: ${referralCode}`);
+          
+          referrerInfo = await applyReferrer(user.id, referralCode);
+          
+          if (referrerInfo.success) {
             referralApplied = true;
-            logger.info('BOT', `Referral applied`, { userId: user.id, referrerId: referrer.id });
+            console.log(`[START] ✅ Referrer applied: ${referrerInfo.referrerId}`);
+            logger.info('BOT', `Referral link applied`, {
+              newUserId: user.id,
+              referrerId: referrerInfo.referrerId
+            });
+            
+            if (referrerInfo.referrerTelegramId) {
+              await notifyReferrerAboutNewReferee(
+                bot,
+                referrerInfo.referrerTelegramId,
+                user.username
+              );
+            }
+          } else {
+            console.warn(`[START] ⚠️ Failed to apply referrer: ${referrerInfo.reason}`);
           }
         }
       }
@@ -526,7 +632,9 @@ if (!BOT_TOKEN) {
           `⚠️ *Сохраните пароль! Он показывается только один раз.*`;
         
         if (referralApplied) {
-          credentialsBlock += `\n\n🎁 *Бонус активирован!*\nПри первом депозите сможете использовать +100% бонус!`;
+          credentialsBlock += `\n\n🎁 *Бонус активирован!*\n` +
+            `✅ Реферер: ${referrerInfo.referrerUsername || `ID${referrerInfo.referrerId}`}\n` +
+            `💰 При первом депозите вы получите +100% бонус!`;
         }
       }
 
@@ -933,17 +1041,35 @@ if (!BOT_TOKEN) {
               select: { referralCode: true, referrerType: true }
             });
             
-            const referralLink = `https://t.me/${ctx.botInfo.username}?start=ref_${userInfo.referralCode}`;
+            const botInfo = await bot.telegram.getMe();
+            const referralLink = generateReferralLink(botInfo.username, userInfo.referralCode);
+            
             const typeEmoji = userInfo.referrerType === 'WORKER' ? '👷' : '👤';
             
-            const refMsg = `${typeEmoji} *Реферальная программа*\n\n` +
-              `🔗 Ваша ссылка:\n\`${referralLink}\`\n\n` +
-              `📊 *Статистика:*\n` +
-              `👥 Рефералов: ${stats.referralsCount}\n` +
-              `💰 Оборот: ${stats.totalTurnover} USDT\n` +
-              `✅ Выплачено: ${stats.totalCommissionPaid} USDT\n` +
-              `⏳ Накоплено: ${stats.potentialCommission} USDT\n\n` +
-              `💎 Ваша комиссия: *${stats.commissionRate}%*`;
+            const refMsg = `${typeEmoji} *РЕФЕРАЛЬНАЯ ПРОГРАММА*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 *ВАШ РЕФЕРАЛЬНЫЙ КОД:*
+\`${userInfo.referralCode}\`
+
+📱 *РЕФЕРАЛЬНАЯ ССЫЛКА:*
+\`${referralLink}\`
+
+💡 Отправьте эту ссылку друзьям - когда они 
+присоединятся, вы получите комиссию!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *СТАТИСТИКА:*
+👥 Рефералов: ${stats.referralsCount}
+💰 Оборот: ${stats.totalTurnover.toFixed(2)} USDT
+✅ Выплачено: ${stats.totalCommissionPaid.toFixed(2)} USDT
+⏳ Накоплено: ${stats.potentialCommission.toFixed(2)} USDT
+
+💎 Ваша комиссия: *${stats.commissionRate}%*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
             
             await ctx.reply(refMsg, { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) });
           } catch (error) {
@@ -954,7 +1080,6 @@ if (!BOT_TOKEN) {
         }
 
         case '👤 Профиль': {
-          // ✅ ИСПРАВЛЕНИЕ: Получаем оба баланса и объединяем их
           const mainBalance = await prisma.balance.findUnique({
             where: { userId_tokenId_type: { userId: user.id, tokenId: 2, type: 'MAIN' } }
           });
@@ -970,7 +1095,6 @@ if (!BOT_TOKEN) {
           if (user.isAdmin) badges.push('👑 АДМИН');
           if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
           
-          // Получаем активный бонус если есть
           let bonusStatus = '';
           const activeBonus = await prisma.userBonus.findFirst({
             where: {
@@ -991,7 +1115,6 @@ if (!BOT_TOKEN) {
               `⏰ Дней осталось: ${daysLeft}`;
           }
           
-          // ✅ Показываем объединённый баланс
           const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
 
           await ctx.reply(
@@ -1105,7 +1228,7 @@ if (!BOT_TOKEN) {
     await ctx.answerCbQuery();
   });
 
-  // ✨ НОВОЕ: ПОКАЗАТЬ УСЛОВИЯ БОНУСА
+  // ✨ ПОКАЗАТЬ УСЛОВИЯ БОНУСА
   bot.action(/show_bonus_conditions_(\d+(?:\.\d+)?)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1125,7 +1248,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // Рассчитываем бонус
       let bonusAmount = amount * (referralService.constructor.CONFIG.DEPOSIT_BONUS_PERCENT / 100);
       const maxBonus = referralService.constructor.CONFIG.MAX_BONUS_AMOUNT;
       
@@ -1137,7 +1259,6 @@ if (!BOT_TOKEN) {
       const requiredWager = totalAmount * referralService.constructor.CONFIG.WAGERING_MULTIPLIER;
       const maxPayout = totalAmount * referralService.constructor.CONFIG.MAX_PAYOUT_MULTIPLIER;
 
-      // ✅ ОБНОВЛЕНО: Добавили максимальный размер бонуса (1500 USDT)
       const conditionsText = `🎁 *УСЛОВИЯ ВАШЕГО БОНУСА*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1469,7 +1590,6 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal request created: #${result.withdrawalId}`);
 
-      // ✅ ИСПРАВЛЕНИЕ: Показываем имя пользователя вместо ID
       const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
 
       await ctx.reply(
@@ -1612,7 +1732,6 @@ if (!BOT_TOKEN) {
     
     for (const w of pendingWithdrawals) {
       const amount = parseFloat(w.amount.toString());
-      // ✅ ИСПРАВЛЕНИЕ: Показываем имя пользователя вместо ID
       const userDisplayName = w.user?.username ? `@${w.user.username}` : `ID: ${w.userId}`;
       
       let shortAddr = '—';
@@ -1916,7 +2035,7 @@ if (!BOT_TOKEN) {
   module.exports = {
     start: () => {
       bot.launch();
-      logger.info('BOT', 'Telegram Bot started successfully');
+      logger.info('BOT', 'Telegram Bot started successfully with referral system');
     },
     botInstance: bot,
     cryptoPayAPI,
@@ -1924,6 +2043,10 @@ if (!BOT_TOKEN) {
     waitingForWithdrawAmount,
     supportTickets,
     setStateTimeout,
-    generateTicketId
+    generateTicketId,
+    parseReferralCode,
+    generateReferralLink,
+    applyReferrer,
+    notifyReferrerAboutNewReferee
   };
 }

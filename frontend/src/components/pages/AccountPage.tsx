@@ -163,6 +163,8 @@ const MetricCard = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
+  console.log('🎁 BonusCard rendering with:', bonus);
+  
   const wagered = toNumber(bonus.wageredAmount);
   const required = toNumber(bonus.requiredWager);
   const granted = toNumber(bonus.grantedAmount);
@@ -172,6 +174,8 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
   const expiresAt = new Date(bonus.expiresAt);
   const now = new Date();
   const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  
+  console.log('🎁 BonusCard computed:', { wagered, required, granted, remaining, progress, daysLeft });
   
   return (
     <motion.div
@@ -345,18 +349,34 @@ export function AccountPage() {
     }
   }, [data]);
 
-  // 🎁 Обработка бонуса (с фалбэком)
+  // 🎁 Обработка бонуса (с фалбэком) - ИСПРАВЛЕНО
   useEffect(() => {
     if (bonusData) {
-      console.log('✅ Bonus data:', bonusData);
+      console.log('🎁 Raw bonusData:', bonusData);
       try {
-        if (bonusData.success && bonusData.data) {
-          setActiveBonus(bonusData.data as ActiveBonus);
-        } else if (bonusData.data) {
-          setActiveBonus(bonusData.data as ActiveBonus);
+        // ✅ Проверяем сначала на прямой объект (если API вернул напрямую)
+        if (bonusData.id && bonusData.grantedAmount !== undefined && bonusData.requiredWager !== undefined) {
+          console.log('✅ [DIRECT BONUS] Setting active bonus:', bonusData);
+          setActiveBonus(bonusData as ActiveBonus);
+          return;
         }
+        
+        // Потом проверяем на обёрнутый объект
+        if (bonusData.success && bonusData.data) {
+          console.log('✅ [WRAPPED BONUS] Setting from success.data:', bonusData.data);
+          setActiveBonus(bonusData.data as ActiveBonus);
+          return;
+        }
+        
+        if (bonusData.data) {
+          console.log('✅ [DATA FIELD BONUS] Setting from data field:', bonusData.data);
+          setActiveBonus(bonusData.data as ActiveBonus);
+          return;
+        }
+        
+        console.warn('⚠️ Bonus data структура не поддерживается:', bonusData);
       } catch (err) {
-        console.warn('⚠️ Error parsing bonus:', err);
+        console.error('❌ Error parsing bonus:', err);
       }
     }
   }, [bonusData]);
@@ -403,6 +423,8 @@ export function AccountPage() {
 
     const initials = getInitials(firstName || "", lastName);
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+
+    console.log('🎯 Rendering AccountPage with activeBonus:', activeBonus);
 
     return (
       <div style={{ backgroundColor: COLORS.background, minHeight: '100vh', padding: '24px 16px' }} className="pb-24">
@@ -476,8 +498,14 @@ export function AccountPage() {
           </motion.div>
 
           {/* 🎁 АКТИВНЫЙ БОНУС (если есть) */}
-          {activeBonus && (
-            <BonusCard bonus={activeBonus} />
+          {activeBonus ? (
+            <>
+              <BonusCard bonus={activeBonus} />
+            </>
+          ) : (
+            <div style={{ color: COLORS.mutedForeground }} className="text-center text-sm mb-6">
+              🎁 Нет активных бонусов
+            </div>
           )}
 
           {/* 📊 ОСНОВНЫЕ МЕТРИКИ (4 карточки) */}
