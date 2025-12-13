@@ -6,7 +6,7 @@
  * 
  * КОМИССИИ:
  * 1. REGULAR: (House Edge × Turnover / 2) × Commission Rate
- * 2. WORKER: 5% от потерь казино (суммы которую проебали рефералы)
+ * 2. WORKER: 5% от потерь рефералов (когда они проигрывают, казино выигрывает)
  */
 
 const prisma = require('../../prismaClient');
@@ -32,9 +32,9 @@ class ReferralService {
     BONUS_EXPIRY_DAYS: 7,
     
     // КОМИССИИ
-    HOUSE_EDGE: 0.03,           // 3% HE для REGULAR комиссии
-    REGULAR_COMMISSION_RATE: 0.30,  // 0.30% от (HE × Turnover / 2)
-    WORKER_PROFIT_SHARE: 5.0,   // 5% от потерь
+    HOUSE_EDGE: 0.02,           // 2% HE (преимущество казино) от оборота
+    REGULAR_COMMISSION_RATE: 30,    // 30% от (HE × Turnover / 2)
+    WORKER_PROFIT_SHARE: 5.0,   // 5% от потерь рефералов (казино выигрывает)
     
     // ПОРОГ ВЫПЛАТЫ
     COMMISSION_PAYOUT_THRESHOLD: 1  // Выплачивать только если > 1 USDT
@@ -365,7 +365,7 @@ class ReferralService {
   /**
    * 👥 ПОЛУЧИТЬ СТАТИСТИКУ РЕФЕРЕРА (ИЗ БАЗЫ, БЕЗ ПЕРЕСЧЕТА)
    * 🟢 REGULAR: (House Edge × Turnover / 2) × Commission Rate
-   * 🔴 WORKER: 5% от потерь казино
+   * 🔴 WORKER: 5% от потерь рефералов
    */
   async getReferrerStats(userId) {
     try {
@@ -403,7 +403,7 @@ class ReferralService {
             .times(turnover)
             .dividedBy(2)
             .times(commissionRate)
-            .dividedBy(100);
+            .dividedBy(100);  // ⭐ Делим на 100 потому что комиссия в процентах (30)
           pendingCommission = pendingCommission.plus(commission);
         } else if (user.referrerType === 'WORKER') {
           const losses = new Decimal(stat.totalLosses || 0);
@@ -483,10 +483,10 @@ class ReferralService {
 
   /**
    * 💰 ОБРАБОТАТЬ ВСЕ НАКОПЛЕННЫЕ КОМИССИИ
-   * ⭐ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Считаем на основе newTurnoverSinceLastPayout
+   * ⭐ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Считаем на основе turnoverSinceLastPayout
    * 
    * 🟢 REGULAR: (HE × newTurnover / 2) × CommRate
-   * 🔴 WORKER: 5% от totalLosses
+   * 🔴 WORKER: 5% от totalLosses (потерь рефералов)
    */
   async processAllPendingCommissions(tokenId = 2) {
     console.log(`\n💰 [PROCESS COMMISSIONS] Starting...`);
@@ -525,7 +525,7 @@ class ReferralService {
                 .times(turnover)
                 .dividedBy(2)
                 .times(commissionRate)
-                .dividedBy(100);
+                .dividedBy(100);  // ⭐ Делим на 100 потому что commissionRate в процентах (30)
 
               console.log(`   🟢 REGULAR ${stat.referrer.id}: Turnover=${turnover.toFixed(2)}, Commission=${commission.toFixed(8)}`);
             }
