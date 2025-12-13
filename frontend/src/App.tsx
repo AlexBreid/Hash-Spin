@@ -19,14 +19,21 @@ import { WithdrawPage } from './components/pages/WithdrawPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
+import { BonusModal } from './components/modals/BonusModal';
+import { BonusFloatingButton } from './components/modals/BonusFloatingButton';
 
 const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper'];
 
 function AppContent() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, user } = useAuth();
     
+    const [showBonusModal, setShowBonusModal] = useState(false);
+    const [hasBonusAvailable, setHasBonusAvailable] = useState(false);
+    const [showFloatingButton, setShowFloatingButton] = useState(false);
+    const [floatingButtonIndex, setFloatingButtonIndex] = useState(0);
+
     const getCurrentPageFromURL = () => {
         const path = location.pathname.toLowerCase();
         if (path === '/' || path === '/home') return 'home';
@@ -44,6 +51,66 @@ function AppContent() {
 
     const [currentPage, setCurrentPage] = useState(getCurrentPageFromURL());
     const [isDarkMode, setIsDarkMode] = useState(true);
+
+    // Проверяем доступность бонуса
+    useEffect(() => {
+        const checkBonusAvailability = async () => {
+            if (!isAuthenticated || !user?.id) {
+                setHasBonusAvailable(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/bonus/check-availability`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    console.error('❌ Failed to check bonus availability');
+                    setHasBonusAvailable(false);
+                    return;
+                }
+
+                const data = await response.json();
+                setHasBonusAvailable(data.canUseBonus === true);
+            } catch (error) {
+                console.error('❌ Error checking bonus:', error);
+                setHasBonusAvailable(false);
+            }
+        };
+
+        checkBonusAvailability();
+        
+        // Проверяем каждые 30 сек
+        const interval = setInterval(checkBonusAvailability, 30000);
+        return () => clearInterval(interval);
+    }, [isAuthenticated, user?.id]);
+
+    // Управляем плавающей кнопкой
+    useEffect(() => {
+        if (!hasBonusAvailable) {
+            setShowFloatingButton(false);
+            return;
+        }
+
+        // Показываем кнопку каждые 5 секунд (периодичность)
+        const showInterval = setInterval(() => {
+            setShowFloatingButton(true);
+            setFloatingButtonIndex(prev => (prev + 1) % 4); // 4 позиции
+        }, 5000);
+
+        // Скрываем через 2.5 сек
+        const hideTimeout = setTimeout(() => {
+            setShowFloatingButton(false);
+        }, 2500);
+
+        return () => {
+            clearInterval(showInterval);
+            clearTimeout(hideTimeout);
+        };
+    }, [hasBonusAvailable]);
 
     useEffect(() => {
         setCurrentPage(getCurrentPageFromURL());
@@ -91,6 +158,11 @@ function AppContent() {
 
     const handleProfileClick = () => {
         handlePageChange('account');
+    };
+
+    const handleBonusLearnMore = () => {
+        setShowBonusModal(false);
+        handlePageChange('support');
     };
 
     const renderCurrentPage = () => {
@@ -163,6 +235,25 @@ function AppContent() {
             </main>
 
             {!isAuthPage && !isCrashPage && !isMinesweeperPage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+
+            {/* Плавающая кнопка с подарком */}
+            {showFloatingButton && hasBonusAvailable && (
+                <BonusFloatingButton 
+                    position={floatingButtonIndex}
+                    onClick={() => {
+                        setShowBonusModal(true);
+                        setShowFloatingButton(false);
+                    }}
+                />
+            )}
+
+            {/* Модалка бонуса */}
+            {showBonusModal && (
+                <BonusModal
+                    onClose={() => setShowBonusModal(false)}
+                    onLearnMore={handleBonusLearnMore}
+                />
+            )}
 
             <Toaster />
         </div>

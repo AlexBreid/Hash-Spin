@@ -18,6 +18,7 @@ const GlassCard = ({ children, className = '' }: { children: React.ReactNode; cl
 const MAX_WAIT_TIME = 10;
 const STORAGE_KEY = 'crash_game_history';
 const MAX_HISTORY_ITEMS = 10;
+const MIN_BET = 0.1;
 
 interface CrashHistory {
   id: string;
@@ -52,6 +53,7 @@ export function CrashGame() {
   const [canCashout, setCanCashout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [playersCount, setPlayersCount] = useState(0);
+  const [cashoutStatus, setCashoutStatus] = useState<'pending' | 'won' | 'lost' | null>(null);
   
   const [mainBalance, setMainBalance] = useState<number>(0);
   const [bonusBalance, setBonusBalance] = useState<number>(0);
@@ -413,18 +415,20 @@ export function CrashGame() {
 
   const handlePlaceBet = async () => {
     const amount = parseFloat(inputBet);
+    
     if (!amount || amount <= 0) {
       toast.error('❌ Введите сумму ставки');
+      return;
+    }
+    if (amount < MIN_BET) {
+      toast.error(`❌ Минимальная ставка: $${MIN_BET.toFixed(2)}`);
       return;
     }
     if (amount > totalBalance) {
       toast.error(`❌ Недостаточно средств (доступно: ${totalBalance.toFixed(2)} $)`);
       return;
     }
-    if (gameState.status !== 'waiting') {
-      toast.error('❌ Раунд уже начался');
-      return;
-    }
+    
     try {
       setIsLoading(true);
       await crashGameService.placeBet(amount, selectedTokenId);
@@ -469,6 +473,7 @@ export function CrashGame() {
       }));
       setCanCashout(false);
       setBetPlaced(false);
+      setCashoutStatus('lost');
 
       sessionStorage.removeItem(sessionKeys.betId);
       sessionStorage.removeItem(sessionKeys.currentBet);
@@ -495,6 +500,7 @@ export function CrashGame() {
 
       setTimeout(() => {
         setActiveCrash(null);
+        setCashoutStatus(null);
       }, 1500);
     };
 
@@ -505,6 +511,7 @@ export function CrashGame() {
       const betAmount = data.bet ?? 0;
       setCurrentBet(betAmount);
       setCanCashout(false);
+      setCashoutStatus(null);
       toast.success(`✅ Ставка: $${betAmount.toFixed(2)}`);
       
       setBalanceType(data.balanceType || 'MAIN');
@@ -520,6 +527,7 @@ export function CrashGame() {
       const profit = data.winnings - currentBet;
       setBetPlaced(false);
       setCanCashout(false);
+      setCashoutStatus('won');
       
       sessionStorage.removeItem(sessionKeys.betId);
       sessionStorage.removeItem(sessionKeys.currentBet);
@@ -529,7 +537,10 @@ export function CrashGame() {
       setBalanceType(null);
       setUserBonusId(null);
       
-      setTimeout(() => fetchBalances(), 500);
+      setTimeout(() => {
+        fetchBalances();
+        setCashoutStatus(null);
+      }, 500);
       toast.success(`💰 +$${profit.toFixed(2)}`);
     };
     
@@ -717,13 +728,14 @@ export function CrashGame() {
 
           <GlassCard className="p-3 space-y-2">
             <div>
-              <label className="text-xs font-bold text-gray-300 uppercase mb-2 block">Ставка</label>
+              <label className="text-xs font-bold text-gray-300 uppercase mb-2 block">
+                Ставка (мин. ${MIN_BET.toFixed(2)})
+              </label>
               <div className="flex gap-1.5">
                 <input
                   type="number"
                   value={inputBet}
                   onChange={(e) => setInputBet(e.target.value)}
-                  disabled={betPlaced || gameState.status !== 'waiting'}
                   placeholder="Сумма"
                   className="flex-1 bg-white/5 border border-white/20 rounded-xl py-2.5 px-3 text-base font-bold text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/50 focus:bg-white/10 transition-all"
                 />
@@ -755,10 +767,14 @@ export function CrashGame() {
                   exit={{ opacity: 0, y: -10 }}
                   onClick={handleCashout}
                   disabled={isLoading}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-xl transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 transition-all text-sm"
+                  className={`w-full px-4 py-3 font-black rounded-xl transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 transition-all text-sm border-2 ${
+                    cashoutStatus === 'won'
+                      ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 hover:border-emerald-300'
+                      : 'border-emerald-500 bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-400 hover:to-green-500'
+                  }`}
                 >
                   <Zap className="w-4 h-4" />
-                  ЗАБРАТЬ ${potentialWinnings.toFixed(2)}
+                  {cashoutStatus === 'won' ? '✅ УСПЕШНО' : 'ЗАБРАТЬ'} ${potentialWinnings.toFixed(2)}
                 </motion.button>
               ) : betPlaced ? (
                 <motion.div
@@ -766,9 +782,13 @@ export function CrashGame() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="w-full px-4 py-3 bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-bold rounded-xl text-center animate-pulse text-sm"
+                  className={`w-full px-4 py-3 font-bold rounded-xl text-center animate-pulse border-2 ${
+                    cashoutStatus === 'lost'
+                      ? 'border-red-500/50 bg-red-500/10 text-red-400'
+                      : 'border-indigo-500/50 bg-indigo-500/20 text-indigo-300'
+                  }`}
                 >
-                  🎲 СТАВКА: ${currentBet.toFixed(2)}
+                  {cashoutStatus === 'lost' ? '❌ ПОТЕРЯ' : '🎲'} СТАВКА: ${currentBet.toFixed(2)}
                 </motion.div>
               ) : (
                 <motion.button
@@ -777,8 +797,8 @@ export function CrashGame() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   onClick={handlePlaceBet}
-                  disabled={gameState.status !== 'waiting' || !isHistoryLoaded || isLoading}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all text-sm flex items-center justify-center gap-2"
+                  disabled={!isHistoryLoaded || isLoading}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all text-sm flex items-center justify-center gap-2 border-2 border-indigo-400"
                 >
                   {isLoading ? (
                     <>

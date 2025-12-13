@@ -1,15 +1,9 @@
 /**
  * ✅ ПОЛНЫЙ TELEGRAM БОТ С ИНТЕГРИРОВАННОЙ РЕФЕРАЛКОЙ И КРАСИВЫМИ БОНУСАМИ
  * 
- * НОВОЕ:
- * ✨ Полная интеграция рефералки в /start
- * ✅ Автоматическая привязка реферера при регистрации
- * 🎁 Бонус выдается при первом депозите
- * 📊 Реферальная статистика и комиссии
- * 🔗 Красивая реферальная ссылка в профиле
- * ✨ Красивые условия бонуса при депозите
- * 
- * Замени содержимое src/bots/telegramBot.js на этот код
+ * ПОДДЕРЖКА: 2 кнопки
+ * 1. ❓ FAQ - Часто задаваемые вопросы
+ * 2. 💬 Связаться с администратором
  */
 
 const { Telegraf } = require('telegraf');
@@ -28,6 +22,22 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
+
+// 🎁 FAQ DATA
+const faqData = [
+  {
+    question: "Как играть в Сапёр?",
+    answer: "Цель игры - найти все мины на игровом поле, не наступив на них. Нажимайте на клетки, чтобы открыть их. Числа показывают количество мин в соседних клетках."
+  },
+  {
+    question: "Что такое игра Краш?",
+    answer: "Краш - это игра на удачу, где нужно вовремя забрать выигрыш до того, как график 'упадёт'. Чем дольше ждёте, тем больше множитель, но и больше риск."
+  },
+  {
+    question: "Как вывести деньги?",
+    answer: "Перейди в бота, нажми '💸 Вывести', выбери сумму и подтверди операцию. Средства будут отправлены прямо на твой кошелёк."
+  },
+];
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 🎁 ФУНКЦИИ РЕФЕРАЛКИ
@@ -750,7 +760,6 @@ if (!BOT_TOKEN) {
 
         const typeLabels = {
           'GENERAL': '📋 Общая поддержка',
-          'BUG': '⚠️ Ошибка',
           'CONTACT': '💬 От пользователя'
         };
 
@@ -1155,13 +1164,12 @@ if (!BOT_TOKEN) {
           waitingForWithdrawAmount.delete(user.id);
           
           await ctx.reply(
-            `❓ *Помощь и поддержка*\n\nВыберите тип заявки:`,
+            `❓ *Помощь и поддержка*\n\nВыберите:`,
             {
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: '📋 Общая поддержка', callback_data: 'support_general' }],
-                  [{ text: '⚠️ Сообщить об ошибке', callback_data: 'support_bug' }],
-                  [{ text: '💬 Связаться с админом', callback_data: 'support_contact' }],
+                  [{ text: '❓ FAQ - Часто задаваемые вопросы', callback_data: 'support_faq' }],
+                  [{ text: '💬 Связаться с администратором', callback_data: 'support_contact' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
               },
@@ -1785,8 +1793,6 @@ if (!BOT_TOKEN) {
     for (const [userId, ticket] of supportTickets.entries()) {
       if (ticket.status === 'OPEN' || ticket.status === 'REPLIED') {
         const typeLabel = {
-          'GENERAL': '📋',
-          'BUG': '⚠️',
           'CONTACT': '💬'
         }[ticket.type] || '❓';
 
@@ -1908,76 +1914,22 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // SUPPORT CALLBACKS
-  bot.action(/reply_ticket_action_(.+)/, async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
-
-    if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
-      return;
+  // SUPPORT CALLBACKS - FAQ AND CONTACT ONLY
+  bot.action('support_faq', async (ctx) => {
+    let faqText = `❓ *ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ*\n\n`;
+    
+    for (let i = 0; i < faqData.length; i++) {
+      faqText += `*${i + 1}. ${faqData[i].question}*\n${faqData[i].answer}\n\n`;
     }
 
-    const ticketId = ctx.match[1];
-    adminWaitingForReply.set(user.id, ticketId);
-
-    await ctx.editMessageText(
-      `🎫 Тикет: \`${ticketId}\`\n\n` +
-      `Напишите ответ для пользователя:`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '❌ Отмена', callback_data: 'admin_show_tickets' }]
-          ]
-        },
-        parse_mode: 'Markdown'
-      }
-    );
-    await ctx.answerCbQuery();
-  });
-
-  bot.action('support_general', async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
+    await ctx.editMessageText(faqText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+        ]
+      },
+      parse_mode: 'Markdown'
     });
-    if (!user) return;
-    
-    waitingForTicketMessage.set(user.id, 'GENERAL');
-    
-    await ctx.editMessageText(
-      '📋 *Опишите вашу проблему:*\n\nНапишите подробное описание того, что вам нужно:',
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '◀️ Назад', callback_data: 'support_back' }]
-          ]
-        },
-        parse_mode: 'Markdown'
-      }
-    );
-    await ctx.answerCbQuery();
-  });
-
-  bot.action('support_bug', async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
-    if (!user) return;
-    
-    waitingForTicketMessage.set(user.id, 'BUG');
-    
-    await ctx.editMessageText(
-      '⚠️ *Сообщить об ошибке*\n\nОпишите ошибку как можно подробнее:\n• Что вы делали\n• Что произошло\n• Какую ошибку вы видели',
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '◀️ Назад', callback_data: 'support_back' }]
-          ]
-        },
-        parse_mode: 'Markdown'
-      }
-    );
     await ctx.answerCbQuery();
   });
 
@@ -2012,13 +1964,12 @@ if (!BOT_TOKEN) {
     waitingForTicketMessage.delete(user.id);
     
     await ctx.editMessageText(
-      `❓ *Помощь и поддержка*\n\nВыберите тип заявки:`,
+      `❓ *Помощь и поддержка*\n\nВыберите:`,
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '📋 Общая поддержка', callback_data: 'support_general' }],
-            [{ text: '⚠️ Сообщить об ошибке', callback_data: 'support_bug' }],
-            [{ text: '💬 Связаться с админом', callback_data: 'support_contact' }],
+            [{ text: '❓ FAQ - Часто задаваемые вопросы', callback_data: 'support_faq' }],
+            [{ text: '💬 Связаться с администратором', callback_data: 'support_contact' }],
             [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
           ]
         },
@@ -2047,6 +1998,7 @@ if (!BOT_TOKEN) {
     parseReferralCode,
     generateReferralLink,
     applyReferrer,
-    notifyReferrerAboutNewReferee
+    notifyReferrerAboutNewReferee,
+    faqData
   };
 }
