@@ -8,6 +8,8 @@ import {
   Trophy,
   Zap,
   Clock,
+  Star,
+  TrendingUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -39,6 +41,50 @@ interface ActiveBonus {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 🎨 НОВАЯ ЦВЕТОВАЯ ПАЛИТРА (по скриншоту)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const COLORS = {
+  background: '#0A0F1E',      // Очень тёмный синий (фон)
+  card: '#0B1C3A',            // Тёмный синий (карточки)
+  primary: '#3B82F6',         // Яркий синий (основной)
+  success: '#10B981',         // Зелёный (успех)
+  accent: '#10B981',          // Зелёный (акцент)
+  muted: '#1E3A8A',           // Мягкий синий (приглушённый)
+  border: 'rgba(59, 130, 246, 0.15)',  // Синяя граница
+  foreground: '#ffffff',      // Белый текст
+  mutedForeground: '#94A3B8', // Серый текст
+};
+
+const VIP_RANKS = {
+  bronze: { 
+    name: 'Бронза', 
+    icon: '🥉',
+    gradient: 'linear-gradient(135deg, #8B4513, #CD7F32)'
+  },
+  silver: { 
+    name: 'Серебро', 
+    icon: '🥈',
+    gradient: 'linear-gradient(135deg, #708090, #C0C0C0)'
+  },
+  gold: { 
+    name: 'Золото', 
+    icon: '🥇',
+    gradient: 'linear-gradient(135deg, #DAA520, #FFD700)'
+  },
+  platinum: { 
+    name: 'Платина', 
+    icon: '💎',
+    gradient: 'linear-gradient(135deg, #71797E, #E5E4E2)'
+  },
+  diamond: { 
+    name: 'Бриллиант', 
+    icon: '✨',
+    gradient: 'linear-gradient(135deg, #00CED1, #00FFFF)'
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 🔧 УТИЛИТЫ
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -67,19 +113,7 @@ function calculateVipRank(totalGames: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎨 ЦВЕТОВАЯ СХЕМА VIP
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const VIP_COLORS: Record<string, any> = {
-  bronze: { name: 'Бронза', color: '#cd7f32', bgGradient: 'linear-gradient(135deg, #8B4513, #CD7F32)', icon: '🥉' },
-  silver: { name: 'Серебро', color: '#c0c0c0', bgGradient: 'linear-gradient(135deg, #708090, #C0C0C0)', icon: '🥈' },
-  gold: { name: 'Золото', color: '#ffd700', bgGradient: 'linear-gradient(135deg, #DAA520, #FFD700)', icon: '🥇' },
-  platinum: { name: 'Платина', color: '#e5e4e2', bgGradient: 'linear-gradient(135deg, #71797E, #E5E4E2)', icon: '💎' },
-  diamond: { name: 'Бриллиант', color: '#00ffff', bgGradient: 'linear-gradient(135deg, #00CED1, #00FFFF)', icon: '✨' },
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 КОМПОНЕНТ: MetricCard
+// 🎯 КОМПОНЕНТ: MetricCard (с новыми цветами)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface MetricCardProps {
@@ -91,31 +125,42 @@ interface MetricCardProps {
   delay?: number;
 }
 
-const MetricCard = ({ icon, label, value, unit = '', color = '#0ea5e9', delay = 0 }: MetricCardProps) => (
+const MetricCard = ({ 
+  icon, 
+  label, 
+  value, 
+  unit = '', 
+  color = COLORS.primary, 
+  delay = 0 
+}: MetricCardProps) => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay }}
+    className="rounded-2xl p-6 border transition-all hover:border-opacity-100"
     style={{
-      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(6, 182, 212, 0.05))',
-      border: `2px solid ${color}40`,
-      borderRadius: '16px',
-      padding: '24px',
-      textAlign: 'center',
-      flex: 1,
+      background: `linear-gradient(135deg, ${color}15, ${color}08)`,
+      border: `1px solid ${color}30`,
+      borderColor: color + '30',
     }}
   >
-    <div style={{ fontSize: '32px', marginBottom: '8px' }}>{icon}</div>
-    <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 8px 0', fontWeight: '600' }}>{label}</p>
-    <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#fff', margin: '0' }}>
+    <div className="flex items-center space-x-3 mb-3">
+      <div style={{ color }}>
+        {icon}
+      </div>
+      <p style={{ color: COLORS.mutedForeground }} className="text-sm font-medium">
+        {label}
+      </p>
+    </div>
+    <p style={{ color: COLORS.foreground }} className="text-2xl font-bold">
       {value}
-      {unit && <span style={{ fontSize: '14px', marginLeft: '4px', color: '#9ca3af' }}>{unit}</span>}
+      {unit && <span className="text-sm ml-2" style={{ color: COLORS.mutedForeground }}>{unit}</span>}
     </p>
   </motion.div>
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ
+// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ (с новыми цветами)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
@@ -133,149 +178,124 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
+      transition={{ delay: 0.3 }}
+      className="rounded-2xl p-6 mb-6 border"
       style={{
-        background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))',
-        border: '2px solid #fbbf2440',
-        borderRadius: '20px',
-        padding: '24px',
-        marginBottom: '32px',
+        background: `linear-gradient(135deg, ${COLORS.success}15, ${COLORS.success}08)`,
+        border: `1px solid ${COLORS.success}30`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '32px' }}>🎁</div>
+      {/* ЗАГОЛОВОК */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="text-3xl">🎁</div>
         <div>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', margin: '0 0 4px 0' }}>
+          <h3 style={{ color: COLORS.foreground }} className="text-lg font-bold">
             Активный бонус
           </h3>
-          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0' }}>
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs">
             Отыграйте требуемую сумму чтобы вывести выигрыш
           </p>
         </div>
       </div>
 
-      {/* ИНФОРМАЦИЯ О БОНУСЕ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-        <div style={{
-          background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid #10b98140',
-          borderRadius: '12px',
-          padding: '12px',
-          textAlign: 'center',
-        }}>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 4px 0' }}>Размер бонуса</p>
-          <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', margin: '0' }}>
-            {granted.toFixed(2)} USDT
+      {/* ИНФОРМАЦИЯ О БОНУСЕ (две колонки) */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div
+          className="rounded-xl p-4 text-center border"
+          style={{
+            background: `${COLORS.success}15`,
+            border: `1px solid ${COLORS.success}30`,
+          }}
+        >
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
+            Размер бонуса
+          </p>
+          <p style={{ color: COLORS.success }} className="text-2xl font-bold">
+            {granted.toFixed(2)}
+          </p>
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs mt-1">
+            USDT
           </p>
         </div>
 
-        <div style={{
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid #3b82f640',
-          borderRadius: '12px',
-          padding: '12px',
-          textAlign: 'center',
-        }}>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 4px 0' }}>Осталось отыграть</p>
-          <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#3b82f6', margin: '0' }}>
-            {remaining.toFixed(2)} USDT
+        <div
+          className="rounded-xl p-4 text-center border"
+          style={{
+            background: `${COLORS.primary}15`,
+            border: `1px solid ${COLORS.primary}30`,
+          }}
+        >
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
+            Осталось отыграть
+          </p>
+          <p style={{ color: COLORS.primary }} className="text-2xl font-bold">
+            {remaining.toFixed(2)}
+          </p>
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs mt-1">
+            USDT
           </p>
         </div>
       </div>
 
-      {/* ПРОГРЕСС-БАР С КРАСИВОЙ АНИМАЦИЕЙ */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0', fontWeight: '600' }}>
+      {/* ПРОГРЕСС-БАР */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium">
             Прогресс отыгрыша
           </p>
-          <p style={{ fontSize: '12px', color: '#fbbf24', margin: '0', fontWeight: 'bold' }}>
+          <p style={{ color: COLORS.success }} className="text-sm font-bold">
             {progress.toFixed(0)}%
           </p>
         </div>
 
-        {/* КРАСИВЫЙ ПРОГРЕСС-БАР */}
-        <div style={{
-          width: '100%',
-          height: '12px',
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: '10px',
-          overflow: 'hidden',
-          border: '1px solid rgba(251, 191, 36, 0.2)',
-          position: 'relative',
-        }}>
+        <div
+          className="w-full h-3 rounded-full overflow-hidden border"
+          style={{
+            background: COLORS.muted + '40',
+            border: `1px solid ${COLORS.success}30`,
+          }}
+        >
           <motion.div
             initial={{ width: '0%' }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 1, ease: 'easeOut' }}
             style={{
               height: '100%',
-              background: 'linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)',
-              borderRadius: '10px',
-              boxShadow: '0 0 20px rgba(251, 191, 36, 0.6)',
-              position: 'relative',
-              overflow: 'hidden',
+              background: `linear-gradient(90deg, ${COLORS.success}, ${COLORS.primary}, ${COLORS.success})`,
+              boxShadow: `0 0 16px ${COLORS.success}80`,
             }}
-          >
-            {/* БЛЕСК ЭФФЕКТ */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
-                animation: 'shine 2s infinite',
-              }}
-            />
-          </motion.div>
+          />
         </div>
 
-        {/* ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-          <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0' }}>
-            Отыграно: {wagered.toFixed(2)} / {required.toFixed(2)} USDT
-          </p>
-          <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0' }}>
-            10x от {granted.toFixed(2)} USDT
-          </p>
+        <div className="flex justify-between text-xs mt-3" style={{ color: COLORS.mutedForeground }}>
+          <span>Отыграно: {wagered.toFixed(2)} / {required.toFixed(2)}</span>
+          <span>10x от {granted.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* ВРЕМЯ ДО ИСТЕЧЕНИЯ */}
-      <div style={{
-        background: 'rgba(239, 68, 68, 0.1)',
-        border: '1px solid #ef444440',
-        borderRadius: '12px',
-        padding: '12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <Clock size={16} style={{ color: '#ef4444' }} />
-        <p style={{ fontSize: '13px', color: '#ef4444', margin: '0', fontWeight: '600' }}>
+      {/* ДНЕЙ ДО ИСТЕЧЕНИЯ */}
+      <div
+        className="rounded-xl p-4 flex items-center gap-3 border"
+        style={{
+          background: '#EF444415',
+          border: '1px solid #EF444430',
+        }}
+      >
+        <Clock size={18} style={{ color: '#EF4444' }} />
+        <p style={{ color: '#EF4444' }} className="font-medium">
           ⏰ Осталось {daysLeft} дн{daysLeft !== 1 ? '' : 'я'}
         </p>
       </div>
-
-      <style>{`
-        @keyframes shine {
-          0% { left: -100%; }
-          100% { left: 100%; }
-        }
-      `}</style>
     </motion.div>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 ГЛАВНЫЙ КОМПОНЕНТ
+// 📱 ГЛАВНЫЙ КОМПОНЕНТ (С НОВОЙ ЦВЕТОВОЙ ПАЛИТРОЙ)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AccountPage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [activeBonus, setActiveBonus] = useState<ActiveBonus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -284,12 +304,7 @@ export function AccountPage() {
   const hasLoadedRef = useRef(false);
 
   const { data, loading: profileLoading, error: profileError, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
-  const { data: bonusData, execute: fetchActiveBonus } = useFetch('USER_GET_active_bonus', 'GET');
-
-  const mainBg = '#0a0f1a';
-  const accentColor = '#0ea5e9';
-  const greenAccent = '#10b981';
-  const redAccent = '#ef4444';
+  const { data: bonusData, execute: fetchActiveBonus } = useFetch('USER_GET_active-bonus', 'GET');
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // 🔄 ЗАГРУЗКА
@@ -300,26 +315,21 @@ export function AccountPage() {
       hasLoadedRef.current = true;
       console.log('🔄 Загружаю профиль и бонус...');
       
-      // Загружаем профиль
       fetchProfile().catch((err: Error) => {
         console.error('❌ Profile error:', err.message);
         setError('Failed to load profile');
         setLoading(false);
       });
       
-      // Загружаем бонус (с фалбэком если эндпоинта нет)
       fetchActiveBonus().catch((err: Error) => {
-        console.warn('⚠️ No active bonus (это нормально):', err.message);
-        // Не вызываем setError, просто продолжаем
+        console.warn('⚠️ No active bonus:', err.message);
       });
     }
   }, [fetchProfile, fetchActiveBonus]);
 
-  // ✅ Обработка ответа профиля
   useEffect(() => {
     if (data) {
       console.log('✅ Profile data:', data);
-      
       if (data.success && data.data) {
         setProfileData(data.data as UserProfile);
       } else if (data.id && data.username) {
@@ -332,16 +342,9 @@ export function AccountPage() {
     }
   }, [data]);
 
-  // ✅ Обработка ответа активного бонуса
   useEffect(() => {
-    if (bonusData) {
-      console.log('✅ Bonus data:', bonusData);
-      
-      if (bonusData.success && bonusData.data) {
-        setActiveBonus(bonusData.data as ActiveBonus);
-      } else if (bonusData.id) {
-        setActiveBonus(bonusData as ActiveBonus);
-      }
+    if (bonusData?.data) {
+      setActiveBonus(bonusData.data as ActiveBonus);
     }
   }, [bonusData]);
 
@@ -371,10 +374,11 @@ export function AccountPage() {
     } = profileData;
 
     const calculatedVipRank = vipRank || calculateVipRank(totalGames);
-    const vipInfo = VIP_COLORS[calculatedVipRank] || VIP_COLORS.bronze;
+    const vipInfo = VIP_RANKS[calculatedVipRank as keyof typeof VIP_RANKS] || VIP_RANKS.bronze;
     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username;
     const lossCount = totalGames - winningBets;
     const safeLargestWin = largestWin ? toNumber(largestWin.amount) : 0;
+    const winRate = totalGames > 0 ? ((winningBets / totalGames) * 100).toFixed(1) : '0';
 
     const getInitials = (fName: string, lName: string | null) => {
       const first = fName ? fName[0] : '';
@@ -386,120 +390,136 @@ export function AccountPage() {
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
     return (
-      <div style={{ backgroundColor: mainBg, minHeight: '100vh', padding: '20px' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' }}>
+      <div style={{ backgroundColor: COLORS.background, minHeight: '100vh', padding: '24px 16px' }}>
+        <div style={{ maxWidth: '500px', margin: '0 auto', paddingBottom: '100px' }}>
           
-          {/* 🎪 ЗАГОЛОВОК И АВАТАР */}
+          {/* 🎪 ПРОФИЛЬ (как на скриншоте) */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="rounded-2xl p-6 mb-6 border"
             style={{
-              background: `linear-gradient(135deg, ${vipInfo.bgGradient})`,
-              borderRadius: '20px',
-              padding: '32px',
-              marginBottom: '32px',
-              border: `2px solid ${vipInfo.color}40`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '24px',
-              flexWrap: 'wrap',
+              background: `linear-gradient(135deg, ${COLORS.card}, ${COLORS.card}80)`,
+              border: `1px solid ${COLORS.border}`,
             }}
           >
-            {/* АВАТАР */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2 }}
+            {/* АВАТАР И ИМЯ */}
+            <div className="flex items-center gap-4 mb-6">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2 }}
+                className="w-20 h-20 rounded-full border-2 flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
+                style={{
+                  background: vipInfo.gradient,
+                  borderColor: COLORS.primary,
+                  boxShadow: `0 0 24px ${COLORS.primary}60`,
+                }}
+              >
+                {photoUrl ? (
+                  <img src={photoUrl} alt="User" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  initials
+                )}
+              </motion.div>
+
+              <div>
+                <h1 style={{ color: COLORS.foreground }} className="text-2xl font-bold">
+                  {fullName || username}
+                </h1>
+                <div className="flex items-center gap-1 mt-1">
+                  <Star size={16} style={{ color: COLORS.success }} className="fill-current" />
+                  <span style={{ color: COLORS.success }} className="font-medium">
+                    {vipInfo.name} статус
+                  </span>
+                </div>
+                <p style={{ color: COLORS.mutedForeground }} className="text-xs mt-1">
+                  Игрок с {dateJoined}
+                </p>
+              </div>
+            </div>
+
+            {/* УРОВЕНЬ ИГРОКА (большая карточка) */}
+            <div
+              className="rounded-2xl p-6 mb-6 border"
               style={{
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                background: vipInfo.bgGradient,
-                border: `3px solid ${vipInfo.color}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '48px',
-                fontWeight: 'bold',
-                color: '#fff',
-                boxShadow: `0 0 30px ${vipInfo.color}`,
-                position: 'relative',
-                overflow: 'hidden',
-                flexShrink: 0,
+                background: `linear-gradient(135deg, ${COLORS.primary}20, ${COLORS.accent}10)`,
+                border: `1px solid ${COLORS.primary}30`,
               }}
             >
-              {photoUrl ? (
-                <img src={photoUrl} alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                initials
-              )}
-              <div style={{
-                position: 'absolute',
-                bottom: '-8px',
-                right: '-8px',
-                fontSize: '36px',
-                background: mainBg,
-                borderRadius: '50%',
-                padding: '4px',
-                border: `2px solid ${vipInfo.color}`,
-              }}>
-                {vipInfo.icon}
-              </div>
-            </motion.div>
-
-            {/* ИНФОРМАЦИЯ */}
-            <div style={{ flex: 1 }}>
-              <h1 style={{ fontSize: '36px', fontWeight: 'bold', color: '#fff', margin: '0 0 12px 0' }}>
-                {fullName || username}
-              </h1>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-                <span style={{
-                  background: vipInfo.bgGradient,
-                  color: '#fff',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                }}>
-                  {vipInfo.icon} {vipInfo.name} • Уровень {level}
+              <div className="flex items-center gap-3 mb-3">
+                <Trophy size={24} style={{ color: COLORS.primary }} />
+                <span style={{ color: COLORS.mutedForeground }} className="text-sm font-medium">
+                  Уровень игрока
                 </span>
               </div>
-              <p style={{ color: '#9ca3af', fontSize: '14px', margin: '0' }}>
-                📅 Игрок с {dateJoined}
+              <p style={{ color: COLORS.primary }} className="text-4xl font-bold">
+                {level}
               </p>
+            </div>
+
+            {/* КНОПКИ */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="py-3 rounded-2xl font-semibold transition-all duration-300 border"
+                style={{
+                  background: COLORS.success,
+                  color: COLORS.foreground,
+                  border: `1px solid ${COLORS.success}`,
+                }}
+              >
+                Достижения
+              </button>
+              <button
+                className="py-3 rounded-2xl font-semibold transition-all duration-300 border hover:opacity-80"
+                style={{
+                  background: 'transparent',
+                  color: COLORS.primary,
+                  border: `1px solid ${COLORS.primary}30`,
+                }}
+              >
+                Рейтинг
+              </button>
             </div>
           </motion.div>
 
-          {/* 🎁 АКТИВНЫЙ БОНУС (ЕСЛИ ЕСТЬ) */}
+          {/* 🎁 АКТИВНЫЙ БОНУС (если есть) */}
           {activeBonus && (
             <BonusCard bonus={activeBonus} />
           )}
 
-          {/* ОСНОВНЫЕ МЕТРИКИ */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {/* 📊 ОСНОВНЫЕ МЕТРИКИ */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <MetricCard
-              icon={<Trophy className="w-8 h-8" style={{ margin: '0 auto', color: accentColor }} />}
-              label="Всего игр сыграно"
-              value={totalGames > 0 ? totalGames.toLocaleString('ru-RU') : '0'}
-              color={accentColor}
+              icon={<TrendingUp size={20} />}
+              label="Общий счёт"
+              value={profileData.totalScore?.toLocaleString() || '0'}
+              color={COLORS.success}
               delay={0.3}
             />
             <MetricCard
-              icon={<Flame className="w-8 h-8" style={{ margin: '0 auto', color: '#fbbf24' }} />}
-              label="Выигрышей"
-              value={winningBets > 0 ? winningBets.toLocaleString('ru-RU') : '0'}
-              color="#fbbf24"
+              icon={<Clock size={20} />}
+              label="Игр сыграно"
+              value={totalGames.toLocaleString()}
+              color={COLORS.primary}
               delay={0.35}
+            />
+            <MetricCard
+              icon={<Flame size={20} />}
+              label="Выигрышей"
+              value={winningBets.toLocaleString()}
+              color={COLORS.success}
+              delay={0.4}
             />
             {largestWin && safeLargestWin > 0 && (
               <MetricCard
-                icon={<Zap className="w-8 h-8" style={{ margin: '0 auto', color: '#ec4899' }} />}
-                label="Максимальный выигрыш"
+                icon={<Zap size={20} />}
+                label="Макс выигрыш"
                 value={safeLargestWin.toFixed(2)}
                 unit="USDT"
-                color="#ec4899"
-                delay={0.4}
+                color="#FBBF24"
+                delay={0.45}
               />
             )}
           </div>
@@ -508,27 +528,28 @@ export function AccountPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
+            transition={{ delay: 0.5 }}
+            className="rounded-2xl p-6 border grid grid-cols-2 gap-4"
             style={{
-              background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.05), rgba(6, 182, 212, 0.02))',
-              border: '2px solid rgba(14, 165, 233, 0.2)',
-              borderRadius: '16px',
-              padding: '24px',
+              background: `linear-gradient(135deg, ${COLORS.primary}10, ${COLORS.card})`,
+              border: `1px solid ${COLORS.border}`,
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 8px 0' }}>Процент побед</p>
-                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981', margin: '0' }}>
-                  {totalGames > 0 ? ((winningBets / totalGames) * 100).toFixed(1) : '0'}%
-                </p>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 8px 0' }}>Поражений</p>
-                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444', margin: '0' }}>
-                  {lossCount > 0 ? lossCount.toLocaleString('ru-RU') : '0'}
-                </p>
-              </div>
+            <div className="text-center">
+              <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
+                Win Rate
+              </p>
+              <p style={{ color: COLORS.success }} className="text-2xl font-bold">
+                {winRate}%
+              </p>
+            </div>
+            <div className="text-center">
+              <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
+                Поражений
+              </p>
+              <p style={{ color: '#EF4444' }} className="text-2xl font-bold">
+                {lossCount.toLocaleString()}
+              </p>
             </div>
           </motion.div>
         </div>
@@ -541,43 +562,37 @@ export function AccountPage() {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div style={{
-      backgroundColor: mainBg,
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: '16px',
-    }}>
+    <div
+      style={{ backgroundColor: COLORS.background }}
+      className="min-h-screen flex items-center justify-center flex-col gap-4"
+    >
       {loading || profileLoading ? (
         <>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
-            <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
+            <Loader2 size={48} style={{ color: COLORS.primary }} />
           </motion.div>
-          <p style={{ color: '#9ca3af' }}>Загрузка профиля...</p>
+          <p style={{ color: COLORS.mutedForeground }}>Загрузка профиля...</p>
         </>
       ) : error ? (
         <>
-          <p style={{ color: '#ef4444', fontWeight: 'bold', textAlign: 'center' }}>❌ {error}</p>
-          <Button onClick={() => window.location.reload()} style={{
-            background: accentColor,
-            color: '#fff',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            border: 'none',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-          }}>
+          <p style={{ color: '#EF4444', fontWeight: 'bold', textAlign: 'center' }}>❌ {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 rounded-xl font-semibold transition-all"
+            style={{
+              background: COLORS.primary,
+              color: COLORS.foreground,
+            }}
+          >
             Повторить
-          </Button>
+          </button>
         </>
       ) : (
         <>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
-            <Loader2 className="w-12 h-12" style={{ color: accentColor }} />
+            <Loader2 size={48} style={{ color: COLORS.primary }} />
           </motion.div>
-          <p style={{ color: '#9ca3af' }}>Инициализация...</p>
+          <p style={{ color: COLORS.mutedForeground }}>Инициализация...</p>
         </>
       )}
     </div>
