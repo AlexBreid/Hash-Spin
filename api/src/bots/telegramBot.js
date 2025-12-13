@@ -1122,19 +1122,21 @@ if (!BOT_TOKEN) {
       const requiredWager = totalAmount * referralService.constructor.CONFIG.WAGERING_MULTIPLIER;
       const maxPayout = totalAmount * referralService.constructor.CONFIG.MAX_PAYOUT_MULTIPLIER;
 
+      // ✅ ОБНОВЛЕНО: Добавили максимальный размер бонуса (1500 USDT)
       const conditionsText = `🎁 *УСЛОВИЯ ВАШЕГО БОНУСА*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📊 *РАЗМЕР:*
 💙 Депозит: ${amount.toFixed(8)} USDT
-💛 Бонус: +100% к депозиту
+💛 Бонус: +100% (макс ${maxBonus} USDT)
+📈 Ваш бонус: ${bonusAmount.toFixed(8)} USDT
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚡ *ТРЕБОВАНИЯ:*
-🎲 Отыграть: ${referralService.constructor.CONFIG.WAGERING_MULTIPLIER}x (10 раз от суммы)
-⏰ Действует: ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
+🎲 Отыграть: 10x (10 раз от суммы)
+⏰ Действует: 7 дней
 💰 Выигрыш: до 3x от суммы депо + бонуса
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1151,6 +1153,7 @@ if (!BOT_TOKEN) {
 • Отыграть нужно ровно 10x
 • Выиграешь максимум 3x суммы
 • Бонус действует 7 дней
+• Максимальный бонус: ${maxBonus} USDT
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
