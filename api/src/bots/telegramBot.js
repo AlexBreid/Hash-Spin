@@ -413,14 +413,12 @@ if (!BOT_TOKEN) {
             if (activeBonus) {
               const depositAmount = parseFloat(amountNum.toFixed(8));
               const bonusAmount = parseFloat(activeBonus.grantedAmount.toString());
-              const totalReceived = parseFloat((depositAmount + bonusAmount).toFixed(8));
               const wageringRequired = parseFloat(activeBonus.requiredWager.toString());
               
               message = `✅ *Пополнение с БОНУСОМ успешно!*\n\n` +
-                `💰 Ваш депозит: ${depositAmount.toFixed(8)} ${asset}\n` +
-                `🎁 Бонус казино: +${bonusAmount.toFixed(8)} ${asset}\n` +
-                `📊 Всего поступило: ${totalReceived.toFixed(8)} ${asset}\n\n` +
-                `⚡ Требуется отыграть: ${wageringRequired.toFixed(8)} ${asset}`;
+                `💰 Пополнено: ${depositAmount.toFixed(8)} ${asset}\n` +
+                `🎁 Бонус: +100%\n\n` +
+                `⚡ Требуется отыграть: 10x`;
             } else {
               message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}\n\nℹ️ Бонус был выбран, но оказался недоступен.`;
             }
@@ -961,11 +959,32 @@ if (!BOT_TOKEN) {
           if (user.isAdmin) badges.push('👑 АДМИН');
           if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
           
+          // Получаем активный бонус если есть
+          let bonusStatus = '';
+          const activeBonus = await prisma.userBonus.findFirst({
+            where: {
+              userId: user.id,
+              isActive: true,
+              isCompleted: false,
+              expiresAt: { gt: new Date() }
+            }
+          });
+          
+          if (activeBonus) {
+            const wagered = parseFloat(activeBonus.wageredAmount.toString());
+            const required = parseFloat(activeBonus.requiredWager.toString());
+            const progress = Math.min((wagered / required) * 100, 100);
+            bonusStatus = `\n\n🎁 *АКТИВНЫЙ БОНУС:*\n` +
+              `⚡ Отыграно: ${progress.toFixed(0)}%\n` +
+              `⏰ Дней осталось: ${Math.ceil((activeBonus.expiresAt - new Date()) / (1000 * 60 * 60 * 24))}`;
+          }
+          
           await ctx.reply(
             `👤 *Профиль*\n\n` +
             `${user.username ? '@' + user.username : 'ID: ' + user.id}\n` +
             `💰 Баланс: ${userBal.toFixed(8)} USDT` +
-            (badges.length ? `\n${badges.join(' | ')}` : ''),
+            (badges.length ? `\n${badges.join(' | ')}` : '') +
+            bonusStatus,
             { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
           );
           break;
@@ -1103,37 +1122,35 @@ if (!BOT_TOKEN) {
       const requiredWager = totalAmount * referralService.constructor.CONFIG.WAGERING_MULTIPLIER;
       const maxPayout = totalAmount * referralService.constructor.CONFIG.MAX_PAYOUT_MULTIPLIER;
 
-      const conditionsText = `🎁 *УСЛОВИЯ БОНУСА КАЗИНО*
+      const conditionsText = `🎁 *УСЛОВИЯ ВАШЕГО БОНУСА*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 *ВАША СУММА:*
+📊 *РАЗМЕР:*
 💙 Депозит: ${amount.toFixed(8)} USDT
-💛 Бонус: +${bonusAmount.toFixed(8)} USDT
-📈 Всего: ${totalAmount.toFixed(8)} USDT
+💛 Бонус: +100% к депозиту
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚡ *ЧТО НУЖНО СДЕЛАТЬ:*
-🎲 Отыграть ${requiredWager.toFixed(8)} USDT (${referralService.constructor.CONFIG.WAGERING_MULTIPLIER}x)
-⏰ Срок: ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
-💰 Максимум выиграть: ${maxPayout.toFixed(8)} USDT
+⚡ *ТРЕБОВАНИЯ:*
+🎲 Отыграть: ${referralService.constructor.CONFIG.WAGERING_MULTIPLIER}x (10 раз от суммы)
+⏰ Действует: ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
+💰 Выигрыш: до 3x от суммы депо + бонуса
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ *КАК ЭТО РАБОТАЕТ:*
-1️⃣ Все ${totalAmount.toFixed(8)} USDT идут в игровой баланс
-2️⃣ Играешь и ставишь из этого баланса
-3️⃣ Когда отыграешь ${requiredWager.toFixed(8)} USDT:
-   → Выигрыш до ${maxPayout.toFixed(8)} USDT переходит на вывод
-   → Остаток теряется
+✅ *КАК ПОЛУЧИТЬ ДЕНЬГИ:*
+1️⃣ Пополни баланс
+2️⃣ Играй и ставь обычно
+3️⃣ Отыграй 10x суммы
+4️⃣ Выиграешь? Деньги на вывод!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ *ВАЖНО:*
-• Вывести деньги можно только после вейджера
-• Максимум выплаты ограничена ${maxPayout.toFixed(8)} USDT
-• Бонус действует ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
+⚠️ *ПОМНИ:*
+• Отыграть нужно ровно 10x
+• Выиграешь максимум 3x суммы
+• Бонус действует 7 дней
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
@@ -1196,7 +1213,7 @@ if (!BOT_TOKEN) {
       scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', useBonus);
 
       const bonusText = useBonus 
-        ? `\n\n🎁 *С БОНУСОМ:*\n• +${amount.toFixed(8)} USDT бонуса\n• Отыграй в 10x\n• Действует 7 дней`
+        ? `\n\n🎁 *С БОНУСОМ:*\n• +100% к пополнению\n• Отыграй 10x\n• Выигрыш до 3x`
         : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
 
       await ctx.reply(

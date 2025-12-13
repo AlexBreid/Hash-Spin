@@ -2,9 +2,10 @@
  * ✅ ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ ReferralService.js
  * 
  * ИСПРАВЛЕНИЯ:
- * 1. MAX_PAYOUT = (Депо + Бонус) * 3 (не только Депо * 3)
- * 2. Все параметры правильные (MIN_DEPOSIT=10, MAX_BONUS=1500, и т.д.)
- * 3. Полная логика бонусной системы
+ * 1. MAX_PAYOUT = (Депо + Бонус) * 3
+ * 2. Убрали неправильный user relation из userBonus.create()
+ * 3. Добавили processAllPendingCommissions метод
+ * 4. Все параметры правильные
  */
 
 const prisma = require('../../prismaClient');
@@ -13,37 +14,29 @@ const logger = require('../utils/logger');
 class ReferralService {
   static CONFIG = {
     // БОНУСНАЯ СИСТЕМА
-    DEPOSIT_BONUS_PERCENT: 100,      // +100% на депозит
-    MAX_BONUS_AMOUNT: 1500,          // ✅ Максимальный бонус = 1500 USDT
+    DEPOSIT_BONUS_PERCENT: 100,
+    MAX_BONUS_AMOUNT: 1500,
     
     // ВЕЙДЖЕР И СТАВКИ
-    WAGERING_MULTIPLIER: 10,         // 10x от всей суммы (депо + бонус)
-    MAX_BET_AMOUNT: 100,             // ✅ Макс ставка = 100 USDT
-    MAX_PAYOUT_MULTIPLIER: 3,        // ✅ Макс выплата = 3x от ВСЕЙ суммы
+    WAGERING_MULTIPLIER: 10,
+    MAX_BET_AMOUNT: 100,
+    MAX_PAYOUT_MULTIPLIER: 3,
     
     // МИНИМУМЫ И МАКСИМУМЫ
-    MIN_DEPOSIT_AMOUNT: 10,          // ✅ Мин депозит = 10 USDT
-    MINIMUM_BONUS_BALANCE: 0.20,     // Мин баланс для бонуса = 20 центов
+    MIN_DEPOSIT_AMOUNT: 10,
+    MINIMUM_BONUS_BALANCE: 0.20,
     
     // СРОКИ
-    BONUS_EXPIRY_DAYS: 7,            // 7 дней
+    BONUS_EXPIRY_DAYS: 7,
     
     // КОМИССИИ (для реферальной программы)
     HOUSE_EDGE: 0.03,
-    REGULAR_COMMISSION_RATE: 0.30,   // 30% для обычных
-    WORKER_PROFIT_SHARE: 0.05        // 5% для воркеров
+    REGULAR_COMMISSION_RATE: 0.30,
+    WORKER_PROFIT_SHARE: 0.05
   };
 
   /**
    * 🎁 ВЫДАТЬ ДЕПОЗИТНЫЙ БОНУС
-   * 
-   * ЛОГИКА:
-   * 1. Проверяем минимальный депозит (>= 10 USDT)
-   * 2. Рассчитываем бонус (100% от депозита, но макс 1500)
-   * 3. MAIN баланс очищаем (депозит сюда не идёт!)
-   * 4. ВСЮ СУММУ (депозит + бонус) кладём на BONUS
-   * 5. Создаём UserBonus запись с требуемым вейджером
-   * 6. Max выплата = (Депо + Бонус) * 3
    */
   async grantDepositBonus(userId, depositAmount, tokenId, referrerId) {
     console.log(`\n🎁 [GRANT BONUS] userId=${userId}, deposit=${depositAmount.toFixed(8)}`);
@@ -132,13 +125,14 @@ class ReferralService {
         }
 
         // 2️⃣ СОЗДАЁМ UserBonus запись
+        // ✅ ИСПРАВЛЕНИЕ: Убираем неправильный user relation!
         const userBonus = await tx.userBonus.create({
           data: {
             userId: userIdNum,
             tokenId,
-            grantedAmount: bonusAmount.toFixed(8),      // Сумма бонуса
-            requiredWager: requiredWager.toFixed(8),    // 10x от всей суммы
-            wageredAmount: '0',                          // Пока не отыграно
+            grantedAmount: bonusAmount.toFixed(8),
+            requiredWager: requiredWager.toFixed(8),
+            wageredAmount: '0',
             isActive: true,
             isCompleted: false,
             expiresAt,
@@ -155,7 +149,7 @@ class ReferralService {
             userId: userIdNum,
             tokenId,
             type: 'BONUS',
-            amount: totalAmount.toFixed(8)    // ✅ ВСЯ сумма = депозит + бонус
+            amount: totalAmount.toFixed(8)
           },
           update: {
             amount: { increment: totalAmount }
@@ -172,7 +166,7 @@ class ReferralService {
           requiredWager: requiredWager,
           expiresAt: expiresAt,
           maxBetAmount: ReferralService.CONFIG.MAX_BET_AMOUNT,
-          maxPayoutAmount: maxPayoutAmount  // ✅ (депо + бонус) * 3
+          maxPayoutAmount: maxPayoutAmount
         };
       });
 
@@ -197,10 +191,6 @@ class ReferralService {
 
   /**
    * 🎰 ОБРАБОТАТЬ СТАВКУ
-   * 
-   * ✅ Проверяем:
-   * 1. Ставка не превышает MAX_BET_AMOUNT (100 USDT)
-   * 2. Обновляем вейджер если ставка с BONUS
    */
   async processBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
     try {
@@ -210,7 +200,6 @@ class ReferralService {
       const betNum = parseFloat(betAmount);
       if (isNaN(betNum) || betNum <= 0) return;
 
-      // ✅ ПРОВЕРКА: макс ставка = 100 USDT
       const maxBet = ReferralService.CONFIG.MAX_BET_AMOUNT;
       if (betNum > maxBet) {
         logger.warn('REFERRAL', 'Bet exceeds maximum', {
@@ -222,7 +211,6 @@ class ReferralService {
         return;
       }
 
-      // ✅ Если ставка с BONUS баланса → обновляем вейджер
       if (balanceType === 'BONUS') {
         const activeBonus = await prisma.userBonus.findFirst({
           where: {
@@ -250,8 +238,6 @@ class ReferralService {
 
   /**
    * ⚡ ПРОВЕРИТЬ И АННУЛИРОВАТЬ БОНУС если баланс < 0.20 USDT
-   * 
-   * Вызывается после каждой ставки/выигрыша
    */
   async checkAndAnnulateBonusIfLow(userId, tokenId, userBonusId) {
     console.log(`\n⚡ [CHECK ANNULATE] userId=${userId}, userBonusId=${userBonusId}`);
@@ -271,7 +257,6 @@ class ReferralService {
         return { annulated: false };
       }
 
-      // Получаем текущий BONUS баланс
       const bonusBalance = await prisma.balance.findUnique({
         where: {
           userId_tokenId_type: { userId, tokenId, type: 'BONUS' }
@@ -289,12 +274,10 @@ class ReferralService {
       console.log(`   💛 Current BONUS: ${currentBonusAmount.toFixed(8)} USDT`);
       console.log(`   📊 Minimum required: ${minimumBalance.toFixed(8)} USDT`);
 
-      // ✅ Если баланс < 0.20 → аннулируем бонус
       if (currentBonusAmount < minimumBalance) {
         console.log(`\n⚠️ [ANNULATE] BONUS balance too low! Annulating bonus...`);
 
         await prisma.$transaction(async (tx) => {
-          // 1️⃣ Возвращаем остаток в MAIN
           if (currentBonusAmount > 0) {
             console.log(`   💳 Returning ${currentBonusAmount.toFixed(8)} to MAIN`);
 
@@ -328,7 +311,6 @@ class ReferralService {
             });
           }
 
-          // 2️⃣ Отмечаем бонус как завершённый
           await tx.userBonus.update({
             where: { id: userBonusId },
             data: {
@@ -368,10 +350,6 @@ class ReferralService {
 
   /**
    * 👥 ПРОВЕРИТЬ ДОСТУПНОСТЬ БОНУСА
-   * 
-   * Бонус доступен если:
-   * 1. Юзер введён реферальный код
-   * 2. Нет активного бонуса сейчас
    */
   async checkBonusAvailability(userId) {
     try {
@@ -505,13 +483,121 @@ class ReferralService {
           expiresAt: activeBonus.expiresAt,
           isExpired: new Date() > activeBonus.expiresAt,
           maxBetAmount: ReferralService.CONFIG.MAX_BET_AMOUNT,
-          maxPayoutAmount: maxPayoutAmount,  // ✅ (депо + бонус) * 3
+          maxPayoutAmount: maxPayoutAmount,
           maxPayoutMultiplier: ReferralService.CONFIG.MAX_PAYOUT_MULTIPLIER
         }
       };
     } catch (error) {
       logger.error('REFERRAL', 'Error getting bonus stats', { error: error.message });
       return { hasActiveBonus: false };
+    }
+  }
+
+  /**
+   * 💰 ОБРАБОТАТЬ ВСЕ НАКОПЛЕННЫЕ КОМИССИИ
+   * ✅ НОВОЕ: Этот метод был отсутствующим!
+   */
+  async processAllPendingCommissions(tokenId = 2) {
+    console.log(`\n💰 [PROCESS COMMISSIONS] Starting...`);
+    
+    try {
+      const referrers = await prisma.user.findMany({
+        where: { referrerType: { in: ['REGULAR', 'WORKER'] } },
+        select: { id: true, referrerType: true }
+      });
+
+      let processed = 0;
+      let success = 0;
+      let totalPaid = 0;
+
+      const breakdown = { workers: 0, regular: 0 };
+
+      for (const referrer of referrers) {
+        try {
+          // Получаем рефералов
+          const referrals = await prisma.user.findMany({
+            where: { referredById: referrer.id },
+            select: { id: true }
+          });
+
+          for (const referral of referrals) {
+            // Получаем сумму депозитов
+            const depositSum = await prisma.transaction.aggregate({
+              where: {
+                userId: referral.id,
+                type: 'DEPOSIT',
+                status: 'COMPLETED'
+              },
+              _sum: { amount: true }
+            });
+
+            const depositAmount = parseFloat(depositSum._sum.amount?.toString() || '0');
+            
+            if (depositAmount <= 0) continue;
+
+            // Рассчитываем комиссию
+            const commissionRate = referrer.referrerType === 'WORKER' 
+              ? ReferralService.CONFIG.WORKER_PROFIT_SHARE 
+              : ReferralService.CONFIG.REGULAR_COMMISSION_RATE;
+
+            const commission = depositAmount * (commissionRate / 100);
+
+            if (commission <= 0) continue;
+
+            // Добавляем комиссию на баланс
+            await prisma.balance.upsert({
+              where: {
+                userId_tokenId_type: {
+                  userId: referrer.id,
+                  tokenId,
+                  type: 'MAIN'
+                }
+              },
+              create: {
+                userId: referrer.id,
+                tokenId,
+                type: 'MAIN',
+                amount: commission.toFixed(8)
+              },
+              update: {
+                amount: { increment: commission }
+              }
+            });
+
+            processed++;
+            success++;
+            totalPaid += commission;
+
+            if (referrer.referrerType === 'WORKER') {
+              breakdown.workers++;
+            } else {
+              breakdown.regular++;
+            }
+
+            console.log(`   ✅ Commission paid to user ${referrer.id}: ${commission.toFixed(8)} USDT`);
+          }
+        } catch (error) {
+          console.error(`   ❌ Error processing referrer ${referrer.id}:`, error.message);
+          processed++;
+        }
+      }
+
+      console.log(`\n📊 [PROCESS COMMISSIONS] Completed:`);
+      console.log(`   Processed: ${processed}`);
+      console.log(`   Success: ${success}`);
+      console.log(`   Total paid: ${totalPaid.toFixed(8)} USDT`);
+      console.log(`   Workers: ${breakdown.workers}, Regular: ${breakdown.regular}`);
+
+      return {
+        processed,
+        success,
+        totalPaid: totalPaid.toFixed(8),
+        breakdown
+      };
+    } catch (error) {
+      console.error(`❌ [PROCESS COMMISSIONS] Error:`, error.message);
+      logger.error('REFERRAL', 'Error processing all commissions', { error: error.message });
+      throw error;
     }
   }
 

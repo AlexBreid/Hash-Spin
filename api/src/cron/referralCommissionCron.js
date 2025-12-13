@@ -21,15 +21,16 @@ async function processCommissions() {
   console.log(`📅 [CRON] Time: ${new Date().toISOString()}`);
   
   try {
+    // ✅ ИСПРАВЛЕНИЕ: processAllPendingCommissions теперь существует!
     const result = await referralService.processAllPendingCommissions(DEFAULT_TOKEN_ID);
     
-    // ✅ ИСПРАВЛЕНИЕ #1: Проверяем что result существует и имеет нужные свойства
+    // ✅ Проверяем что result существует и имеет нужные свойства
     if (!result) {
       logger.warn('CRON', 'processAllPendingCommissions returned null');
       return { processed: 0, success: 0, totalPaid: '0' };
     }
     
-    // ✅ ИСПРАВЛЕНИЕ #2: Приводим totalPaid к числу перед toFixed
+    // ✅ Приводим totalPaid к числу перед toFixed
     const totalPaidNum = typeof result.totalPaid === 'string' 
       ? parseFloat(result.totalPaid) 
       : result.totalPaid;
@@ -126,7 +127,7 @@ async function cleanupExpiredBonuses() {
     
     for (const bonus of expiredBonuses) {
       try {
-        // ✅ ИСПРАВЛЕНИЕ: Используем transaction для атомарности
+        // ✅ Используем transaction для атомарности
         await prisma.$transaction(async (tx) => {
           // Помечаем как неактивный
           await tx.userBonus.update({
