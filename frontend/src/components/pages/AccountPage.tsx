@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetch } from "../../hooks/useDynamicApi";
 import { useAuth } from "../../context/AuthContext";
-import { Button } from "../ui/button";
 import {
   Loader2,
   Flame,
@@ -25,6 +24,7 @@ interface UserProfile {
   level: number;
   totalGames: number;
   winningBets: number;
+  totalScore?: number;
   largestWin?: {
     amount: number;
     gameType: string;
@@ -41,11 +41,11 @@ interface ActiveBonus {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎨 НОВАЯ ЦВЕТОВАЯ ПАЛИТРА (по скриншоту)
+// 🎨 ЦВЕТОВАЯ ПАЛИТРА (из CSS переменных)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const COLORS = {
-  background: '#0A0F1E',      // Очень тёмный синий (фон)
+  background: '#0A0F1E',      // Очень тёмный синий (основной фон)
   card: '#0B1C3A',            // Тёмный синий (карточки)
   primary: '#3B82F6',         // Яркий синий (основной)
   success: '#10B981',         // Зелёный (успех)
@@ -141,7 +141,6 @@ const MetricCard = ({
     style={{
       background: `linear-gradient(135deg, ${color}15, ${color}08)`,
       border: `1px solid ${color}30`,
-      borderColor: color + '30',
     }}
   >
     <div className="flex items-center space-x-3 mb-3">
@@ -160,7 +159,7 @@ const MetricCard = ({
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ (с новыми цветами)
+// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ (если есть)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
@@ -291,7 +290,7 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 ГЛАВНЫЙ КОМПОНЕНТ (С НОВОЙ ЦВЕТОВОЙ ПАЛИТРОЙ)
+// 📱 ГЛАВНЫЙ КОМПОНЕНТ (БЕЗ КНОПОК, С ФАЛБЭКОМ НА БОНУС)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AccountPage() {
@@ -313,7 +312,7 @@ export function AccountPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('🔄 Загружаю профиль и бонус...');
+      console.log('🔄 Загружаю профиль...');
       
       fetchProfile().catch((err: Error) => {
         console.error('❌ Profile error:', err.message);
@@ -321,9 +320,13 @@ export function AccountPage() {
         setLoading(false);
       });
       
-      fetchActiveBonus().catch((err: Error) => {
-        console.warn('⚠️ No active bonus:', err.message);
-      });
+      // 🎁 Пытаемся загрузить бонус (НО НЕ ПАДАЕМ ЕСЛИ ОШИБКА)
+      fetchActiveBonus()
+        .then(() => console.log('✅ Бонус загружен'))
+        .catch((err: Error) => {
+          console.warn('⚠️ Бонус не загружен (это нормально):', err.message);
+          // Не вызываем setError - продолжаем работу
+        });
     }
   }, [fetchProfile, fetchActiveBonus]);
 
@@ -342,9 +345,19 @@ export function AccountPage() {
     }
   }, [data]);
 
+  // 🎁 Обработка бонуса (с фалбэком)
   useEffect(() => {
-    if (bonusData?.data) {
-      setActiveBonus(bonusData.data as ActiveBonus);
+    if (bonusData) {
+      console.log('✅ Bonus data:', bonusData);
+      try {
+        if (bonusData.success && bonusData.data) {
+          setActiveBonus(bonusData.data as ActiveBonus);
+        } else if (bonusData.data) {
+          setActiveBonus(bonusData.data as ActiveBonus);
+        }
+      } catch (err) {
+        console.warn('⚠️ Error parsing bonus:', err);
+      }
     }
   }, [bonusData]);
 
@@ -366,6 +379,7 @@ export function AccountPage() {
       lastName,
       totalGames,
       winningBets,
+      totalScore = 0,
       largestWin,
       photoUrl,
       createdAt,
@@ -379,6 +393,7 @@ export function AccountPage() {
     const lossCount = totalGames - winningBets;
     const safeLargestWin = largestWin ? toNumber(largestWin.amount) : 0;
     const winRate = totalGames > 0 ? ((winningBets / totalGames) * 100).toFixed(1) : '0';
+    const safeTotalScore = toNumber(totalScore);
 
     const getInitials = (fName: string, lName: string | null) => {
       const first = fName ? fName[0] : '';
@@ -390,8 +405,8 @@ export function AccountPage() {
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
     return (
-      <div style={{ backgroundColor: COLORS.background, minHeight: '100vh', padding: '24px 16px' }}>
-        <div style={{ maxWidth: '500px', margin: '0 auto', paddingBottom: '100px' }}>
+      <div style={{ backgroundColor: COLORS.background, minHeight: '100vh', padding: '24px 16px' }} className="pb-24">
+        <div style={{ maxWidth: '500px', margin: '0 auto' }}>
           
           {/* 🎪 ПРОФИЛЬ (как на скриншоте) */}
           <motion.div
@@ -442,7 +457,7 @@ export function AccountPage() {
 
             {/* УРОВЕНЬ ИГРОКА (большая карточка) */}
             <div
-              className="rounded-2xl p-6 mb-6 border"
+              className="rounded-2xl p-6 border"
               style={{
                 background: `linear-gradient(135deg, ${COLORS.primary}20, ${COLORS.accent}10)`,
                 border: `1px solid ${COLORS.primary}30`,
@@ -458,30 +473,6 @@ export function AccountPage() {
                 {level}
               </p>
             </div>
-
-            {/* КНОПКИ */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                className="py-3 rounded-2xl font-semibold transition-all duration-300 border"
-                style={{
-                  background: COLORS.success,
-                  color: COLORS.foreground,
-                  border: `1px solid ${COLORS.success}`,
-                }}
-              >
-                Достижения
-              </button>
-              <button
-                className="py-3 rounded-2xl font-semibold transition-all duration-300 border hover:opacity-80"
-                style={{
-                  background: 'transparent',
-                  color: COLORS.primary,
-                  border: `1px solid ${COLORS.primary}30`,
-                }}
-              >
-                Рейтинг
-              </button>
-            </div>
           </motion.div>
 
           {/* 🎁 АКТИВНЫЙ БОНУС (если есть) */}
@@ -489,26 +480,26 @@ export function AccountPage() {
             <BonusCard bonus={activeBonus} />
           )}
 
-          {/* 📊 ОСНОВНЫЕ МЕТРИКИ */}
+          {/* 📊 ОСНОВНЫЕ МЕТРИКИ (4 карточки) */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <MetricCard
               icon={<TrendingUp size={20} />}
               label="Общий счёт"
-              value={profileData.totalScore?.toLocaleString() || '0'}
+              value={safeTotalScore.toLocaleString('ru-RU')}
               color={COLORS.success}
               delay={0.3}
             />
             <MetricCard
               icon={<Clock size={20} />}
               label="Игр сыграно"
-              value={totalGames.toLocaleString()}
+              value={totalGames.toLocaleString('ru-RU')}
               color={COLORS.primary}
               delay={0.35}
             />
             <MetricCard
               icon={<Flame size={20} />}
               label="Выигрышей"
-              value={winningBets.toLocaleString()}
+              value={winningBets.toLocaleString('ru-RU')}
               color={COLORS.success}
               delay={0.4}
             />
@@ -524,7 +515,7 @@ export function AccountPage() {
             )}
           </div>
 
-          {/* ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ */}
+          {/* WIN RATE И ПОРАЖЕНИЯ */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -548,7 +539,7 @@ export function AccountPage() {
                 Поражений
               </p>
               <p style={{ color: '#EF4444' }} className="text-2xl font-bold">
-                {lossCount.toLocaleString()}
+                {lossCount.toLocaleString('ru-RU')}
               </p>
             </div>
           </motion.div>

@@ -1,11 +1,11 @@
 /**
- * ✅ ИСПРАВЛЕННЫЙ userRoutes.js (v7) - С ЭНДПОИНТОМ АКТИВНОГО БОНУСА
+ * ✅ ИСПРАВЛЕННЫЙ userRoutes.js - РАБОТАЕТ С ТАБЛИЦЕЙ UserBonus
  * 
- * ИСПРАВЛЕНИЯ:
- * 1. ✅ UNION запрос для всех игр
- * 2. ✅ Новый эндпоинт GET /active-bonus для получения активного бонуса
- * 3. ✅ Информация о размере, вейджере, отыграно, истечение
- * 4. ✅ Все логирование
+ * ИЗМЕНЕНИЯ:
+ * 1. ✅ Эндпоинт /active-bonus теперь ищет в таблице UserBonus
+ * 2. ✅ Использует isActive, isCompleted, expiresAt из UserBonus
+ * 3. ✅ Джойн с CryptoToken для получения символа токена
+ * 4. ✅ Все остальные эндпоинты остаются без изменений
  */
 
 const express = require('express');
@@ -54,7 +54,7 @@ function getVipName(rank) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// 🎁 НОВЫЙ МАРШРУТ: GET /active-bonus (АКТИВНЫЙ БОНУС)
+// 🎁 ✅ ОБНОВЛЕННЫЙ МАРШРУТ: GET /active-bonus (АКТИВНЫЙ БОНУС ИЗ UserBonus)
 // ════════════════════════════════════════════════════════════════════════════════
 
 router.get('/active-bonus', authenticateToken, async (req, res) => {
@@ -65,30 +65,25 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
     logger.info('USER', 'Fetching active bonus', { userId });
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 1: Поиск активного бонуса
+    // ЭТАП 1: Поиск активного бонуса в таблице UserBonus
     // ════════════════════════════════════════════════════════════════════════════
 
-    console.log('[ACTIVE_BONUS] 📋 Ищу активный бонус...');
+    console.log('[ACTIVE_BONUS] 📋 Ищу активный бонус в таблице UserBonus...');
 
-    const activeBonus = await prisma.bonus.findFirst({
+    const activeBonus = await prisma.userBonus.findFirst({
       where: {
         userId: userId,
-        status: 'ACTIVE',
+        isActive: true,          // ✅ Активный бонус
+        isCompleted: false,      // ✅ Не завершён
         expiresAt: {
-          gt: new Date(), // Еще не истёк
+          gt: new Date(),        // ✅ Ещё не истёк
         },
       },
-      select: {
-        id: true,
-        grantedAmount: true,
-        requiredWager: true,
-        wageredAmount: true,
-        expiresAt: true,
-        status: true,
-        createdAt: true,
+      include: {
+        token: true,             // ✅ Информация о токене (для получения символа)
       },
       orderBy: {
-        createdAt: 'desc', // Последний активный бонус
+        createdAt: 'desc',       // Последний активный бонус
       },
     });
 
@@ -114,11 +109,14 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
 
     const bonusData = {
       id: activeBonus.id.toString(),
+      userId: activeBonus.userId.toString(),
       grantedAmount: activeBonus.grantedAmount.toString(),
       requiredWager: activeBonus.requiredWager.toString(),
       wageredAmount: (activeBonus.wageredAmount || 0).toString(),
-      expiresAt: activeBonus.expiresAt.toISOString(),
-      status: activeBonus.status,
+      expiresAt: activeBonus.expiresAt?.toISOString() || null,
+      isActive: activeBonus.isActive,
+      isCompleted: activeBonus.isCompleted,
+      tokenSymbol: activeBonus.token?.symbol || 'USDT',
       createdAt: activeBonus.createdAt.toISOString(),
     };
 
@@ -127,7 +125,8 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
     logger.info('USER', 'Active bonus fetched successfully', {
       userId,
       bonusId: activeBonus.id,
-      grantedAmount: activeBonus.grantedAmount,
+      grantedAmount: activeBonus.grantedAmount.toString(),
+      tokenSymbol: activeBonus.token?.symbol,
     });
 
     return res.json({
