@@ -1,7 +1,10 @@
 /**
- * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js С ПОЛНЫМ ЛОГИРОВАНИЕМ
+ * ✅ ПОЛНЫЙ withdrawalService.js С ПРОВЕРКОЙ АКТИВНОГО БОНУСА
  * 
- * Добавляем полный response логирование для отладки 400 ошибок
+ * КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ:
+ * 1. Проверяем есть ли активный бонус ДО вывода
+ * 2. Если есть - возвращаем ошибку "Завершите отыгрыш"
+ * 3. Только MAIN баланс доступен для вывода (BONUS блокирован)
  */
 
 const prisma = require('../../prismaClient');
@@ -15,6 +18,7 @@ const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 class WithdrawalService {
   /**
    * 📋 Создать заявку на вывод
+   * ✅ ПРОВЕРКА: если есть активный бонус - вывод блокирован!
    */
   async createWithdrawalRequest(bot, userId, amount, asset = 'USDT') {
     console.log(`\n💸 [WITHDRAWAL] Creating withdrawal request`);
@@ -27,17 +31,29 @@ class WithdrawalService {
 
       if (!validators.validateUserId(userIdNum)) {
         console.error(`❌ Invalid userId: ${userId}`);
-        return { success: false, userMessage: '❌ Некорректный пользователь', error: 'Invalid userId' };
+        return { 
+          success: false, 
+          userMessage: '❌ Некорректный пользователь', 
+          error: 'Invalid userId' 
+        };
       }
 
       if (!validators.validateWithdrawAmount(amountNum)) {
         console.error(`❌ Invalid amount: ${amount}`);
-        return { success: false, userMessage: '❌ Некорректная сумма', error: 'Invalid amount' };
+        return { 
+          success: false, 
+          userMessage: '❌ Некорректная сумма', 
+          error: 'Invalid amount' 
+        };
       }
 
       if (!validators.validateAsset(asset)) {
         console.error(`❌ Invalid asset: ${asset}`);
-        return { success: false, userMessage: '❌ Некорректный актив', error: 'Invalid asset' };
+        return { 
+          success: false, 
+          userMessage: '❌ Некорректный актив', 
+          error: 'Invalid asset' 
+        };
       }
 
       const user = await prisma.user.findUnique({
@@ -47,7 +63,11 @@ class WithdrawalService {
 
       if (!user) {
         console.error(`❌ User not found: ${userIdNum}`);
-        return { success: false, userMessage: '❌ Пользователь не найден', error: 'User not found' };
+        return { 
+          success: false, 
+          userMessage: '❌ Пользователь не найден', 
+          error: 'User not found' 
+        };
       }
 
       const token = await prisma.cryptoToken.findUnique({
@@ -56,33 +76,80 @@ class WithdrawalService {
 
       if (!token) {
         console.error(`❌ Token not found: ${asset}`);
-        return { success: false, userMessage: `❌ Токен ${asset} не найден`, error: 'Token not found' };
+        return { 
+          success: false, 
+          userMessage: `❌ Токен ${asset} не найден`, 
+          error: 'Token not found' 
+        };
       }
 
+      // ✅ НОВОЕ: Проверяем есть ли активный бонус
+      console.log(`\n🎁 [WITHDRAWAL] Checking for active bonus...`);
+      
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: {
+          userId: userIdNum,
+          tokenId: token.id,
+          isActive: true,
+          isCompleted: false,
+          expiresAt: { gt: new Date() }
+        }
+      });
+
+      if (activeBonus) {
+        const wagered = parseFloat(activeBonus.wageredAmount.toString());
+        const required = parseFloat(activeBonus.requiredWager.toString());
+        const remaining = Math.max(required - wagered, 0);
+
+        console.error(`❌ [WITHDRAWAL] User has active bonus!`);
+        console.error(`   Wagered: ${wagered.toFixed(8)} / ${required.toFixed(8)}`);
+        console.error(`   Remaining: ${remaining.toFixed(8)}`);
+
+        return {
+          success: false,
+          userMessage: 
+            `❌ *Вывод заблокирован*\n\n` +
+            `🎁 У вас активен бонус!\n` +
+            `⚡ Осталось отыграть: ${remaining.toFixed(8)} USDT\n\n` +
+            `💡 После завершения отыгрыша сможете выводить деньги.`,
+          error: 'Active bonus exists',
+          bonus: {
+            wagered: wagered.toFixed(8),
+            required: required.toFixed(8),
+            remaining: remaining.toFixed(8)
+          }
+        };
+      }
+
+      console.log(`✅ [WITHDRAWAL] No active bonus found, proceeding...`);
+
+      // Получаем MAIN баланс (не BONUS!)
       const balance = await prisma.balance.findUnique({
         where: {
           userId_tokenId_type: {
             userId: userIdNum,
             tokenId: token.id,
-            type: 'MAIN'
+            type: 'MAIN'  // ✅ ТОЛЬКО MAIN можно выводить!
           }
         }
       });
 
       const currentBalance = balance ? parseFloat(balance.amount.toString()) : 0;
 
+      console.log(`   💰 MAIN Balance: ${currentBalance.toFixed(8)}`);
+
       if (currentBalance < amountNum) {
-        console.error(`❌ Insufficient balance: ${currentBalance} < ${amountNum}`);
+        console.error(`❌ Insufficient MAIN balance: ${currentBalance} < ${amountNum}`);
         return {
           success: false,
-          userMessage: `❌ Недостаточно средств. Доступно: ${currentBalance.toFixed(8)} ${asset}`,
+          userMessage: `❌ Недостаточно средств на счёте. Доступно: ${currentBalance.toFixed(8)} ${asset}`,
           error: 'Insufficient balance'
         };
       }
 
       console.log(`   ✅ Validation passed`);
-      console.log(`   💰 Current balance: ${currentBalance.toFixed(8)}`);
 
+      // Создаём заявку на вывод
       const withdrawal = await prisma.$transaction(async (tx) => {
         const newTx = await tx.transaction.create({
           data: {
@@ -98,6 +165,7 @@ class WithdrawalService {
 
         console.log(`   ✅ Transaction created: ID=${newTx.id}`);
 
+        // ✅ Списываем с MAIN баланса!
         if (balance) {
           await tx.balance.update({
             where: { id: balance.id },
@@ -105,9 +173,9 @@ class WithdrawalService {
               amount: { decrement: amountNum }
             }
           });
-        }
 
-        console.log(`   ✅ Balance reduced by ${amountNum.toFixed(8)}`);
+          console.log(`   ✅ MAIN balance reduced by ${amountNum.toFixed(8)}`);
+        }
 
         return newTx;
       });
@@ -122,6 +190,7 @@ class WithdrawalService {
         asset
       });
 
+      // Уведомляем админов
       try {
         const admins = await prisma.user.findMany({
           where: { isAdmin: true },
@@ -241,7 +310,7 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ Одобрить вывод (с ПОЛНЫМ логированием)
+   * ✅ Одобрить вывод
    */
   async _approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
@@ -254,7 +323,6 @@ class WithdrawalService {
 
       console.log(`   📝 spend_id: ${spendId}`);
 
-      // ✅ ПРОСТОЙ payload - без опциональных полей
       const payload = {
         user_id: telegramId,
         asset: asset,
@@ -265,10 +333,6 @@ class WithdrawalService {
       console.log(`   📤 Payload:`, JSON.stringify(payload, null, 2));
 
       console.log(`\n📡 Отправляем запрос на ${CRYPTO_PAY_API}/transfer`);
-      console.log(`   Headers:`, {
-        'Crypto-Pay-API-Token': CRYPTO_PAY_TOKEN ? '***' : 'NOT SET',
-        'Content-Type': 'application/json'
-      });
 
       let transferResponse;
       try {
@@ -288,15 +352,12 @@ class WithdrawalService {
         console.log(`📋 Full Response:`, JSON.stringify(transferResponse.data, null, 2));
 
       } catch (axiosError) {
-        // ✅ ПОЛНОЕ ЛОГИРОВАНИЕ ОШИБКИ
         console.error(`\n❌ AXIOS ERROR:`);
         console.error(`   Status: ${axiosError.response?.status}`);
         console.error(`   Status Text: ${axiosError.response?.statusText}`);
         console.error(`   Response Data:`, JSON.stringify(axiosError.response?.data, null, 2));
-        console.error(`   Response Headers:`, axiosError.response?.headers);
         console.error(`   Error Message: ${axiosError.message}`);
 
-        // Логируем для анализа
         logger.error('WITHDRAWAL', 'Crypto Pay API Error', {
           status: axiosError.response?.status,
           statusText: axiosError.response?.statusText,
@@ -310,7 +371,6 @@ class WithdrawalService {
       if (!transferResponse.data.ok) {
         const errorMsg = transferResponse.data.error?.message || 'Unknown error';
         console.error(`❌ API Error: ${errorMsg}`);
-        console.error(`Full error object:`, transferResponse.data.error);
         throw new Error(`Transfer failed: ${errorMsg}`);
       }
 
@@ -395,13 +455,14 @@ class WithdrawalService {
   }
 
   /**
-   * ✅ Отклонить вывод
+   * ✅ Отклонить вывод (возвращаем деньги)
    */
   async _rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
       console.log(`🚫 Rejecting withdrawal...`);
 
       await prisma.$transaction(async (tx) => {
+        // Обновляем статус заявки
         await tx.transaction.update({
           where: { id: withdrawal.id },
           data: {
@@ -412,6 +473,7 @@ class WithdrawalService {
 
         console.log(`   ✅ Transaction updated: status=FAILED`);
 
+        // Возвращаем деньги на MAIN баланс
         await tx.balance.upsert({
           where: {
             userId_tokenId_type: {

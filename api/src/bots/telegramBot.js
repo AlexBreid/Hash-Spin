@@ -1,20 +1,12 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ - ОДИН ФАЙЛ (~1700 строк) - ИСПРАВЛЕННАЯ ВЕРСИЯ
+ * ✅ TELEGRAM БОТ С КРАСИВЫМИ УСЛОВИЯМИ БОНУСА
  * 
- * Содержит ВСЁ:
- * - /start команда
- * - Главное меню (8 пунктов)
- * - Пополнение денег (с новой системой бонуса!)
- * - Вывод денег
- * - Админ панель
- * - Система поддержки с тикетами
- * - ВСЕ callback handlers
- * - Проверка платежей
+ * НОВОЕ:
+ * ✨ Когда выбираешь "С БОНУСОМ", сначала показываются красиво оформленные условия
+ * ✅ Две кнопки: "ПРИНИМАЮ УСЛОВИЯ" и "ОТКАЗАТЬСЯ"
+ * 💰 После согласия - создаётся инвойс
  * 
- * ИСПРАВЛЕНИЯ:
- * ✅ reject_withdrawal - конвертация Decimal в число
- * 
- * Просто скопируйте в: src/bots/telegramBot.js и используйте!
+ * Скопируй содержимое в: src/bots/telegramBot.js
  */
 
 const { Telegraf } = require('telegraf');
@@ -27,10 +19,6 @@ const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const withdrawalService = require('../services/withdrawalService');
-
-// ====================================
-// КОНФИГУРАЦИЯ
-// ====================================
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FRONTEND_URL = process.env.FRONTEND_URL;
@@ -60,10 +48,6 @@ function setStateTimeout(map, userId, timeoutMs = 10 * 60 * 1000) {
 function generateTicketId() {
   return 'TK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 }
-
-// ====================================
-// ИНИЦИАЛИЗАЦИЯ
-// ====================================
 
 if (!BOT_TOKEN) {
   logger.error('BOT', 'TELEGRAM_BOT_TOKEN is not set');
@@ -797,7 +781,7 @@ if (!BOT_TOKEN) {
             {
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: "✅ С БОНУСОМ +100%", callback_data: `confirm_deposit_${amount.toFixed(8)}_yes` }],
+                  [{ text: "✅ С БОНУСОМ +100%", callback_data: `show_bonus_conditions_${amount.toFixed(8)}` }],
                   [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
                 ]
               },
@@ -1087,7 +1071,97 @@ if (!BOT_TOKEN) {
     await ctx.answerCbQuery();
   });
 
-  // DEPOSIT CALLBACKS
+  // ✨ НОВОЕ: ПОКАЗАТЬ УСЛОВИЯ БОНУСА
+  bot.action(/show_bonus_conditions_(\d+(?:\.\d+)?)/, async (ctx) => {
+    try {
+      const amountStr = ctx.match[1];
+      const amount = parseFloat(amountStr);
+      
+      if (!validators.validateDepositAmount(amount)) {
+        await ctx.answerCbQuery("❌ Некорректная сумма");
+        return;
+      }
+      
+      const user = await prisma.user.findUnique({ 
+        where: { telegramId: ctx.from.id.toString() } 
+      });
+      
+      if (!user) {
+        await ctx.answerCbQuery("❌ Пользователь не найден.");
+        return;
+      }
+
+      // Рассчитываем бонус
+      let bonusAmount = amount * (referralService.constructor.CONFIG.DEPOSIT_BONUS_PERCENT / 100);
+      const maxBonus = referralService.constructor.CONFIG.MAX_BONUS_AMOUNT;
+      
+      if (bonusAmount > maxBonus) {
+        bonusAmount = maxBonus;
+      }
+      
+      const totalAmount = amount + bonusAmount;
+      const requiredWager = totalAmount * referralService.constructor.CONFIG.WAGERING_MULTIPLIER;
+      const maxPayout = totalAmount * referralService.constructor.CONFIG.MAX_PAYOUT_MULTIPLIER;
+
+      const conditionsText = `🎁 *УСЛОВИЯ БОНУСА КАЗИНО*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *ВАША СУММА:*
+💙 Депозит: ${amount.toFixed(8)} USDT
+💛 Бонус: +${bonusAmount.toFixed(8)} USDT
+📈 Всего: ${totalAmount.toFixed(8)} USDT
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ *ЧТО НУЖНО СДЕЛАТЬ:*
+🎲 Отыграть ${requiredWager.toFixed(8)} USDT (${referralService.constructor.CONFIG.WAGERING_MULTIPLIER}x)
+⏰ Срок: ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
+💰 Максимум выиграть: ${maxPayout.toFixed(8)} USDT
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ *КАК ЭТО РАБОТАЕТ:*
+1️⃣ Все ${totalAmount.toFixed(8)} USDT идут в игровой баланс
+2️⃣ Играешь и ставишь из этого баланса
+3️⃣ Когда отыграешь ${requiredWager.toFixed(8)} USDT:
+   → Выигрыш до ${maxPayout.toFixed(8)} USDT переходит на вывод
+   → Остаток теряется
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ *ВАЖНО:*
+• Вывести деньги можно только после вейджера
+• Максимум выплаты ограничена ${maxPayout.toFixed(8)} USDT
+• Бонус действует ${referralService.constructor.CONFIG.BONUS_EXPIRY_DAYS} дней
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+      try {
+        await ctx.deleteMessage();
+      } catch (e) {}
+
+      await ctx.reply(
+        conditionsText,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "✅ ПРИНИМАЮ УСЛОВИЯ", callback_data: `confirm_deposit_${amount.toFixed(8)}_yes` }],
+              [{ text: "❌ ОТКАЗАТЬСЯ", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
+            ]
+          },
+          parse_mode: "Markdown"
+        }
+      );
+      
+      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.error('BOT', `Error showing bonus conditions`, { error: error.message });
+      await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`);
+    }
+  });
+
+  // CONFIRM DEPOSIT WITH BONUS
   bot.action(/confirm_deposit_(\d+(?:\.\d+)?)_(yes|no)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1192,7 +1266,7 @@ if (!BOT_TOKEN) {
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "✅ С БОНУСОМ +100%", callback_data: `confirm_deposit_${amount.toFixed(8)}_yes` }],
+                [{ text: "✅ С БОНУСОМ +100%", callback_data: `show_bonus_conditions_${amount.toFixed(8)}` }],
                 [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
               ]
             },
@@ -1644,7 +1718,6 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal rejected`);
       
-      // ✅ ИСПРАВЛЕНИЕ: конвертируем Decimal в число
       const returnedAmount = parseFloat(result.returnedAmount.toString());
       
       await ctx.reply(

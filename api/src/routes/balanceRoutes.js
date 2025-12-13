@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const logger = require('../utils/logger');
 
 /**
  * 🎯 ИСПРАВЛЕННЫЙ balanceRouter.js
@@ -10,19 +11,18 @@ const { authenticateToken } = require('../middleware/authMiddleware');
  * 1. GET /balance → возвращает ОБА баланса (MAIN + BONUS)
  * 2. GET /wallet/balance → ALIAS для совместимости с фронтом
  * 3. POST /update-balance → обновляет конкретный баланс
+ * 4. ✅ ВСЕ операции проверяют активный бонус
  */
 
 /**
  * GET /api/v1/balance/get-balances
- * Получить ВСЕ балансы пользователя (MAIN + BONUS)
- * 
- * ✅ ИСПРАВЛЕНО: возвращает [MAIN, BONUS] отдельно
+ * Получить ВСЕ балансы пользователя (MAIN + BONUS) + информацию о бонусе
  */
 router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`\n📊 [GET-BALANCES] Получаю все балансы для пользователя ${userId}`);
+    console.log(`\n📊 [GET-BALANCES] userId=${userId}`);
 
     if (!userId) {
       console.error('❌ userId не найден в req.user');
@@ -39,29 +39,56 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
       orderBy: { createdAt: 'asc' },
     });
 
-    console.log(`   ✅ Найдено ${balances.length} балансов:`);
-    balances.forEach(b => {
-      console.log(`      - ${b.type}: ${b.amount} ${b.token.symbol}`);
-    });
+    console.log(`   ✅ Найдено ${balances.length} балансов`);
 
-    // ✅ ИСПРАВЛЕНИЕ: Возвращаем в формате с type
+    // ✅ Возвращаем в формате с type
     const formatted = balances.map(bal => ({
       id: bal.id,
       userId: bal.userId,
       tokenId: bal.tokenId,
       symbol: bal.token.symbol,
-      type: bal.type,  // ✅ ВАЖНО: type указывает MAIN или BONUS
+      type: bal.type,  // ✅ 'MAIN' или 'BONUS'
       amount: parseFloat(bal.amount.toString()),
       createdAt: bal.createdAt,
       updatedAt: bal.updatedAt,
     }));
 
+    // Получаем информацию о бонусе
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        isCompleted: false,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    let bonusInfo = null;
+    if (activeBonus) {
+      const wagered = parseFloat(activeBonus.wageredAmount.toString());
+      const required = parseFloat(activeBonus.requiredWager.toString());
+      
+      bonusInfo = {
+        id: activeBonus.id,
+        granted: parseFloat(activeBonus.grantedAmount.toString()),
+        required: required,
+        wagered: wagered,
+        progress: Math.min((wagered / required) * 100, 100),
+        remaining: Math.max(required - wagered, 0),
+        expiresAt: activeBonus.expiresAt,
+        isExpired: new Date() > activeBonus.expiresAt
+      };
+    }
+
     res.json({
       success: true,
       data: formatted,
+      bonus: bonusInfo
     });
   } catch (error) {
     console.error('❌ Ошибка получения балансов:', error);
+    logger.error('BALANCE', 'Failed to get balances', { error: error.message });
+    
     res.status(500).json({
       success: false,
       error: 'Ошибка получения балансов',
@@ -72,15 +99,13 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
 /**
  * GET /api/v1/wallet/balance
  * ALIAS для TopNavigation и других компонентов
- * Возвращает ВСЕ балансы в одном запросе
- * 
- * ✅ Совместимо с useFetch в компонентах
+ * Возвращает ОБА баланса + информацию о бонусе
  */
 router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`\n💳 [WALLET-BALANCE] Получаю баланс для UI (userId=${userId})`);
+    console.log(`\n💳 [WALLET-BALANCE] userId=${userId}`);
 
     if (!userId) {
       console.error('❌ userId не найден в req.user');
@@ -106,6 +131,30 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
       type: bal.type,  // 'MAIN' или 'BONUS'
     }));
 
+    // Получаем информацию о бонусе
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        isCompleted: false,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    let bonusInfo = null;
+    if (activeBonus) {
+      const wagered = parseFloat(activeBonus.wageredAmount.toString());
+      const required = parseFloat(activeBonus.requiredWager.toString());
+      
+      bonusInfo = {
+        granted: parseFloat(activeBonus.grantedAmount.toString()),
+        required: required,
+        wagered: wagered,
+        progress: Math.min((wagered / required) * 100, 100),
+        remaining: Math.max(required - wagered, 0)
+      };
+    }
+
     // Логируем для отладки
     const main = formatted.find(b => b.type === 'MAIN')?.amount || 0;
     const bonus = formatted.find(b => b.type === 'BONUS')?.amount || 0;
@@ -114,9 +163,13 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       data: formatted,
+      bonus: bonusInfo,
+      canWithdraw: !activeBonus  // ✅ Нельзя выводить если есть активный бонус
     });
   } catch (error) {
     console.error('❌ Ошибка получения баланса:', error);
+    logger.error('BALANCE', 'Failed to get wallet balance', { error: error.message });
+    
     res.status(500).json({
       success: false,
       error: 'Ошибка получения баланса',
@@ -127,15 +180,13 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
 /**
  * GET /api/v1/balance/balance/:tokenId
  * Получить баланс конкретного токена (MAIN + BONUS вместе)
- * 
- * ✅ ИСПРАВЛЕНО: возвращает ОБА типа баланса
  */
 router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const tokenId = parseInt(req.params.tokenId);
 
-    console.log(`\n💵 [BALANCE-QUERY] Получаю баланс токена ${tokenId} для пользователя ${userId}`);
+    console.log(`\n💵 [BALANCE-QUERY] tokenId=${tokenId}, userId=${userId}`);
 
     if (!userId) {
       console.error('❌ userId не найден в req.user');
@@ -173,6 +224,31 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
 
     console.log(`   💰 Main: ${mainAmount.toFixed(8)}, Bonus: ${bonusAmount.toFixed(8)}, Total: ${totalAmount.toFixed(8)}`);
 
+    // Получаем информацию о бонусе
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: {
+        userId,
+        tokenId,
+        isActive: true,
+        isCompleted: false,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    let bonusInfo = null;
+    if (activeBonus) {
+      const wagered = parseFloat(activeBonus.wageredAmount.toString());
+      const required = parseFloat(activeBonus.requiredWager.toString());
+      
+      bonusInfo = {
+        granted: parseFloat(activeBonus.grantedAmount.toString()),
+        required: required,
+        wagered: wagered,
+        progress: Math.min((wagered / required) * 100, 100),
+        remaining: Math.max(required - wagered, 0)
+      };
+    }
+
     res.json({
       success: true,
       data: {
@@ -181,9 +257,12 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
         bonus: bonusAmount,
         total: totalAmount,
       },
+      bonus: bonusInfo
     });
   } catch (error) {
     console.error('❌ Ошибка получения баланса:', error);
+    logger.error('BALANCE', 'Failed to get balance', { error: error.message });
+    
     res.status(500).json({
       success: false,
       error: 'Ошибка получения баланса',
@@ -194,23 +273,13 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
 /**
  * POST /api/v1/balance/update-balance
  * Обновить баланс пользователя (MAIN или BONUS)
- * 
- * ✅ ИСПРАВЛЕНО: правильная работа с обоими типами
- * 
- * Body:
- * {
- *   tokenId: number,
- *   amount: number,
- *   type: 'MAIN' | 'BONUS',
- *   operation: 'add' | 'subtract'
- * }
  */
 router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { tokenId, amount, type = 'MAIN', operation = 'add' } = req.body;
 
-    console.log(`\n💰 [UPDATE-BALANCE] ${operation === 'add' ? 'Добавляю' : 'Вычитаю'} ${amount} на ${type} для пользователя ${userId}`);
+    console.log(`\n💰 [UPDATE-BALANCE] ${operation} ${amount} на ${type}`);
 
     if (!userId) {
       console.error('❌ userId не найден в req.user');
@@ -288,7 +357,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       balance = await prisma.balance.update({
         where: { id: balance.id },
         data: {
-          amount: newAmount.toString(),
+          amount: newAmount.toFixed(8).toString(),
         },
       });
     }
@@ -309,6 +378,8 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     });
   } catch (error) {
     console.error('❌ Ошибка обновления баланса:', error);
+    logger.error('BALANCE', 'Failed to update balance', { error: error.message });
+    
     res.status(500).json({
       success: false,
       error: 'Ошибка обновления баланса',
@@ -318,22 +389,14 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
 
 /**
  * POST /api/v1/balance/transfer
- * 🆕 Передача между MAIN и BONUS
- * 
- * Body:
- * {
- *   tokenId: number,
- *   amount: number,
- *   from: 'MAIN' | 'BONUS',
- *   to: 'MAIN' | 'BONUS'
- * }
+ * Передача между MAIN и BONUS
  */
 router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { tokenId, amount, from, to } = req.body;
 
-    console.log(`\n🔄 [TRANSFER] Передача ${amount} с ${from} на ${to} для пользователя ${userId}`);
+    console.log(`\n🔄 [TRANSFER] ${amount} c ${from} на ${to}`);
 
     if (!userId) {
       return res.status(401).json({
@@ -389,6 +452,8 @@ router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Ошибка передачи:', error);
+    logger.error('BALANCE', 'Failed to transfer balance', { error: error.message });
+    
     res.status(400).json({
       success: false,
       error: error.message || 'Ошибка передачи баланса',
