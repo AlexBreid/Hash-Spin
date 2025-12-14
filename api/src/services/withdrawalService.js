@@ -1,11 +1,9 @@
 /**
- * ✅ ПОЛНЫЙ withdrawalService.js
+ * ✅ ИСПРАВЛЕННЫЙ withdrawalService.js
  * 
- * КЛЮЧЕВЫЕ ИСПРАВЛЕНИЯ:
- * 1. Проверяем есть ли активный бонус ДО вывода
- * 2. Если есть - возвращаем ошибку "Завершите отыгрыш"
- * 3. Выводим ТОЛЬКО MAIN баланс (BONUS блокирован)
- * 4. ⭐ НОВОЕ: Отправляем админам имя пользователя, а не ID
+ * КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ:
+ * ⭐ Экранируем спецсимволы в usernames для Markdown
+ * Используем escapeMarkdownV2() для безопасного отправления сообщений
  */
 
 const prisma = require('../../prismaClient');
@@ -16,11 +14,32 @@ const validators = require('../utils/validators');
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
 
+/**
+ * ⭐ Экранировать спецсимволы для Markdown v2
+ * Спецсимволы: _ * [ ] ( ) ~ ` > # + - = | { } . !
+ */
+function escapeMarkdownV2(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+}
+
+/**
+ * ⭐ Экранировать спецсимволы для Markdown (не v2)
+ * Спецсимволы: * _ ` [
+ */
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/[*_`[]/g, '\\$&');
+}
+
 class WithdrawalService {
   /**
    * 📋 Создать заявку на вывод
    * ✅ ПРОВЕРКА: если есть активный бонус - вывод блокирован!
    * ✅ УЛУЧШЕНИЕ: Отправляем админам имя пользователя
+   * ⭐ ИСПРАВЛЕНИЕ: Экранируем username для Markdown
    */
   async createWithdrawalRequest(bot, userId, amount, asset = 'USDT') {
     console.log(`\n💸 [WITHDRAWAL] Creating withdrawal request`);
@@ -66,8 +85,8 @@ class WithdrawalService {
         select: { 
           id: true, 
           telegramId: true,
-          username: true,    // ⭐ Загружаем username
-          firstName: true    // ⭐ Загружаем firstName
+          username: true,
+          firstName: true
         }
       });
 
@@ -141,7 +160,7 @@ class WithdrawalService {
           userId_tokenId_type: {
             userId: userIdNum,
             tokenId: token.id,
-            type: 'MAIN'  // ✅ ТОЛЬКО MAIN можно выводить!
+            type: 'MAIN'
           }
         }
       });
@@ -204,7 +223,7 @@ class WithdrawalService {
         asset
       });
 
-      // ⭐ Уведомляем админов С ИМЕНЕМ ПОЛЬЗОВАТЕЛЯ
+      // ⭐ Уведомляем админов С ЭКРАНИРОВАННЫМ ИМЕНЕМ
       try {
         // Формируем отображаемое имя
         const userDisplayName = user.username 
@@ -213,13 +232,16 @@ class WithdrawalService {
             ? user.firstName 
             : `User #${user.id}`;
 
+        // ⭐ ЭКРАНИРУЕМ для Markdown
+        const escapedUserName = escapeMarkdown(userDisplayName);
+
         const admins = await prisma.user.findMany({
           where: { isAdmin: true },
           select: { telegramId: true }
         });
 
         console.log(`\n📤 Notifying ${admins.length} admin(s)...`);
-        console.log(`   User: ${userDisplayName}`);
+        console.log(`   User: ${userDisplayName} (escaped: ${escapedUserName})`);
 
         for (const admin of admins) {
           if (admin.telegramId) {
@@ -228,7 +250,7 @@ class WithdrawalService {
                 admin.telegramId,
                 `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\n` +
                 `🎫 ID: #${withdrawal.id}\n` +
-                `👤 Пользователь: ${userDisplayName}\n` +
+                `👤 Пользователь: ${escapedUserName}\n` +
                 `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
                 `⏰ Время: ${new Date().toLocaleString()}\n\n` +
                 `Управляйте в Админ Панели`,
@@ -445,12 +467,12 @@ class WithdrawalService {
         if (user?.telegramId) {
           await bot.telegram.sendMessage(
             user.telegramId,
-            `✅ *Заявка на вывод одобрена и выполнена!*\n\n` +
+            `✅ *Заявка на вывод одобрена и выполнена\\!*\n\n` +
             `💰 Сумма: ${amount.toFixed(8)} ${asset}\n` +
             `🔗 TX ID: \`${transferId}\`\n` +
             `⏰ Дата: ${new Date().toLocaleString()}\n\n` +
-            `Средства отправлены на ваш кошелёк.`,
-            { parse_mode: 'Markdown' }
+            `Средства отправлены на ваш кошелёк\\.`,
+            { parse_mode: 'MarkdownV2' }
           );
           console.log(`   ✅ User notified`);
         }
@@ -541,8 +563,7 @@ class WithdrawalService {
             `💰 Возвращено: ${amount.toFixed(8)} ${asset}\n` +
             `🎫 ID: #${withdrawal.id}\n` +
             `⏰ Дата: ${new Date().toLocaleString()}\n\n` +
-            `Средства вернулись на ваш счёт.\n` +
-            `Если у вас есть вопросы, напишите в поддержку.`,
+            `Средства вернулись на ваш счёт\\.`,
             { parse_mode: 'Markdown' }
           );
           console.log(`   ✅ User notified`);
