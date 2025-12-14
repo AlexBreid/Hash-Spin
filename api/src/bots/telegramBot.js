@@ -1,8 +1,7 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ - ВСЕ ОШИБКИ ИСПРАВЛЕНЫ
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ - АДМИН ПАНЕЛЬ ИСПРАВЛЕНА
  * 
- * ПРОСТО СКОПИРУЙ ВЕСЬ КОД И ЗАМЕНИ src/bots/telegramBot.js
- * ВСЁ УЖЕ РАБОТАЕТ!
+ * ЗАМЕНИ src/bots/telegramBot.js
  */
 
 const { Telegraf } = require('telegraf');
@@ -46,11 +45,11 @@ const faqData = [
   },
   {
     question: "Что такое игра Краш?",
-    answer: "Краш - это игра на удачу, где нужно вовремя забрать выигрыш до того, как график 'упадёт'. Чем дольше ждёте, тем больше множитель, но и больше риск."
+    answer: "Краш - это игра на удачу, где нужно вовремя забрать выигрыш до того, как график упадёт. Чем дольше ждёте, тем больше множитель, но и больше риск."
   },
   {
     question: "Как вывести деньги?",
-    answer: "Перейди в бота, нажми '💸 Вывести', выбери сумму и подтверди операцию. Средства будут отправлены прямо на твой кошелёк."
+    answer: "Перейди в бота, нажми Вывести, выбери сумму и подтверди операцию. Средства будут отправлены прямо на твой кошелёк."
   },
 ];
 
@@ -762,8 +761,8 @@ if (!BOT_TOKEN) {
         const messageText = text;
 
         const typeLabels = {
-          'GENERAL': '📋 Общая поддержка',
-          'CONTACT': '💬 От пользователя'
+          'GENERAL': 'Общая поддержка',
+          'CONTACT': 'От пользователя'
         };
 
         const typeLabel = typeLabels[ticketType] || ticketType;
@@ -1251,42 +1250,24 @@ if (!BOT_TOKEN) {
       if (bonusAmount > maxBonus) {
         bonusAmount = maxBonus;
       }
-      
-      const totalAmount = amount + bonusAmount;
 
-      const conditionsText = `🎁 *УСЛОВИЯ ВАШЕГО БОНУСА*
+      const conditionsText = `🎁 УСЛОВИЯ ВАШЕГО БОНУСА
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Размер:
+- Депозит: ${amount.toFixed(8)} USDT
+- Бонус: +100% (макс ${maxBonus} USDT)
+- Ваш бонус: ${bonusAmount.toFixed(8)} USDT
 
-📊 *РАЗМЕР:*
-💙 Депозит: ${amount.toFixed(8)} USDT
-💛 Бонус: +100% (макс ${maxBonus} USDT)
-📈 Ваш бонус: ${bonusAmount.toFixed(8)} USDT
+Требования:
+- Отыграть: 10x от суммы
+- Действует: 7 дней
+- Выигрыш: до 3x от суммы
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚡ *ТРЕБОВАНИЯ:*
-🎲 Отыграть: 10x (10 раз от суммы)
-⏰ Действует: 7 дней
-💰 Выигрыш: до 3x от суммы депо + бонуса
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ *КАК ПОЛУЧИТЬ ДЕНЬГИ:*
-1️⃣ Пополни баланс
-2️⃣ Играй и ставь обычно
-3️⃣ Отыграй 10x суммы
-4️⃣ Выиграешь? Деньги на вывод!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️ *ПОМНИ:*
-• Отыграть нужно ровно 10x
-• Выиграешь максимум 3x суммы
-• Бонус действует 7 дней
-• Максимальный бонус: ${maxBonus} USDT
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+Как получить деньги:
+1. Пополни баланс
+2. Играй и ставь обычно
+3. Отыграй 10x суммы
+4. Выиграешь - деньги на вывод`;
 
       try {
         await ctx.deleteMessage();
@@ -1297,18 +1278,17 @@ if (!BOT_TOKEN) {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "✅ ПРИНИМАЮ УСЛОВИЯ", callback_data: `confirm_deposit_${amount.toFixed(8)}_yes` }],
+              [{ text: "✅ ПРИНИМАЮ", callback_data: `confirm_deposit_${amount.toFixed(8)}_yes` }],
               [{ text: "❌ ОТКАЗАТЬСЯ", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
             ]
-          },
-          parse_mode: "Markdown"
+          }
         }
       );
       
       await ctx.answerCbQuery();
     } catch (error) {
       logger.error('BOT', `Error showing bonus conditions`, { error: error.message });
-      await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`);
+      await ctx.answerCbQuery(`Ошибка: ${error.message}`);
     }
   });
 
@@ -1346,11 +1326,11 @@ if (!BOT_TOKEN) {
       scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', useBonus);
 
       const bonusText = useBonus 
-        ? `\n\n🎁 *С БОНУСОМ:*\n• +100% к пополнению\n• Отыграй 10x\n• Выигрыш до 3x`
-        : `\n\n💎 *БЕЗ БОНУСА:*\n• Сразу на счёт`;
+        ? `\n\nС БОНУСОМ:\n- +100% к пополнению\n- Отыграй 10x\n- Выигрыш до 3x`
+        : `\n\nБЕЗ БОНУСА:\n- Сразу на счёт`;
 
       await ctx.reply(
-        `✅ *Инвойс создан*\n\nСумма: ${amount.toFixed(8)} USDT${bonusText}`,
+        `Инвойс создан\n\nСумма: ${amount.toFixed(8)} USDT${bonusText}`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -1358,15 +1338,14 @@ if (!BOT_TOKEN) {
               [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }],
               [{ text: "◀️ Отменить", callback_data: `cancel_deposit` }]
             ]
-          },
-          parse_mode: "Markdown"
+          }
         }
       );
       
       await ctx.answerCbQuery();
     } catch (error) {
       logger.error('BOT', `Error in confirm_deposit callback`, { error: error.message });
-      await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`);
+      await ctx.answerCbQuery(`Ошибка: ${error.message}`);
     }
   });
 
@@ -1410,17 +1389,14 @@ if (!BOT_TOKEN) {
       
       if (bonusAvailability.canUseBonus) {
         await ctx.reply(
-          `💰 *Пополнение на ${amount.toFixed(8)} USDT*\n\n` +
-          `🎁 У вас доступен бонус +100%!\n\n` +
-          `Использовать бонус при этом пополнении?`,
+          `Пополнение на ${amount.toFixed(8)} USDT\n\nУ вас доступен бонус +100%!\n\nИспользовать бонус?`,
           {
             reply_markup: {
               inline_keyboard: [
                 [{ text: "✅ С БОНУСОМ +100%", callback_data: `show_bonus_conditions_${amount.toFixed(8)}` }],
-                [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
+                [{ text: "БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
               ]
-            },
-            parse_mode: "Markdown"
+            }
           }
         );
       } else {
@@ -1433,7 +1409,7 @@ if (!BOT_TOKEN) {
         scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', false);
         
         await ctx.reply(
-          `✅ *Инвойс создан*\n\n💰 Сумма: ${amount.toFixed(8)} USDT\n⏳ Статус: Ожидание оплаты`,
+          `Инвойс создан\n\nСумма: ${amount.toFixed(8)} USDT\nСтатус: Ожидание оплаты`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -1441,8 +1417,7 @@ if (!BOT_TOKEN) {
                 [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }],
                 [{ text: "◀️ Отменить", callback_data: `cancel_deposit` }]
               ]
-            },
-            parse_mode: "Markdown"
+            }
           }
         );
       }
@@ -1466,7 +1441,7 @@ if (!BOT_TOKEN) {
       const result = await cryptoPayAPI.getInvoices([invoiceId]);
       
       if (!result?.items?.length) {
-        await ctx.editMessageText('ℹ️ Инвойс не найден.', { parse_mode: 'Markdown' });
+        await ctx.editMessageText('Инвойс не найден.');
         return;
       }
       
@@ -1475,8 +1450,7 @@ if (!BOT_TOKEN) {
       if (invoice.status === 'paid') {
         try {
           await ctx.editMessageText(
-            `✅ *Оплата получена!*\n\nДеньги поступают на ваш счёт...`,
-            { parse_mode: 'Markdown' }
+            `✅ Оплата получена!\n\nДеньги поступают на ваш счёт...`
           );
         } catch (e) {
           if (!e.description?.includes('message is not modified')) {
@@ -1485,7 +1459,7 @@ if (!BOT_TOKEN) {
         }
       } else if (invoice.status === 'active') {
         await ctx.editMessageText(
-          `⏳ *Инвойс ожидает оплаты*`,
+          `Инвойс ожидает оплаты`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -1493,27 +1467,25 @@ if (!BOT_TOKEN) {
                 [{ text: '🔄 Проверить снова', callback_data: `check_invoice_${invoiceId}` }],
                 [{ text: '◀️ Назад', callback_data: `back_to_menu` }]
               ]
-            },
-            parse_mode: 'Markdown'
+            }
           }
         );
       } else {
         await ctx.editMessageText(
-          `❌ Инвойс ${invoice.status}. Попробуйте создать новый.`,
+          `Инвойс ${invoice.status}. Попробуйте создать новый.`,
           {
             reply_markup: {
               inline_keyboard: [
                 [{ text: '◀️ Назад', callback_data: `back_to_menu` }]
               ]
-            },
-            parse_mode: 'Markdown'
+            }
           }
         );
       }
       
     } catch (error) {
       logger.error('BOT', `Error in check_invoice callback`, { error: error.message });
-      await ctx.answerCbQuery('⚠️ Ошибка при проверке');
+      await ctx.answerCbQuery('Ошибка при проверке');
     }
   });
 
@@ -1521,18 +1493,18 @@ if (!BOT_TOKEN) {
     try {
       const amountStr = ctx.match[1];
       if (!amountStr || amountStr.trim() === '') {
-        await ctx.answerCbQuery('❌ Ошибка: пустая сумма');
+        await ctx.answerCbQuery('Ошибка: пустая сумма');
         return;
       }
       
       const amount = parseFloat(amountStr.trim());
       if (isNaN(amount) || amount <= 0 || !isFinite(amount)) {
-        await ctx.answerCbQuery(`❌ Некорректная сумма`);
+        await ctx.answerCbQuery(`Некорректная сумма`);
         return;
       }
       
       if (!validators.validateWithdrawAmount(amount)) {
-        await ctx.answerCbQuery('❌ Сумма вне допустимого диапазона');
+        await ctx.answerCbQuery('Сумма вне допустимого диапазона');
         return;
       }
       
@@ -1541,14 +1513,14 @@ if (!BOT_TOKEN) {
       });
       
       if (!user) {
-        await ctx.answerCbQuery('❌ Пользователь не найден');
+        await ctx.answerCbQuery('Пользователь не найден');
         return;
       }
 
       const balance = await getUserBalance(user.id);
       if (balance < amount) {
-        await ctx.answerCbQuery('❌ Недостаточно средств');
-        await ctx.reply(`❌ Доступно только ${balance.toFixed(8)} USDT`);
+        await ctx.answerCbQuery('Недостаточно средств');
+        await ctx.reply(`Доступно только ${balance.toFixed(8)} USDT`);
         return;
       }
 
@@ -1556,16 +1528,16 @@ if (!BOT_TOKEN) {
         await ctx.deleteMessage();
       } catch (deleteError) {}
 
-      await ctx.answerCbQuery('⏳ Обработка...', false);
+      await ctx.answerCbQuery('Обработка...', false);
 
       console.log(`\n💸 Creating withdrawal request for user ${user.id}, amount ${amount.toFixed(8)}`);
       
       const result = await withdrawalService.createWithdrawalRequest(bot, user.id, amount, 'USDT');
 
       if (!result.success) {
-        console.error(`❌ Withdrawal creation failed: ${result.error}`);
+        console.error(`Withdrawal creation failed: ${result.error}`);
         
-        let userMessage = result.userMessage || '❌ Ошибка при создании заявки на вывод';
+        let userMessage = result.userMessage || 'Ошибка при создании заявки на вывод';
         
         await ctx.reply(
           userMessage + '\n\nПопробуйте позже.',
@@ -1582,15 +1554,9 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal request created: ${result.withdrawalId}`);
 
-      const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.firstName}`;
-
       await ctx.reply(
-        `📋 Заявка на вывод ${amount.toFixed(8)} USDT создана.\n\n` +
-        `🎫 ID: ${result.withdrawalId}\n` +
-        `👤 Пользователь: ${escapeMarkdownV2(userDisplayName)}\n` +
-        `⏳ Статус: На рассмотрении\n\n` +
-        `Администратор одобрит её в течение нескольких минут.`,
-        { parse_mode: 'MarkdownV2', ...getMainMenuKeyboard(user.isAdmin) }
+        `Заявка на вывод ${amount.toFixed(8)} USDT создана.\n\nID: ${result.withdrawalId}\nСтатус: На рассмотрении\n\nАдминистратор одобрит её в течение нескольких минут.`,
+        getMainMenuKeyboard(user.isAdmin)
       );
       
       logger.info('BOT', 'Withdrawal request created successfully', { 
@@ -1601,7 +1567,7 @@ if (!BOT_TOKEN) {
       });
 
     } catch (error) {
-      console.error(`\n❌ CRITICAL ERROR in confirm_withdraw: ${error.message}`);
+      console.error(`CRITICAL ERROR in confirm_withdraw: ${error.message}`);
       
       logger.error('BOT', 'Critical error in confirm_withdraw callback', { 
         error: error.message,
@@ -1609,12 +1575,12 @@ if (!BOT_TOKEN) {
       });
       
       try {
-        await ctx.answerCbQuery('❌ Внутренняя ошибка сервера', false);
+        await ctx.answerCbQuery('Внутренняя ошибка сервера', false);
       } catch (e) {}
       
       try {
         await ctx.reply(
-          '❌ Произошла ошибка при обработке вывода.\n\nПожалуйста, попробуйте позже или обратитесь в поддержку.',
+          'Произошла ошибка при обработке вывода.\n\nПожалуйста, попробуйте позже или обратитесь в поддержку.',
           getMainMenuKeyboard(false)
         );
       } catch (e) {}
@@ -1643,7 +1609,7 @@ if (!BOT_TOKEN) {
       const amount = parseFloat(ctx.match[1]);
       
       if (!validators.validateWithdrawAmount(amount)) {
-        await ctx.answerCbQuery('❌ Некорректная сумма');
+        await ctx.answerCbQuery('Некорректная сумма');
         return;
       }
       
@@ -1655,8 +1621,8 @@ if (!BOT_TOKEN) {
 
       const balance = await getUserBalance(user.id);
       if (balance < amount) {
-        await ctx.answerCbQuery('❌ Недостаточно средств');
-        await ctx.reply(`❌ Доступно только ${balance.toFixed(8)} USDT`);
+        await ctx.answerCbQuery('Недостаточно средств');
+        await ctx.reply(`Доступно только ${balance.toFixed(8)} USDT`);
         return;
       }
 
@@ -1665,29 +1631,25 @@ if (!BOT_TOKEN) {
       } catch (e) {}
 
       await ctx.reply(
-        `💰 *Ваша заявка на вывод*\n\n` +
-        `Сумма: ${amount.toFixed(8)} USDT\n` +
-        `Способ: Прямой перевод на ваш кошелёк\n\n` +
-        `⏳ Подтвердите операцию:`,
+        `Ваша заявка на вывод\n\nСумма: ${amount.toFixed(8)} USDT\nСпособ: Прямой перевод на кошелёк\n\nПодтвердите операцию:`,
         {
           reply_markup: {
             inline_keyboard: [
               [{ text: '✅ Подтвердить', callback_data: `confirm_withdraw_${amount.toFixed(8)}` }],
               [{ text: '❌ Отмена', callback_data: 'back_to_menu' }]
             ]
-          },
-          parse_mode: 'Markdown'
+          }
         }
       );
       
       await ctx.answerCbQuery();
     } catch (error) {
       logger.error('BOT', `Error in withdraw callback`, { error: error.message });
-      await ctx.answerCbQuery('❌ Ошибка');
+      await ctx.answerCbQuery('Ошибка');
     }
   });
 
-  // ⭐ ИСПРАВЛЕННЫЙ ADMIN CALLBACK
+  // ⭐ АДМИНИСТРАТОРСКАЯ ПАНЕЛЬ - ПОЛНОСТЬЮ ПЕРЕРАБОТАНА БЕЗ MARKDOWN
   bot.action('admin_show_withdrawals', async (ctx) => {
     try {
       const user = await prisma.user.findUnique({ 
@@ -1695,7 +1657,7 @@ if (!BOT_TOKEN) {
       });
 
       if (!user || !user.isAdmin) {
-        await ctx.answerCbQuery('❌ Нет доступа', true);
+        await ctx.answerCbQuery('Нет доступа', true);
         return;
       }
 
@@ -1720,49 +1682,46 @@ if (!BOT_TOKEN) {
       console.log(`✅ Found ${pendingWithdrawals.length} pending withdrawals`);
 
       if (pendingWithdrawals.length === 0) {
-        await ctx.editMessageText(
-          '✅ *Нет заявок на вывод*\n\nВсе заявки обработаны!',
-          { 
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]
-              ]
-            }
+        await ctx.editMessageText('Нет заявок на вывод. Все заявки обработаны!', { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]
+            ]
           }
-        );
-        await ctx.answerCbQuery('✅ Нет заявок', true);
+        });
+        await ctx.answerCbQuery('Нет заявок', true);
         return;
       }
 
-      let msg = `💸 *ЗАЯВКИ НА ВЫВОД (${pendingWithdrawals.length}):*\n\n`;
+      let msg = 'ЗАЯВКИ НА ВЫВОД (' + pendingWithdrawals.length + '):\n\n';
       
       for (const w of pendingWithdrawals.slice(0, 5)) {
         const amount = parseFloat(w.amount.toString());
         const withdrawalId = String(w.id);
         
-        let userDisplayName;
+        let userDisplayName = 'Unknown';
         if (w.user?.username) {
-          userDisplayName = `@${w.user.username}`;
+          userDisplayName = '@' + w.user.username;
         } else if (w.user?.firstName) {
           userDisplayName = w.user.firstName;
         } else {
-          userDisplayName = `ID: ${w.userId}`;
+          userDisplayName = 'ID:' + w.userId;
         }
         
-        let shortAddr = '—';
+        let shortAddr = '-';
         if (w.walletAddress) {
           const addr = w.walletAddress.toString().trim();
-          shortAddr = addr.length > 15 ? `${addr.slice(0,10)}...` : addr;
+          shortAddr = addr.length > 15 ? addr.slice(0,10) + '...' : addr;
         }
         
         const dateStr = new Date(w.createdAt).toLocaleString('ru-RU');
         
-        msg += `🎫 ID: ${withdrawalId}\n` +
-               `👤 ${userDisplayName}\n` +
-               `💰 ${amount.toFixed(8)} USDT\n` +
-               `📍 ${shortAddr}\n` +
-               `⏰ ${dateStr}\n\n`;
+        msg += 'ID: ' + withdrawalId + '\n' +
+               'User: ' + userDisplayName + '\n' +
+               'Sum: ' + amount.toFixed(8) + ' USDT\n' +
+               'Addr: ' + shortAddr + '\n' +
+               'Date: ' + dateStr + '\n' +
+               '---\n';
       }
 
       const buttons = [];
@@ -1770,71 +1729,66 @@ if (!BOT_TOKEN) {
       for (const w of pendingWithdrawals.slice(0, 5)) {
         buttons.push([
           { 
-            text: `✅ #${w.id}`, 
-            callback_data: `approve_withdrawal_${w.id}` 
+            text: 'OK #' + w.id, 
+            callback_data: 'approve_withdrawal_' + w.id
           },
           { 
-            text: `❌ #${w.id}`, 
-            callback_data: `reject_withdrawal_${w.id}` 
+            text: 'NO #' + w.id, 
+            callback_data: 'reject_withdrawal_' + w.id
           }
         ]);
       }
 
       if (pendingWithdrawals.length > 5) {
-        msg += `...и ещё ${pendingWithdrawals.length - 5} заявок. Показаны первые 5.`;
+        msg += '\nAnd ' + (pendingWithdrawals.length - 5) + ' more. First 5 shown.';
       }
 
       buttons.push([
-        { text: '🔄 Обновить', callback_data: 'admin_show_withdrawals' },
-        { text: '◀️ Назад', callback_data: 'back_to_admin_menu' }
+        { text: 'Refresh', callback_data: 'admin_show_withdrawals' },
+        { text: 'Back', callback_data: 'back_to_admin_menu' }
       ]);
 
-      console.log(`✅ Sending message with ${buttons.length} button rows`);
+      console.log('✅ Sending message');
 
       try {
         await ctx.editMessageText(msg, {
-          reply_markup: { inline_keyboard: buttons },
-          parse_mode: 'Markdown'
+          reply_markup: { inline_keyboard: buttons }
         });
-        console.log(`✅ Message edited successfully`);
+        console.log('✅ Message edited');
       } catch (editError) {
-        console.error(`❌ Edit error: ${editError.message}`);
+        console.error('Edit error: ' + editError.message);
         
         try {
           await ctx.deleteMessage();
         } catch (e) {}
         
         await ctx.reply(msg, {
-          reply_markup: { inline_keyboard: buttons },
-          parse_mode: 'Markdown'
+          reply_markup: { inline_keyboard: buttons }
         });
-        console.log(`✅ Sent as new message instead`);
+        console.log('✅ Sent as new message');
       }
 
-      await ctx.answerCbQuery(`✅ ${pendingWithdrawals.length} заявок загружено`, false);
+      await ctx.answerCbQuery(pendingWithdrawals.length + ' requests loaded', false);
 
     } catch (error) {
-      console.error(`\n❌ CRITICAL ERROR in admin_show_withdrawals:`, error.message);
+      console.error('CRITICAL ERROR: ' + error.message);
       console.error(error.stack);
       
-      logger.error('BOT', `Error in admin_show_withdrawals`, { 
-        error: error.message,
-        stack: error.stack 
+      logger.error('BOT', 'Error in admin_show_withdrawals', { 
+        error: error.message
       });
 
       try {
-        await ctx.answerCbQuery(`❌ Ошибка: ${error.message}`, true);
+        await ctx.answerCbQuery('Error: ' + error.message, true);
       } catch (e) {}
 
       try {
-        await ctx.reply(
-          `❌ *Ошибка при загрузке заявок*\n\n\`\`\`\n${error.message}\n\`\`\``,
+        await ctx.reply('Error loading requests. Try again later.',
           { 
-            parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
-                [{ text: '🔄 Попробовать снова', callback_data: 'admin_show_withdrawals' }],
-                [{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]
+                [{ text: 'Try Again', callback_data: 'admin_show_withdrawals' }],
+                [{ text: 'Back', callback_data: 'back_to_admin_menu' }]
               ]
             }
           }
@@ -1849,7 +1803,7 @@ if (!BOT_TOKEN) {
     });
 
     if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа', true);
+      await ctx.answerCbQuery('Нет доступа', true);
       return;
     }
 
@@ -1858,16 +1812,15 @@ if (!BOT_TOKEN) {
     } catch (e) {}
 
     await ctx.reply(
-      `⚙️ *Админ Панель*\n\nВыберите действие:`,
+      'Admin Panel\n\nChoose action:',
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '💸 Заявки на вывод', callback_data: 'admin_show_withdrawals' }],
-            [{ text: '🎫 Заявки поддержки', callback_data: 'admin_show_tickets' }],
-            [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+            [{ text: 'Withdrawals', callback_data: 'admin_show_withdrawals' }],
+            [{ text: 'Support', callback_data: 'admin_show_tickets' }],
+            [{ text: 'Back', callback_data: 'back_to_menu' }]
           ]
-        },
-        parse_mode: 'Markdown'
+        }
       }
     );
 
@@ -1880,24 +1833,22 @@ if (!BOT_TOKEN) {
     });
 
     if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
+      await ctx.answerCbQuery('Нет доступа');
       return;
     }
 
     if (supportTickets.size === 0) {
-      await ctx.editMessageText('✅ Нет открытых тикетов.', { parse_mode: 'Markdown' });
+      await ctx.editMessageText('No open tickets.', { parse_mode: 'Markdown' });
       await ctx.answerCbQuery();
       return;
     }
 
-    let msg = `🎫 *ПОДДЕРЖКА (${supportTickets.size}):*\n\n`;
+    let msg = 'SUPPORT (' + supportTickets.size + '):\n\n';
     let ticketsList = [];
 
     for (const [userId, ticket] of supportTickets.entries()) {
       if (ticket.status === 'OPEN' || ticket.status === 'REPLIED') {
-        const typeLabel = {
-          'CONTACT': '💬'
-        }[ticket.type] || '❓';
+        const typeLabel = ticket.type === 'CONTACT' ? 'MSG' : 'Q';
 
         ticketsList.push({
           id: ticket.ticketId,
@@ -1909,28 +1860,27 @@ if (!BOT_TOKEN) {
     }
 
     if (ticketsList.length === 0) {
-      await ctx.editMessageText('✅ Нет открытых тикетов.', { parse_mode: 'Markdown' });
+      await ctx.editMessageText('No open tickets.', { parse_mode: 'Markdown' });
       await ctx.answerCbQuery();
       return;
     }
 
     for (const t of ticketsList) {
-      msg += `${t.type} ${t.id}\n` +
-             `👤 User: ${t.userId}\n` +
-             `📝 ${t.message}\n\n`;
+      msg += t.type + ' ' + t.id + '\n' +
+             'User: ' + t.userId + '\n' +
+             'Msg: ' + t.message + '\n\n';
     }
 
     const buttons = [];
     for (const t of ticketsList) {
       buttons.push([
-        { text: `💬 ${t.id}`, callback_data: `reply_ticket_action_${t.id}` }
+        { text: 'Reply ' + t.id, callback_data: 'reply_ticket_action_' + t.id }
       ]);
     }
-    buttons.push([{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]);
+    buttons.push([{ text: 'Back', callback_data: 'back_to_admin_menu' }]);
 
     await ctx.editMessageText(msg, {
-      reply_markup: { inline_keyboard: buttons },
-      parse_mode: 'Markdown'
+      reply_markup: { inline_keyboard: buttons }
     });
     await ctx.answerCbQuery();
   });
@@ -1941,14 +1891,14 @@ if (!BOT_TOKEN) {
     });
 
     if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
+      await ctx.answerCbQuery('Нет доступа');
       return;
     }
 
     const withdrawalId = parseInt(ctx.match[1]);
 
     try {
-      await ctx.answerCbQuery('⏳ Обработка...');
+      await ctx.answerCbQuery('Processing...');
 
       console.log(`\n✅ Admin approving withdrawal ${withdrawalId}`);
 
@@ -1959,19 +1909,16 @@ if (!BOT_TOKEN) {
       const amount = parseFloat(result.amount.toString());
       
       await ctx.reply(
-        `✅ Заявка ${withdrawalId} одобрена!\n\n` +
-        `💰 Сумма: ${amount.toFixed(8)} ${result.asset}\n` +
-        `🔗 Transfer ID: \`${result.transferId}\`\n\n` +
-        `Средства отправлены пользователю.`,
-        { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+        `Request #${withdrawalId} approved!\n\nAmount: ${amount.toFixed(8)} ${result.asset}\nTransfer ID: ${result.transferId}\n\nFunds sent to user.`,
+        getMainMenuKeyboard(user.isAdmin)
       );
 
     } catch (error) {
       logger.error('BOT', `Error approving withdrawal`, { error: error.message });
       
-      await ctx.answerCbQuery('❌ Ошибка');
+      await ctx.answerCbQuery('Error');
       await ctx.reply(
-        `❌ Ошибка при одобрении заявки:\n\n${error.message}`,
+        `Error approving request:\n\n${error.message}`,
         getMainMenuKeyboard(user.isAdmin)
       );
     }
@@ -1983,14 +1930,14 @@ if (!BOT_TOKEN) {
     });
 
     if (!user || !user.isAdmin) {
-      await ctx.answerCbQuery('❌ Нет доступа');
+      await ctx.answerCbQuery('Нет доступа');
       return;
     }
 
     const withdrawalId = parseInt(ctx.match[1]);
 
     try {
-      await ctx.answerCbQuery('⏳ Обработка...');
+      await ctx.answerCbQuery('Processing...');
 
       console.log(`\n❌ Admin rejecting withdrawal ${withdrawalId}`);
 
@@ -2001,36 +1948,34 @@ if (!BOT_TOKEN) {
       const returnedAmount = parseFloat(result.returnedAmount.toString());
       
       await ctx.reply(
-        `❌ Заявка ${withdrawalId} отклонена\n\n` +
-        `💰 ${returnedAmount.toFixed(8)} ${result.asset} вернено на счёт пользователя`,
-        { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+        `Request #${withdrawalId} rejected\n\nReturned: ${returnedAmount.toFixed(8)} ${result.asset} to user account`,
+        getMainMenuKeyboard(user.isAdmin)
       );
 
     } catch (error) {
       logger.error('BOT', `Error rejecting withdrawal`, { error: error.message });
       
-      await ctx.answerCbQuery('❌ Ошибка');
+      await ctx.answerCbQuery('Error');
       await ctx.reply(
-        `❌ Ошибка при отклонении заявки:\n\n${error.message}`,
+        `Error rejecting request:\n\n${error.message}`,
         getMainMenuKeyboard(user.isAdmin)
       );
     }
   });
 
   bot.action('support_faq', async (ctx) => {
-    let faqText = `❓ *ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ*\n\n`;
+    let faqText = 'FAQ:\n\n';
     
     for (let i = 0; i < faqData.length; i++) {
-      faqText += `*${i + 1}. ${escapeMarkdown(faqData[i].question)}*\n${escapeMarkdown(faqData[i].answer)}\n\n`;
+      faqText += (i + 1) + '. ' + faqData[i].question + '\n' + faqData[i].answer + '\n\n';
     }
 
     await ctx.editMessageText(faqText, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+          [{ text: 'Back', callback_data: 'back_to_menu' }]
         ]
-      },
-      parse_mode: 'Markdown'
+      }
     });
     await ctx.answerCbQuery();
   });
@@ -2044,14 +1989,13 @@ if (!BOT_TOKEN) {
     waitingForTicketMessage.set(user.id, 'CONTACT');
     
     await ctx.editMessageText(
-      '💬 *Связаться с администратором*\n\nНапишите ваше сообщение. Администратор ответит вам в ближайшее время:',
+      'Contact Admin\n\nWrite your message. We will reply soon.',
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '◀️ Назад', callback_data: 'support_back' }]
+            [{ text: 'Back', callback_data: 'support_back' }]
           ]
-        },
-        parse_mode: 'Markdown'
+        }
       }
     );
     await ctx.answerCbQuery();
@@ -2066,16 +2010,15 @@ if (!BOT_TOKEN) {
     waitingForTicketMessage.delete(user.id);
     
     await ctx.editMessageText(
-      `❓ *Помощь и поддержка*\n\nВыберите:`,
+      `Help and Support\n\nChoose:`,
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '❓ FAQ - Часто задаваемые вопросы', callback_data: 'support_faq' }],
-            [{ text: '💬 Связаться с администратором', callback_data: 'support_contact' }],
-            [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
+            [{ text: 'FAQ', callback_data: 'support_faq' }],
+            [{ text: 'Contact Admin', callback_data: 'support_contact' }],
+            [{ text: 'Back', callback_data: 'back_to_menu' }]
           ]
-        },
-        parse_mode: 'Markdown'
+        }
       }
     );
     await ctx.answerCbQuery();
