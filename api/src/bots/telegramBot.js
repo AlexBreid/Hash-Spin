@@ -1756,7 +1756,7 @@ if (!BOT_TOKEN) {
         
         const dateStr = new Date(w.createdAt).toLocaleString('ru-RU');
         
-        msg += `🎫 ID: #${w.id}\n` +
+        msg += `🎫 ID: \#${w.id}\n` +
                `👤 ${userDisplayName}\n` +
                `💰 ${amount.toFixed(8)} USDT\n` +
                `📍 ${shortAddr}\n` +
