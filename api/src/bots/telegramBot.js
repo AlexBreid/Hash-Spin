@@ -1,9 +1,8 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ С ИНТЕГРИРОВАННОЙ РЕФЕРАЛКОЙ И КРАСИВЫМИ БОНУСАМИ
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ - РАБОЧИЙ КОД
  * 
- * ПОДДЕРЖКА: 2 кнопки
- * 1. ❓ FAQ - Часто задаваемые вопросы
- * 2. 💬 Связаться с администратором
+ * Просто замени весь содержимое src/bots/telegramBot.js на этот код
+ * И готово!
  */
 
 const { Telegraf } = require('telegraf');
@@ -38,6 +37,22 @@ const faqData = [
     answer: "Перейди в бота, нажми '💸 Вывести', выбери сумму и подтверди операцию. Средства будут отправлены прямо на твой кошелёк."
   },
 ];
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ⭐ ФУНКЦИИ ЭКРАНИРОВАНИЯ MARKDOWN
+// ════════════════════════════════════════════════════════════════════════════════
+
+function escapeMarkdownV2(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+}
+
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/[*_`[]/g, '\\$&');
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 🎁 ФУНКЦИИ РЕФЕРАЛКИ
@@ -118,9 +133,8 @@ async function notifyReferrerAboutNewReferee(bot, referrerTelegramId, newUserUse
     await bot.telegram.sendMessage(
       referrerTelegramId,
       `🎉 *Новый реферал!*\n\n` +
-      `👤 ${userDisplay} присоединился к вашей сети!\n\n` +
-      `💰 Когда он пополнит счёт - вы получите комиссию.\n\n` +
-      `📊 Проверить статистику: нажмите "👥 Рефералы"`,
+      `👤 ${escapeMarkdown(userDisplay)} присоединился к вашей сети!\n\n` +
+      `💰 Когда он пополнит счёт - вы получите комиссию.`,
       { parse_mode: 'Markdown' }
     );
     console.log(`[REFERRAL] ✅ Notification sent to referrer ${referrerTelegramId}`);
@@ -465,7 +479,6 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Transaction completed`);
 
-      // Выдаём бонус ВНЕ транзакции
       if (bonusWasSelected && asset === 'USDT') {
         try {
           const user = await prisma.user.findUnique({
@@ -494,7 +507,6 @@ if (!BOT_TOKEN) {
         }
       }
 
-      // Уведомляем пользователя
       try {
         const user = await prisma.user.findUnique({ 
           where: { id: userIdNum }, 
@@ -516,7 +528,6 @@ if (!BOT_TOKEN) {
             if (activeBonus) {
               const depositAmount = parseFloat(amountNum.toFixed(8));
               const bonusAmount = parseFloat(activeBonus.grantedAmount.toString());
-              const wageringRequired = parseFloat(activeBonus.requiredWager.toString());
               
               message = `✅ *Пополнение с БОНУСОМ успешно!*\n\n` +
                 `💰 Пополнено: ${depositAmount.toFixed(8)} ${asset}\n` +
@@ -561,7 +572,7 @@ if (!BOT_TOKEN) {
   }
 
   // ====================================
-  // /start КОМАНДА С РЕФЕРАЛКОЙ
+  // /start КОМАНДА
   // ====================================
 
   bot.start(async (ctx) => {
@@ -697,10 +708,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ====================================
-      // ADMIN REPLY TO TICKET
-      // ====================================
-
       if (adminWaitingForReply.has(user.id)) {
         const ticketId = adminWaitingForReply.get(user.id);
         let ticketUser = null;
@@ -748,10 +755,6 @@ if (!BOT_TOKEN) {
         }
         return;
       }
-
-      // ====================================
-      // WAITING FOR TICKET MESSAGE
-      // ====================================
 
       if (waitingForTicketMessage.has(user.id)) {
         const ticketType = waitingForTicketMessage.get(user.id);
@@ -811,10 +814,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ====================================
-      // WAITING FOR WITHDRAW AMOUNT
-      // ====================================
-
       if (waitingForWithdrawAmount.has(user.id)) {
         if (text === '◀️ Назад') {
           waitingForWithdrawAmount.delete(user.id);
@@ -858,10 +857,6 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      // ====================================
-      // WAITING FOR DEPOSIT AMOUNT
-      // ====================================
-
       if (waitingForDeposit.has(user.id)) {
         if (text === '◀️ Назад') {
           waitingForDeposit.delete(user.id);
@@ -883,7 +878,6 @@ if (!BOT_TOKEN) {
         waitingForDeposit.delete(user.id);
         logger.info('BOT', `User entered deposit amount`, { userId: user.id, amount: amount.toFixed(8) });
         
-        // Проверяем доступность бонуса
         const bonusAvailability = await referralService.checkBonusAvailability(user.id);
         
         console.log(`\n💰 [DEPOSIT] User ${user.id} entered amount: ${amount.toFixed(8)}, bonus available: ${bonusAvailability.canUseBonus}`);
@@ -933,10 +927,6 @@ if (!BOT_TOKEN) {
         }
         return;
       }
-
-      // ====================================
-      // MAIN MENU SWITCHES
-      // ====================================
 
       switch (text) {
         case '🎰 Казино': {
@@ -1236,7 +1226,6 @@ if (!BOT_TOKEN) {
     await ctx.answerCbQuery();
   });
 
-  // ✨ ПОКАЗАТЬ УСЛОВИЯ БОНУСА
   bot.action(/show_bonus_conditions_(\d+(?:\.\d+)?)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1264,8 +1253,6 @@ if (!BOT_TOKEN) {
       }
       
       const totalAmount = amount + bonusAmount;
-      const requiredWager = totalAmount * referralService.constructor.CONFIG.WAGERING_MULTIPLIER;
-      const maxPayout = totalAmount * referralService.constructor.CONFIG.MAX_PAYOUT_MULTIPLIER;
 
       const conditionsText = `🎁 *УСЛОВИЯ ВАШЕГО БОНУСА*
 
@@ -1325,7 +1312,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // CONFIRM DEPOSIT WITH BONUS
   bot.action(/confirm_deposit_(\d+(?:\.\d+)?)_(yes|no)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1468,7 +1454,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // CHECK INVOICE
   bot.action(/check_invoice_(\d+)/, async (ctx) => {
     try {
       const invoiceId = parseInt(ctx.match[1]);
@@ -1532,7 +1517,6 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // WITHDRAW CALLBACKS
   bot.action(/confirm_withdraw_(.+)/, async (ctx) => {
     try {
       const amountStr = ctx.match[1];
@@ -1603,10 +1587,10 @@ if (!BOT_TOKEN) {
       await ctx.reply(
         `📋 Заявка на вывод ${amount.toFixed(8)} USDT создана.\n\n` +
         `🎫 ID: #${result.withdrawalId}\n` +
-        `👤 Пользователь: ${userDisplayName}\n` +
+        `👤 Пользователь: ${escapeMarkdownV2(userDisplayName)}\n` +
         `⏳ Статус: На рассмотрении\n\n` +
         `Администратор одобрит её в течение нескольких минут.`,
-        getMainMenuKeyboard(user.isAdmin)
+        { parse_mode: 'MarkdownV2', ...getMainMenuKeyboard(user.isAdmin) }
       );
       
       logger.info('BOT', 'Withdrawal request created successfully', { 
@@ -1703,7 +1687,7 @@ if (!BOT_TOKEN) {
     }
   });
 
-bot.action('admin_show_withdrawals', async (ctx) => {
+  bot.action('admin_show_withdrawals', async (ctx) => {
     try {
       const user = await prisma.user.findUnique({ 
         where: { telegramId: ctx.from.id.toString() } 
@@ -1755,7 +1739,6 @@ bot.action('admin_show_withdrawals', async (ctx) => {
       for (const w of pendingWithdrawals.slice(0, 5)) {
         const amount = parseFloat(w.amount.toString());
         
-        // Формируем имя пользователя с экранированием
         let userDisplayName;
         if (w.user?.username) {
           userDisplayName = escapeMarkdownV2(`@${w.user.username}`);
@@ -1765,14 +1748,12 @@ bot.action('admin_show_withdrawals', async (ctx) => {
           userDisplayName = `ID: ${w.userId}`;
         }
         
-        // Экранируем адрес кошелька
         let shortAddr = '—';
         if (w.walletAddress) {
           const addr = w.walletAddress.toString().trim();
           shortAddr = escapeMarkdownV2(addr.length > 15 ? `${addr.slice(0,10)}...` : addr);
         }
         
-        // Форматируем дату
         const dateStr = new Date(w.createdAt).toLocaleString('ru-RU');
         
         msg += `🎫 ID: #${w.id}\n` +
@@ -1782,7 +1763,6 @@ bot.action('admin_show_withdrawals', async (ctx) => {
                `⏰ ${escapeMarkdownV2(dateStr)}\n\n`;
       }
 
-      // ⭐ КНОПКИ: по одной паре на заявку
       const buttons = [];
       
       for (const w of pendingWithdrawals.slice(0, 5)) {
@@ -1798,7 +1778,6 @@ bot.action('admin_show_withdrawals', async (ctx) => {
         ]);
       }
 
-      // Если больше 5 заявок - добавляем информационное сообщение
       if (pendingWithdrawals.length > 5) {
         msg += `\\.\\.\\. и ещё ${pendingWithdrawals.length - 5} заявок\\. Показаны первые 5\\.`;
       }
@@ -1819,7 +1798,6 @@ bot.action('admin_show_withdrawals', async (ctx) => {
       } catch (editError) {
         console.error(`❌ Edit error: ${editError.message}`);
         
-        // Если редактирование не сработало - отправить новое сообщение
         try {
           await ctx.deleteMessage();
         } catch (e) {}
@@ -1863,7 +1841,6 @@ bot.action('admin_show_withdrawals', async (ctx) => {
     }
   });
 
-  // ⭐ НОВЫЙ CALLBACK для возврата в админ-меню
   bot.action('back_to_admin_menu', async (ctx) => {
     const user = await prisma.user.findUnique({ 
       where: { telegramId: ctx.from.id.toString() } 
@@ -2109,7 +2086,7 @@ bot.action('admin_show_withdrawals', async (ctx) => {
   module.exports = {
     start: () => {
       bot.launch();
-      logger.info('BOT', 'Telegram Bot started successfully with referral system');
+      logger.info('BOT', 'Telegram Bot started successfully');
     },
     botInstance: bot,
     cryptoPayAPI,
