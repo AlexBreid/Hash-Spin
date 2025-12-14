@@ -325,9 +325,13 @@ model ReferralStats {
     // ⭐ НОВОЕ ПОЛЕ: Оборот с последней выплаты комиссии (обнуляется после выплаты)
     // Это поле используется для расчета комиссии и обнуляется после каждой выплаты
     // Благодаря этому НИКОГДА не будет двойного расчета комиссий!
-    turnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
+    newTurnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
     
-    // Казино выиграло (потери игроков) - для расчета профита воркеров
+    // ⭐ ДЛЯ WORKER: Потери с последней выплаты (обнуляется после выплаты)
+    // Это поле используется для расчета комиссии WORKER и обнуляется после каждой выплаты
+    newLossesSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
+    
+    // Казино выиграло (потери игроков) - для статистики и расчета профита воркеров
     totalLosses             Decimal   @default(0) @db.Decimal(30, 18)
     
     // Игроки выиграли (убытки казино)
@@ -348,7 +352,8 @@ model ReferralStats {
     // Индексы для быстрого поиска
     @@index([referrerId])
     @@index([refereeId])
-    @@index([turnoverSinceLastPayout])  // ⭐ Индекс на счетчик для быстрого поиска незачисленных комиссий
+    @@index([newTurnoverSinceLastPayout])  // ⭐ Индекс на счетчик для REGULAR
+    @@index([newLossesSinceLastPayout])    // ⭐ Индекс на счетчик для WORKER
     @@index([lastPayoutAt])
 }
 

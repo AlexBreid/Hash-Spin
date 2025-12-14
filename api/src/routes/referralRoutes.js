@@ -1,5 +1,5 @@
 /**
- * 🔗 Referral Routes - API реферальной системы
+ * 🔗 Referral Routes - API реферальной системы (ИСПРАВЛЕННЫЙ)
  */
 
 const express = require('express');
@@ -48,16 +48,16 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
         // Моя рефералка
         myReferralCode: user.referralCode,
         referrerType: user.referrerType,
-        commissionRate: stats.commissionRate,
+        commissionRate: stats?.commissionRate || 0,
         
         // Мои рефералы
-        myReferralsCount: stats.referralsCount,
+        myReferralsCount: stats?.referralsCount || 0,
         
         // Статистика заработка
-        totalTurnover: stats.totalTurnover,
-        totalCommissionPaid: stats.totalCommissionPaid,
-        pendingTurnover: stats.pendingTurnover,
-        potentialCommission: stats.potentialCommission,
+        totalTurnover: stats?.totalTurnover || 0,
+        totalCommissionPaid: stats?.totalCommissionPaid || 0,
+        potentialCommission: stats?.potentialCommission || 0,
+        totalLosses: stats?.totalLosses || 0,
         
         // Был ли я приглашен
         referredByCode: user.referredById ? true : false,
@@ -75,33 +75,33 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
 
 /**
  * 📊 GET прогресс отыгрыша бонуса
- * GET /api/v1/referral/wager-progress
+ * GET /api/v1/referral/bonus-stats
  */
-router.get('/api/v1/referral/wager-progress', authenticateToken, async (req, res) => {
+router.get('/api/v1/referral/bonus-stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`📊 [REFERRAL API] Загружаю прогресс отыгрыша для ${userId}`);
+    console.log(`📊 [REFERRAL API] Загружаю статистику бонуса для ${userId}`);
 
-    const progress = await referralService.getWagerProgress(userId);
+    const bonusStats = await referralService.getBonusStats(userId);
 
-    if (!progress) {
+    if (!bonusStats?.hasActiveBonus) {
       return res.json({
         success: true,
         data: null,
-        message: 'Нет активных бонусов для отыгрыша'
+        message: 'Нет активных бонусов'
       });
     }
 
     res.json({
       success: true,
-      data: progress
+      data: bonusStats.bonus
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка получения прогресса:', error.message);
+    console.error('❌ [REFERRAL API] Ошибка получения статистики бонуса:', error.message);
     res.status(500).json({
       success: false,
-      message: 'Ошибка получения прогресса отыгрыша'
+      message: 'Ошибка получения статистики бонуса'
     });
   }
 });
@@ -244,7 +244,8 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
           firstName: ref.firstName,
           joinedAt: ref.createdAt,
           totalTurnover: parseFloat(stats?.totalTurnover?.toString() || '0'),
-          commissionEarned: parseFloat(stats?.totalCommissionPaid?.toString() || '0')
+          commissionEarned: parseFloat(stats?.totalCommissionPaid?.toString() || '0'),
+          totalLosses: parseFloat(stats?.totalLosses?.toString() || '0')
         };
       })
     );
@@ -269,79 +270,6 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
     res.status(500).json({
       success: false,
       message: 'Ошибка получения списка рефералов'
-    });
-  }
-});
-
-/**
- * 💰 POST запросить выплату комиссии (ручная)
- * POST /api/v1/referral/claim-commission
- */
-router.post('/api/v1/referral/claim-commission', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    console.log(`💰 [REFERRAL API] Запрос выплаты комиссии от ${userId}`);
-
-    // Получаем всех рефералов пользователя
-    const stats = await prisma.referralStats.findMany({
-      where: { 
-        referrerId: userId,
-        turnoverSinceLastPayout: { gt: 0 }
-      }
-    });
-
-    if (stats.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Нет накопленной комиссии для выплаты'
-      });
-    }
-
-    let totalPaid = 0;
-    const results = [];
-
-    for (const stat of stats) {
-      try {
-        const result = await referralService.payoutReferrerCommission(
-          stat.referrerId,
-          stat.refereeId,
-          stat.tokenId
-        );
-
-        if (result) {
-          totalPaid += result.commission;
-          results.push({
-            refereeId: stat.refereeId,
-            commission: result.commission,
-            turnover: result.turnover
-          });
-        }
-      } catch (error) {
-        console.error(`⚠️ [REFERRAL API] Ошибка выплаты для реферала ${stat.refereeId}:`, error.message);
-      }
-    }
-
-    if (totalPaid === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Минимальная сумма для выплаты не достигнута'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `Выплачено ${totalPaid.toFixed(4)} USDT`,
-      data: {
-        totalPaid,
-        details: results
-      }
-    });
-  } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка выплаты комиссии:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка выплаты комиссии'
     });
   }
 });
@@ -379,11 +307,14 @@ router.post('/api/v1/admin/referral/set-worker', authenticateToken, async (req, 
       });
     }
 
-    const user = await referralService.setUserAsWorker(userId);
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { referrerType: 'WORKER' }
+    });
 
     res.json({
       success: true,
-      message: `Пользователь ${userId} установлен как WORKER (40% комиссия)`,
+      message: `Пользователь ${userId} установлен как WORKER (5% комиссия от потерь рефералов)`,
       data: {
         userId: user.id,
         username: user.username,
@@ -486,7 +417,8 @@ router.get('/api/v1/admin/referral/global-stats', authenticateToken, async (req,
     const statsAgg = await prisma.referralStats.aggregate({
       _sum: {
         totalTurnover: true,
-        totalCommissionPaid: true
+        totalCommissionPaid: true,
+        totalLosses: true
       }
     });
 
@@ -505,7 +437,8 @@ router.get('/api/v1/admin/referral/global-stats', authenticateToken, async (req,
         totalWorkers,
         activeBonuses,
         totalTurnover: parseFloat(statsAgg._sum.totalTurnover?.toString() || '0'),
-        totalCommissionPaid: parseFloat(statsAgg._sum.totalCommissionPaid?.toString() || '0')
+        totalCommissionPaid: parseFloat(statsAgg._sum.totalCommissionPaid?.toString() || '0'),
+        totalLosses: parseFloat(statsAgg._sum.totalLosses?.toString() || '0')
       }
     });
   } catch (error) {
@@ -539,7 +472,7 @@ router.post('/api/v1/admin/referral/payout-all', authenticateToken, async (req, 
 
     res.json({
       success: true,
-      message: `Обработано ${result.processed} записей, выплачено ${result.totalPaid.toFixed(4)}`,
+      message: `Обработано ${result.processed} записей, выплачено ${result.totalPaid}`,
       data: result
     });
   } catch (error) {

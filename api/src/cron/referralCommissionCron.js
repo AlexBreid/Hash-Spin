@@ -1,15 +1,17 @@
 /**
  * ✅ referralCommissionCron.js - ИСПРАВЛЕННЫЙ
  * 
- * ГЛАВНОЕ: Используем processAllPendingCommissions из ReferralService
- * которое считает комиссии на основе newTurnoverSinceLastPayout
+ * Запускается раз в час и обрабатывает все накопленные комиссии
+ * Использует processAllPendingCommissions из ReferralService
+ * который считает комиссии на основе newTurnoverSinceLastPayout (REGULAR)
+ * и newLossesSinceLastPayout (WORKER)
  */
 
 const prisma = require('../../prismaClient');
 const logger = require('../utils/logger');
 const referralService = require('../services/ReferralService');
 
-const CRON_INTERVAL_MS = 60 * 60 * 1000; // 1 час
+const CRON_INTERVAL_MS = 60 * 60 * 10000; // 1 час
 const DEFAULT_TOKEN_ID = 2; // USDT
 
 let cronInterval = null;

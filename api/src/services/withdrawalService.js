@@ -1,10 +1,11 @@
 /**
- * ✅ ПОЛНЫЙ withdrawalService.js С ПРОВЕРКОЙ АКТИВНОГО БОНУСА
+ * ✅ ПОЛНЫЙ withdrawalService.js
  * 
- * КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ:
+ * КЛЮЧЕВЫЕ ИСПРАВЛЕНИЯ:
  * 1. Проверяем есть ли активный бонус ДО вывода
  * 2. Если есть - возвращаем ошибку "Завершите отыгрыш"
- * 3. Только MAIN баланс доступен для вывода (BONUS блокирован)
+ * 3. Выводим ТОЛЬКО MAIN баланс (BONUS блокирован)
+ * 4. ⭐ НОВОЕ: Отправляем админам имя пользователя, а не ID
  */
 
 const prisma = require('../../prismaClient');
@@ -19,6 +20,7 @@ class WithdrawalService {
   /**
    * 📋 Создать заявку на вывод
    * ✅ ПРОВЕРКА: если есть активный бонус - вывод блокирован!
+   * ✅ УЛУЧШЕНИЕ: Отправляем админам имя пользователя
    */
   async createWithdrawalRequest(bot, userId, amount, asset = 'USDT') {
     console.log(`\n💸 [WITHDRAWAL] Creating withdrawal request`);
@@ -56,9 +58,17 @@ class WithdrawalService {
         };
       }
 
+      // ⭐ Загружаем пользователя с именем
+      console.log(`   🔍 Loading user data...`);
+      
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
-        select: { id: true, telegramId: true }
+        select: { 
+          id: true, 
+          telegramId: true,
+          username: true,    // ⭐ Загружаем username
+          firstName: true    // ⭐ Загружаем firstName
+        }
       });
 
       if (!user) {
@@ -69,6 +79,8 @@ class WithdrawalService {
           error: 'User not found' 
         };
       }
+
+      console.log(`   ✅ User found: ${user.username || user.firstName || `#${user.id}`}`);
 
       const token = await prisma.cryptoToken.findUnique({
         where: { symbol: asset }
@@ -83,7 +95,7 @@ class WithdrawalService {
         };
       }
 
-      // ✅ НОВОЕ: Проверяем есть ли активный бонус
+      // ✅ Проверяем есть ли активный бонус
       console.log(`\n🎁 [WITHDRAWAL] Checking for active bonus...`);
       
       const activeBonus = await prisma.userBonus.findFirst({
@@ -186,16 +198,28 @@ class WithdrawalService {
         withdrawalId: withdrawal.id,
         userId: userIdNum,
         telegramId: user.telegramId,
+        username: user.username,
+        firstName: user.firstName,
         amount: amountNum.toFixed(8),
         asset
       });
 
-      // Уведомляем админов
+      // ⭐ Уведомляем админов С ИМЕНЕМ ПОЛЬЗОВАТЕЛЯ
       try {
+        // Формируем отображаемое имя
+        const userDisplayName = user.username 
+          ? `@${user.username}`
+          : user.firstName 
+            ? user.firstName 
+            : `User #${user.id}`;
+
         const admins = await prisma.user.findMany({
           where: { isAdmin: true },
           select: { telegramId: true }
         });
+
+        console.log(`\n📤 Notifying ${admins.length} admin(s)...`);
+        console.log(`   User: ${userDisplayName}`);
 
         for (const admin of admins) {
           if (admin.telegramId) {
@@ -204,13 +228,13 @@ class WithdrawalService {
                 admin.telegramId,
                 `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\n` +
                 `🎫 ID: #${withdrawal.id}\n` +
-                `👤 Пользователь: ${userIdNum}\n` +
+                `👤 Пользователь: ${userDisplayName}\n` +
                 `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
                 `⏰ Время: ${new Date().toLocaleString()}\n\n` +
                 `Управляйте в Админ Панели`,
                 { parse_mode: 'Markdown' }
               );
-              console.log(`   ✅ Notification sent to admin`);
+              console.log(`   ✅ Notified admin ${admin.telegramId}`);
             } catch (e) {
               logger.warn('WITHDRAWAL', `Failed to notify admin`, { error: e.message });
             }

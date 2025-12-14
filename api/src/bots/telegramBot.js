@@ -1598,7 +1598,7 @@ if (!BOT_TOKEN) {
 
       console.log(`✅ Withdrawal request created: #${result.withdrawalId}`);
 
-      const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
+      const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.firstName}`;
 
       await ctx.reply(
         `📋 Заявка на вывод ${amount.toFixed(8)} USDT создана.\n\n` +
