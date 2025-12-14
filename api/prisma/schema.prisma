@@ -322,10 +322,9 @@ model ReferralStats {
     // Общий оборот реферала (вся история)
     totalTurnover           Decimal   @default(0) @db.Decimal(30, 18)
     
-    // ⭐ НОВОЕ ПОЛЕ: Оборот с последней выплаты комиссии (обнуляется после выплаты)
-    // Это поле используется для расчета комиссии и обнуляется после каждой выплаты
-    // Благодаря этому НИКОГДА не будет двойного расчета комиссий!
-    newTurnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
+    // ⭐ СТАРОЕ ПОЛЕ (для совместимости с существующими данными)
+    // Оборот с последней выплаты комиссии (обнуляется после выплаты)
+    turnoverSinceLastPayout Decimal   @default(0) @db.Decimal(30, 18)
     
     // ⭐ ДЛЯ WORKER: Потери с последней выплаты (обнуляется после выплаты)
     // Это поле используется для расчета комиссии WORKER и обнуляется после каждой выплаты
@@ -352,8 +351,8 @@ model ReferralStats {
     // Индексы для быстрого поиска
     @@index([referrerId])
     @@index([refereeId])
-    @@index([newTurnoverSinceLastPayout])  // ⭐ Индекс на счетчик для REGULAR
-    @@index([newLossesSinceLastPayout])    // ⭐ Индекс на счетчик для WORKER
+    @@index([turnoverSinceLastPayout])  // ⭐ Индекс для REGULAR (старое поле)
+    @@index([newLossesSinceLastPayout])    // ⭐ Индекс для WORKER (новое поле)
     @@index([lastPayoutAt])
 }
 
