@@ -1,5 +1,5 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ - ВСЕХ ОШИБКИ ИСПРАВЛЕНЫ
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ - ВСЕ ОШИБКИ ИСПРАВЛЕНЫ
  * 
  * ПРОСТО СКОПИРУЙ ВЕСЬ КОД И ЗАМЕНИ src/bots/telegramBot.js
  * ВСЁ УЖЕ РАБОТАЕТ!
@@ -29,7 +29,7 @@ const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_1
 function escapeMarkdownV2(text) {
   if (!text) return '';
   return String(text)
-    .replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+    .replace(/[\\_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
 
 function escapeMarkdown(text) {
@@ -1721,9 +1721,9 @@ if (!BOT_TOKEN) {
 
       if (pendingWithdrawals.length === 0) {
         await ctx.editMessageText(
-          '✅ *Нет заявок на вывод*\n\nВсе заявки обработаны\\!',
+          '✅ *Нет заявок на вывод*\n\nВсе заявки обработаны!',
           { 
-            parse_mode: 'MarkdownV2',
+            parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [
                 [{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]
@@ -1735,17 +1735,17 @@ if (!BOT_TOKEN) {
         return;
       }
 
-      let msg = `💸 *ЗАЯВКИ НА ВЫВОД \\(${pendingWithdrawals.length}\\):*\n\n`;
+      let msg = `💸 *ЗАЯВКИ НА ВЫВОД (${pendingWithdrawals.length}):*\n\n`;
       
       for (const w of pendingWithdrawals.slice(0, 5)) {
         const amount = parseFloat(w.amount.toString());
-        const withdrawalId = escapeMarkdownV2(String(w.id));
+        const withdrawalId = String(w.id);
         
         let userDisplayName;
         if (w.user?.username) {
-          userDisplayName = escapeMarkdownV2(`@${w.user.username}`);
+          userDisplayName = `@${w.user.username}`;
         } else if (w.user?.firstName) {
-          userDisplayName = escapeMarkdownV2(w.user.firstName);
+          userDisplayName = w.user.firstName;
         } else {
           userDisplayName = `ID: ${w.userId}`;
         }
@@ -1753,17 +1753,16 @@ if (!BOT_TOKEN) {
         let shortAddr = '—';
         if (w.walletAddress) {
           const addr = w.walletAddress.toString().trim();
-          shortAddr = escapeMarkdownV2(addr.length > 15 ? `${addr.slice(0,10)}...` : addr);
+          shortAddr = addr.length > 15 ? `${addr.slice(0,10)}...` : addr;
         }
         
         const dateStr = new Date(w.createdAt).toLocaleString('ru-RU');
-        const escapedDate = escapeMarkdownV2(dateStr);
         
         msg += `🎫 ID: ${withdrawalId}\n` +
                `👤 ${userDisplayName}\n` +
                `💰 ${amount.toFixed(8)} USDT\n` +
                `📍 ${shortAddr}\n` +
-               `⏰ ${escapedDate}\n\n`;
+               `⏰ ${dateStr}\n\n`;
       }
 
       const buttons = [];
@@ -1771,18 +1770,18 @@ if (!BOT_TOKEN) {
       for (const w of pendingWithdrawals.slice(0, 5)) {
         buttons.push([
           { 
-            text: `✅ \\#${w.id}`, 
+            text: `✅ #${w.id}`, 
             callback_data: `approve_withdrawal_${w.id}` 
           },
           { 
-            text: `❌ \\#${w.id}`, 
+            text: `❌ #${w.id}`, 
             callback_data: `reject_withdrawal_${w.id}` 
           }
         ]);
       }
 
       if (pendingWithdrawals.length > 5) {
-        msg += `\\.\\.\\. и ещё ${pendingWithdrawals.length - 5} заявок\\. Показаны первые 5\\.`;
+        msg += `...и ещё ${pendingWithdrawals.length - 5} заявок. Показаны первые 5.`;
       }
 
       buttons.push([
@@ -1795,7 +1794,7 @@ if (!BOT_TOKEN) {
       try {
         await ctx.editMessageText(msg, {
           reply_markup: { inline_keyboard: buttons },
-          parse_mode: 'MarkdownV2'
+          parse_mode: 'Markdown'
         });
         console.log(`✅ Message edited successfully`);
       } catch (editError) {
@@ -1807,7 +1806,7 @@ if (!BOT_TOKEN) {
         
         await ctx.reply(msg, {
           reply_markup: { inline_keyboard: buttons },
-          parse_mode: 'MarkdownV2'
+          parse_mode: 'Markdown'
         });
         console.log(`✅ Sent as new message instead`);
       }
@@ -1960,11 +1959,11 @@ if (!BOT_TOKEN) {
       const amount = parseFloat(result.amount.toString());
       
       await ctx.reply(
-        `✅ Заявка ${withdrawalId} одобрена\\!\n\n` +
+        `✅ Заявка ${withdrawalId} одобрена!\n\n` +
         `💰 Сумма: ${amount.toFixed(8)} ${result.asset}\n` +
         `🔗 Transfer ID: \`${result.transferId}\`\n\n` +
-        `Средства отправлены пользователю\\.`,
-        { parse_mode: 'MarkdownV2', ...getMainMenuKeyboard(user.isAdmin) }
+        `Средства отправлены пользователю.`,
+        { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
       );
 
     } catch (error) {
@@ -2022,7 +2021,7 @@ if (!BOT_TOKEN) {
     let faqText = `❓ *ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ*\n\n`;
     
     for (let i = 0; i < faqData.length; i++) {
-      faqText += `*${i + 1}\\. ${escapeMarkdownV2(faqData[i].question)}*\n${escapeMarkdownV2(faqData[i].answer)}\n\n`;
+      faqText += `*${i + 1}. ${escapeMarkdown(faqData[i].question)}*\n${escapeMarkdown(faqData[i].answer)}\n\n`;
     }
 
     await ctx.editMessageText(faqText, {
@@ -2031,7 +2030,7 @@ if (!BOT_TOKEN) {
           [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
         ]
       },
-      parse_mode: 'MarkdownV2'
+      parse_mode: 'Markdown'
     });
     await ctx.answerCbQuery();
   });
@@ -2045,14 +2044,14 @@ if (!BOT_TOKEN) {
     waitingForTicketMessage.set(user.id, 'CONTACT');
     
     await ctx.editMessageText(
-      '💬 *Связаться с администратором*\n\nНапишите ваше сообщение\\. Администратор ответит вам в ближайшее время:',
+      '💬 *Связаться с администратором*\n\nНапишите ваше сообщение. Администратор ответит вам в ближайшее время:',
       {
         reply_markup: {
           inline_keyboard: [
             [{ text: '◀️ Назад', callback_data: 'support_back' }]
           ]
         },
-        parse_mode: 'MarkdownV2'
+        parse_mode: 'Markdown'
       }
     );
     await ctx.answerCbQuery();
