@@ -1,97 +1,130 @@
-import { useRef } from 'react';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { GameCard } from './GameCard';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Game {
   id: string;
   title: string;
   image: string;
   category: string;
+  onClick: () => void;
 }
 
 interface GameSliderProps {
-  games: Game[];
-  onGameClick: (gameId: string) => void;
+  onGameSelect?: (gameId: string) => void;
+  onNavigate?: (page: string) => void;
 }
 
-export function GameSlider({ games, onGameClick }: GameSliderProps) {
-  const sliderRef = useRef<HTMLDivElement>(null);
-  
-  const scrollLeft = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ 
-        left: -280, 
-        behavior: 'smooth' 
-      });
-    }
+export function GameSlider({ onGameSelect, onNavigate }: GameSliderProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  // Игры
+  const games: Game[] = [
+    {
+      id: 'crash',
+      title: 'Краш',
+      image: 'https://images.unsplash.com/photo-1516222338670-c482920eecca?w=400&h=300&fit=crop',
+      category: 'ставки',
+      onClick: () => onNavigate?.('crash')
+    },
+    {
+      id: 'minesweeper',
+      title: 'Сапёр',
+      image: 'https://images.unsplash.com/photo-1552820728-8ac41f1ce891?w=400&h=300&fit=crop',
+      category: 'логика',
+      onClick: () => onNavigate?.('minesweeper')
+    },
+    {
+      id: 'plinko',
+      title: 'Plinko',
+      image: 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400&h=300&fit=crop',
+      category: 'ставки',
+      onClick: () => onNavigate?.('plinko')
+    },
+  ];
+
+  const checkScroll = () => {
+    if (!scrollContainerRef.current) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
   };
-  
-  const scrollRight = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ 
-        left: 280, 
-        behavior: 'smooth' 
-      });
+
+  useEffect(() => {
+    checkScroll();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+
+      return () => {
+        container.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
     }
+  }, []);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (!scrollContainerRef.current) return;
+
+    const scrollAmount = 320;
+    const newScrollLeft =
+      scrollContainerRef.current.scrollLeft +
+      (direction === 'left' ? -scrollAmount : scrollAmount);
+
+    scrollContainerRef.current.scrollTo({
+      left: newScrollLeft,
+      behavior: 'smooth',
+    });
   };
 
   return (
-    <div className="relative">
-      <div 
-        ref={sliderRef}
-        className="flex space-x-4 overflow-x-auto px-4 py-2 slider-container"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+    <div className="relative w-full">
+      {/* Левная кнопка */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-primary/80 hover:bg-primary p-2 rounded-full transition-all"
+          aria-label="Scroll left"
+        >
+          <ChevronLeft size={20} className="text-primary-foreground" />
+        </button>
+      )}
+
+      {/* Контейнер с играми */}
+      <div
+        ref={scrollContainerRef}
+        className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2"
+        style={{
+          scrollBehavior: 'smooth',
+          WebkitOverflowScrolling: 'touch',
+        }}
       >
-        {games.map((game, index) => (
-          <div 
-            key={game.id}
-            onClick={() => onGameClick(game.id)}
-            className="slider-item flex-shrink-0 w-64 bg-card rounded-2xl overflow-hidden cursor-pointer group hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 card-appear"
-            style={{ animationDelay: `${index * 0.1}s` }}
-          >
-            <div className="relative aspect-[16/10] overflow-hidden">
-              <ImageWithFallback
-                src={game.image}
-                alt={game.title}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <div className="bg-primary rounded-full p-4 transform group-hover:scale-110 transition-transform glow-effect">
-                  <Play className="w-6 h-6 text-primary-foreground" />
-                </div>
-              </div>
-              <div className="absolute top-3 right-3">
-                <div className="bg-accent/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-accent-foreground">
-                  {game.category}
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-4">
-              <h3 className="font-semibold text-card-foreground text-lg mb-2">{game.title}</h3>
-              <button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-2 rounded-xl font-medium transition-all duration-300 hover:glow-effect">
-                Играть
-              </button>
-            </div>
+        {games.map((game) => (
+          <div key={game.id} className="flex-shrink-0 w-[280px]">
+            <GameCard
+              title={game.title}
+              image={game.image}
+              category={game.category}
+              onClick={game.onClick}
+            />
           </div>
         ))}
       </div>
-      
-      {/* Navigation buttons */}
-      <button 
-        onClick={scrollLeft}
-        className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center text-card-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:glow-effect"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      
-      <button 
-        onClick={scrollRight}
-        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center text-card-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:glow-effect"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
+
+      {/* Правая кнопка */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-primary/80 hover:bg-primary p-2 rounded-full transition-all"
+          aria-label="Scroll right"
+        >
+          <ChevronRight size={20} className="text-primary-foreground" />
+        </button>
+      )}
     </div>
   );
 }

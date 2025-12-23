@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useFetch } from '../hooks/useDynamicApi'; 
 import { Button } from './ui/button';
 import DepositPage from './pages/DepositPage';
+import { useTheme } from '../context/ThemeContext';
 
 // --- Интерфейсы ---
 
@@ -27,6 +28,7 @@ interface WalletData {
 // --- Компонент TopNavigation ---
 
 export function TopNavigation({ onProfileClick }: TopNavigationProps) {
+  const { theme } = useTheme();
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -125,16 +127,30 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     );
   }
 
+  // Цвета в зависимости от темы
+  const bgColor = theme === 'dark' ? '#0f1d3a' : '#f5f5f7';
+  const borderColor = theme === 'dark' ? '#3b82f640' : '#e0e0e5';
+  const textColor = theme === 'dark' ? '#fafafa' : '#1a1a2e';
+  const mutedColor = theme === 'dark' ? '#a0aac0' : '#7a7a8a';
+  const balanceBg = theme === 'dark' ? '#1f2937' : '#eeeff5';
+  const balanceBorder = theme === 'dark' ? '#374151' : '#d0d0db';
+
   // --- Разметка компонента навигации ---
   return (
-    <div className="sticky top-0 z-50 bg-card/90 backdrop-blur-md border-b border-border px-4 py-3">
+    <div 
+      className="sticky top-0 z-50 backdrop-blur-md border-b px-4 py-3"
+      style={{
+        backgroundColor: `${bgColor}dd`,
+        borderBottomColor: borderColor,
+      }}
+    >
       <div className="flex items-center justify-between">
         
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-lg">
-            <div className="w-6 h-6 bg-white rounded-md opacity-90"></div>
-          </div>
+          <img 
+            src="../assets/SU.png" 
+            alt="Logo"></img>
         </div>
 
         {/* Balance and Actions */}
@@ -146,8 +162,8 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
+                backgroundColor: balanceBg,
+                border: `1px solid ${balanceBorder}`,
                 borderRadius: '12px',
                 padding: '8px 12px',
                 gap: '8px',
@@ -155,7 +171,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
             >
               <Wallet
                 className="w-5 h-5"
-                style={{ color: '#60a5fa' }}
+                style={{ color: '#3b82f6' }}
               />
               <div
                 style={{
@@ -167,7 +183,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                 <span
                   style={{
                     fontSize: '12px',
-                    color: '#9ca3af',
+                    color: mutedColor,
                   }}
                 >
                   Баланс
@@ -178,7 +194,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                   style={{
                     fontSize: '14px',
                     fontWeight: '600',
-                    color: '#e5e7eb',
+                    color: textColor,
                   }}
                 >
                   {formatBalance(Math.floor(walletData.balance * 100) / 100)} {walletData.currency}
@@ -188,13 +204,14 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           ) : loading ? (
              // Если loading: true - отображаем заглушку
              <div 
-                    className="text-sm text-gray-500" 
+                    className="text-sm"
                     style={{ 
                         padding: '10px 12px', 
                         borderRadius: '12px', 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #374151',
-                        minWidth: '120px'
+                        backgroundColor: balanceBg, 
+                        border: `1px solid ${balanceBorder}`,
+                        minWidth: '120px',
+                        color: mutedColor,
                     }}
                 >
                     Загрузка...
@@ -209,7 +226,9 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
             style={{
               width: '40px',
               height: '40px',
-              backgroundColor: 'rgba(148, 163, 184, 0.2)',
+              backgroundColor: theme === 'dark' 
+                ? 'rgba(148, 163, 184, 0.2)' 
+                : 'rgba(148, 163, 184, 0.15)',
               border: 'none',
               borderRadius: '50%',
               display: 'flex',
@@ -219,13 +238,17 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
               transition: 'all 0.3s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.3)';
+              e.currentTarget.style.backgroundColor = theme === 'dark' 
+                ? 'rgba(148, 163, 184, 0.3)' 
+                : 'rgba(148, 163, 184, 0.25)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.2)';
+              e.currentTarget.style.backgroundColor = theme === 'dark' 
+                ? 'rgba(148, 163, 184, 0.2)' 
+                : 'rgba(148, 163, 184, 0.15)';
             }}
           >
-            <User className="w-5 h-5" style={{ color: '#60a5fa' }} />
+            <User className="w-5 h-5" style={{ color: '#3b82f6' }} />
           </button>
         </div>
       </div>

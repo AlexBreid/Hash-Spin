@@ -17,12 +17,13 @@ import { LoginPage } from './components/pages/LoginPage';
 import { CrashGame } from './components/pages/CrashGame';
 import { WithdrawPage } from './components/pages/WithdrawPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
+import { PlinkoPage } from './components/pages/PlinkoPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
 import { BonusFloatingButton } from './components/modals/Bonusfloatingbutton';
 
-const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper'];
+const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper', 'plinko'];
 
 function AppContent() {
     const navigate = useNavigate();
@@ -39,6 +40,7 @@ function AppContent() {
         if (path === '/' || path === '/home') return 'home';
         if (path === '/crash') return 'crash';
         if (path === '/minesweeper') return 'minesweeper';
+        if (path === '/plinko') return 'plinko';
         if (path === '/withdraw') return 'withdraw';
         if (path === '/records') return 'records';
         if (path === '/referrals') return 'referrals';
@@ -178,6 +180,8 @@ function AppContent() {
                 return <CrashGame />;
             case 'minesweeper':
                 return <MinesweeperPage onBack={() => handlePageChange('home')} />;
+            case 'plinko':
+                return <PlinkoPage onBack={() => handlePageChange('home')} />;
             case 'withdraw':
                 return <WithdrawPage />;
             case 'records':
@@ -207,7 +211,9 @@ function AppContent() {
     const isAuthPage = currentPage === 'login';
     const isCrashPage = currentPage === 'crash';
     const isMinesweeperPage = currentPage === 'minesweeper';
+    const isPlinkoPage = currentPage === 'plinko';
     const isWithdrawPage = currentPage === 'withdraw';
+    const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
 
     if (loading) {
         return (
@@ -222,11 +228,10 @@ function AppContent() {
             className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
             style={{ height: '850px' }}
         >
-            {!isAuthPage && !isCrashPage && !isMinesweeperPage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
+            {!isAuthPage && !isGamePage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main className={
-                isCrashPage ? 'h-full overflow-hidden' :
-                isMinesweeperPage ? 'h-full overflow-hidden' :
+                isGamePage ? 'h-full overflow-hidden' :
                 isWithdrawPage ? 'h-[calc(850px-70px)] overflow-y-auto' :
                 isAuthPage ? 'h-full' : 
                 'h-[calc(850px-140px)] overflow-y-auto'
@@ -234,7 +239,7 @@ function AppContent() {
                 {renderCurrentPage()}
             </main>
 
-            {!isAuthPage && !isCrashPage && !isMinesweeperPage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+            {!isAuthPage && !isGamePage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
 
             {/* Плавающая кнопка с подарком */}
             {showFloatingButton && hasBonusAvailable && (

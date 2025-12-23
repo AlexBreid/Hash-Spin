@@ -1,7 +1,8 @@
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { LogOut, HelpCircle, MessageCircle, LogIn } from 'lucide-react';
+import { LogOut, HelpCircle, MessageCircle, LogIn, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -11,6 +12,7 @@ interface SettingsPageProps {
 
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const { logout, user, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -26,12 +28,49 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
           ⚙️ Настройки
         </h1>
         {isAuthenticated && user && (
-          <p className="text-muted-foreground text-sm mt-1">Аккаунт: <span className="font-semibold text-white">{user?.username || user?.email}</span></p>
+          <p className="text-muted-foreground text-sm mt-1">Аккаунт: <span className="font-semibold text-white dark:text-white">{user?.username || user?.email}</span></p>
         )}
+      </motion.div>
+
+      {/* ТЕМА */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02 }}
+      >
+        <Card className="p-6 bg-gradient-to-br from-amber-500/20 to-orange-500/10 border-2 border-amber-400/60 dark:from-amber-950/40 dark:to-orange-950/20 dark:border-amber-700/60">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-3 bg-amber-600/20 dark:bg-amber-600/20 rounded-xl">
+              {theme === 'dark' ? (
+                <Moon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <Sun className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              )}
+            </div>
+            <h3 className="font-bold text-lg text-amber-900 dark:text-amber-200">Тема</h3>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-amber-400/50 dark:border-amber-700/50">
+              <div>
+                <p className="text-white font-semibold">Текущая тема</p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                  {theme === 'dark' ? '🌙 Тёмная' : '☀️ Светлая'}
+                </p>
+              </div>
+              <Button
+                onClick={toggleTheme}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg px-6"
+              >
+                {theme === 'dark' ? '☀️ Свет' : '🌙 Темнота'}
+              </Button>
+            </div>
+          </div>
+        </Card>
       </motion.div>
 
       {/* ПОДДЕРЖКА */}
@@ -124,10 +163,10 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="p-6 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border-2 border-blue-400/60">
+          <Card className="p-6 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border-2 border-blue-400/60 dark:from-blue-950/40 dark:to-cyan-950/20 dark:border-blue-700/60">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-3 bg-blue-600/20 rounded-xl">
-                <LogIn className="w-6 h-6 text-blue-600" />
+                <LogIn className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <h3 className="font-bold text-lg text-blue-900 dark:text-blue-200">Аккаунт</h3>
             </div>

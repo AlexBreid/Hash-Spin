@@ -45,8 +45,21 @@ const popularGames: Game[] = [
   },
 ];
 
+// 🎨 CSS переменные для темы
+const getThemeColors = () => ({
+  background: 'var(--background)',
+  card: 'var(--card)',
+  foreground: 'var(--foreground)',
+  mutedForeground: 'var(--muted-foreground)',
+  primary: 'var(--primary)',
+  success: 'var(--success)',
+  border: 'var(--border)',
+  accent: 'var(--accent)',
+});
+
 export function HomePage() {
   const navigate = useNavigate();
+  const colors = getThemeColors();
   const [hasReferrer, setHasReferrer] = useState<boolean | null>(null);
   const hasLoadedRef = useRef(false);
 
@@ -110,22 +123,29 @@ export function HomePage() {
   };
 
   return (
-    <div className="pb-24 pt-6">
+    <div className="pb-24 pt-6 transition-colors duration-300" style={{ backgroundColor: colors.background, color: colors.foreground }}>
       {/* 🎁 Welcome Banner - ПОКАЗЫВАЕМ ТОЛЬКО ЕСЛИ НЕТ РЕФЕРЕРА */}
       {hasReferrer === false && (
         <div className="px-4 mb-8">
-          <div className="bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl p-6 text-primary-foreground relative overflow-hidden">
+          <div className="rounded-3xl p-6 relative overflow-hidden transition-colors border" style={{
+            background: `linear-gradient(135deg, ${colors.primary}20, ${colors.accent}15)`,
+            borderColor: colors.primary,
+            borderOpacity: 0.3
+          }}>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
             <div className="relative z-10">
               <div className="flex items-center space-x-2 mb-2">
-                <Gift className="w-6 h-6" />
+                <Gift className="w-6 h-6" style={{ color: colors.accent }} />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Получите бонусы!</h2>
-              <p className="text-primary-foreground/90 mb-4">Введите реферальную ссылку и получите бонусы!</p>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.foreground }}>Получите бонусы!</h2>
+              <p className="mb-4" style={{ color: colors.mutedForeground }}>Введите реферальную ссылку и получите бонусы!</p>
               <Button 
                 onClick={handleBonusClick}
-                className="bg-white text-primary hover:bg-white/90 font-semibold shadow-lg"
-                size="sm"
+                className="font-semibold shadow-lg transition-all active:scale-95"
+                style={{
+                  background: colors.accent,
+                  color: 'white'
+                }}
               >
                 Получить бонус
               </Button>
@@ -137,14 +157,18 @@ export function HomePage() {
       {/* ✅ Альтернативная плашка для тех кто УЖЕ использовал реферала */}
       {hasReferrer === true && (
         <div className="px-4 mb-8">
-          <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-teal-900/20 rounded-3xl p-6 border border-green-500/30 text-green-100 relative overflow-hidden">
+          <div className="rounded-3xl p-6 border transition-colors relative overflow-hidden" style={{
+            background: `linear-gradient(135deg, ${colors.success}20, #10b98110)`,
+            borderColor: colors.success,
+            borderOpacity: 0.3
+          }}>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
             <div className="relative z-10">
               <div className="flex items-center space-x-2 mb-2">
-                <Zap className="w-6 h-6 text-green-400" />
+                <Zap className="w-6 h-6" style={{ color: colors.success }} />
               </div>
-              <h2 className="text-lg font-bold mb-1">✨ Бонус активирован!</h2>
-              <p className="text-green-100/80 text-sm">При первом пополнении счёта вы получите дополнительные средства</p>
+              <h2 className="text-lg font-bold mb-1" style={{ color: colors.foreground }}>✨ Бонус активирован!</h2>
+              <p className="text-sm" style={{ color: colors.mutedForeground }}>При первом пополнении счёта вы получите дополнительные средства</p>
             </div>
           </div>
         </div>
@@ -154,8 +178,8 @@ export function HomePage() {
       <div className="mb-8">
         <div className="flex items-center justify-between px-4 mb-4">
           <div className="flex items-center space-x-2">
-            <Zap className="w-5 h-5 text-accent" />
-            <h3 className="text-xl font-bold">Рекомендуемые игры</h3>
+            <Zap className="w-5 h-5" style={{ color: colors.accent }} />
+            <h3 className="text-xl font-bold" style={{ color: colors.foreground }}>Рекомендуемые игры</h3>
           </div>
         </div>
         
@@ -166,8 +190,8 @@ export function HomePage() {
       <div className="px-4">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
-            <Star className="w-5 h-5 text-accent" />
-            <h3 className="text-xl font-bold">Популярные игры</h3>
+            <Star className="w-5 h-5" style={{ color: colors.accent }} />
+            <h3 className="text-xl font-bold" style={{ color: colors.foreground }}>Популярные игры</h3>
           </div>
         </div>
         
@@ -185,8 +209,13 @@ export function HomePage() {
         </div>
 
         <Button 
-          variant="outline" 
-          className="w-full py-3 rounded-2xl border-primary/30 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 hover:glow-effect"
+          className="w-full py-3 rounded-2xl font-semibold transition-all duration-300 active:scale-95"
+          style={{
+            color: colors.primary,
+            backgroundColor: 'transparent',
+            border: `2px solid ${colors.primary}`,
+            borderOpacity: 0.3
+          }}
           onClick={() => console.log('Просмотр всех игр')}
         >
           Все игры

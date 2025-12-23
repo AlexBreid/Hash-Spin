@@ -27,8 +27,20 @@ interface BalanceItem {
   type: 'MAIN' | 'BONUS';
 }
 
+// 🎨 CSS переменные для темы
+const getThemeColors = () => ({
+  background: 'var(--background)',
+  card: 'var(--card)',
+  foreground: 'var(--foreground)',
+  mutedForeground: 'var(--muted-foreground)',
+  primary: 'var(--primary)',
+  success: 'var(--success)',
+  border: 'var(--border)',
+});
+
 export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { token } = useAuth();
+  const colors = getThemeColors();
 
   const [step, setStep] = useState<'SELECT' | 'PLAYING' | 'REVEAL_BOARD' | 'RESULT'>('SELECT');
   const [difficulties, setDifficulties] = useState<Difficulty[]>([]);
@@ -333,7 +345,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
+    <div className="min-h-screen p-4 transition-colors duration-300" style={{ backgroundColor: colors.background, color: colors.foreground }}>
       <style>{`
         @keyframes slideInDown {
           from { opacity: 0; transform: translateY(-20px); }
@@ -378,15 +390,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           animation: slideInDown 0.6s ease-out;
         }
         .back-button {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
           border-radius: 8px;
           padding: 8px;
           cursor: pointer;
           transition: all 0.3s ease;
         }
         .back-button:hover {
-          background: rgba(255, 255, 255, 0.2);
           transform: translateX(-2px);
         }
         .minesweeper-content {
@@ -397,9 +406,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           grid-template-columns: repeat(6, 1fr);
           gap: 8px;
           padding: 16px;
-          background: rgba(0, 0, 0, 0.3);
           border-radius: 12px;
-          border: 2px solid rgba(59, 130, 246, 0.3);
+          border: 2px solid;
         }
         .minesweeper-cell {
           aspect-ratio: 1;
@@ -475,14 +483,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         }
         .stat-box {
           padding: 12px;
-          background: rgba(0, 0, 0, 0.3);
           border-radius: 8px;
-          border: 1px solid rgba(59, 130, 246, 0.3);
+          border: 1px solid;
           text-align: center;
         }
         .stat-label {
           font-size: 12px;
-          color: #9ca3af;
           margin-bottom: 4px;
         }
         .stat-value {
@@ -493,7 +499,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         .bet-input {
           border: 2px solid #10b981 !important;
           background: rgba(16, 185, 129, 0.1) !important;
-          color: white !important;
+          color: inherit !important;
           border-radius: 10px !important;
           padding: 8px 12px !important;
           font-size: 1rem !important;
@@ -515,7 +521,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
       <div className="minesweeper-page max-w-md mx-auto">
         <div className="minesweeper-header">
-          <button className="back-button" onClick={onBack}>
+          <button 
+            className="back-button" 
+            onClick={onBack}
+            style={{ color: colors.foreground }}
+          >
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-3xl font-bold">🎮 Сапёр</h1>
@@ -524,18 +534,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
         <div className="minesweeper-content">
           {step === 'SELECT' && (
-            <Card className="card-animated p-4 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
+            <Card className="card-animated p-4 border transition-colors" style={{
+              backgroundColor: colors.card,
+              borderColor: colors.border
+            }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">🎮 Выберите уровень</h2>
-                <div className="flex items-center gap-2 bg-gray-700/50 px-3 py-1 rounded-lg">
-                  <Coins size={16} className="text-yellow-400" />
+                <h2 className="text-lg font-bold" style={{ color: colors.foreground }}>🎮 Выберите уровень</h2>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors font-bold" style={{
+                  backgroundColor: '#FBBF24',
+                  border: '2px solid #F59E0B'
+                }}>
+                  <Coins size={18} style={{ color: '#000000' }} />
                   {balanceLoading ? (
-                    <Loader className="animate-spin" size={16} />
+                    <Loader className="animate-spin" size={16} style={{ color: '#000000' }} />
                   ) : (
                     <>
-                      <span className="text-sm font-bold text-yellow-400">{totalBalance.toFixed(2)}</span>
+                      <span className="text-sm" style={{ color: '#000000' }}>💰 {totalBalance.toFixed(2)}</span>
                       {bonusBalance > 0 && (
-                        <span className="text-xs text-amber-300">💛+{bonusBalance.toFixed(2)}</span>
+                        <span className="text-xs" style={{ color: '#7c2d12' }}>💛+{bonusBalance.toFixed(2)}</span>
                       )}
                     </>
                   )}
@@ -544,7 +560,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
               <div className="space-y-2 mb-4">
                 {difficulties.length === 0 ? (
-                  <div className="text-center py-8">
+                  <div className="text-center py-8" style={{ color: colors.mutedForeground }}>
                     <Loader className="animate-spin inline mr-2" size={24} />
                     <span>Загрузка...</span>
                   </div>
@@ -553,25 +569,28 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                     <button
                       key={diff.id}
                       onClick={() => setSelectedDifficulty(diff)}
-                      className={`difficulty-btn w-full p-3 rounded-lg border transition-all text-sm ${
-                        selectedDifficulty?.id === diff.id
-                          ? 'selected border-yellow-400 bg-yellow-500/15'
-                          : 'border-gray-600 bg-gray-700/30 hover:border-gray-500 hover:bg-gray-700/50'
-                      }`}
+                      className={`difficulty-btn w-full p-4 rounded-2xl border-2 transition-all text-sm font-bold`}
+                      style={{
+                        borderColor: selectedDifficulty?.id === diff.id ? '#FBBF24' : colors.border,
+                        backgroundColor: selectedDifficulty?.id === diff.id 
+                          ? '#FBBF24'
+                          : colors.card,
+                        color: selectedDifficulty?.id === diff.id ? '#000000' : colors.foreground
+                      }}
                     >
                       <div className="flex justify-between items-center gap-2">
                         <div className="text-left min-w-0">
-                          <p className="font-bold">{diff.name}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="font-black text-base">{diff.name}</p>
+                          <p className="text-xs mt-1" style={{ color: selectedDifficulty?.id === diff.id ? '#1f2937' : colors.mutedForeground }}>
                             💣 {diff.minesCount} мин • 6×6
                           </p>
                         </div>
                         <div className="flex flex-col items-end flex-shrink-0">
                           <Trophy
-                            size={18}
-                            className={selectedDifficulty?.id === diff.id ? 'text-yellow-400' : 'text-gray-500'}
+                            size={20}
+                            className={selectedDifficulty?.id === diff.id ? 'text-black' : 'text-gray-500'}
                           />
-                          <p className="text-xs text-green-400 mt-1">
+                          <p className="text-xs font-bold mt-1" style={{ color: selectedDifficulty?.id === diff.id ? '#000000' : '#10b981' }}>
                             ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(1)}
                           </p>
                         </div>
@@ -582,7 +601,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
               </div>
 
               <div className="mb-4">
-                <label className="block text-xs text-gray-300 mb-2 font-bold">Ставка (USDT)</label>
+                <label className="block text-xs mb-2 font-bold" style={{ color: colors.mutedForeground }}>Ставка (USDT)</label>
                 <Input
                   type="number"
                   min="1"
@@ -591,13 +610,20 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   onChange={(e) => setBetAmount(e.target.value)}
                   placeholder="10"
                   className="bet-input w-full"
+                  style={{ color: colors.foreground }}
                 />
               </div>
 
               <Button
                 onClick={handleStartGame}
                 disabled={!selectedDifficulty || loading || balanceLoading || difficulties.length === 0}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full font-black py-3 rounded-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 text-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                  border: 'none'
+                }}
               >
                 {loading ? (
                   <>
@@ -612,22 +638,37 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           )}
 
           {step === 'PLAYING' && Array.isArray(grid) && grid.length === 6 && (
-            <Card className="card-animated p-5 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
+            <Card className="card-animated p-5 border transition-colors" style={{
+              backgroundColor: colors.card,
+              borderColor: colors.border
+            }}>
               <div className="stats-container">
-                <div className="stat-box">
-                  <div className="stat-label">Текущий</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Текущий</div>
                   <div className="stat-value text-green-400">×{currentMultiplier.toFixed(2)}</div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Следующий</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Следующий</div>
                   <div className="stat-value text-blue-400">×{nextMultiplier.toFixed(2)}</div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Максимум</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Максимум</div>
                   <div className="stat-value text-purple-400">×{maxMultiplier.toFixed(2)}</div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Потенциальный</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Потенциальный</div>
                   <div className="stat-value text-yellow-400">{potentialWin} USDT</div>
                 </div>
               </div>
@@ -641,7 +682,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                 Забрать выигрыш
               </Button>
 
-              <div className="minesweeper-grid">
+              <div className="minesweeper-grid" style={{
+                backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                borderColor: colors.primary
+              }}>
                 {grid.map((row, y) =>
                   Array.isArray(row) ? (
                     row.map((cell, x) => (
@@ -673,31 +717,49 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           )}
 
           {(step === 'REVEAL_BOARD' || step === 'RESULT') && Array.isArray(grid) && grid.length === 6 && (
-            <Card className="card-animated p-5 bg-gray-800/80 border-gray-700 backdrop-blur-sm">
+            <Card className="card-animated p-5 border transition-colors" style={{
+              backgroundColor: colors.card,
+              borderColor: colors.border
+            }}>
               <div className="stats-container">
-                <div className="stat-box">
-                  <div className="stat-label">Итоговый</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Итоговый</div>
                   <div className="stat-value text-green-400">×{currentMultiplier.toFixed(2)}</div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Выигрыш</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Выигрыш</div>
                   <div className={`stat-value ${gameStatus === 'WON' || gameStatus === 'CASHED_OUT' ? 'text-green-400' : 'text-red-400'}`}>
                     {winAmount ? winAmount + ' USDT' : '0'}
                   </div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Статус</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Статус</div>
                   <div className={`stat-value ${gameStatus === 'WON' || gameStatus === 'CASHED_OUT' ? 'text-green-400' : 'text-red-400'}`}>
                     {gameStatus === 'WON' ? '🎉' : gameStatus === 'CASHED_OUT' ? '💸' : '💣'}
                   </div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-label">Максимум</div>
+                <div className="stat-box" style={{
+                  backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                  borderColor: colors.border
+                }}>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Максимум</div>
                   <div className="stat-value text-purple-400">×{maxMultiplier.toFixed(2)}</div>
                 </div>
               </div>
 
-              <div className="minesweeper-grid">
+              <div className="minesweeper-grid" style={{
+                backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                borderColor: colors.primary
+              }}>
                 {grid.map((row, y) =>
                   Array.isArray(row) ? (
                     row.map((cell, x) => (
@@ -729,7 +791,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   </Button>
                   <Button
                     onClick={onBack}
-                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white transition-all transform hover:scale-105 active:scale-95"
+                    className="flex-1 text-white transition-all transform hover:scale-105 active:scale-95"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${colors.primary} 50%, transparent)`,
+                      borderColor: colors.primary
+                    }}
                   >
                     Выйти
                   </Button>

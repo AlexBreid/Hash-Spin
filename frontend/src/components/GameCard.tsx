@@ -1,5 +1,5 @@
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Play } from 'lucide-react';
+import { Play, Brain, TrendingUp } from 'lucide-react';
 
 interface GameCardProps {
   title: string;
@@ -7,6 +7,17 @@ interface GameCardProps {
   category: string;
   onClick: () => void;
 }
+
+const getCategoryIcon = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'логика':
+      return <Brain className="w-4 h-4" />;
+    case 'ставки':
+      return <TrendingUp className="w-4 h-4" />;
+    default:
+      return <Brain className="w-4 h-4" />;
+  }
+};
 
 export function GameCard({ title, image, category, onClick }: GameCardProps) {
   return (
@@ -27,8 +38,8 @@ export function GameCard({ title, image, category, onClick }: GameCardProps) {
           </div>
         </div>
         <div className="absolute top-3 right-3">
-          <div className="bg-accent/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-accent-foreground">
-            {category}
+          <div className="bg-accent/90 backdrop-blur-sm p-2 rounded-full text-accent-foreground flex items-center justify-center">
+            {getCategoryIcon(category)}
           </div>
         </div>
       </div>

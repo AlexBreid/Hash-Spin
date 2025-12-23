@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { useFetch } from "../../hooks/useDynamicApi";
-import { useAuth } from "../../context/AuthContext";
+import { useState, useEffect, useRef } from 'react';
+import { useFetch } from '../../hooks/useDynamicApi';
+import { useAuth } from '../../context/AuthContext';
 import {
   Loader2,
   Flame,
@@ -9,9 +9,9 @@ import {
   Clock,
   Star,
   TrendingUp,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 interface UserProfile {
   id: string;
@@ -41,19 +41,19 @@ interface ActiveBonus {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎨 ЦВЕТОВАЯ ПАЛИТРА (из CSS переменных)
+// 🎨 ЦВЕТОВАЯ ПАЛИТРА (использует CSS переменные)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const COLORS = {
-  background: '#0A0F1E',      // Очень тёмный синий (основной фон)
-  card: '#0B1C3A',            // Тёмный синий (карточки)
-  primary: '#3B82F6',         // Яркий синий (основной)
-  success: '#10B981',         // Зелёный (успех)
-  accent: '#10B981',          // Зелёный (акцент)
-  muted: '#1E3A8A',           // Мягкий синий (приглушённый)
-  border: 'rgba(59, 130, 246, 0.15)',  // Синяя граница
-  foreground: '#ffffff',      // Белый текст
-  mutedForeground: '#94A3B8', // Серый текст
+  background: 'var(--background)',
+  card: 'var(--card)',
+  primary: 'var(--primary)',
+  success: 'var(--success)',
+  accent: 'var(--accent)',
+  muted: 'var(--muted)',
+  border: 'var(--border)',
+  foreground: 'var(--foreground)',
+  mutedForeground: 'var(--muted-foreground)',
 };
 
 const VIP_RANKS = {
@@ -113,7 +113,7 @@ function calculateVipRank(totalGames: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 КОМПОНЕНТ: MetricCard (с новыми цветами)
+// 🎯 КОМПОНЕНТ: MetricCard
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface MetricCardProps {
@@ -139,8 +139,9 @@ const MetricCard = ({
     transition={{ delay }}
     className="rounded-2xl p-6 border transition-all hover:border-opacity-100"
     style={{
-      background: `linear-gradient(135deg, ${color}15, ${color}08)`,
-      border: `1px solid ${color}30`,
+      background: `color-mix(in srgb, ${color} 15%, transparent)`,
+      borderColor: color,
+      borderOpacity: 0.3,
     }}
   >
     <div className="flex items-center space-x-3 mb-3">
@@ -159,7 +160,7 @@ const MetricCard = ({
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ (если есть)
+// 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
@@ -182,10 +183,11 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="rounded-2xl p-6 mb-6 border"
+      className="rounded-2xl p-6 mb-6 border transition-all"
       style={{
-        background: `linear-gradient(135deg, ${COLORS.success}15, ${COLORS.success}08)`,
-        border: `1px solid ${COLORS.success}30`,
+        background: `color-mix(in srgb, ${COLORS.success} 15%, transparent)`,
+        borderColor: COLORS.success,
+        borderOpacity: 0.3,
       }}
     >
       {/* ЗАГОЛОВОК */}
@@ -204,10 +206,11 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
       {/* ИНФОРМАЦИЯ О БОНУСЕ (две колонки) */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div
-          className="rounded-xl p-4 text-center border"
+          className="rounded-xl p-4 text-center border transition-all"
           style={{
-            background: `${COLORS.success}15`,
-            border: `1px solid ${COLORS.success}30`,
+            background: `color-mix(in srgb, ${COLORS.success} 15%, transparent)`,
+            borderColor: COLORS.success,
+            borderOpacity: 0.3,
           }}
         >
           <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
@@ -222,10 +225,11 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
         </div>
 
         <div
-          className="rounded-xl p-4 text-center border"
+          className="rounded-xl p-4 text-center border transition-all"
           style={{
-            background: `${COLORS.primary}15`,
-            border: `1px solid ${COLORS.primary}30`,
+            background: `color-mix(in srgb, ${COLORS.primary} 15%, transparent)`,
+            borderColor: COLORS.primary,
+            borderOpacity: 0.3,
           }}
         >
           <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
@@ -252,10 +256,11 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
         </div>
 
         <div
-          className="w-full h-3 rounded-full overflow-hidden border"
+          className="w-full h-3 rounded-full overflow-hidden border transition-all"
           style={{
-            background: COLORS.muted + '40',
-            border: `1px solid ${COLORS.success}30`,
+            background: `color-mix(in srgb, ${COLORS.muted} 40%, transparent)`,
+            borderColor: COLORS.success,
+            borderOpacity: 0.3,
           }}
         >
           <motion.div
@@ -265,7 +270,7 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
             style={{
               height: '100%',
               background: `linear-gradient(90deg, ${COLORS.success}, ${COLORS.primary}, ${COLORS.success})`,
-              boxShadow: `0 0 16px ${COLORS.success}80`,
+              boxShadow: `0 0 16px color-mix(in srgb, ${COLORS.success} 50%, transparent)`,
             }}
           />
         </div>
@@ -278,10 +283,11 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
 
       {/* ДНЕЙ ДО ИСТЕЧЕНИЯ */}
       <div
-        className="rounded-xl p-4 flex items-center gap-3 border"
+        className="rounded-xl p-4 flex items-center gap-3 border transition-all"
         style={{
-          background: '#EF444415',
-          border: '1px solid #EF444430',
+          background: 'color-mix(in srgb, #EF4444 15%, transparent)',
+          borderColor: '#EF4444',
+          borderOpacity: 0.3,
         }}
       >
         <Clock size={18} style={{ color: '#EF4444' }} />
@@ -294,7 +300,7 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 ГЛАВНЫЙ КОМПОНЕНТ (БЕЗ КНОПОК, С ФАЛБЭКОМ НА БОНУС)
+// 📱 ГЛАВНЫЙ КОМПОНЕНТ
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AccountPage() {
@@ -303,6 +309,7 @@ export function AccountPage() {
   const [activeBonus, setActiveBonus] = useState<ActiveBonus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avatarFallback, setAvatarFallback] = useState(false);
 
   const hasLoadedRef = useRef(false);
 
@@ -324,12 +331,10 @@ export function AccountPage() {
         setLoading(false);
       });
       
-      // 🎁 Пытаемся загрузить бонус (НО НЕ ПАДАЕМ ЕСЛИ ОШИБКА)
       fetchActiveBonus()
         .then(() => console.log('✅ Бонус загружен'))
         .catch((err: Error) => {
           console.warn('⚠️ Бонус не загружен (это нормально):', err.message);
-          // Не вызываем setError - продолжаем работу
         });
     }
   }, [fetchProfile, fetchActiveBonus]);
@@ -349,19 +354,16 @@ export function AccountPage() {
     }
   }, [data]);
 
-  // 🎁 Обработка бонуса (с фалбэком) - ИСПРАВЛЕНО
   useEffect(() => {
     if (bonusData) {
       console.log('🎁 Raw bonusData:', bonusData);
       try {
-        // ✅ Проверяем сначала на прямой объект (если API вернул напрямую)
         if (bonusData.id && bonusData.grantedAmount !== undefined && bonusData.requiredWager !== undefined) {
           console.log('✅ [DIRECT BONUS] Setting active bonus:', bonusData);
           setActiveBonus(bonusData as ActiveBonus);
           return;
         }
         
-        // Потом проверяем на обёрнутый объект
         if (bonusData.success && bonusData.data) {
           console.log('✅ [WRAPPED BONUS] Setting from success.data:', bonusData.data);
           setActiveBonus(bonusData.data as ActiveBonus);
@@ -427,18 +429,26 @@ export function AccountPage() {
     console.log('🎯 Rendering AccountPage with activeBonus:', activeBonus);
 
     return (
-      <div style={{ backgroundColor: COLORS.background, minHeight: '100vh', padding: '24px 16px' }} className="pb-24">
+      <div 
+        style={{ 
+          backgroundColor: COLORS.background, 
+          minHeight: '100vh', 
+          padding: '24px 16px',
+          transition: 'background-color 300ms ease, color 300ms ease'
+        }} 
+        className="pb-24"
+      >
         <div style={{ maxWidth: '500px', margin: '0 auto' }}>
           
-          {/* 🎪 ПРОФИЛЬ (как на скриншоте) */}
+          {/* 🎪 ПРОФИЛЬ */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="rounded-2xl p-6 mb-6 border"
+            className="rounded-2xl p-6 mb-6 border transition-all"
             style={{
-              background: `linear-gradient(135deg, ${COLORS.card}, ${COLORS.card}80)`,
-              border: `1px solid ${COLORS.border}`,
+              background: COLORS.card,
+              borderColor: COLORS.border,
             }}
           >
             {/* АВАТАР И ИМЯ */}
@@ -447,17 +457,22 @@ export function AccountPage() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2 }}
-                className="w-20 h-20 rounded-full border-2 flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
+                className="w-20 h-20 rounded-full border-4 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 transition-all overflow-hidden"
                 style={{
-                  background: vipInfo.gradient,
+                  background: avatarFallback || !photoUrl ? vipInfo.gradient : 'transparent',
                   borderColor: COLORS.primary,
-                  boxShadow: `0 0 24px ${COLORS.primary}60`,
+                  boxShadow: `0 0 24px color-mix(in srgb, ${COLORS.primary} 60%, transparent)`,
                 }}
               >
-                {photoUrl ? (
-                  <img src={photoUrl} alt="User" className="w-full h-full object-cover rounded-full" />
+                {!avatarFallback && photoUrl ? (
+                  <img 
+                    src={photoUrl} 
+                    alt="User" 
+                    className="w-full h-full object-cover"
+                    onError={() => setAvatarFallback(true)}
+                  />
                 ) : (
-                  initials
+                  <span>{initials}</span>
                 )}
               </motion.div>
 
@@ -477,12 +492,13 @@ export function AccountPage() {
               </div>
             </div>
 
-            {/* УРОВЕНЬ ИГРОКА (большая карточка) */}
+            {/* УРОВЕНЬ ИГРОКА */}
             <div
-              className="rounded-2xl p-6 border"
+              className="rounded-2xl p-6 border transition-all"
               style={{
-                background: `linear-gradient(135deg, ${COLORS.primary}20, ${COLORS.accent}10)`,
-                border: `1px solid ${COLORS.primary}30`,
+                background: `color-mix(in srgb, ${COLORS.primary} 20%, transparent)`,
+                borderColor: COLORS.primary,
+                borderOpacity: 0.3,
               }}
             >
               <div className="flex items-center gap-3 mb-3">
@@ -497,7 +513,7 @@ export function AccountPage() {
             </div>
           </motion.div>
 
-          {/* 🎁 АКТИВНЫЙ БОНУС (если есть) */}
+          {/* 🎁 АКТИВНЫЙ БОНУС */}
           {activeBonus ? (
             <>
               <BonusCard bonus={activeBonus} />
@@ -508,7 +524,7 @@ export function AccountPage() {
             </div>
           )}
 
-          {/* 📊 ОСНОВНЫЕ МЕТРИКИ (4 карточки) */}
+          {/* 📊 ОСНОВНЫЕ МЕТРИКИ */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <MetricCard
               icon={<TrendingUp size={20} />}
@@ -548,10 +564,10 @@ export function AccountPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="rounded-2xl p-6 border grid grid-cols-2 gap-4"
+            className="rounded-2xl p-6 border grid grid-cols-2 gap-4 transition-all"
             style={{
-              background: `linear-gradient(135deg, ${COLORS.primary}10, ${COLORS.card})`,
-              border: `1px solid ${COLORS.border}`,
+              background: `color-mix(in srgb, ${COLORS.primary} 10%, ${COLORS.card})`,
+              borderColor: COLORS.border,
             }}
           >
             <div className="text-center">
@@ -583,7 +599,7 @@ export function AccountPage() {
   return (
     <div
       style={{ backgroundColor: COLORS.background }}
-      className="min-h-screen flex items-center justify-center flex-col gap-4"
+      className="min-h-screen flex items-center justify-center flex-col gap-4 transition-colors duration-300"
     >
       {loading || profileLoading ? (
         <>
@@ -600,7 +616,7 @@ export function AccountPage() {
             className="px-6 py-2 rounded-xl font-semibold transition-all"
             style={{
               background: COLORS.primary,
-              color: COLORS.foreground,
+              color: 'white',
             }}
           >
             Повторить

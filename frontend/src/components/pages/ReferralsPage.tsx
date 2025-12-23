@@ -44,6 +44,17 @@ function toNumber(value: any): number {
   return isNaN(num) ? 0 : num
 }
 
+// 🎨 CSS переменные для темы
+const getThemeColors = () => ({
+  background: 'var(--background)',
+  card: 'var(--card)',
+  foreground: 'var(--foreground)',
+  mutedForeground: 'var(--muted-foreground)',
+  primary: 'var(--primary)',
+  success: 'var(--success)',
+  border: 'var(--border)',
+})
+
 export function ReferralsPage() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -56,6 +67,8 @@ export function ReferralsPage() {
 
   const { execute: loadStats } = useFetch('REFERRAL_GET_referral_stats', 'GET')
   const { execute: linkReferrer } = useFetch('REFERRAL_POST_referral_link-referrer', 'POST')
+
+  const colors = getThemeColors()
 
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
@@ -109,7 +122,7 @@ export function ReferralsPage() {
   if (!isAuthenticated) {
     return (
       <div className="pb-24 pt-6 px-4">
-        <Card className="p-5 bg-zinc-900 border-zinc-800 text-white">
+        <Card className="p-5 border transition-colors" style={{ backgroundColor: colors.card, color: colors.foreground }}>
           <p>Войдите в аккаунт</p>
         </Card>
       </div>
@@ -130,7 +143,7 @@ export function ReferralsPage() {
   const referralsCount = stats?.myReferralsCount || stats?.myRefeersCount || 0
 
   return (
-    <div className="pb-32 pt-6 px-4 space-y-6 relative overflow-hidden">
+    <div className="pb-32 pt-6 px-4 space-y-6 relative overflow-hidden transition-colors duration-300" style={{ backgroundColor: colors.background }}>
       
       {/* BACKGROUND GLOWS */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
@@ -144,7 +157,7 @@ export function ReferralsPage() {
           <h1 className="text-3xl md:text-4xl font-black italic bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent uppercase tracking-tighter">
             Партнёрская
             <br />
-            <span className="text-white text-xl md:text-2xl not-italic font-bold tracking-normal">Программа</span>
+            <span style={{ color: colors.foreground }} className="text-xl md:text-2xl not-italic font-bold tracking-normal">Программа</span>
           </h1>
         </motion.div>
       </div>
@@ -161,7 +174,7 @@ export function ReferralsPage() {
               {/* Пульсирующий фон */}
               <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-600 rounded-2xl blur opacity-40 group-hover:opacity-100 transition duration-1000 animate-pulse" />
               
-              <Card className="relative bg-gradient-to-br from-slate-900 via-zinc-900 to-black border-0 rounded-2xl overflow-hidden shadow-2xl">
+              <Card className="relative bg-gradient-to-br border-0 rounded-2xl overflow-hidden shadow-2xl transition-colors" style={{ backgroundColor: colors.card }}>
                 {/* Шумовой оверлей */}
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 z-0" />
                 
@@ -182,10 +195,10 @@ export function ReferralsPage() {
 
                   {/* Заголовок */}
                   <div className="text-center mb-6">
-                    <h2 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-tight">
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight mb-2" style={{ color: colors.foreground }}>
                       ВВЕДИ ПРОМОКОД
                     </h2>
-                    <p className="text-zinc-300 text-sm md:text-base">
+                    <p style={{ color: colors.mutedForeground }} className="text-sm md:text-base">
                       И получи <span className="font-bold text-yellow-400">эксклюзивный бонус</span>
                     </p>
                   </div>
@@ -198,7 +211,12 @@ export function ReferralsPage() {
                         value={inputCode}
                         onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                         disabled={linking}
-                        className="bg-zinc-800/50 border-zinc-700 border-2 focus:border-yellow-400 text-center text-xl md:text-2xl font-black tracking-widest uppercase h-14 md:h-16 rounded-xl transition-all"
+                        className="border-2 focus:border-yellow-400 text-center text-xl md:text-2xl font-black tracking-widest uppercase h-14 md:h-16 rounded-xl transition-all"
+                        style={{ 
+                          color: colors.foreground,
+                          backgroundColor: colors.background,
+                          borderColor: colors.border
+                        }}
                       />
                       <Sparkles className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-yellow-400 pointer-events-none" />
                     </div>
@@ -235,14 +253,14 @@ export function ReferralsPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.05 }}
           >
-            <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/20 border border-green-500/30 flex items-center justify-between">
+            <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/20 border border-green-500/30 flex items-center justify-between transition-colors">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-500/20 flex items-center justify-center">
                   <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-green-400" />
                 </div>
                 <div>
                   <p className="text-xs text-green-400 uppercase font-bold tracking-wider">Ваш наставник</p>
-                  <p className="text-white font-bold">{stats.referrerUsername || stats.referredByCode}</p>
+                  <p style={{ color: colors.foreground }} className="font-bold">{stats.referrerUsername || stats.referredByCode}</p>
                 </div>
               </div>
               <div className="px-3 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[10px] text-green-300 whitespace-nowrap">
@@ -267,6 +285,7 @@ export function ReferralsPage() {
               icon={<Users className="w-5 h-5 text-cyan-400" />}
               gradient="from-cyan-500/10 to-blue-500/10"
               border="border-cyan-500/20"
+              colors={colors}
             />
             <StatCard
               title="МОЙ ДОХОД"
@@ -274,6 +293,7 @@ export function ReferralsPage() {
               icon={<Award className="w-5 h-5 text-yellow-400" />}
               gradient="from-yellow-500/10 to-orange-500/10"
               border="border-yellow-500/20"
+              colors={colors}
             />
             <StatCard
               title="ОБОРОТ СЕТИ"
@@ -281,6 +301,7 @@ export function ReferralsPage() {
               icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
               gradient="from-purple-500/10 to-pink-500/10"
               border="border-purple-500/20"
+              colors={colors}
             />
             <StatCard
               title="СТАВКА"
@@ -288,6 +309,7 @@ export function ReferralsPage() {
               icon={<Flame className="w-5 h-5 text-red-400" />}
               gradient="from-red-500/10 to-rose-500/10"
               border="border-red-500/20"
+              colors={colors}
             />
           </div>
         </motion.div>
@@ -302,28 +324,36 @@ export function ReferralsPage() {
         >
           <div className="flex items-center gap-2 mb-4 px-1">
             <Crown className="w-6 h-6 text-indigo-400" />
-            <h2 className="text-lg md:text-xl font-bold text-white">Твой реферальный код</h2>
+            <h2 style={{ color: colors.foreground }} className="text-lg md:text-xl font-bold">Твой реферальный код</h2>
           </div>
 
-          <Card className="relative overflow-hidden border-0 rounded-3xl group">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black z-0" />
+          <Card className="relative overflow-hidden border-0 rounded-3xl group transition-colors" style={{ backgroundColor: colors.card }}>
+            {/* Динамический фон в зависимости от темы */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-black dark:from-indigo-900 dark:via-purple-900 dark:to-black from-indigo-100 via-purple-100 to-white z-0" />
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0 mix-blend-overlay" />
             
             <div className="relative z-10 p-6 md:p-8 flex flex-col items-center text-center">
-              <p className="text-indigo-200 text-xs font-bold tracking-[0.2em] uppercase mb-4">
+              <p style={{ color: colors.mutedForeground }} className="text-xs font-bold tracking-[0.2em] uppercase mb-4">
                 Поделись с друзьями
               </p>
 
-              <div className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden">
+              <div style={{ 
+                backgroundColor: colors.background,
+                borderColor: colors.border
+              }} className="w-full backdrop-blur-md border rounded-2xl p-6 mb-6 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-100%] group-hover:animate-pulse transition-all duration-1000" />
-                <p className="font-mono text-3xl md:text-4xl font-black text-white tracking-widest drop-shadow-lg select-all">
+                <p style={{ color: colors.foreground }} className="font-mono text-3xl md:text-4xl font-black tracking-widest drop-shadow-lg select-all">
                   {stats?.myReferralCode || '...'}
                 </p>
               </div>
 
               <Button
                 onClick={copyCode}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold rounded-xl py-6 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all active:scale-95"
+                className="w-full text-white font-bold rounded-xl py-6 flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
+                style={{
+                  background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+                  color: 'white'
+                }}
               >
                 <Copy className="w-5 h-5" />
                 КОПИРОВАТЬ И ПРИГЛАСИТЬ
@@ -340,17 +370,21 @@ export function ReferralsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+          <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20 transition-colors" style={{ color: colors.foreground }}>
             <div className="flex items-start gap-4 mb-4">
               <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
                 <Users className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-white font-bold text-lg mb-2">Зарабатывай на рефералах</h3>
-                <p className="text-zinc-300 text-sm mb-4">30% от преимущества казино каждого реферала, пожизненно</p>
+                <h3 className="font-bold text-lg mb-2">Зарабатывай на рефералах</h3>
+                <p style={{ color: colors.mutedForeground }} className="text-sm mb-4">30% от преимущества казино каждого реферала, пожизненно</p>
                 <Button 
                   onClick={() => navigate('/support?section=referral')}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"
+                  className="w-full text-white font-bold rounded-lg text-sm"
+                  style={{
+                    background: 'linear-gradient(to right, #7c3aed, #8b5cf6)',
+                    color: 'white'
+                  }}
                 >
                   Подробнее о расчётах
                 </Button>
@@ -380,7 +414,7 @@ export function ReferralsPage() {
               exit={{ scale: 0.5, opacity: 0, y: 100 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
             >
-              <div className="relative w-full max-w-sm bg-gradient-to-br from-zinc-900 via-zinc-900 to-black rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl shadow-purple-500/50 md:rounded-3xl">
+              <div className="relative w-full max-w-sm bg-gradient-to-br from-zinc-900 via-zinc-900 to-black rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl shadow-purple-500/50 md:rounded-3xl transition-colors" style={{ backgroundColor: colors.card }}>
                 {/* Confetti/Rays Effect Background */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-72 bg-gradient-to-b from-purple-500/30 via-purple-500/10 to-transparent blur-3xl" />
                 
@@ -388,8 +422,9 @@ export function ReferralsPage() {
                 <button 
                   onClick={() => setShowBonusModal(false)}
                   className="absolute top-4 right-4 z-20 p-2 hover:bg-zinc-800 rounded-full transition-colors"
+                  style={{ color: colors.mutedForeground }}
                 >
-                  <X className="w-6 h-6 text-zinc-400 hover:text-white" />
+                  <X className="w-6 h-6" />
                 </button>
 
                 <div className="relative p-8 text-center flex flex-col items-center pt-12">
@@ -410,7 +445,7 @@ export function ReferralsPage() {
                   </motion.div>
 
                   {/* Heading */}
-                  <div className="text-3xl md:text-4xl font-black text-white mb-3 uppercase tracking-tight drop-shadow-lg">
+                  <div className="text-3xl md:text-4xl font-black uppercase tracking-tight drop-shadow-lg" style={{ color: colors.foreground }}>
                     <motion.span 
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -434,7 +469,8 @@ export function ReferralsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="text-zinc-300 text-base mb-8"
+                    style={{ color: colors.mutedForeground }}
+                    className="text-base mb-8"
                   >
                     Поздравляем! Ты присоединился к нашей программе
                   </motion.p>
@@ -449,25 +485,25 @@ export function ReferralsPage() {
                     <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-4">
                       <div className="flex items-center gap-3 mb-1">
                         <Star className="w-5 h-5 text-yellow-400" />
-                        <span className="text-white font-bold">Стартовый бонус</span>
+                        <span style={{ color: colors.foreground }} className="font-bold">Стартовый бонус</span>
                       </div>
-                      <p className="text-zinc-400 text-xs">Узнай подробнее в условиях</p>
+                      <p style={{ color: colors.mutedForeground }} className="text-xs">Узнай подробнее в условиях</p>
                     </div>
 
                     <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-4">
                       <div className="flex items-center gap-3 mb-1">
                         <Unlock className="w-5 h-5 text-purple-400" />
-                        <span className="text-white font-bold">Комиссия реферала</span>
+                        <span style={{ color: colors.foreground }} className="font-bold">Комиссия реферала</span>
                       </div>
-                      <p className="text-zinc-400 text-xs">От преимущества казино</p>
+                      <p style={{ color: colors.mutedForeground }} className="text-xs">От преимущества казино</p>
                     </div>
 
                     <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl p-4">
                       <div className="flex items-center gap-3 mb-1">
                         <Rocket className="w-5 h-5 text-green-400" />
-                        <span className="text-white font-bold">Пожизненно</span>
+                        <span style={{ color: colors.foreground }} className="font-bold">Пожизненно</span>
                       </div>
-                      <p className="text-zinc-400 text-xs">Без ограничений</p>
+                      <p style={{ color: colors.mutedForeground }} className="text-xs">Без ограничений</p>
                     </div>
                   </motion.div>
 
@@ -491,8 +527,13 @@ export function ReferralsPage() {
                         setShowBonusModal(false)
                         navigate('/support?section=bonus')
                       }}
-                      variant="outline"
-                      className="w-full py-5 text-sm bg-transparent border-zinc-600 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-2xl transition-all"
+                      className="w-full py-5 text-sm rounded-2xl transition-all font-bold"
+                      style={{
+                        backgroundColor: 'transparent',
+                        borderColor: '#3b82f6',
+                        color: '#3b82f6',
+                        border: '2px solid'
+                      }}
                     >
                       УЗНАТЬ УСЛОВИЯ
                     </Button>
@@ -513,24 +554,26 @@ function StatCard({
   value,
   icon,
   gradient,
-  border
+  border,
+  colors
 }: {
   title: string
   value: string | number
   icon: React.ReactNode
   gradient: string
   border: string
+  colors: ReturnType<typeof getThemeColors>
 }) {
   return (
-    <Card className={`p-4 bg-gradient-to-br ${gradient} ${border} border backdrop-blur-sm transition-all hover:border-opacity-100`}>
+    <Card className={`p-4 bg-gradient-to-br ${gradient} ${border} border backdrop-blur-sm transition-all hover:border-opacity-100`} style={{ color: colors.foreground }}>
       <div className="flex flex-col gap-3">
         <div className="flex justify-between items-start">
-          <p className="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider">
+          <p style={{ color: colors.mutedForeground }} className="text-[10px] md:text-xs font-bold uppercase tracking-wider">
             {title}
           </p>
           <div className="opacity-80">{icon}</div>
         </div>
-        <p className="text-lg md:text-2xl font-black text-white tracking-tight">
+        <p className="text-lg md:text-2xl font-black tracking-tight" style={{ color: colors.foreground }}>
           {value}
         </p>
       </div>
