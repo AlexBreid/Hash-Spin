@@ -1,5 +1,6 @@
 /**
  * ✅ ПОЛНЫЙ TELEGRAM БОТ - АДМИН ПАНЕЛЬ ИСПРАВЛЕНА НА РУССКОМ
+ * МЕНЮ ОЧИЩЕНО: УДАЛЕНЫ КНОПКИ ПРОФИЛЬ, РЕФЕРАЛЫ, ПОМОЩЬ
  * 
  * ЗАМЕНИ src/bots/telegramBot.js
  */
@@ -179,15 +180,12 @@ if (!BOT_TOKEN) {
     const baseButtons = [
       [{ text: '🎰 Казино' }],
       [{ text: '💰 Пополнить' }, { text: '💸 Вывести' }],
-      [{ text: '📥 Мои выводы' }],
-      [{ text: '👥 Рефералы' }, { text: '👤 Профиль' }]
+      [{ text: '📥 Мои выводы' }]
     ];
 
     if (isAdmin) {
       baseButtons.push([{ text: '⚙️ Админ Панель' }]);
     }
-
-    baseButtons.push([{ text: '❓ Помощь' }]);
 
     return {
       reply_markup: {
@@ -634,7 +632,7 @@ if (!BOT_TOKEN) {
         }
       }
 
-      const commonSlogan = `🎰 *Добро пожаловать в SafariX — Казино будущего!* 🌍
+      const commonSlogan = `🎰 *Добро пожаловать в SafariUp — Казино будущего!* 🌍
 
 🚀 Здесь каждый спин — шаг к выигрышу!  
 💎 Крипто-ставки без границ  
@@ -1031,111 +1029,6 @@ if (!BOT_TOKEN) {
           break;
         }
 
-        case '👥 Рефералы': {
-          try {
-            // Считаем рефералов напрямую из БД
-            const referralCount = await prisma.user.count({
-              where: { referredById: user.id }
-            });
-            
-            const stats = await referralService.getReferrerStats(user.id);
-            const userInfo = await prisma.user.findUnique({
-              where: { id: user.id },
-              select: { referralCode: true, referrerType: true }
-            });
-            
-            const botInfo = await bot.telegram.getMe();
-            const referralLink = generateReferralLink(botInfo.username, userInfo.referralCode);
-            
-            const typeEmoji = userInfo.referrerType === 'WORKER' ? '👷' : '👤';
-            
-            const totalTurnover = stats?.totalTurnover || 0;
-            const totalPaid = stats?.totalCommissionPaid || 0;
-            const potentialComm = stats?.potentialCommission || 0;
-            const commRate = stats?.commissionRate || 0;
-            
-            const refMsg = `${typeEmoji} *РЕФЕРАЛЬНАЯ ПРОГРАММА*
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔗 *ВАШ РЕФЕРАЛЬНЫЙ КОД:*
-\`${userInfo.referralCode}\`
-
-📱 *РЕФЕРАЛЬНАЯ ССЫЛКА:*
-\`${referralLink}\`
-
-💡 Отправьте эту ссылку друзьям - когда они 
-присоединятся, вы получите комиссию!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 *СТАТИСТИКА:*
-👥 Рефералов: ${referralCount}
-💰 Оборот: ${totalTurnover.toFixed(2)} USDT
-✅ Выплачено: ${totalPaid.toFixed(2)} USDT
-⏳ Накоплено: ${potentialComm.toFixed(2)} USDT
-
-💎 Ваша комиссия: *${commRate}%*
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-            
-            await ctx.reply(refMsg, { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) });
-          } catch (error) {
-            logger.error('BOT', `Error in referrals command`, { error: error.message });
-            await ctx.reply('❌ Ошибка при получении информации о рефералах.', getMainMenuKeyboard(user.isAdmin));
-          }
-          break;
-        }
-
-        case '👤 Профиль': {
-          const mainBalance = await prisma.balance.findUnique({
-            where: { userId_tokenId_type: { userId: user.id, tokenId: 2, type: 'MAIN' } }
-          });
-          const bonusBalance = await prisma.balance.findUnique({
-            where: { userId_tokenId_type: { userId: user.id, tokenId: 2, type: 'BONUS' } }
-          });
-
-          const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
-          const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
-          const totalBalance = mainAmount + bonusAmount;
-
-          const badges = [];
-          if (user.isAdmin) badges.push('👑 АДМИН');
-          if (user.referrerType === 'WORKER') badges.push('👷 ВОРКЕР');
-          
-          let bonusStatus = '';
-          const activeBonus = await prisma.userBonus.findFirst({
-            where: {
-              userId: user.id,
-              isActive: true,
-              isCompleted: false,
-              expiresAt: { gt: new Date() }
-            }
-          });
-          
-          if (activeBonus) {
-            const wagered = parseFloat(activeBonus.wageredAmount.toString());
-            const required = parseFloat(activeBonus.requiredWager.toString());
-            const progress = Math.min((wagered / required) * 100, 100);
-            const daysLeft = Math.ceil((activeBonus.expiresAt - new Date()) / (1000 * 60 * 60 * 24));
-            bonusStatus = `\n\n🎁 *АКТИВНЫЙ БОНУС:*\n` +
-              `⚡ Отыграно: ${progress.toFixed(0)}%\n` +
-              `⏰ Дней осталось: ${daysLeft}`;
-          }
-          
-          const userDisplayName = user.username ? `@${user.username}` : `ID: ${user.id}`;
-
-          await ctx.reply(
-            `👤 *Профиль*\n\n` +
-            `${userDisplayName}\n` +
-            `💰 Баланс: ${totalBalance.toFixed(8)} USDT` +
-            (badges.length ? `\n${badges.join(' | ')}` : '') +
-            bonusStatus,
-            { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
-          );
-          break;
-        }
-
         case '⚙️ Админ Панель': {
           if (!user.isAdmin) {
             await ctx.reply('❌ У вас нет доступа.');
@@ -1155,33 +1048,6 @@ if (!BOT_TOKEN) {
               parse_mode: 'Markdown'
             }
           );
-          break;
-        }
-
-        case '❓ Помощь': {
-          waitingForDeposit.delete(user.id);
-          waitingForWithdrawAmount.delete(user.id);
-          
-          await ctx.reply(
-            `❓ *Помощь и поддержка*\n\nВыберите:`,
-            {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: '❓ FAQ - Часто задаваемые вопросы', callback_data: 'support_faq' }],
-                  [{ text: '💬 Связаться с администратором', callback_data: 'support_contact' }],
-                  [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
-                ]
-              },
-              parse_mode: 'Markdown'
-            }
-          );
-          break;
-        }
-
-        case '◀️ Назад': {
-          waitingForDeposit.delete(user.id);
-          waitingForWithdrawAmount.delete(user.id);
-          await ctx.reply('📋 Выберите действие:', getMainMenuKeyboard(user.isAdmin));
           break;
         }
 
@@ -1643,7 +1509,7 @@ if (!BOT_TOKEN) {
     }
   });
 
-  // ⭐ АДМИНИСТРАТОРСКАЯ ПАНЕЛЬ - ПОЛНОСТЬЮ ПЕРЕРАБОТАНА БЕЗ MARKDOWN
+  // ⭐ АДМИНИСТРАТОРСКАЯ ПАНЕЛЬ
   bot.action('admin_show_withdrawals', async (ctx) => {
     try {
       const user = await prisma.user.findUnique({ 
@@ -1955,67 +1821,6 @@ if (!BOT_TOKEN) {
         getMainMenuKeyboard(user.isAdmin)
       );
     }
-  });
-
-  bot.action('support_faq', async (ctx) => {
-    let faqText = 'FAQ:\n\n';
-    
-    for (let i = 0; i < faqData.length; i++) {
-      faqText += (i + 1) + '. ' + faqData[i].question + '\n' + faqData[i].answer + '\n\n';
-    }
-
-    await ctx.editMessageText(faqText, {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: 'Назад', callback_data: 'back_to_menu' }]
-        ]
-      }
-    });
-    await ctx.answerCbQuery();
-  });
-
-  bot.action('support_contact', async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
-    if (!user) return;
-    
-    waitingForTicketMessage.set(user.id, 'CONTACT');
-    
-    await ctx.editMessageText(
-      'Связаться с администратором\n\nНапишите ваше сообщение. Мы ответим вскоре.',
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: 'Назад', callback_data: 'support_back' }]
-          ]
-        }
-      }
-    );
-    await ctx.answerCbQuery();
-  });
-
-  bot.action('support_back', async (ctx) => {
-    const user = await prisma.user.findUnique({ 
-      where: { telegramId: ctx.from.id.toString() } 
-    });
-    if (!user) return;
-    
-    waitingForTicketMessage.delete(user.id);
-    
-    await ctx.editMessageText(
-      `Помощь и поддержка\n\nВыберите:`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: 'FAQ', callback_data: 'support_faq' }],
-            [{ text: 'Связаться с администратором', callback_data: 'support_contact' }],
-            [{ text: 'Назад', callback_data: 'back_to_menu' }]
-          ]
-        }
-      }
-    );
-    await ctx.answerCbQuery();
   });
 
   // ====================================

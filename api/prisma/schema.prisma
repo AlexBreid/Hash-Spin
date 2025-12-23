@@ -25,6 +25,7 @@ model CryptoToken {
     crashTransactions   CrashTransaction[]   @relation("CrashTransactionTokens")
     minesweeperGames    MinesweeperGame[]    @relation("MinesweeperTokens")
     minesweeperBets     MinesweeperBet[]     @relation("MinesweeperBetTokens")
+    plinkoGames         PlinkoGame[]         @relation("PlinkoGames")
     balances            Balance[]
     transactions        Transaction[]
     bets                Bet[]
@@ -106,6 +107,7 @@ model User {
     crashTransactions   CrashTransaction[] @relation("CrashTransactions")
     minesweeperGames    MinesweeperGame[]  @relation("MinesweeperGames")
     minesweeperBets     MinesweeperBet[]   @relation("MinesweeperBets")
+    plinkoGames         PlinkoGame[]       @relation("PlinkoGames")
     balances            Balance[]
     transactions        Transaction[]
     bets                Bet[]
@@ -535,4 +537,31 @@ model MinesweeperBet {
     createdAt       DateTime            @default(now())
     
     @@index([userId, createdAt])
+}
+
+// ====================================================
+// 12. PLINKO GAME MODELS
+// ====================================================
+
+model PlinkoGame {
+    id              Int                 @id @default(autoincrement())
+    
+    userId          Int
+    user            User                @relation("PlinkoGames", fields: [userId], references: [id], onDelete: Cascade)
+    
+    tokenId         Int
+    token           CryptoToken         @relation("PlinkoGames", fields: [tokenId], references: [id])
+    
+    betAmount       Decimal             @db.Decimal(30, 18)
+    winAmount       Decimal             @db.Decimal(30, 18)
+    
+    ballPath        String              // JSON массив пути шарика
+    finalPosition   Int                 // Финальная позиция (0-14)
+    multiplier      Float               // Множитель выигрыша
+    status          String              @default("COMPLETED") // COMPLETED, CANCELLED
+    
+    createdAt       DateTime            @default(now())
+    
+    @@index([userId, createdAt])
+    @@index([status])
 }
