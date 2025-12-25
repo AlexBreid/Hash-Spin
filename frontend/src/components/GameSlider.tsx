@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { GameCard } from './GameCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -7,43 +7,17 @@ interface Game {
   title: string;
   image: string;
   category: string;
-  onClick: () => void;
 }
 
 interface GameSliderProps {
-  onGameSelect?: (gameId: string) => void;
-  onNavigate?: (page: string) => void;
+  games: Game[];
+  onGameClick?: (gameId: string) => void;
 }
 
-export function GameSlider({ onGameSelect, onNavigate }: GameSliderProps) {
+export function GameSlider({ games, onGameClick }: GameSliderProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-
-  // Игры
-  const games: Game[] = [
-    {
-      id: 'crash',
-      title: 'Краш',
-      image: 'https://images.unsplash.com/photo-1516222338670-c482920eecca?w=400&h=300&fit=crop',
-      category: 'ставки',
-      onClick: () => onNavigate?.('crash')
-    },
-    {
-      id: 'minesweeper',
-      title: 'Сапёр',
-      image: 'https://images.unsplash.com/photo-1552820728-8ac41f1ce891?w=400&h=300&fit=crop',
-      category: 'логика',
-      onClick: () => onNavigate?.('minesweeper')
-    },
-    {
-      id: 'plinko',
-      title: 'Plinko',
-      image: 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400&h=300&fit=crop',
-      category: 'ставки',
-      onClick: () => onNavigate?.('plinko')
-    },
-  ];
 
   const checkScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -70,7 +44,7 @@ export function GameSlider({ onGameSelect, onNavigate }: GameSliderProps) {
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
 
-    const scrollAmount = 320;
+    const scrollAmount = 220;
     const newScrollLeft =
       scrollContainerRef.current.scrollLeft +
       (direction === 'left' ? -scrollAmount : scrollAmount);
@@ -81,48 +55,63 @@ export function GameSlider({ onGameSelect, onNavigate }: GameSliderProps) {
     });
   };
 
+  const handleCardClick = (gameId: string) => {
+    console.log('🎮 GameCard clicked:', gameId);
+    if (onGameClick) {
+      onGameClick(gameId);
+    }
+  };
+
   return (
     <div className="relative w-full">
-      {/* Левная кнопка */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-primary/80 hover:bg-primary p-2 rounded-full transition-all"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full transition-all"
+          style={{
+            background: 'var(--primary)',
+            color: 'white'
+          }}
           aria-label="Scroll left"
         >
-          <ChevronLeft size={20} className="text-primary-foreground" />
+          <ChevronLeft size={20} />
         </button>
       )}
 
-      {/* Контейнер с играми */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2"
+        className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2"
         style={{
           scrollBehavior: 'smooth',
           WebkitOverflowScrolling: 'touch',
         }}
       >
         {games.map((game) => (
-          <div key={game.id} className="flex-shrink-0 w-[280px]">
+          <div 
+            key={game.id} 
+            className="flex-shrink-0 slider-card-wrapper"
+          >
             <GameCard
               title={game.title}
               image={game.image}
               category={game.category}
-              onClick={game.onClick}
+              onClick={() => handleCardClick(game.id)}
             />
           </div>
         ))}
       </div>
 
-      {/* Правая кнопка */}
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-primary/80 hover:bg-primary p-2 rounded-full transition-all"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full transition-all"
+          style={{
+            background: 'var(--primary)',
+            color: 'white'
+          }}
           aria-label="Scroll right"
         >
-          <ChevronRight size={20} className="text-primary-foreground" />
+          <ChevronRight size={20} />
         </button>
       )}
     </div>

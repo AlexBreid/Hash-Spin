@@ -6,6 +6,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ArrowLeft, Loader, Trophy, Coins, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { GameHeader } from './games/GameHeader';
+import './games/games.css';
 
 interface Difficulty {
   id: number;
@@ -519,18 +521,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         }
       `}</style>
 
-      <div className="minesweeper-page max-w-md mx-auto">
-        <div className="minesweeper-header">
-          <button 
-            className="back-button" 
-            onClick={onBack}
-            style={{ color: colors.foreground }}
-          >
-            <ArrowLeft size={24} />
-          </button>
-          <h1 className="text-3xl font-bold">🎮 Сапёр</h1>
-          <div style={{ width: 40 }} />
-        </div>
+      <div className="minesweeper-page game-page max-w-md mx-auto">
+        <GameHeader 
+          title="САПЁР" 
+          icon="🎮"
+          balance={totalBalance}
+        />
 
         <div className="minesweeper-content">
           {step === 'SELECT' && (

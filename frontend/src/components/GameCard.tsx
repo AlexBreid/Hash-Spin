@@ -1,5 +1,5 @@
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Play, Brain, TrendingUp } from 'lucide-react';
+import { Play, Brain, TrendingUp, Target } from 'lucide-react';
 
 interface GameCardProps {
   title: string;
@@ -8,7 +8,12 @@ interface GameCardProps {
   onClick: () => void;
 }
 
-const getCategoryIcon = (category: string) => {
+const getCategoryIcon = (category: string, title?: string) => {
+  // Специальная иконка для Plinko
+  if (title?.toLowerCase() === 'plinko') {
+    return <Target className="w-4 h-4" />;
+  }
+  
   switch (category.toLowerCase()) {
     case 'логика':
       return <Brain className="w-4 h-4" />;
@@ -23,7 +28,8 @@ export function GameCard({ title, image, category, onClick }: GameCardProps) {
   return (
     <div 
       onClick={onClick}
-      className="bg-card border border-border rounded-2xl overflow-hidden cursor-pointer group hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:scale-105"
+      className="bg-card border border-border rounded-2xl overflow-hidden cursor-pointer group hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:scale-105 w-full"
+      style={{ maxWidth: '100%' }}
     >
       <div className="relative aspect-[4/3] overflow-hidden">
         <ImageWithFallback
@@ -39,7 +45,7 @@ export function GameCard({ title, image, category, onClick }: GameCardProps) {
         </div>
         <div className="absolute top-3 right-3">
           <div className="bg-accent/90 backdrop-blur-sm p-2 rounded-full text-accent-foreground flex items-center justify-center">
-            {getCategoryIcon(category)}
+            {getCategoryIcon(category, title)}
           </div>
         </div>
       </div>

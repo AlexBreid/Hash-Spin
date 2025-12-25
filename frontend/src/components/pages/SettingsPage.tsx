@@ -32,7 +32,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           ⚙️ Настройки
         </h1>
         {isAuthenticated && user && (
-          <p className="text-muted-foreground text-sm mt-1">Аккаунт: <span className="font-semibold text-white dark:text-white">{user?.username || user?.email}</span></p>
+          <p className="text-muted-foreground text-sm mt-1">Аккаунт: <span className="font-semibold text-foreground">{user?.username || user?.email}</span></p>
         )}
       </motion.div>
 
@@ -57,14 +57,18 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-amber-400/50 dark:border-amber-700/50">
               <div>
-                <p className="text-white font-semibold">Текущая тема</p>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                <p className="text-foreground font-semibold">Текущая тема</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   {theme === 'dark' ? '🌙 Тёмная' : '☀️ Светлая'}
                 </p>
               </div>
               <Button
                 onClick={toggleTheme}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg px-6"
+                className={`font-semibold rounded-lg px-6 ${
+                  theme === 'dark' 
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                    : 'bg-amber-400 hover:bg-amber-500 text-amber-900'
+                }`}
               >
                 {theme === 'dark' ? '☀️ Свет' : '🌙 Темнота'}
               </Button>
@@ -89,7 +93,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
           <div className="space-y-3">
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 hover:text-white text-green-900 dark:text-green-200 dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
               onClick={() => navigate('/support')}
             >
               <HelpCircle className="w-5 h-5 mr-3" />
@@ -100,7 +104,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             </Button>
             
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 hover:text-white text-green-900 dark:text-green-200 dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
               onClick={() => navigate('/support?section=bonus')}
             >
               <MessageCircle className="w-5 h-5 mr-3" />
@@ -111,7 +115,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             </Button>
 
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 hover:text-white text-green-900 dark:text-green-200 dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
               onClick={() => navigate('/support?section=referral')}
             >
               <MessageCircle className="w-5 h-5 mr-3" />

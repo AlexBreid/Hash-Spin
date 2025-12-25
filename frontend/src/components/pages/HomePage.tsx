@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useFetch } from '../../hooks/useDynamicApi';
 import imgMines from '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp';
 import imgCrash from '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp';
+import imgPlinko from '../../assets/plinko.png';
 
 interface Game {
   id: string;
@@ -17,35 +18,46 @@ interface Game {
 
 const featuredGames: Game[] = [
   {
-    id: '1',
+    id: 'minesweeper',
     title: 'Сапёр',
     image: imgMines,
     category: 'Логика'
   },
   {
-    id: '2',
+    id: 'crash',
     title: 'Краш',
     image: imgCrash,
+    category: 'Ставки'
+  },
+  {
+    id: 'plinko',
+    title: 'Plinko',
+    image: imgPlinko,
     category: 'Ставки'
   },
 ];
 
 const popularGames: Game[] = [
   {
-    id: '5',
+    id: 'minesweeper',
     title: 'Сапёр Про',
     image: imgMines,
     category: 'Логика'
   },
   {
-    id: '6',
+    id: 'crash',
     title: 'Турбо Краш',
     image: imgCrash,
     category: 'Ставки'
   },
+  {
+    id: 'plinko',
+    title: 'Plinko',
+    image: imgPlinko,
+    category: 'Ставки'
+  },
 ];
 
-// 🎨 CSS переменные для темы
 const getThemeColors = () => ({
   background: 'var(--background)',
   card: 'var(--card)',
@@ -63,7 +75,6 @@ export function HomePage() {
   const [hasReferrer, setHasReferrer] = useState<boolean | null>(null);
   const hasLoadedRef = useRef(false);
 
-  // 🔄 Загружаем информацию профиля для проверки реферала
   const { data: profileData, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
 
   useEffect(() => {
@@ -73,12 +84,11 @@ export function HomePage() {
       
       fetchProfile().catch((err: Error) => {
         console.warn('⚠️ Ошибка загрузки профиля:', err.message);
-        setHasReferrer(false); // По умолчанию показываем плашку если ошибка
+        setHasReferrer(false);
       });
     }
   }, [fetchProfile]);
 
-  // 🎁 Проверяем наличие реферала
   useEffect(() => {
     if (profileData) {
       console.log('✅ Profile data:', profileData);
@@ -86,45 +96,45 @@ export function HomePage() {
       try {
         const profile = profileData.data || profileData;
         
-        // ❌ Если есть referredById - у него уже есть реферал
         if (profile.referredById) {
           console.log('✅ У пользователя уже есть реферер:', profile.referredById);
-          setHasReferrer(true); // СКРЫВАЕМ плашку
+          setHasReferrer(true);
         } 
-        // ✅ Если нет referredById - нет реферала
         else {
           console.log('⚠️ У пользователя НЕТ реферера');
-          setHasReferrer(false); // ПОКАЗЫВАЕМ плашку
+          setHasReferrer(false);
         }
       } catch (err) {
         console.warn('⚠️ Ошибка парсинга профиля:', err);
-        setHasReferrer(false); // По умолчанию показываем
+        setHasReferrer(false);
       }
     }
   }, [profileData]);
 
   const handleGameClick = (gameId: string) => {
-    // Сапёр
-    if (gameId === '1' || gameId === '5') {
-      navigate('/minesweeper'); // 🎮 Переход на Сапёр
+    console.log('🎮 Запуск игры:', gameId);
+    
+    if (gameId === 'minesweeper') {
+      navigate('/minesweeper');
     } 
-    // Краш
-    else if (gameId === '2' || gameId === '6') {
-      navigate('/crash'); // 💥 Переход на Краш
+    else if (gameId === 'crash') {
+      navigate('/crash');
     } 
-    // Остальные игры
+    else if (gameId === 'plinko') {
+      navigate('/plinko');
+    } 
     else {
-      console.log('Запуск игры:', gameId);
+      console.log('❓ Неизвестная игра:', gameId);
     }
   };
 
   const handleBonusClick = () => {
-    navigate('/referrals'); // 🎁 Переход на рефералки
+    navigate('/referrals');
   };
 
   return (
     <div className="pb-24 pt-6 transition-colors duration-300" style={{ backgroundColor: colors.background, color: colors.foreground }}>
-      {/* 🎁 Welcome Banner - ПОКАЗЫВАЕМ ТОЛЬКО ЕСЛИ НЕТ РЕФЕРЕРА */}
+      {/* 🎁 Welcome Banner */}
       {hasReferrer === false && (
         <div className="px-4 mb-8">
           <div className="rounded-3xl p-6 relative overflow-hidden transition-colors border" style={{
@@ -154,7 +164,7 @@ export function HomePage() {
         </div>
       )}
 
-      {/* ✅ Альтернативная плашка для тех кто УЖЕ использовал реферала */}
+      {/* ✅ Альтернативная плашка */}
       {hasReferrer === true && (
         <div className="px-4 mb-8">
           <div className="rounded-3xl p-6 border transition-colors relative overflow-hidden" style={{

@@ -17,7 +17,7 @@ import { LoginPage } from './components/pages/LoginPage';
 import { CrashGame } from './components/pages/CrashGame';
 import { WithdrawPage } from './components/pages/WithdrawPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
-import { PlinkoPage } from './components/pages/PlinkoPage';
+import PlinkoGame from './components/pages/games/Plinkogame';  // ✅ Исправлено
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
@@ -181,7 +181,7 @@ function AppContent() {
             case 'minesweeper':
                 return <MinesweeperPage onBack={() => handlePageChange('home')} />;
             case 'plinko':
-                return <PlinkoPage onBack={() => handlePageChange('home')} />;
+                return <PlinkoGame />;  // ✅ Используем правильный компонент
             case 'withdraw':
                 return <WithdrawPage />;
             case 'records':

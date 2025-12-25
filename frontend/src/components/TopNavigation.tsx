@@ -4,6 +4,7 @@ import { useFetch } from '../hooks/useDynamicApi';
 import { Button } from './ui/button';
 import DepositPage from './pages/DepositPage';
 import { useTheme } from '../context/ThemeContext';
+import logoSU from '../assets/SU.png';
 
 // --- Интерфейсы ---
 
@@ -148,9 +149,25 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
         
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <img 
-            src="../assets/SU.png" 
-            alt="Logo"></img>
+          <div 
+            className="flex items-center justify-center rounded-xl p-2 transition-all duration-300"
+            style={{
+              background: theme === 'dark' 
+                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.1))'
+                : 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.05))',
+              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`,
+              boxShadow: theme === 'dark' 
+                ? '0 2px 8px rgba(59, 130, 246, 0.1)'
+                : '0 2px 8px rgba(59, 130, 246, 0.05)'
+            }}
+          >
+            <img 
+              src={logoSU} 
+              alt="Logo"
+              className="h-14 w-auto max-w-[180px] object-contain"
+              style={{ maxHeight: '88px' }}
+            />
+          </div>
         </div>
 
         {/* Balance and Actions */}

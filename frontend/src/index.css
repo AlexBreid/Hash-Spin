@@ -2546,6 +2546,7 @@
   --destructive-foreground: #fff;
   --border: #3b82f626;
   --input: #1e3a8a;
+  --input-background: #0b1c3a;  /* Темный фон инпута */
   --ring: #3b82f6;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -2639,6 +2640,25 @@ body {
 
 .slider-item {
   scroll-snap-align: center;
+}
+
+/* Стили для карточек в слайдере */
+.slider-card-wrapper {
+  width: 210px !important;
+  min-width: 210px !important;
+  max-width: 210px !important;
+  flex-shrink: 0 !important;
+}
+
+.slider-card-wrapper > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.slider-card-wrapper [class*="aspect"] {
+  aspect-ratio: 4/3 !important;
+  width: 100% !important;
+  height: auto !important;
 }
 
 @property --tw-translate-x {

@@ -7,6 +7,8 @@ import { Zap, TrendingUp, Users, ArrowLeft, Timer, Flame, RefreshCw, Loader } fr
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GameHeader } from './games/GameHeader';
+import './games/games.css';
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`relative overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl ${className}`}>
@@ -592,60 +594,16 @@ export function CrashGame() {
   }, [betPlaced, currentBet, fetchBalances, sessionKeys]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0F1419] via-[#1a1f2e] to-[#0a0e17] text-white pb-24">
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
-      </div>
+    <div className="game-page" style={{ paddingBottom: '96px' }}>
+      <GameHeader 
+        title="CRASH" 
+        icon={<Flame className="w-6 h-6" style={{ color: '#f59e0b' }} />}
+        balance={totalBalance}
+        onRefreshBalance={fetchBalances}
+        status={isHistoryLoaded ? '🟢 OK' : '🟡 LOAD...'}
+      />
 
-      <div className="relative z-10 w-full">
-        <header className="sticky top-0 z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-3 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/')}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/10"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <ArrowLeft className="w-5 h-5 text-gray-300" />
-                </motion.div>
-              </button>
-              <div>
-                <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-1">
-                  <Flame className="w-6 h-6 text-orange-500 animate-bounce" />
-                  CRASH
-                </h1>
-                <p className="text-xs text-emerald-400 font-mono">
-                  {isHistoryLoaded ? '🟢 OK' : '🟡 LOAD...'}
-                </p>
-              </div>
-            </div>
-
-            {/* ✅ ТОЛЬКО ОБЪЕДИНЁННЫЙ БАЛАНС БЕЗ УПОМИНАНИЯ БОНУСА */}
-            <GlassCard className="px-3 py-2 flex items-center gap-2 !rounded-full">
-              <div className="text-right">
-                <p className="text-xs text-gray-400">Баланс</p>
-                <p className="text-sm font-black text-emerald-300">${totalBalance.toFixed(2)}</p>
-              </div>
-              <button 
-                onClick={() => fetchBalances()} 
-                className="p-1.5 hover:bg-white/20 rounded-lg"
-              >
-                <motion.div
-                  whileHover={{ rotate: 180 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-                </motion.div>
-              </button>
-            </GlassCard>
-          </div>
-        </header>
-
-        <div className="w-full p-3 space-y-3">
+        <div className="game-content w-full">
           <GlassCard className="relative rounded-2xl overflow-hidden bg-black/40 w-full" style={{ aspectRatio: '16/9' }}>
             <canvas
               ref={canvasRef}
@@ -902,7 +860,6 @@ export function CrashGame() {
           div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 4px; }
           div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
         `}</style>
-      </div>
     </div>
   );
 }
