@@ -9,9 +9,13 @@ import {
   Clock,
   Star,
   TrendingUp,
+  CreditCard,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import DepositPage from './DepositPage';
+import { WithdrawPage } from './WithdrawPage';
 
 interface UserProfile {
   id: string;
@@ -310,6 +314,8 @@ export function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [avatarFallback, setAvatarFallback] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
 
   const hasLoadedRef = useRef(false);
 
@@ -428,6 +434,15 @@ export function AccountPage() {
 
     console.log('🎯 Rendering AccountPage with activeBonus:', activeBonus);
 
+    // Если показываем страницу депозита или вывода
+    if (showDeposit) {
+      return <DepositPage onBack={() => setShowDeposit(false)} />;
+    }
+
+    if (showWithdraw) {
+      return <WithdrawPage onBack={() => setShowWithdraw(false)} />;
+    }
+
     return (
       <div 
         style={{ 
@@ -510,6 +525,41 @@ export function AccountPage() {
               <p style={{ color: COLORS.primary }} className="text-4xl font-bold">
                 {level}
               </p>
+            </div>
+
+            {/* КНОПКИ ПОПОЛНЕНИЯ И ВЫВОДА */}
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <motion.button
+                onClick={() => setShowDeposit(true)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="rounded-xl p-4 border transition-all flex items-center justify-center gap-3 font-semibold"
+                style={{
+                  background: `linear-gradient(135deg, ${COLORS.success}, #10b981)`,
+                  borderColor: COLORS.success,
+                  color: '#fff',
+                  boxShadow: `0 4px 16px color-mix(in srgb, ${COLORS.success} 30%, transparent)`,
+                }}
+              >
+                <CreditCard size={20} />
+                <span>Пополнить</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => setShowWithdraw(true)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="rounded-xl p-4 border transition-all flex items-center justify-center gap-3 font-semibold"
+                style={{
+                  background: `linear-gradient(135deg, ${COLORS.primary}, #3b82f6)`,
+                  borderColor: COLORS.primary,
+                  color: '#fff',
+                  boxShadow: `0 4px 16px color-mix(in srgb, ${COLORS.primary} 30%, transparent)`,
+                }}
+              >
+                <ArrowUpCircle size={20} />
+                <span>Вывести</span>
+              </motion.button>
             </div>
           </motion.div>
 

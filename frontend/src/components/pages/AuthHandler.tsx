@@ -6,7 +6,7 @@ import axios from 'axios';
 
 // ВАЖНО: Убедитесь, что Ngrok ЗАПУЩЕН и это его АКТУАЛЬНЫЙ HTTPS-адрес
 // Если Ngrok перезапустится, этот адрес ИЗМЕНИТСЯ, и его нужно будет обновить здесь!
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const AuthHandler: React.FC = () => {
     const location = useLocation();

@@ -15,13 +15,17 @@ interface BalanceData {
 
 type WithdrawStep = 'FORM' | 'CONFIRM' | 'SUCCESS' | 'ERROR';
 
-export function WithdrawPage() {
+interface WithdrawPageProps {
+  onBack?: () => void;
+}
+
+export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
   const navigate = useNavigate();
   const [balances, setBalances] = useState<BalanceData[]>([]);
   const [step, setStep] = useState<WithdrawStep>('FORM');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
   const [formData, setFormData] = useState({
     amount: '',
     walletAddress: '',
@@ -54,7 +58,11 @@ export function WithdrawPage() {
 
   const handleBack = () => {
     if (step === 'FORM') {
-      navigate('/account');
+      if (onBack) {
+        onBack();
+      } else {
+        navigate('/account');
+      }
     } else {
       setStep('FORM');
       setError('');

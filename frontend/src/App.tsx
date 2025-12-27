@@ -22,6 +22,8 @@ import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
 import { BonusFloatingButton } from './components/modals/Bonusfloatingbutton';
+import { PaymentSuccessPage } from './components/pages/PaymentSuccessPage';
+import { PaymentFailedPage } from './components/pages/PaymentFailedPage';
 
 const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper', 'plinko'];
 
@@ -63,9 +65,11 @@ function AppContent() {
             }
 
             try {
-                const response = await fetch(`/api/bonus/check-availability`, {
+                const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+                const token = localStorage.getItem('casino_jwt_token') || localStorage.getItem('authToken') || localStorage.getItem('token');
+                const response = await fetch(`${API_BASE_URL}/api/v1/deposit/check-bonus`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
 
@@ -200,6 +204,10 @@ function AppContent() {
                 );
             case 'support':
                 return <SupportPage />;
+            case 'successful-payment':
+                return <PaymentSuccessPage />;
+            case 'failed-payment':
+                return <PaymentFailedPage />;
             default:
                 return isAuthenticated ? <HomePage /> : <LoginPage onLoginSuccess={() => {
                     navigate('/');

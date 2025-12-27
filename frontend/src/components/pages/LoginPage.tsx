@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // <<< 1. ИМПОРТ КОНТЕКСТА
 
 // --- КОНФИГУРАЦИЯ ---
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const LOGIN_ENDPOINT_TOKEN = `${API_BASE_URL}/login-with-token`;
 const LOGIN_ENDPOINT_CREDENTIALS = `${API_BASE_URL}/login-with-credentials`;
 // (Этот ключ больше не нужен здесь, он управляется AuthContext)
