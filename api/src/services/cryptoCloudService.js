@@ -11,9 +11,9 @@ const referralService = require('./ReferralService');
 
 // Конфигурация CryptoCloud
 const CRYPTO_CLOUD_API_URL = 'https://api.cryptocloud.plus/v2';
-const CRYPTO_CLOUD_API_KEY = process.env.CRYPTO_CLOUD_API_KEY || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiT0RNNE5UTT0iLCJ0eXBlIjoicHJvamVjdCIsInYiOiI0YmNmNGYxMmNhNzMyNGVjMzYyNWMwZjM1YjgxZTAyN2NkZThhNGE0MTRlMzUzMWIwYzE0NjI1MWMwOWM1MTVmIiwiZXhwIjo4ODE2Njc4MzM5N30.DvyMDzdRWNEgm8GtEOMaWT5njtiw6nAiUpUO_S6P0jo';
-const CRYPTO_CLOUD_SHOP_ID = process.env.CRYPTO_CLOUD_SHOP_ID || '6cIUewIuaGohxks5';
-const CRYPTO_CLOUD_SECRET = process.env.CRYPTO_CLOUD_SECRET || 'hyVRuoPkQIThAaRiqN784I4Dqhz3gg8Bnl3g';
+const CRYPTO_CLOUD_API_KEY = process.env.CRYPTO_CLOUD_API_KEY;
+const CRYPTO_CLOUD_SHOP_ID = process.env.CRYPTO_CLOUD_SHOP_ID;
+const CRYPTO_CLOUD_SECRET = process.env.CRYPTO_CLOUD_SECRET;
 
 class CryptoCloudService {
   constructor() {
@@ -241,25 +241,90 @@ class CryptoCloudService {
       }
 
       // CryptoCloud отправляет разные поля в зависимости от версии API
-      const invoiceId = webhookData.invoice_id || webhookData.uuid;
-      if (!invoiceId) {
+      const rawInvoiceId = webhookData.invoice_id || webhookData.uuid;
+      if (!rawInvoiceId) {
         throw new Error('Missing invoice_id/uuid');
       }
 
-      // Получаем информацию о депозите из БД
-      const pendingDeposit = await prisma.pendingDeposit.findUnique({
-        where: { invoiceId: invoiceId.toString() }
-      });
+      // Пробуем найти депозит по разным форматам ID
+      // CryptoCloud присылает "E9PPO4KK", а в БД хранится "INV-E9PPO4KK"
+      const possibleIds = [
+        rawInvoiceId,                          // E9PPO4KK
+        `INV-${rawInvoiceId}`,                 // INV-E9PPO4KK
+        rawInvoiceId.replace('INV-', ''),      // На случай если уже с префиксом
+      ];
+
+      let pendingDeposit = null;
+      let foundInvoiceId = null;
+
+      for (const id of possibleIds) {
+        pendingDeposit = await prisma.pendingDeposit.findUnique({
+          where: { invoiceId: id }
+        });
+        if (pendingDeposit) {
+          foundInvoiceId = id;
+          logger.info('CRYPTOCLOUD', 'Found deposit with invoiceId', { 
+            searchedId: rawInvoiceId, 
+            foundId: id 
+          });
+          break;
+        }
+      }
+
+      // Если не нашли по invoiceId, пробуем по order_id
+      if (!pendingDeposit && webhookData.order_id) {
+        // order_id формат: "DEPOSIT-{userId}-{timestamp}"
+        const orderParts = webhookData.order_id.split('-');
+        if (orderParts.length >= 3 && orderParts[0] === 'DEPOSIT') {
+          const orderUserId = parseInt(orderParts[1]);
+          const orderTimestamp = parseInt(orderParts[2]);
+          
+          // Ищем pending deposit для этого пользователя с близким временем создания
+          const deposits = await prisma.pendingDeposit.findMany({
+            where: {
+              userId: orderUserId,
+              status: 'pending'
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+          });
+
+          // Находим депозит с подходящей суммой
+          const webhookAmount = parseFloat(webhookData.amount_crypto) || 
+                               parseFloat(webhookData.invoice_info?.amount_usd) ||
+                               parseFloat(webhookData.invoice_info?.amount);
+          
+          for (const dep of deposits) {
+            // Сравниваем суммы (с небольшой погрешностью для комиссий)
+            const depAmount = parseFloat(dep.amount);
+            if (Math.abs(depAmount - webhookAmount) < 0.01 || 
+                dep.invoiceId.includes(rawInvoiceId) ||
+                rawInvoiceId.includes(dep.invoiceId.replace('INV-', ''))) {
+              pendingDeposit = dep;
+              foundInvoiceId = dep.invoiceId;
+              logger.info('CRYPTOCLOUD', 'Found deposit by order_id match', { 
+                orderId: webhookData.order_id,
+                foundId: foundInvoiceId
+              });
+              break;
+            }
+          }
+        }
+      }
 
       if (!pendingDeposit) {
-        logger.warn('CRYPTOCLOUD', 'Pending deposit not found', { invoiceId });
+        logger.warn('CRYPTOCLOUD', 'Pending deposit not found', { 
+          rawInvoiceId,
+          triedIds: possibleIds,
+          orderId: webhookData.order_id
+        });
         return { processed: false, reason: 'Deposit not found' };
       }
 
       // Проверяем статус
       if (pendingDeposit.status !== 'pending') {
         logger.info('CRYPTOCLOUD', 'Deposit already processed', { 
-          invoiceId, 
+          invoiceId: foundInvoiceId, 
           status: pendingDeposit.status 
         });
         return { processed: false, reason: 'Already processed' };
@@ -268,14 +333,14 @@ class CryptoCloudService {
       // Проверяем статус оплаты
       const invoiceStatus = webhookData.status;
       if (invoiceStatus !== 'success' && invoiceStatus !== 'paid') {
-        logger.info('CRYPTOCLOUD', 'Invoice not paid', { invoiceId, status: invoiceStatus });
+        logger.info('CRYPTOCLOUD', 'Invoice not paid', { invoiceId: foundInvoiceId, status: invoiceStatus });
         return { processed: false, reason: 'Not paid' };
       }
 
       // Обрабатываем депозит
       const result = await this.processDeposit(
         pendingDeposit.userId,
-        invoiceId,
+        foundInvoiceId,  // Используем ID из базы
         pendingDeposit.amount,
         pendingDeposit.asset,
         pendingDeposit.withBonus
