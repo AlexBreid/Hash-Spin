@@ -24,6 +24,7 @@ import { BonusModal } from './components/modals/Bonusmodal';
 import { BonusFloatingButton } from './components/modals/Bonusfloatingbutton';
 import { PaymentSuccessPage } from './components/pages/PaymentSuccessPage';
 import { PaymentFailedPage } from './components/pages/PaymentFailedPage';
+import { CryptoCloudCallback } from './components/pages/CryptoCloudCallback';
 
 const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper', 'plinko'];
 
@@ -50,6 +51,9 @@ function AppContent() {
         if (path === '/settings') return 'settings';
         if (path === '/support') return 'support';
         if (path === '/login') return 'login';
+        if (path === '/callback') return 'callback';
+        if (path === '/successful-payment') return 'successful-payment';
+        if (path === '/failed-payment') return 'failed-payment';
         return 'home';
     };
 
@@ -204,6 +208,8 @@ function AppContent() {
                 );
             case 'support':
                 return <SupportPage />;
+            case 'callback':
+                return <CryptoCloudCallback />;
             case 'successful-payment':
                 return <PaymentSuccessPage />;
             case 'failed-payment':
@@ -221,7 +227,9 @@ function AppContent() {
     const isMinesweeperPage = currentPage === 'minesweeper';
     const isPlinkoPage = currentPage === 'plinko';
     const isWithdrawPage = currentPage === 'withdraw';
+    const isCallbackPage = currentPage === 'callback' || currentPage === 'successful-payment' || currentPage === 'failed-payment';
     const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
+    const isFullscreenPage = isGamePage || isCallbackPage;
 
     if (loading) {
         return (
@@ -236,10 +244,10 @@ function AppContent() {
             className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
             style={{ height: '850px' }}
         >
-            {!isAuthPage && !isGamePage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
+            {!isAuthPage && !isFullscreenPage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main className={
-                isGamePage ? 'h-full overflow-hidden' :
+                isFullscreenPage ? 'h-full overflow-hidden' :
                 isWithdrawPage ? 'h-[calc(850px-70px)] overflow-y-auto' :
                 isAuthPage ? 'h-full' : 
                 'h-[calc(850px-140px)] overflow-y-auto'
@@ -247,7 +255,7 @@ function AppContent() {
                 {renderCurrentPage()}
             </main>
 
-            {!isAuthPage && !isGamePage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+            {!isAuthPage && !isFullscreenPage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
 
             {/* Плавающая кнопка с подарком */}
             {showFloatingButton && hasBonusAvailable && (
