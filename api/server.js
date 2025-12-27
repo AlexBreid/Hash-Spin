@@ -43,7 +43,7 @@ console.log('✅ All required environment variables are set');
 // КОНФИГУРАЦИЯ
 // ====================================
 const app = express();
-const PORT = process.env.API_PORT || 8000;
+const PORT = process.env.API_PORT || 4000;
 const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
 
 // ✅ Инициализируем route loader
@@ -236,6 +236,15 @@ console.log('✅ Webhook route registered: POST /webhook/crypto-pay');
 const routers = routeLoader.getExpressRouters();
 for (const router of routers) {
   app.use('/', router);
+}
+
+// ✅ Явно подключаем depositRoutes для отладки
+try {
+  const depositRoutes = require('./src/routes/depositRoutes');
+  app.use('/', depositRoutes);
+  console.log('✅ Deposit routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading deposit routes:', err.message);
 }
 
 console.log(`✅ ${routers.length} route(s) loaded`);

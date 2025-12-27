@@ -662,6 +662,15 @@ class ReferralService {
       workerProfitShare: ReferralService.CONFIG.WORKER_PROFIT_SHARE
     };
   }
+
+  /**
+   * 💰 КОНФИГУРАЦИЯ (экземпляр метод для обратной совместимости)
+   */
+  getLimits() {
+    return ReferralService.getLimits();
+  }
 }
 
+// Экспортируем и класс, и экземпляр
 module.exports = new ReferralService();
+module.exports.ReferralService = ReferralService;
