@@ -11,9 +11,9 @@ const referralService = require('./ReferralService');
 
 // Конфигурация CryptoCloud
 const CRYPTO_CLOUD_API_URL = 'https://api.cryptocloud.plus/v2';
-const CRYPTO_CLOUD_API_KEY = process.env.CRYPTO_CLOUD_API_KEY || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiT0RNNE5UTT0iLCJ0eXBlIjoicHJvamVjdCIsInYiOiI0YmNmNGYxMmNhNzMyNGVjMzYyNWMwZjM1YjgxZTAyN2NkZThhNGE0MTRlMzUzMWIwYzE0NjI1MWMwOWM1MTVmIiwiZXhwIjo4ODE2Njc4MzM5N30.DvyMDzdRWNEgm8GtEOMaWT5njtiw6nAiUpUO_S6P0jo';
-const CRYPTO_CLOUD_SHOP_ID = process.env.CRYPTO_CLOUD_SHOP_ID || '6cIUewIuaGohxks5';
-const CRYPTO_CLOUD_SECRET = process.env.CRYPTO_CLOUD_SECRET || 'hyVRuoPkQIThAaRiqN784I4Dqhz3gg8Bnl3g';
+const CRYPTO_CLOUD_API_KEY = process.env.CRYPTO_CLOUD_API_KEY;
+const CRYPTO_CLOUD_SHOP_ID = process.env.CRYPTO_CLOUD_SHOP_ID;
+const CRYPTO_CLOUD_SECRET = process.env.CRYPTO_CLOUD_SECRET;
 
 class CryptoCloudService {
   constructor() {
