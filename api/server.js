@@ -43,7 +43,7 @@ console.log('✅ All required environment variables are set');
 // КОНФИГУРАЦИЯ
 // ====================================
 const app = express();
-const PORT = process.env.API_PORT || 4000;
+const PORT = process.env.PORT || process.env.API_PORT || 4000;
 const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
 
 // ✅ Инициализируем route loader
