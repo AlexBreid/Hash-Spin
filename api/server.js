@@ -247,6 +247,15 @@ try {
   console.error('❌ Error loading deposit routes:', err.message);
 }
 
+// ✅ Явно подключаем plinkoRoutes
+try {
+  const plinkoRoutes = require('./src/routes/plinkoRoutes');
+  app.use('/', plinkoRoutes);
+  console.log('✅ Plinko routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading plinko routes:', err.message);
+}
+
 console.log(`✅ ${routers.length} route(s) loaded`);
 
 // ====================================
