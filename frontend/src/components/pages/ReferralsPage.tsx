@@ -17,7 +17,9 @@ import {
   ChevronDown,
   Star,
   Unlock,
-  Rocket
+  Rocket,
+  Send,
+  ExternalLink
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useFetch } from '../../hooks/useDynamicApi'
@@ -116,6 +118,21 @@ export function ReferralsPage() {
     if (stats?.myReferralCode) {
       navigator.clipboard.writeText(stats.myReferralCode)
       toast.success('✅ Код скопирован')
+    }
+  }
+
+  const copyTelegramLink = () => {
+    if (stats?.myReferralCode) {
+      const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
+      navigator.clipboard.writeText(telegramLink)
+      toast.success('✅ Ссылка на Telegram бота скопирована')
+    }
+  }
+
+  const openTelegramLink = () => {
+    if (stats?.myReferralCode) {
+      const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
+      window.open(telegramLink, '_blank')
     }
   }
 
@@ -342,9 +359,42 @@ export function ReferralsPage() {
                 borderColor: colors.border
               }} className="w-full backdrop-blur-md border rounded-2xl p-6 mb-6 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-100%] group-hover:animate-pulse transition-all duration-1000" />
-                <p style={{ color: colors.foreground }} className="font-mono text-3xl md:text-4xl font-black tracking-widest drop-shadow-lg select-all">
+                <p style={{ color: colors.foreground }} className="font-mono text-3xl md:text-4xl font-black tracking-widest drop-shadow-lg select-all mb-4">
                   {stats?.myReferralCode || '...'}
                 </p>
+                
+                {/* Telegram ссылка */}
+                {stats?.myReferralCode && (
+                  <div className="mt-4 pt-4 border-t" style={{ borderColor: colors.border }}>
+                    <p style={{ color: colors.mutedForeground }} className="text-xs mb-2">
+                      Ссылка на Telegram бота:
+                    </p>
+                    <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: colors.card }}>
+                      <Send className="w-4 h-4" style={{ color: colors.foreground }} />
+                      <a
+                        href={`https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono flex-1 truncate hover:underline"
+                        style={{ color: '#0088cc' }}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          openTelegramLink()
+                        }}
+                      >
+                        t.me/SafariUpbot?start=ref_{stats.myReferralCode}
+                      </a>
+                      <button
+                        onClick={copyTelegramLink}
+                        className="p-1.5 rounded hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: colors.background }}
+                        title="Скопировать ссылку"
+                      >
+                        <Copy className="w-4 h-4" style={{ color: colors.foreground }} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Button
@@ -356,7 +406,7 @@ export function ReferralsPage() {
                 }}
               >
                 <Copy className="w-5 h-5" />
-                КОПИРОВАТЬ И ПРИГЛАСИТЬ
+                КОПИРОВАТЬ КОД И ПРИГЛАСИТЬ
               </Button>
             </div>
           </Card>
