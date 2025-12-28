@@ -609,25 +609,42 @@ if (!BOT_TOKEN) {
         if (referralCode) {
           console.log(`[START] 🎁 Applying referrer with code: ${referralCode}`);
           
-          referrerInfo = await applyReferrer(user.id, referralCode);
-          
-          if (referrerInfo.success) {
-            referralApplied = true;
-            console.log(`[START] ✅ Referrer applied: ${referrerInfo.referrerId}`);
-            logger.info('BOT', `Referral link applied`, {
-              newUserId: user.id,
-              referrerId: referrerInfo.referrerId
-            });
+          try {
+            referrerInfo = await applyReferrer(user.id, referralCode);
             
-            if (referrerInfo.referrerTelegramId) {
-              await notifyReferrerAboutNewReferee(
-                bot,
-                referrerInfo.referrerTelegramId,
-                user.username
-              );
+            if (referrerInfo.success) {
+              referralApplied = true;
+              console.log(`[START] ✅ Referrer applied: ${referrerInfo.referrerId}`);
+              logger.info('BOT', `Referral link applied`, {
+                newUserId: user.id,
+                referrerId: referrerInfo.referrerId
+              });
+              
+              // Уведомление реферера - не критично, если не отправится
+              if (referrerInfo.referrerTelegramId) {
+                try {
+                  await notifyReferrerAboutNewReferee(
+                    bot,
+                    referrerInfo.referrerTelegramId,
+                    user.username
+                  );
+                } catch (notifyError) {
+                  logger.warn('BOT', `Failed to notify referrer`, { 
+                    error: notifyError.message,
+                    referrerTelegramId: referrerInfo.referrerTelegramId 
+                  });
+                  // Продолжаем выполнение, даже если уведомление не отправилось
+                }
+              }
+            } else {
+              console.warn(`[START] ⚠️ Failed to apply referrer: ${referrerInfo.reason}`);
             }
-          } else {
-            console.warn(`[START] ⚠️ Failed to apply referrer: ${referrerInfo.reason}`);
+          } catch (referralError) {
+            logger.error('BOT', `Error applying referrer`, { 
+              error: referralError.message,
+              referralCode 
+            });
+            // Продолжаем выполнение, даже если реферал не применился
           }
         }
       }
@@ -658,25 +675,62 @@ if (!BOT_TOKEN) {
 
       const fullMessage = commonSlogan + credentialsBlock;
 
+      // Отправляем welcome сообщение с более надежной обработкой ошибок
       try {
         if (fs.existsSync(WELCOME_IMAGE_PATH)) {
-          await ctx.replyWithPhoto(
-            { source: fs.createReadStream(WELCOME_IMAGE_PATH) },
-            { caption: fullMessage, parse_mode: 'Markdown' }
-          );
+          try {
+            await ctx.replyWithPhoto(
+              { source: fs.createReadStream(WELCOME_IMAGE_PATH) },
+              { caption: fullMessage, parse_mode: 'Markdown' }
+            );
+          } catch (imageError) {
+            logger.warn('BOT', `Error sending welcome image`, { error: imageError.message });
+            // Пробуем отправить без фото
+            try {
+              await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
+            } catch (textError) {
+              logger.error('BOT', `Error sending welcome text`, { error: textError.message });
+              // Если и текст не отправился, пробуем простое сообщение
+              await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
+            }
+          }
         } else {
           await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
         }
-      } catch (imageError) {
-        logger.warn('BOT', `Error sending welcome image`, { error: imageError.message });
-        await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
+      } catch (messageError) {
+        logger.error('BOT', `Error in welcome message`, { error: messageError.message });
+        // Пытаемся отправить хотя бы базовое сообщение
+        try {
+          await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
+        } catch (fallbackError) {
+          logger.error('BOT', `Failed to send fallback message`, { error: fallbackError.message });
+        }
       }
 
-      const menu = getMainMenuKeyboard(user.isAdmin);
-      await ctx.reply('📋 *Выберите действие:*', menu);
+      // Отправляем меню отдельно, чтобы даже если welcome не отправился, меню показалось
+      try {
+        const menu = getMainMenuKeyboard(user.isAdmin);
+        await ctx.reply('📋 *Выберите действие:*', menu);
+      } catch (menuError) {
+        logger.error('BOT', `Error sending menu`, { error: menuError.message });
+        // Меню критично важно, но не останавливаем выполнение
+      }
     } catch (error) {
-      logger.error('BOT', `Error in /start command`, { error: error.message });
-      await ctx.reply("Произошла ошибка. Попробуйте позже.");
+      logger.error('BOT', `Error in /start command`, { error: error.message, stack: error.stack });
+      
+      // Пытаемся отправить хотя бы сообщение об ошибке
+      try {
+        // Если пользователь уже создан, отправляем базовое сообщение
+        const existingUser = await prisma.user.findUnique({ where: { telegramId } });
+        if (existingUser) {
+          const menu = getMainMenuKeyboard(existingUser.isAdmin);
+          await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.', menu);
+        } else {
+          await ctx.reply("Произошла ошибка при регистрации. Попробуйте позже.");
+        }
+      } catch (finalError) {
+        logger.error('BOT', `Failed to send error message`, { error: finalError.message });
+      }
     }
   });
 
