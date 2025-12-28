@@ -104,14 +104,33 @@ export default function PlinkoGame() {
 
   // Баланс
   const loadBalance = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      console.warn('[PLINKO] loadBalance: No token');
+      return;
+    }
     try {
+      console.log('[PLINKO] Загружаю баланс...');
       const r = await fetch(`${API}/api/v1/plinko/balance`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      if (!r.ok) {
+        console.error(`[PLINKO] Баланс: HTTP ${r.status}`, r.statusText);
+        return;
+      }
+      
       const d = await r.json();
-      if (d.success) setBalance(d.balance);
-    } catch { }
+      console.log('[PLINKO] Ответ баланса:', d);
+      
+      if (d.success && d.balance !== undefined) {
+        setBalance(parseFloat(d.balance));
+        console.log(`[PLINKO] Баланс установлен: ${d.balance}`);
+      } else {
+        console.error('[PLINKO] Неверный формат ответа:', d);
+      }
+    } catch (err) {
+      console.error('[PLINKO] Ошибка загрузки баланса:', err);
+    }
   }, [token]);
 
   // Бросок
@@ -125,10 +144,31 @@ export default function PlinkoGame() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ betAmount: bet })
       });
+      
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        return toast.error(errorData.error || `Ошибка: ${r.status}`);
+      }
+      
       const d = await r.json();
-      if (!d.success) return toast.error(d.error);
+      console.log('[PLINKO] Ответ от drop:', d);
+      
+      if (!d.success) {
+        return toast.error(d.error || 'Ошибка при броске');
+      }
 
-      setBalance(d.newBalance);
+      // Обновляем баланс из ответа
+      if (d.newBalance !== undefined) {
+        setBalance(parseFloat(d.newBalance));
+        console.log(`[PLINKO] Баланс обновлён: ${d.newBalance}`);
+      } else if (d.balance !== undefined) {
+        setBalance(parseFloat(d.balance));
+        console.log(`[PLINKO] Баланс обновлён (balance): ${d.balance}`);
+      } else {
+        // Если баланс не пришёл в ответе, перезагружаем его
+        console.warn('[PLINKO] Баланс не пришёл в ответе, перезагружаю...');
+        await loadBalance();
+      }
 
       const targetX = getSlotX(d.ball.slot);
       
