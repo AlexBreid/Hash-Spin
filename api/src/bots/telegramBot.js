@@ -675,7 +675,8 @@ if (!BOT_TOKEN) {
 
       const fullMessage = commonSlogan + credentialsBlock;
 
-      // Отправляем welcome сообщение с более надежной обработкой ошибок
+      // Отправляем welcome сообщение с картинкой, как было раньше
+      let welcomeSent = false;
       try {
         if (fs.existsSync(WELCOME_IMAGE_PATH)) {
           try {
@@ -683,27 +684,38 @@ if (!BOT_TOKEN) {
               { source: fs.createReadStream(WELCOME_IMAGE_PATH) },
               { caption: fullMessage, parse_mode: 'Markdown' }
             );
+            welcomeSent = true;
           } catch (imageError) {
-            logger.warn('BOT', `Error sending welcome image`, { error: imageError.message });
-            // Пробуем отправить без фото
+            logger.warn('BOT', `Error sending welcome image, trying without photo`, { error: imageError.message });
+            // Если не удалось отправить с фото, отправляем без фото, но с полным текстом
             try {
               await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
+              welcomeSent = true;
             } catch (textError) {
               logger.error('BOT', `Error sending welcome text`, { error: textError.message });
-              // Если и текст не отправился, пробуем простое сообщение
-              await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
             }
           }
         } else {
+          // Если файла нет, отправляем только текст с полным сообщением
           await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
+          welcomeSent = true;
         }
       } catch (messageError) {
         logger.error('BOT', `Error in welcome message`, { error: messageError.message });
-        // Пытаемся отправить хотя бы базовое сообщение
+      }
+      
+      // Если welcome не отправилось, пытаемся отправить хотя бы базовое приветствие
+      if (!welcomeSent) {
         try {
-          await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
+          await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
         } catch (fallbackError) {
-          logger.error('BOT', `Failed to send fallback message`, { error: fallbackError.message });
+          logger.error('BOT', `Failed to send welcome message`, { error: fallbackError.message });
+          // Последняя попытка - простое сообщение
+          try {
+            await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
+          } catch (finalError) {
+            logger.error('BOT', `All welcome attempts failed`, { error: finalError.message });
+          }
         }
       }
 
