@@ -1,7 +1,6 @@
 import io, { Socket } from 'socket.io-client';
 
 const GAME_SERVER_URL = import.meta.env.VITE_GAME_SERVER_URL || 'http://localhost:5000';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export interface CrashGameState {
   gameId: string;
@@ -29,40 +28,35 @@ export interface LiveEvent {
   data?: any;
 }
 
-export interface CrashHistory {
-  id: string;
-  gameId: string;
-  crashPoint: number;
-  timestamp: Date;
-}
-
 class CrashGameService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
-  private authToken: string | null = null;
+  private authToken: string | null = null;  // 🔑 ДОБАВЛЕНО: Хранение токена
 
-  async connect(userId: number, userName: string, authToken: string): Promise<void> {
+  async connect(userId: number, userName: string, authToken: string): Promise<void> {  // 🔑 ДОБАВЛЕНО: authToken параметр
     return new Promise((resolve, reject) => {
       try {
-        this.authToken = authToken;
+        this.authToken = authToken;  // 🔑 СОХРАНЯЕМ ТОКЕН
 
         this.socket = io(GAME_SERVER_URL, {
           reconnection: true,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           reconnectionAttempts: 5,
-          auth: {
+          auth: {  // 🔑 ДОБАВЛЕНО: Отправляем токен при подключении
             token: authToken
           }
         });
 
         this.socket.on('connect', () => {
+          console.log('✅ Подключились к Crash Server');
           
           this.socket!.emit('joinGame', {
             userId,
             userName,
           });
 
+          // Подписываемся на все события
           this.setupEventListeners();
           resolve();
         });
@@ -97,9 +91,10 @@ class CrashGameService {
       this.emit('gameCrashed', data);
     });
 
-    this.socket.on('crashHistoryUpdated', (data: { history: CrashHistory[]; totalInMemory: number }) => {
-      console.log(`📊 [SERVICE] crashHistoryUpdated получено от сервера: ${data.history.length} крашей`);
-      this.emit('crashHistoryUpdated', data);
+    // 🆕 FIX: Обработчик старта нового раунда
+    this.socket.on('roundStarted', (data: any) => {
+      console.log('🚀 roundStarted событие получено от сервера:', data.gameId);
+      this.emit('roundStarted', data);
     });
 
     this.socket.on('playerJoined', (data: { playersCount: number }) => {
@@ -123,78 +118,28 @@ class CrashGameService {
     });
 
     this.socket.on('error', (message: string) => {
-      console.error('❌ Game error:', message);
       this.emit('error', { message });
     });
   }
 
+  // 🔑 ИСПРАВЛЕНО: Методы для размещения ставок и кэшаута
   async placeBet(amount: number, tokenId: number): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
     
+    // 🔑 ДОБАВЛЕНО: Отправляем токен вместе с ставкой
     this.socket.emit('placeBet', { 
       amount, 
       tokenId,
-      token: this.authToken
+      token: this.authToken  // 🔑 ПЕРЕДАЕМ ТОКЕН!
     });
   }
 
-  // 🆕 ИСПРАВЛЕННЫЙ МЕТОД: Отправляет балансстроку и бонусId
-  async cashout(balanceType?: string, userBonusId?: string | null): Promise<void> {
+  async cashout(): Promise<void> {
     if (!this.socket) throw new Error('Socket not connected');
-    
-    // 🆕 Отправляем данные вместе с кэшаутом!
-    this.socket.emit('cashout', {
-      balanceType: balanceType || 'MAIN',
-      userBonusId: userBonusId || null
-    });
+    this.socket.emit('cashout');
   }
 
-  async fetchLastCrashes(): Promise<CrashHistory[]> {
-    try {
-      console.log(`📊 [SERVICE] Загружаю последние крахи с бэкенда...`);
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/crash/last-crashes`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Invalid response');
-      }
-
-      if (!Array.isArray(data.data)) {
-        throw new Error('Data is not an array');
-      }
-      
-      const crashes = data.data.map((crash: any) => {
-        const timestamp = new Date(crash.timestamp);
-        return {
-          id: crash.id || crash.gameId,
-          crashPoint: parseFloat(crash.crashPoint.toString()),
-          timestamp,
-          gameId: crash.gameId
-        };
-      });
-
-      const sorted = crashes.sort((a, b) => 
-        b.timestamp.getTime() - a.timestamp.getTime()
-      );
-
-        return sorted;
-    } catch (error) {
-      console.error('❌ [SERVICE] Ошибка загрузки крашей:', error);
-      return [];
-    }
-  }
-
+  // Система эмиттеров для подписки на события
   on(event: string, callback: Function): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
