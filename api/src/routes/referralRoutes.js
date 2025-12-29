@@ -238,6 +238,11 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
           }
         });
 
+        // Получаем количество рефералов этого реферала
+        const refereeReferralsCount = await prisma.user.count({
+          where: { referredById: ref.id }
+        });
+
         return {
           id: ref.id,
           username: ref.username || `User #${ref.id}`,
@@ -245,7 +250,8 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
           joinedAt: ref.createdAt,
           totalTurnover: parseFloat(stats?.totalTurnover?.toString() || '0'),
           commissionEarned: parseFloat(stats?.totalCommissionPaid?.toString() || '0'),
-          totalLosses: parseFloat(stats?.totalLosses?.toString() || '0')
+          totalLosses: parseFloat(stats?.totalLosses?.toString() || '0'),
+          referralsCount: refereeReferralsCount // Количество рефералов этого реферала
         };
       })
     );
