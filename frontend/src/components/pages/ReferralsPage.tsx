@@ -39,6 +39,17 @@ interface ReferralStats {
   totalCommissionPaid?: number | string
 }
 
+interface Referral {
+  id: number
+  username: string
+  firstName: string | null
+  joinedAt: string
+  totalTurnover: number
+  commissionEarned: number
+  totalLosses: number
+  referralsCount: number
+}
+
 function toNumber(value: any): number {
   if (value === null || value === undefined) return 0
   if (typeof value === 'number') return value
@@ -65,10 +76,13 @@ export function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [showBonusModal, setShowBonusModal] = useState(false)
+  const [referrals, setReferrals] = useState<Referral[]>([])
+  const [loadingReferrals, setLoadingReferrals] = useState(false)
   const hasLoadedRef = useRef(false)
 
   const { execute: loadStats } = useFetch('REFERRAL_GET_referral_stats', 'GET')
   const { execute: linkReferrer } = useFetch('REFERRAL_POST_referral_link-referrer', 'POST')
+  const { execute: loadReferrals } = useFetch('REFERRAL_GET_referral_my-referrals', 'GET')
 
   const colors = getThemeColors()
 
@@ -76,7 +90,20 @@ export function ReferralsPage() {
     if (isAuthenticated && !hasLoadedRef.current) {
       hasLoadedRef.current = true
       loadStatsData()
+      loadReferralsData()
     }
+  }, [isAuthenticated])
+
+  // Обновляем статистику каждые 30 секунд
+  useEffect(() => {
+    if (!isAuthenticated) return
+    
+    const interval = setInterval(() => {
+      loadStatsData()
+      loadReferralsData()
+    }, 30000) // 30 секунд
+
+    return () => clearInterval(interval)
   }, [isAuthenticated])
 
   const loadStatsData = async () => {
@@ -89,6 +116,20 @@ export function ReferralsPage() {
       // Silent error or toast
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadReferralsData = async () => {
+    try {
+      setLoadingReferrals(true)
+      const result = await loadReferrals()
+      if (result?.data?.referrals) {
+        setReferrals(result.data.referrals)
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки рефералов:', err)
+    } finally {
+      setLoadingReferrals(false)
     }
   }
 
@@ -107,6 +148,7 @@ export function ReferralsPage() {
       setShowBonusModal(true)
       setInputCode('')
       await loadStatsData()
+      await loadReferralsData()
     } catch (err: any) {
       toast.error(err?.message || 'Ошибка привязки')
     } finally {
@@ -375,18 +417,22 @@ export function ReferralsPage() {
                         href={`https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm font-mono flex-1 truncate hover:underline"
+                        className="text-sm font-mono flex-1 truncate hover:underline cursor-pointer"
                         style={{ color: '#0088cc' }}
                         onClick={(e) => {
-                          e.preventDefault()
+                          e.stopPropagation()
                           openTelegramLink()
                         }}
                       >
                         t.me/SafariUpbot?start=ref_{stats.myReferralCode}
                       </a>
                       <button
-                        onClick={copyTelegramLink}
-                        className="p-1.5 rounded hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          copyTelegramLink()
+                        }}
+                        className="p-1.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
                         style={{ backgroundColor: colors.background }}
                         title="Скопировать ссылку"
                       >
@@ -443,6 +489,76 @@ export function ReferralsPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* ✅ СПИСОК РЕФЕРАЛОВ - показывается если есть рефералы */}
+      {referrals.length > 0 && (
+        <div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <Users className="w-6 h-6 text-cyan-400" />
+              <h2 style={{ color: colors.foreground }} className="text-lg md:text-xl font-bold">Мои рефералы</h2>
+              <span style={{ color: colors.mutedForeground }} className="text-sm">({referrals.length})</span>
+            </div>
+
+            <div className="space-y-3">
+              {loadingReferrals ? (
+                <Card className="p-6 flex items-center justify-center" style={{ backgroundColor: colors.card }}>
+                  <Loader className="w-6 h-6 animate-spin text-cyan-500" />
+                </Card>
+              ) : (
+                referrals.map((referral) => (
+                  <Card 
+                    key={referral.id} 
+                    className="p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/20 transition-colors hover:border-cyan-500/40"
+                    style={{ backgroundColor: colors.card }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p style={{ color: colors.foreground }} className="font-bold text-base">
+                            {referral.username || referral.firstName || `User #${referral.id}`}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span style={{ color: colors.mutedForeground }}>Оборот: </span>
+                            <span style={{ color: colors.foreground }} className="font-semibold">
+                              ${referral.totalTurnover.toFixed(2)}
+                            </span>
+                          </div>
+                          <div>
+                            <span style={{ color: colors.mutedForeground }}>Комиссия: </span>
+                            <span style={{ color: colors.foreground }} className="font-semibold">
+                              ${referral.commissionEarned.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="ml-4 flex flex-col items-end gap-1">
+                        <div className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-4 h-4 text-cyan-400" />
+                            <span style={{ color: colors.foreground }} className="font-bold text-sm">
+                              {referral.referralsCount || 0}
+                            </span>
+                          </div>
+                          <p style={{ color: colors.mutedForeground }} className="text-[10px] uppercase tracking-wider mt-0.5">
+                            Рефералов
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* === MODAL: BONUS ACTIVATED === */}
       <AnimatePresence>

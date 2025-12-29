@@ -22,19 +22,20 @@ interface Ball {
   id: number;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
   targetSlot: number;
   multiplier: number;
   bet: number;
   win: number;
   done: boolean;
-  lastHitPin: number;
-  lastHitTime: number;
   directions: number[];
-  dirIndex: number;
   currentRow: number;
   targetX: number;
+  // Для детерминированной анимации
+  animationProgress: number; // 0-1, прогресс анимации
+  currentPinIndex: number; // Индекс текущего пина в траектории
+  trajectory: Array<{ x: number; y: number; pinIndex?: number }>; // Предопределенная траектория
+  startTime: number; // Время начала анимации
+  duration: number; // Длительность анимации в мс
 }
 
 export default function PlinkoGame() {
@@ -61,13 +62,13 @@ export default function PlinkoGame() {
   const BOT_Y = H - 100;
   const SIDE_PAD = 30;
 
-  // Физика - естественное падение с гравитацией
-  const GRAVITY = 0.25; // Увеличена гравитация для более естественного падения
-  const BOUNCE = 0.6; // Отскок от пинов (немного уменьшен для реалистичности)
-  const FRICTION = 0.99; // Увеличено трение воздуха для замедления
-  const MIN_VELOCITY = 0.05;
-  const MAX_SPEED = 2.5; // Уменьшена максимальная скорость
-  const MIN_DOWN_VELOCITY = 0.2; // Минимальная скорость вниз
+  // Параметры детерминированной анимации
+  const ANIMATION_DURATION = 2500; // Длительность анимации в мс (2.5 секунды)
+  const BOUNCE_AMPLITUDE = 8; // Амплитуда отскока от пина
+  const EASING_FUNCTION = (t: number) => {
+    // Ease-out cubic для плавного падения
+    return 1 - Math.pow(1 - t, 3);
+  };
 
   const rowHeight = (BOT_Y - TOP_Y) / ROWS;
 
@@ -101,6 +102,87 @@ export default function PlinkoGame() {
     const slotWidth = totalWidth / (ROWS + 1);
     return SIDE_PAD + slot * slotWidth + slotWidth / 2;
   }, []);
+
+  // Генерация предопределенной траектории на основе directions
+  const generateTrajectory = (
+    directions: number[], 
+    targetX: number, 
+    pins: Pin[],
+    width: number,
+    topY: number,
+    botY: number,
+    rowH: number,
+    sidePad: number,
+    pinR: number,
+    bounceAmp: number
+  ): Array<{ x: number; y: number; pinIndex?: number }> => {
+    const trajectory: Array<{ x: number; y: number; pinIndex?: number }> = [];
+    let currentX = width / 2;
+    let currentY = topY - 20;
+    
+    // Начальная точка
+    trajectory.push({ x: currentX, y: currentY });
+    
+    // Проходим по каждому ряду
+    for (let row = 0; row < ROWS; row++) {
+      const rowY = topY + row * rowH;
+      const pinsInRow = row + 2;
+      const totalWidth = width - sidePad * 2;
+      const baseSpacing = totalWidth / (ROWS + 1);
+      const rowWidth = (pinsInRow - 1) * baseSpacing;
+      const startX = (width - rowWidth) / 2;
+      
+      // Определяем направление для этого ряда
+      const direction = directions[row] || 0; // -1 влево, 1 вправо, 0 прямо
+      
+      // Находим ближайший пин в этом ряду
+      let nearestPin: Pin | null = null;
+      let nearestPinIndex = -1;
+      let minDist = Infinity;
+      
+      pins.forEach((pin, idx) => {
+        const pinRow = Math.floor((pin.y - topY) / rowH);
+        if (pinRow === row) {
+          const dist = Math.abs(pin.x - currentX);
+          if (dist < minDist) {
+            minDist = dist;
+            nearestPin = pin;
+            nearestPinIndex = idx;
+          }
+        }
+      });
+      
+      if (nearestPin) {
+        // Вычисляем целевую позицию после столкновения с пином
+        // Смещаемся в направлении, указанном сервером
+        const offsetX = direction * baseSpacing * 0.6; // Смещение после отскока
+        const targetXAfterPin = nearestPin.x + offsetX;
+        
+        // Точка столкновения с пином (немного выше центра пина для красивого отскока)
+        const hitY = nearestPin.y - pinR * 0.3;
+        trajectory.push({ x: nearestPin.x, y: hitY, pinIndex: nearestPinIndex });
+        
+        // Точка после отскока (красивый отскок вверх и в сторону)
+        const bounceY = hitY - bounceAmp;
+        trajectory.push({ x: targetXAfterPin, y: bounceY });
+        
+        // Обновляем текущую позицию
+        currentX = targetXAfterPin;
+        currentY = bounceY;
+      } else {
+        // Если пин не найден, просто двигаемся в направлении
+        const offsetX = direction * baseSpacing * 0.5;
+        currentX += offsetX;
+        trajectory.push({ x: currentX, y: rowY });
+      }
+    }
+    
+    // Финальная точка - целевой слот
+    const slotY = botY + 25;
+    trajectory.push({ x: targetX, y: slotY - BALL_R });
+    
+    return trajectory;
+  };
 
   // Баланс
   const loadBalance = useCallback(async () => {
@@ -175,23 +257,26 @@ export default function PlinkoGame() {
       // Логирование для отладки
       console.log(`🎯 [FRONTEND] Получены данные: slot=${d.ball.slot}, multiplier=${d.ball.multiplier}x, directions=[${d.ball.directions.join(',')}], targetX=${targetX}`);
       
+      // Создаем предопределенную траекторию на основе directions
+      const trajectory = generateTrajectory(d.ball.directions, targetX, pinsRef.current, W, TOP_Y, BOT_Y, rowHeight, SIDE_PAD, PIN_R, BOUNCE_AMPLITUDE);
+      
       const ball: Ball = {
         id: Date.now() + Math.random(),
         x: W / 2, // Начинаем точно в центре
         y: TOP_Y - 20,
-        vx: 0, // Начинаем без горизонтальной скорости
-        vy: 0.3, // Медленная начальная скорость вниз для красивого падения
         targetSlot: d.ball.slot,
         multiplier: d.ball.multiplier,
         bet: bet,
         win: parseFloat(d.ball.winAmount),
         done: false,
-        lastHitPin: -1,
-        lastHitTime: 0,
         directions: d.ball.directions,
-        dirIndex: 0,
         currentRow: -1,
-        targetX: targetX
+        targetX: targetX,
+        animationProgress: 0,
+        currentPinIndex: 0,
+        trajectory: trajectory,
+        startTime: Date.now(),
+        duration: ANIMATION_DURATION
       };
 
       ballsRef.current.push(ball);
@@ -284,8 +369,9 @@ export default function PlinkoGame() {
         ctx.fillText(displayText, x + slotWidth / 2, slotY + slotHeight / 2);
       });
 
-      // Физика шариков
+      // Детерминированная анимация шариков
       const toRemove: number[] = [];
+      const currentTime = Date.now();
 
       ballsRef.current.forEach((ball, idx) => {
         if (ball.done) {
@@ -293,352 +379,71 @@ export default function PlinkoGame() {
           return;
         }
 
-        // Определяем текущий ряд шарика
-        const ballCurrentRow = Math.floor((ball.y - TOP_Y) / rowHeight);
-        if (ballCurrentRow !== ball.currentRow && ballCurrentRow >= 0 && ballCurrentRow < ROWS) {
-          ball.currentRow = ballCurrentRow;
-          
-          // При переходе в новый ряд применяем направление с сервера
-          if (ballCurrentRow >= 0 && ballCurrentRow < ball.directions.length) {
-            const dir = ball.directions[ballCurrentRow];
-            // Сильное влияние направления - это определяет путь шарика
-            // Применяем направление более агрессивно при переходе в новый ряд
-            ball.vx += dir * 2.5;
-            
-            // Логирование для отладки
-            if (ballCurrentRow % 4 === 0) { // Логируем каждые 4 ряда
-              console.log(`🎯 [ROW ${ballCurrentRow}] dir=${dir}, vx=${ball.vx.toFixed(2)}, targetSlot=${ball.targetSlot}`);
-            }
-          }
-        }
+        // Вычисляем прогресс анимации (0-1)
+        const elapsed = currentTime - ball.startTime;
+        ball.animationProgress = Math.min(1, elapsed / ball.duration);
 
-        // Гравитация - основная сила, тянет шарик вниз
-        ball.vy += GRAVITY;
-        
-        // Ограничиваем максимальную скорость вниз для реалистичности
-        if (ball.vy > MAX_SPEED * 0.7) {
-          ball.vy = MAX_SPEED * 0.7;
-        }
-
-        // Трение воздуха (только горизонтальное)
-        ball.vx *= FRICTION;
-        
-        // Постоянное притяжение к целевому слоту на основе направлений
-        if (ball.currentRow >= 0 && ball.currentRow < ball.directions.length) {
-          const dir = ball.directions[ball.currentRow];
-          // Притяжение в нужную сторону на основе направления
-          const desiredVx = dir * 1.8;
-          ball.vx += (desiredVx - ball.vx) * 0.08;
-        }
-        
-        // Дополнительное притяжение к целевому слоту (усиливается ближе к финишу)
-        const distanceToFinish = slotY - ball.y;
-        if (distanceToFinish < 150 && distanceToFinish > 0) {
-          const progress = 1 - (distanceToFinish / 150);
-          const guidanceForce = 0.15 * progress * progress;
-          const dxToTarget = ball.targetX - ball.x;
-          ball.vx += dxToTarget * guidanceForce * 0.12;
-        }
-
-        // Сохраняем старую позицию для непрерывного обнаружения коллизий
-        const oldX = ball.x;
-        const oldY = ball.y;
-
-        // Вычисляем границы треугольника пинов для текущего ряда
-        const rowForTriangle = Math.floor((ball.y - TOP_Y) / rowHeight);
-        let triangleMinXBefore = SIDE_PAD + BALL_R;
-        let triangleMaxXBefore = W - SIDE_PAD - BALL_R;
-        
-        if (rowForTriangle >= 0 && rowForTriangle < ROWS) {
-          // Находим первый и последний пин в текущем ряду
-          const pinsInRow = rowForTriangle + 2;
-          const totalWidth = W - SIDE_PAD * 2;
-          const baseSpacing = totalWidth / (ROWS + 1);
-          const rowWidth = (pinsInRow - 1) * baseSpacing;
-          const startX = (W - rowWidth) / 2;
-          
-          // Границы треугольника: от первого пина до последнего
-          triangleMinXBefore = startX - BALL_R - PIN_R;
-          triangleMaxXBefore = startX + rowWidth + BALL_R + PIN_R;
-        }
-        
-        // Ограничиваем шарик границами треугольника пинов
-        if (ball.x < triangleMinXBefore) {
-          ball.x = triangleMinXBefore;
-          ball.vx = Math.max(0, ball.vx);
-        }
-        if (ball.x > triangleMaxXBefore) {
-          ball.x = triangleMaxXBefore;
-          ball.vx = Math.min(0, ball.vx);
-        }
-
-        // Движение
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-        
-        // Ограничиваем скорость для предотвращения проскакивания через пины
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-        if (speed > MAX_SPEED) {
-          const scale = MAX_SPEED / speed;
-          ball.vx *= scale;
-          ball.vy *= scale;
-        }
-
-        // Непрерывное обнаружение коллизий - проверяем путь движения
-        const currentTime = Date.now();
-        const collisions: Array<{ pin: Pin; pinIdx: number; dist: number; nx: number; ny: number }> = [];
-        
-        pinsRef.current.forEach((pin, pinIdx) => {
-          // Проверяем расстояние от старой позиции до пина
-          const oldDx = oldX - pin.x;
-          const oldDy = oldY - pin.y;
-          const oldDist = Math.sqrt(oldDx * oldDx + oldDy * oldDy);
-          
-          // Проверяем расстояние от новой позиции до пина
-          const newDx = ball.x - pin.x;
-          const newDy = ball.y - pin.y;
-          const newDist = Math.sqrt(newDx * newDx + newDy * newDy);
-          
-          const minDist = BALL_R + PIN_R;
-          
-          // Проверяем коллизию: либо шарик уже внутри пина, либо пересек границу
-          if (newDist < minDist || (oldDist >= minDist && newDist < minDist)) {
-            // Вычисляем точку пересечения на пути движения
-            const dx = newDx;
-            const dy = newDy;
-            const dist = newDist || 0.001;
-            
-            // Нормаль столкновения
-            const nx = dx / dist;
-            const ny = dy / dist;
-            
-            collisions.push({ pin, pinIdx, dist, nx, ny });
-          }
-        });
-
-        // Обрабатываем все коллизии
-        if (collisions.length > 0) {
-          // Сортируем по расстоянию (ближайшие первыми)
-          collisions.sort((a, b) => a.dist - b.dist);
-          
-          // Обрабатываем каждую коллизию
-          collisions.forEach(({ pin, pinIdx, dist, nx, ny }) => {
-            const minDist = BALL_R + PIN_R;
-            
-            // Выталкиваем шарик из пина
-            if (dist < minDist) {
-              ball.x = pin.x + nx * minDist;
-              ball.y = pin.y + ny * minDist;
-            }
-
-            // Отскок только если новый пин или прошло достаточно времени
-            const timeSinceLastHit = currentTime - ball.lastHitTime;
-            if (ball.lastHitPin !== pinIdx || timeSinceLastHit > 30) {
-              ball.lastHitPin = pinIdx;
-              ball.lastHitTime = currentTime;
-
-              // Скорость вдоль нормали
-              const velAlongNormal = ball.vx * nx + ball.vy * ny;
-
-              // Всегда отражаем при столкновении
-              if (velAlongNormal < 0 || Math.abs(velAlongNormal) < 0.2) {
-                // Отражаем скорость
-                const reflectedVx = ball.vx - 2 * velAlongNormal * nx;
-                const reflectedVy = ball.vy - 2 * velAlongNormal * ny;
-                
-                ball.vx = reflectedVx * BOUNCE;
-                ball.vy = Math.max(reflectedVy * BOUNCE, MIN_DOWN_VELOCITY);
-
-                // Применяем направление с сервера для этого ряда - сильное влияние
-                if (ball.currentRow >= 0 && ball.currentRow < ball.directions.length) {
-                  const dir = ball.directions[ball.currentRow];
-                  // Применяем направление с сервера - это определяет куда шарик отскочит
-                  // Используем сильное влияние для гарантированного попадания в целевой слот
-                  ball.vx += dir * 2.0;
-                  
-                  // Ограничиваем горизонтальную скорость после применения направления
-                  if (Math.abs(ball.vx) > MAX_SPEED * 0.7) {
-                    ball.vx = Math.sign(ball.vx) * MAX_SPEED * 0.7;
-                  }
-                }
-
-                // Гарантируем минимальную скорость вниз для продолжения падения
-                if (ball.vy < MIN_DOWN_VELOCITY) {
-                  ball.vy = MIN_DOWN_VELOCITY;
-                }
-                
-                // Если шарик движется вверх, принудительно направляем вниз
-                if (ball.vy <= 0) {
-                  ball.vy = MIN_DOWN_VELOCITY;
-                }
-                
-                // Ограничиваем максимальную скорость
-                const newSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-                if (newSpeed > MAX_SPEED) {
-                  const scale = MAX_SPEED / newSpeed;
-                  ball.vx *= scale;
-                  ball.vy *= scale;
-                }
-              }
-            }
-          });
-        }
-
-        // Дополнительная проверка: если шарик все еще внутри пина, принудительно выталкиваем
-        pinsRef.current.forEach((pin) => {
-          const dx = ball.x - pin.x;
-          const dy = ball.y - pin.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const minDist = BALL_R + PIN_R;
-          
-          if (dist < minDist && dist > 0.01) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            // Жестко выталкиваем шарик из пина с зазором
-            const safeDist = minDist + 0.3;
-            ball.x = pin.x + nx * safeDist;
-            ball.y = pin.y + ny * safeDist;
-            
-            const overlap = minDist - dist;
-            // Принудительно выталкиваем с силой
-            ball.vx += nx * overlap * 3;
-            ball.vy += ny * overlap * 3;
-            
-            // Ограничиваем скорость после выталкивания
-            const pushSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-            if (pushSpeed > MAX_SPEED) {
-              const scale = MAX_SPEED / pushSpeed;
-              ball.vx *= scale;
-              ball.vy *= scale;
-            }
-            
-            // Если шарик застрял на пине, принудительно даем ему скорость
-            if (Math.abs(ball.vx) < 0.2 && ball.vy < 0.2) {
-              // Применяем направление с сервера
-              if (ball.currentRow >= 0 && ball.currentRow < ball.directions.length) {
-                const dir = ball.directions[ball.currentRow];
-                ball.vx = dir * 1.0;
-              } else {
-                ball.vx = (Math.random() - 0.5) * 0.8;
-              }
-              ball.vy = MIN_DOWN_VELOCITY;
-            }
-          }
-        });
-
-        // Если шарик застрял (не двигается), принудительно двигаем его
-        if (Math.abs(ball.vx) < MIN_VELOCITY && ball.vy < 0.4) {
-          // Направляем к целевому слоту
-          const dxToTarget = ball.targetX - ball.x;
-          if (Math.abs(dxToTarget) > 5) {
-            ball.vx = dxToTarget * 0.12;
-          } else {
-            // Если близко к цели, даем случайное направление
-            ball.vx = (Math.random() - 0.5) * 1.2;
-          }
-          ball.vy = MIN_DOWN_VELOCITY * 1.3;
-        }
-        
-        // Гарантируем, что шарик всегда падает вниз
-        if (ball.vy <= 0) {
-          ball.vy = MIN_DOWN_VELOCITY;
-        }
-        
-        // Дополнительная проверка: если шарик не двигается вертикально, принудительно двигаем
-        if (ball.vy < 0.15 && ball.y < slotY - 50) {
-          ball.vy = MIN_DOWN_VELOCITY;
-        }
-
-        // Жесткие границы треугольника пинов - шарик не должен вылетать за пределы треугольника
-        const rowForBounds = Math.floor((ball.y - TOP_Y) / rowHeight);
-        let triangleMinXAfter = SIDE_PAD + BALL_R;
-        let triangleMaxXAfter = W - SIDE_PAD - BALL_R;
-        
-        if (rowForBounds >= 0 && rowForBounds < ROWS) {
-          const pinsInRow = rowForBounds + 2;
-          const totalWidth = W - SIDE_PAD * 2;
-          const baseSpacing = totalWidth / (ROWS + 1);
-          const rowWidth = (pinsInRow - 1) * baseSpacing;
-          const startX = (W - rowWidth) / 2;
-          
-          // Границы треугольника: от первого пина до последнего с запасом
-          triangleMinXAfter = startX - BALL_R - PIN_R - 2;
-          triangleMaxXAfter = startX + rowWidth + BALL_R + PIN_R + 2;
-        }
-        
-        // Жесткая коррекция границ треугольника
-        if (ball.x < triangleMinXAfter) {
-          ball.x = triangleMinXAfter;
-          ball.vx = Math.max(0, ball.vx);
-        }
-        if (ball.x > triangleMaxXAfter) {
-          ball.x = triangleMaxXAfter;
-          ball.vx = Math.min(0, ball.vx);
-        }
-        
-        // Защита от вылета по Y
-        if (ball.y < TOP_Y - 50) {
-          ball.y = TOP_Y - 30;
-          ball.vy = 0.5;
-        }
-        if (ball.y > H - 20) {
+        // Если анимация завершена
+        if (ball.animationProgress >= 1) {
+          ball.x = ball.targetX;
           ball.y = slotY - BALL_R;
-          ball.vy = 0;
-        }
-        
-        // Предотвращение застревания - если шарик не двигается, принудительно двигаем
-        if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1 && ball.y < slotY - 20) {
-          ball.vy = MIN_DOWN_VELOCITY;
-          if (ball.currentRow >= 0 && ball.currentRow < ball.directions.length) {
-            const dir = ball.directions[ball.currentRow];
-            ball.vx = dir * 1.5;
+          ball.done = true;
+
+          const actualMultiplier = ball.multiplier;
+          const p = ball.win - ball.bet;
+          setProfit(pr => pr + p);
+          setCount(c => Math.max(0, c - 1));
+          setHistory(h => [{ m: actualMultiplier }, ...h].slice(0, 20));
+
+          if (p > 0) {
+            const multiplierText = actualMultiplier >= 100 ? String(actualMultiplier) : actualMultiplier + 'x';
+            toast.success(`${multiplierText} → +${p.toFixed(2)}`);
+          } else if (p < -0.01) {
+            const multiplierText = actualMultiplier >= 100 ? String(actualMultiplier) : actualMultiplier + 'x';
+            toast.error(`${multiplierText} → ${p.toFixed(2)}`);
           }
+          return;
         }
 
-        // Финиш - гарантированное попадание в целевой слот
-        if (ball.y >= slotY - BALL_R - 10) {
-          const targetSlotX = getSlotX(ball.targetSlot);
-          
-          // Плавное притяжение к целевому слоту ближе к финишу
-          if (ball.y >= slotY - BALL_R - 8) {
-            const progress = 1 - Math.max(0, (slotY - BALL_R - ball.y) / 8);
-            const pullStrength = 0.2 * progress; // Усиливается ближе к финишу
-            ball.x += (targetSlotX - ball.x) * pullStrength;
-            ball.vx *= 0.85; // Замедление
-          }
-          
-          // Когда шарик достиг финиша, точно устанавливаем позицию в целевой слот
-          if (ball.y >= slotY - BALL_R) {
-            // Определяем в какой слот попал шарик визуально (для отладки)
-            const slotWidth = (W - SIDE_PAD * 2) / (ROWS + 1);
-            const relativeX = ball.x - SIDE_PAD;
-            const visualSlot = Math.round(relativeX / slotWidth);
-            const visualMultiplier = MULTS[Math.max(0, Math.min(ROWS, visualSlot))];
-            
-            // Логирование для отладки
-            console.log(`🎯 [FRONTEND FINISH] targetSlot=${ball.targetSlot}, targetMultiplier=${ball.multiplier}x, visualSlot=${visualSlot}, visualMultiplier=${visualMultiplier}x, targetX=${targetSlotX}, actualX=${ball.x}`);
-            
-            // Точное попадание в целевой слот (который указал бэкенд)
-            ball.x = targetSlotX;
-            ball.y = slotY - BALL_R;
-            ball.done = true;
+        // Применяем easing функцию
+        const easedProgress = EASING_FUNCTION(ball.animationProgress);
 
-            // Используем мультипликатор из бэкенда - он соответствует targetSlot
-            const actualMultiplier = ball.multiplier;
-            const p = ball.win - ball.bet;
-            setProfit(pr => pr + p);
-            setCount(c => Math.max(0, c - 1));
-            setHistory(h => [{ m: actualMultiplier }, ...h].slice(0, 20));
+        // Интерполируем позицию по траектории
+        if (ball.trajectory.length > 1) {
+          // Находим сегмент траектории для текущего прогресса
+          const totalSegments = ball.trajectory.length - 1;
+          const segmentProgress = easedProgress * totalSegments;
+          const segmentIndex = Math.floor(segmentProgress);
+          const segmentT = segmentProgress - segmentIndex;
 
-            // Показываем уведомление только если есть выигрыш или значительный проигрыш
-            if (p > 0) {
-              const multiplierText = actualMultiplier >= 100 ? String(actualMultiplier) : actualMultiplier + 'x';
-              toast.success(`${multiplierText} → +${p.toFixed(2)}`);
-            } else if (p < -0.01) {
-              const multiplierText = actualMultiplier >= 100 ? String(actualMultiplier) : actualMultiplier + 'x';
-              toast.error(`${multiplierText} → ${p.toFixed(2)}`);
+          if (segmentIndex < totalSegments) {
+            const startPoint = ball.trajectory[segmentIndex];
+            const endPoint = ball.trajectory[segmentIndex + 1];
+
+            // Линейная интерполяция между точками
+            ball.x = startPoint.x + (endPoint.x - startPoint.x) * segmentT;
+            ball.y = startPoint.y + (endPoint.y - startPoint.y) * segmentT;
+
+            // Если это точка столкновения с пином, добавляем эффект отскока
+            if (endPoint.pinIndex !== undefined) {
+              // Эффект отскока - красивое попадание и отскок
+              if (segmentT < 0.5) {
+                // Приближение к пину - небольшое ускорение
+                const approachT = segmentT * 2; // 0-1
+                const approachOffset = Math.sin(approachT * Math.PI * 0.5) * 2;
+                ball.y -= approachOffset;
+              } else {
+                // Отскок от пина - красивый отскок вверх и в сторону
+                const bounceT = (segmentT - 0.5) * 2; // 0-1
+                const bounceOffset = Math.sin(bounceT * Math.PI) * BOUNCE_AMPLITUDE;
+                ball.y -= bounceOffset;
+              }
             }
-            return;
+          } else {
+            // Последний сегмент - финальное движение к слоту
+            const lastPoint = ball.trajectory[ball.trajectory.length - 1];
+            ball.x = lastPoint.x;
+            ball.y = lastPoint.y;
           }
         }
 
