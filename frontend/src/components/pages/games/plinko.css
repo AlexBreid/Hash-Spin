@@ -1,6 +1,8 @@
+/* ✅ PLINKO STYLES - ИСПРАВЛЕНО ДЛЯ МОБИЛЬНОЙ КЛАВИАТУРЫ */
+
 .plinko-page {
   min-height: 100vh;
-  max-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height для мобильных */
   background: var(--background);
   color: var(--foreground);
   display: flex;
@@ -10,6 +12,27 @@
   overflow-x: hidden;
   width: 100%;
   box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ✅ Когда клавиатура открыта */
+.plinko-page.keyboard-open {
+  /* Убираем max-height чтобы страница могла скроллиться */
+  max-height: none;
+}
+
+.plinko-page.keyboard-open .plinko-board {
+  /* Уменьшаем canvas когда клавиатура открыта */
+  max-height: 200px;
+  min-height: 150px;
+}
+
+.plinko-page.keyboard-open .plinko-board canvas {
+  max-height: 180px;
+}
+
+.plinko-page.keyboard-open .plinko-history {
+  display: none; /* Скрываем историю */
 }
 
 .plinko-header {
@@ -67,6 +90,7 @@
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  transition: max-height 0.3s ease;
 }
 
 .plinko-board canvas {
@@ -76,6 +100,7 @@
   width: auto;
   height: auto;
   box-sizing: border-box;
+  transition: max-height 0.3s ease;
 }
 
 .plinko-balls {
@@ -102,6 +127,7 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--muted) var(--background);
+  transition: opacity 0.2s ease, max-height 0.2s ease;
 }
 
 .plinko-history::-webkit-scrollbar {
@@ -148,6 +174,7 @@
   color: var(--destructive);
 }
 
+/* ✅ КОНТРОЛЫ - НЕ ФИКСИРОВАННЫЕ */
 .plinko-controls {
   background: var(--card);
   padding: 16px;
@@ -156,6 +183,14 @@
   gap: 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  /* ✅ margin-top: auto прижимает к низу когда места много */
+  margin-top: auto;
+}
+
+/* ✅ Когда клавиатура открыта - добавляем отступ снизу */
+.plinko-page.keyboard-open .plinko-controls {
+  padding-bottom: 20px;
+  margin-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .plinko-input-row {
@@ -170,11 +205,13 @@
   border-radius: 8px;
   padding: 12px;
   color: var(--foreground);
-  font-size: 18px;
   font-weight: 700;
   text-align: center;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* ✅ Предотвращаем зум на iOS - минимум 16px */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
 }
 
 .plinko-input-row input::placeholder {
@@ -202,11 +239,16 @@
   font-size: 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  flex-shrink: 0;
 }
 
 .plinko-input-row button:hover {
   background: var(--accent);
   color: var(--accent-foreground);
+}
+
+.plinko-input-row button:active {
+  transform: scale(0.95);
 }
 
 .plinko-quick-btns {
@@ -233,6 +275,10 @@
   border-color: var(--accent);
 }
 
+.plinko-quick-btns button:active {
+  transform: scale(0.95);
+}
+
 .plinko-play-btn {
   background: linear-gradient(135deg, var(--accent), var(--primary));
   border: none;
@@ -256,6 +302,10 @@
   transform: scale(1.02);
 }
 
+.plinko-play-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .plinko-stat {
   text-align: center;
   padding: 10px;
@@ -264,12 +314,14 @@
   font-size: 16px;
 }
 
-.plinko-stat.plus {
+.plinko-stat.plus,
+.plinko-stat.positive {
   background: rgba(16, 185, 129, 0.15);
   color: var(--success);
 }
 
-.plinko-stat.minus {
+.plinko-stat.minus,
+.plinko-stat.negative {
   background: rgba(239, 68, 68, 0.15);
   color: var(--destructive);
 }
@@ -290,4 +342,28 @@
 .plinko-login p {
   font-size: 18px;
   color: var(--muted-foreground);
+}
+
+/* ✅ Мобильная адаптация */
+@media (max-width: 480px) {
+  .plinko-controls {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .plinko-input-row button {
+    padding: 10px 14px;
+  }
+  
+  .plinko-play-btn {
+    padding: 14px;
+    font-size: 16px;
+  }
+}
+
+/* ✅ Безопасная зона для устройств с вырезом */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .plinko-page {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
