@@ -147,7 +147,7 @@ class GameRoom {
 
     this.crashPoint = this.generateCrashPoint();
     this.startTime = Date.now();
-    this.status = 'in_progress';
+    this.status = 'flying';  // 🔧 FIX: Было 'in_progress', фронт ожидает 'flying'
     this.multiplier = 1.0;
     this.finalizationInProgress = false;
     this.crashHandled = false;  // 🆕 Сброс флага
@@ -166,6 +166,17 @@ class GameRoom {
       serverSeedHash: this.roundKeys.serverSeedHash,
       clientSeed: this.roundKeys.clientSeed,
     });
+
+    // 🆕 FIX: Отправляем gameStatus сразу при старте чтобы клиент переключился на flying
+    io.to('crash-room').emit('gameStatus', {
+      status: 'flying',
+      multiplier: 1.0,
+      gameId: this.gameId,
+      crashPoint: null,
+      countdown: 0,
+    });
+
+    log.info(`🚀 Раунд ${this.gameId} стартовал, отправлен gameStatus: flying`);
 
     // 🔧 FIX: Изменённый game loop
     this.gameLoopInterval = setInterval(() => {
@@ -609,7 +620,7 @@ io.on('connection', socket => {
       return;
     }
 
-    if (gameRoom.status !== 'in_progress') {
+    if (gameRoom.status !== 'flying') {  // 🔧 FIX: Было 'in_progress'
       socket.emit('error', 'Round not in progress');
       return;
     }
