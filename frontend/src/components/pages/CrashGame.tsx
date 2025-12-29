@@ -66,11 +66,15 @@ export function CrashGame() {
 
   // 🔧 УПРОЩЕНО: Только один ref для множителя
   const currentMultiplierRef = useRef<number>(1.0);
+  const targetMultiplierRef = useRef<number>(1.0);
+  const smoothMultiplierRef = useRef<number>(1.0);
   const isCrashedRef = useRef<boolean>(false);
   const crashPointRef = useRef<number | null>(null);
+  const lastUpdateTimeRef = useRef<number>(Date.now());
 
   // Для отображения в UI
   const [displayMultiplier, setDisplayMultiplier] = useState(1.0);
+  const [roundNumber, setRoundNumber] = useState<number>(0);
 
   const sessionKeys = useMemo(() => ({
     betId: `crash_pending_bet_${user?.id}`,
@@ -138,6 +142,8 @@ export function CrashGame() {
         setUserBonusId(null);
         
         currentMultiplierRef.current = 1.0;
+        targetMultiplierRef.current = 1.0;
+        smoothMultiplierRef.current = 1.0;
         isCrashedRef.current = false;
         crashPointRef.current = null;
         setDisplayMultiplier(1.0);
@@ -202,14 +208,14 @@ export function CrashGame() {
   }, [crashHistory, saveHistoryToStorage]);
 
   // 🔧 УПРОЩЁННАЯ отрисовка - напрямую с сервера, без state updates
-  const drawChart = useCallback(() => {
+    const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Используем ref напрямую, БЕЗ вызова setState!
-    const currentMult = currentMultiplierRef.current;
+    // Используем сглаженное значение для плавной анимации
+    const currentMult = smoothMultiplierRef.current;
 
     const w = canvas.width;
     const h = canvas.height;
@@ -268,7 +274,7 @@ export function CrashGame() {
     };
 
     const points: { x: number; y: number }[] = [];
-    const steps = 150;
+    const steps = 300; // Увеличено для более плавной кривой
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
@@ -279,6 +285,16 @@ export function CrashGame() {
       const x = padding + t * graphWidth;
       const y = multToY(mult);
       points.push({ x, y });
+    }
+    
+    // Добавляем последнюю точку точно на текущем множителе для плавности
+    if (points.length > 0 && currentMult > 1) {
+      const lastT = Math.pow((currentMult - 1) / (maxMult - 1), 1 / 1.5);
+      const lastX = padding + lastT * graphWidth;
+      const lastY = multToY(currentMult);
+      if (lastX > points[points.length - 1].x) {
+        points.push({ x: lastX, y: lastY });
+      }
     }
 
     if (points.length > 0) {
@@ -303,9 +319,27 @@ export function CrashGame() {
     if (points.length > 1) {
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
+      
+      // Используем квадратичные кривые Безье для более плавной линии
       for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
+        if (i === 1) {
+          ctx.lineTo(points[i].x, points[i].y);
+        } else {
+          const prev = points[i - 1];
+          const curr = points[i];
+          const midX = (prev.x + curr.x) / 2;
+          const midY = (prev.y + curr.y) / 2;
+          ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+        }
       }
+      
+      // Завершаем линию до последней точки
+      if (points.length > 2) {
+        const last = points[points.length - 1];
+        const prev = points[points.length - 2];
+        ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+      }
+      
       ctx.strokeStyle = gameState.status === 'crashed' ? '#ef4444' : '#22c55e';
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
@@ -419,9 +453,8 @@ export function CrashGame() {
   const handleCashout = async () => {
     try {
       setIsLoading(true);
-      await crashGameService.cashout(balanceType || 'MAIN', userBonusId);
+      await crashGameService.cashout();
     } catch (e) {
-      console.error('Cashout error:', e);
       toast.error('❌ Ошибка');
     } finally {
       setIsLoading(false);
@@ -442,6 +475,8 @@ export function CrashGame() {
       isCrashedRef.current = true;
       crashPointRef.current = parseFloat(data.crashPoint.toString());
       currentMultiplierRef.current = crashPointRef.current;
+      targetMultiplierRef.current = crashPointRef.current;
+      smoothMultiplierRef.current = crashPointRef.current;
       setDisplayMultiplier(crashPointRef.current); // Мгновенно обновляем UI
       
       setGameState((prev) => ({
@@ -527,21 +562,26 @@ export function CrashGame() {
     };
 
     const handleGameStatus = (data: CrashGameState) => {
-      const normalizedStatus = data.status === 'in_progress' ? 'flying' : data.status;
+      const normalizedStatus = (data.status === 'in_progress' || (data.status as any) === 'in_progress') ? 'flying' : data.status;
       const normalizedData = { ...data, status: normalizedStatus as 'waiting' | 'flying' | 'crashed' };
       
       if (normalizedStatus === 'waiting') {
         isCrashedRef.current = false;
         crashPointRef.current = null;
         currentMultiplierRef.current = 1.0;
+        targetMultiplierRef.current = 1.0;
+        smoothMultiplierRef.current = 1.0;
         setDisplayMultiplier(1.0);
       }
       
       if (normalizedStatus === 'flying') {
         isCrashedRef.current = false;
         crashPointRef.current = null;
-        currentMultiplierRef.current = data.multiplier || 1.0;
-        setDisplayMultiplier(data.multiplier || 1.0);
+        const mult = data.multiplier || 1.0;
+        currentMultiplierRef.current = mult;
+        targetMultiplierRef.current = mult;
+        smoothMultiplierRef.current = mult;
+        setDisplayMultiplier(mult);
       }
       
       setGameState(normalizedData);
@@ -561,7 +601,8 @@ export function CrashGame() {
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
       if (!isCrashedRef.current) {
-        // Обновляем ТОЛЬКО ref, state не трогаем для производительности
+        // Обновляем целевое значение для плавной интерполяции
+        targetMultiplierRef.current = data.multiplier;
         currentMultiplierRef.current = data.multiplier;
         // gameState.status обновляем только если был waiting
         setGameState((prev) => {
@@ -578,7 +619,22 @@ export function CrashGame() {
       isCrashedRef.current = false;
       crashPointRef.current = null;
       currentMultiplierRef.current = 1.0;
+      targetMultiplierRef.current = 1.0;
+      smoothMultiplierRef.current = 1.0;
       setDisplayMultiplier(1.0); // Мгновенный сброс UI
+      
+      // Извлекаем номер раунда из gameId (если есть) или увеличиваем счетчик
+      if (data.gameId) {
+        // Пытаемся извлечь номер из gameId (например, "crash_12345" -> 12345)
+        const match = data.gameId.match(/\d+/);
+        if (match) {
+          setRoundNumber(parseInt(match[0], 10));
+        } else {
+          setRoundNumber(prev => prev + 1);
+        }
+      } else {
+        setRoundNumber(prev => prev + 1);
+      }
       
       setGameState(prev => ({
         ...prev,
@@ -618,15 +674,40 @@ export function CrashGame() {
     ? crashPointRef.current 
     : displayMultiplier;
 
-  // 🔧 FIX: Обновляем displayMultiplier отдельным интервалом, не в animation frame
+  // 🔧 ПЛАВНАЯ АНИМАЦИЯ: Интерполяция множителя для плавности
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isCrashedRef.current) {
-        setDisplayMultiplier(currentMultiplierRef.current);
-      }
-    }, 50); // 20 FPS для UI достаточно
+    let animationFrameId: number;
     
-    return () => clearInterval(interval);
+    const smoothUpdate = () => {
+      const now = Date.now();
+      lastUpdateTimeRef.current = now;
+
+      if (!isCrashedRef.current) {
+        // Плавная интерполяция к целевому значению
+        const target = targetMultiplierRef.current;
+        const current = smoothMultiplierRef.current;
+        const diff = target - current;
+        
+        // Используем экспоненциальное сглаживание для плавности
+        const smoothingFactor = 0.15; // Чем меньше, тем плавнее (0.1-0.3 оптимально)
+        smoothMultiplierRef.current = current + diff * smoothingFactor;
+        
+        // Обновляем UI только если изменение заметное
+        if (Math.abs(diff) > 0.001) {
+          setDisplayMultiplier(smoothMultiplierRef.current);
+        }
+      }
+      
+      animationFrameId = requestAnimationFrame(smoothUpdate);
+    };
+    
+    animationFrameId = requestAnimationFrame(smoothUpdate);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
   }, []);
 
   const totalPlayersDisplay = playersCount + FAKE_PLAYERS_OFFSET;
@@ -651,12 +732,12 @@ export function CrashGame() {
           />
           
           {/* 🆕 КОМПАКТНЫЕ БЛОКИ ПО УГЛАМ */}
-          {/* Game ID - левый верхний угол */}
+          {/* Round Number - левый верхний угол */}
           <div className="absolute top-2 left-2 z-20">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10">
               <Hash className="w-3 h-3 text-indigo-400" />
               <span className="text-[10px] font-bold text-white/80 font-mono">
-                {gameState.gameId?.slice(0, 6) || '------'}
+                #{roundNumber || gameState.gameId?.slice(-6) || '------'}
               </span>
             </div>
           </div>
@@ -665,7 +746,8 @@ export function CrashGame() {
           <div className="absolute top-2 right-2 z-20">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10">
               <Users className="w-3 h-3 text-emerald-400" />
-              <span className="text-[10px] font-bold text-white/80 font-mono">{totalPlayersDisplay}</span>
+              <span className="text-[10px] font-bold text-white/80 font-mono">+{totalPlayersDisplay}</span>
+              <span className="text-[9px] text-white/60">игрока</span>
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
             </div>
           </div>
