@@ -1,6 +1,5 @@
 /**
- * ✅ ПОЛНЫЙ TELEGRAM БОТ - АДМИН ПАНЕЛЬ ИСПРАВЛЕНА НА РУССКОМ
- * МЕНЮ ОЧИЩЕНО: УДАЛЕНЫ КНОПКИ ПРОФИЛЬ, РЕФЕРАЛЫ, ПОМОЩЬ
+ * ✅ ПОЛНЫЙ TELEGRAM БОТ - ИСПРАВЛЕН WELCOME MESSAGE ДЛЯ РЕФЕРАЛОВ
  * 
  * ЗАМЕНИ src/bots/telegramBot.js
  */
@@ -35,7 +34,7 @@ function escapeMarkdownV2(text) {
 function escapeMarkdown(text) {
   if (!text) return '';
   return String(text)
-    .replace(/[*_`[]/g, '\\$&');
+    .replace(/[_*`[]/g, '\\$&');
 }
 
 // 🎁 FAQ DATA
@@ -129,11 +128,11 @@ async function applyReferrer(newUserId, referralCode) {
 
 async function notifyReferrerAboutNewReferee(bot, referrerTelegramId, newUserUsername) {
   try {
-    const userDisplay = newUserUsername ? `@${newUserUsername}` : 'новый пользователь';
+    const userDisplay = newUserUsername ? `@${escapeMarkdown(newUserUsername)}` : 'новый пользователь';
     await bot.telegram.sendMessage(
       referrerTelegramId,
       `🎉 *Новый реферал!*\n\n` +
-      `👤 ${escapeMarkdown(userDisplay)} присоединился к вашей сети!\n\n` +
+      `👤 ${userDisplay} присоединился к вашей сети!\n\n` +
       `💰 Когда он пополнит счёт - вы получите комиссию.`,
       { parse_mode: 'Markdown' }
     );
@@ -526,18 +525,19 @@ if (!BOT_TOKEN) {
               const depositAmount = parseFloat(amountNum.toFixed(8));
               const bonusAmount = parseFloat(activeBonus.grantedAmount.toString());
               
-              message = `✅ *Пополнение с БОНУСОМ успешно!*\n\n` +
+              message = `✅ Пополнение с БОНУСОМ успешно!\n\n` +
                 `💰 Пополнено: ${depositAmount.toFixed(8)} ${asset}\n` +
                 `🎁 Бонус: +100%\n\n` +
                 `⚡ Требуется отыграть: 10x`;
             } else {
-              message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}\n\nℹ️ Бонус был выбран, но оказался недоступен.`;
+              message = `✅ Пополнение успешно!\n\n💰 +${amountNum.toFixed(8)} ${asset}\n\nℹ️ Бонус был выбран, но оказался недоступен.`;
             }
           } else {
-            message = `✅ *Пополнение успешно!*\n\n💰 +${amountNum.toFixed(8)} ${asset}`;
+            message = `✅ Пополнение успешно!\n\n💰 +${amountNum.toFixed(8)} ${asset}`;
           }
           
-          await bot.telegram.sendMessage(user.telegramId, message, { parse_mode: 'Markdown' });
+          // Отправляем без Markdown чтобы избежать ошибок форматирования
+          await bot.telegram.sendMessage(user.telegramId, message);
           console.log(`✅ Notification sent`);
         }
       } catch (e) {
@@ -620,7 +620,6 @@ if (!BOT_TOKEN) {
                 referrerId: referrerInfo.referrerId
               });
               
-              // Уведомление реферера - не критично, если не отправится
               if (referrerInfo.referrerTelegramId) {
                 try {
                   await notifyReferrerAboutNewReferee(
@@ -633,7 +632,6 @@ if (!BOT_TOKEN) {
                     error: notifyError.message,
                     referrerTelegramId: referrerInfo.referrerTelegramId 
                   });
-                  // Продолжаем выполнение, даже если уведомление не отправилось
                 }
               }
             } else {
@@ -644,101 +642,104 @@ if (!BOT_TOKEN) {
               error: referralError.message,
               referralCode 
             });
-            // Продолжаем выполнение, даже если реферал не применился
           }
         }
       }
 
-      const commonSlogan = `🎰 *Добро пожаловать в SafariUp — Казино будущего!* 🌍
+      // ═══════════════════════════════════════════════════════════════
+      // ✅ ИСПРАВЛЕНО: Welcome message БЕЗ Markdown для избежания ошибок
+      // ═══════════════════════════════════════════════════════════════
 
-🚀 Здесь каждый спин — шаг к выигрышу!  
-💎 Крипто-ставки без границ  
-⚡ Мгновенные выплаты  
+      const commonSlogan = `🎰 Добро пожаловать в SafariUp — Казино будущего! 🌍
+
+🚀 Здесь каждый спин — шаг к выигрышу!
+💎 Крипто-ставки без границ
+⚡ Мгновенные выплаты
 🎁 Ежедневные бонусы и турниры
 
-🔥 *Играй. Выигрывай. Наслаждайся.*`;
+🔥 Играй. Выигрывай. Наслаждайся.`;
 
       let credentialsBlock = '';
       if (isNewUser) {
         const username = ctx.from.username;
-        credentialsBlock = `\n\n✨ *Ваши данные для входа:*\n` +
-          `🔑 Логин: \`${username ? `@${username}` : `ID: ${user.id}`}\`\n` +
-          `🔐 Пароль: \`${rawPassword}\`\n\n` +
-          `⚠️ *Сохраните пароль! Он показывается только один раз.*`;
+        const loginDisplay = username ? `@${username}` : `ID: ${user.id}`;
+        
+        credentialsBlock = `\n\n✨ Ваши данные для входа:\n` +
+          `🔑 Логин: ${loginDisplay}\n` +
+          `🔐 Пароль: ${rawPassword}\n\n` +
+          `⚠️ Сохраните пароль! Он показывается только один раз.`;
         
         if (referralApplied) {
-          credentialsBlock += `\n\n🎁 *Бонус активирован!*\n` +
-            `✅ Реферер: ${referrerInfo.referrerUsername || `ID${referrerInfo.referrerId}`}\n` +
+          // Безопасное отображение реферера без спецсимволов
+          const referrerDisplay = referrerInfo.referrerUsername 
+            ? referrerInfo.referrerUsername.replace(/[_*`]/g, '')
+            : `ID${referrerInfo.referrerId}`;
+          
+          credentialsBlock += `\n\n🎁 Бонус активирован!\n` +
+            `✅ Реферер: ${referrerDisplay}\n` +
             `💰 При первом депозите вы получите +100% бонус!`;
         }
       }
 
       const fullMessage = commonSlogan + credentialsBlock;
 
-      // Отправляем welcome сообщение с картинкой, как было раньше
+      // Отправляем welcome сообщение
       let welcomeSent = false;
+      
+      // Попытка 1: с картинкой
       try {
         if (fs.existsSync(WELCOME_IMAGE_PATH)) {
-          try {
-            await ctx.replyWithPhoto(
-              { source: fs.createReadStream(WELCOME_IMAGE_PATH) },
-              { caption: fullMessage, parse_mode: 'Markdown' }
-            );
-            welcomeSent = true;
-          } catch (imageError) {
-            logger.warn('BOT', `Error sending welcome image, trying without photo`, { error: imageError.message });
-            // Если не удалось отправить с фото, отправляем без фото, но с полным текстом
-            try {
-              await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
-              welcomeSent = true;
-            } catch (textError) {
-              logger.error('BOT', `Error sending welcome text`, { error: textError.message });
-            }
-          }
-        } else {
-          // Если файла нет, отправляем только текст с полным сообщением
-          await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
+          await ctx.replyWithPhoto(
+            { source: fs.createReadStream(WELCOME_IMAGE_PATH) },
+            { caption: fullMessage }
+          );
           welcomeSent = true;
+          console.log(`[START] ✅ Welcome with image sent`);
         }
-      } catch (messageError) {
-        logger.error('BOT', `Error in welcome message`, { error: messageError.message });
+      } catch (imageError) {
+        console.warn(`[START] ⚠️ Failed to send image: ${imageError.message}`);
       }
-      
-      // Если welcome не отправилось, пытаемся отправить хотя бы базовое приветствие
+
+      // Попытка 2: без картинки
       if (!welcomeSent) {
         try {
-          await ctx.reply(fullMessage, { parse_mode: 'Markdown' });
-        } catch (fallbackError) {
-          logger.error('BOT', `Failed to send welcome message`, { error: fallbackError.message });
-          // Последняя попытка - простое сообщение
-          try {
-            await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
-          } catch (finalError) {
-            logger.error('BOT', `All welcome attempts failed`, { error: finalError.message });
-          }
+          await ctx.reply(fullMessage);
+          welcomeSent = true;
+          console.log(`[START] ✅ Welcome text sent`);
+        } catch (textError) {
+          console.error(`[START] ❌ Failed to send text: ${textError.message}`);
         }
       }
 
-      // Отправляем меню отдельно, чтобы даже если welcome не отправился, меню показалось
+      // Попытка 3: минимальное сообщение
+      if (!welcomeSent) {
+        try {
+          await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.');
+          console.log(`[START] ✅ Fallback welcome sent`);
+        } catch (fallbackError) {
+          console.error(`[START] ❌ All welcome attempts failed: ${fallbackError.message}`);
+        }
+      }
+
+      // Отправляем меню
       try {
         const menu = getMainMenuKeyboard(user.isAdmin);
-        await ctx.reply('📋 *Выберите действие:*', menu);
+        await ctx.reply('📋 Выберите действие:', menu);
+        console.log(`[START] ✅ Menu sent`);
       } catch (menuError) {
-        logger.error('BOT', `Error sending menu`, { error: menuError.message });
-        // Меню критично важно, но не останавливаем выполнение
+        console.error(`[START] ❌ Failed to send menu: ${menuError.message}`);
       }
+
     } catch (error) {
       logger.error('BOT', `Error in /start command`, { error: error.message, stack: error.stack });
       
-      // Пытаемся отправить хотя бы сообщение об ошибке
       try {
-        // Если пользователь уже создан, отправляем базовое сообщение
         const existingUser = await prisma.user.findUnique({ where: { telegramId } });
         if (existingUser) {
           const menu = getMainMenuKeyboard(existingUser.isAdmin);
           await ctx.reply('🎰 Добро пожаловать в SafariUp! Используйте меню для навигации.', menu);
         } else {
-          await ctx.reply("Произошла ошибка при регистрации. Попробуйте позже.");
+          await ctx.reply('Произошла ошибка при регистрации. Попробуйте позже.');
         }
       } catch (finalError) {
         logger.error('BOT', `Failed to send error message`, { error: finalError.message });
@@ -795,11 +796,10 @@ if (!BOT_TOKEN) {
             try {
               await bot.telegram.sendMessage(
                 ticketUser_.telegramId,
-                `💬 *Ответ администратора*\n\n` +
-                `🎫 Тикет: \`${ticketId}\`\n\n` +
-                `📝 Ваше сообщение:\n\`\`\`\n${ticket.message}\n\`\`\`\n\n` +
-                `✅ Ответ:\n\`\`\`\n${text}\n\`\`\``,
-                { parse_mode: 'Markdown' }
+                `💬 Ответ администратора\n\n` +
+                `🎫 Тикет: ${ticketId}\n\n` +
+                `📝 Ваше сообщение:\n${ticket.message}\n\n` +
+                `✅ Ответ:\n${text}`
               );
 
               ticket.status = 'RESOLVED';
@@ -848,12 +848,12 @@ if (!BOT_TOKEN) {
         });
 
         await ctx.reply(
-          `✅ *Заявка создана!*\n\n` +
-          `🎫 Номер: \`${ticketId}\`\n` +
+          `✅ Заявка создана!\n\n` +
+          `🎫 Номер: ${ticketId}\n` +
           `📝 Тип: ${typeLabel}\n` +
           `⏳ Статус: На рассмотрении\n\n` +
           `Администратор рассмотрит вашу заявку в ближайшее время и напишет вам в чат.`,
-          { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) }
+          getMainMenuKeyboard(user.isAdmin)
         );
 
         const admins = await prisma.user.findMany({ where: { isAdmin: true } });
@@ -863,11 +863,10 @@ if (!BOT_TOKEN) {
               await bot.telegram.sendMessage(
                 admin.telegramId,
                 `🎫 НОВАЯ ЗАЯВКА ПОДДЕРЖКИ\n\n` +
-                `🎫 Номер: \`${ticketId}\`\n` +
+                `🎫 Номер: ${ticketId}\n` +
                 `👤 От пользователя: ${user.id}\n` +
                 `📝 Тип: ${typeLabel}\n\n` +
-                `📄 Сообщение:\n\`\`\`\n${messageText}\n\`\`\``,
-                { parse_mode: 'Markdown' }
+                `📄 Сообщение:\n${messageText}`
               );
             } catch (e) {
               logger.warn('BOT', `Failed to notify admin about ticket`, { error: e.message });
@@ -881,7 +880,7 @@ if (!BOT_TOKEN) {
         if (text === '◀️ Назад') {
           waitingForWithdrawAmount.delete(user.id);
           const menu = getMainMenuKeyboard(user.isAdmin);
-          await ctx.reply('📋 *Выберите действие:*', menu);
+          await ctx.reply('📋 Выберите действие:', menu);
           return;
         }
 
@@ -901,7 +900,7 @@ if (!BOT_TOKEN) {
         console.log(`\n💸 User ${user.id} requested withdrawal of ${amount.toFixed(8)} USDT`);
         
         await ctx.reply(
-          `💰 *Ваша заявка на вывод*\n\n` +
+          `💰 Ваша заявка на вывод\n\n` +
           `Сумма: ${amount.toFixed(8)} USDT\n` +
           `Способ: Прямой перевод на ваш кошелёк\n\n` +
           `⏳ Подтвердите операцию:`,
@@ -911,8 +910,7 @@ if (!BOT_TOKEN) {
                 [{ text: '✅ Подтвердить', callback_data: `confirm_withdraw_${amount.toFixed(8)}` }],
                 [{ text: '❌ Отмена', callback_data: 'back_to_menu' }]
               ]
-            },
-            parse_mode: 'Markdown'
+            }
           }
         );
         
@@ -924,7 +922,7 @@ if (!BOT_TOKEN) {
         if (text === '◀️ Назад') {
           waitingForDeposit.delete(user.id);
           const menu = getMainMenuKeyboard(user.isAdmin);
-          await ctx.reply('📋 *Выберите действие:*', menu);
+          await ctx.reply('📋 Выберите действие:', menu);
           return;
         }
 
@@ -947,7 +945,7 @@ if (!BOT_TOKEN) {
 
         if (bonusAvailability.canUseBonus) {
           await ctx.reply(
-            `💰 *Пополнение на ${amount.toFixed(8)} USDT*\n\n` +
+            `💰 Пополнение на ${amount.toFixed(8)} USDT\n\n` +
             `🎁 У вас доступен бонус +100%!\n\n` +
             `Использовать бонус при этом пополнении?`,
             {
@@ -956,8 +954,7 @@ if (!BOT_TOKEN) {
                   [{ text: "✅ С БОНУСОМ +100%", callback_data: `show_bonus_conditions_${amount.toFixed(8)}` }],
                   [{ text: "💎 БЕЗ БОНУСА", callback_data: `confirm_deposit_${amount.toFixed(8)}_no` }]
                 ]
-              },
-              parse_mode: "Markdown"
+              }
             }
           );
         } else {
@@ -972,7 +969,7 @@ if (!BOT_TOKEN) {
           scheduleDepositCheck(bot, user.id, invoice.invoice_id, amount, 'USDT', false);
           
           await ctx.reply(
-            `✅ *Инвойс создан*\n\n` +
+            `✅ Инвойс создан\n\n` +
             `💰 Сумма: ${amount.toFixed(8)} USDT\n` +
             `⏳ Статус: Ожидание оплаты\n\n` +
             `🔗 Кликните ниже для оплаты или проверьте статус:`,
@@ -983,8 +980,7 @@ if (!BOT_TOKEN) {
                   [{ text: "🔄 Проверить статус", callback_data: `check_invoice_${invoice.invoice_id}` }],
                   [{ text: "◀️ Отменить", callback_data: `cancel_deposit` }]
                 ]
-              },
-              parse_mode: "Markdown"
+              }
             }
           );
         }
@@ -995,8 +991,8 @@ if (!BOT_TOKEN) {
         case '🎰 Казино': {
           const oneTimeToken = await generateOneTimeToken(user.id);
           const authUrl = `${FRONTEND_URL}/login?token=${oneTimeToken}`;
-          if (FRONTEND_URL.startsWith('https://')) {
-            await ctx.reply('🚀 *Открываем казино...*', {
+          if (FRONTEND_URL && FRONTEND_URL.startsWith('https://')) {
+            await ctx.reply('🚀 Открываем казино...', {
               reply_markup: {
                 inline_keyboard: [
                   [{ text: '🚀 Открыть Казино', web_app: { url: authUrl } }]
@@ -1017,7 +1013,7 @@ if (!BOT_TOKEN) {
           setStateTimeout(waitingForDeposit, user.id);
           
           await ctx.reply(
-            `💰 *Пополнение счета*\n\nВыберите сумму или введите свою:`,
+            `💰 Пополнение счета\n\nВыберите сумму или введите свою:`,
             {
               reply_markup: {
                 inline_keyboard: [
@@ -1026,8 +1022,7 @@ if (!BOT_TOKEN) {
                   [{ text: 'Другая сумма', callback_data: 'deposit_custom' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
-              },
-              parse_mode: 'Markdown'
+              }
             }
           );
           break;
@@ -1047,7 +1042,7 @@ if (!BOT_TOKEN) {
           setStateTimeout(waitingForWithdrawAmount, user.id);
           
           await ctx.reply(
-            `💸 *Выберите сумму для вывода:*\n\n💡 Средства будут отправлены прямо на ваш кошелёк!`,
+            `💸 Выберите сумму для вывода:\n\n💡 Средства будут отправлены прямо на ваш кошелёк!`,
             {
               reply_markup: {
                 inline_keyboard: [
@@ -1057,8 +1052,7 @@ if (!BOT_TOKEN) {
                   [{ text: 'Другая сумма', callback_data: 'withdraw_custom' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
-              },
-              parse_mode: 'Markdown'
+              }
             }
           );
           break;
@@ -1077,7 +1071,7 @@ if (!BOT_TOKEN) {
             return;
           }
 
-          let msg = `📥 *Ваши последние заявки на вывод:*\n\n`;
+          let msg = `📥 Ваши последние заявки на вывод:\n\n`;
           for (const tx of userTx) {
             const statusEmoji = tx.status === 'PENDING' ? '⏳' : tx.status === 'COMPLETED' ? '✅' : '❌';
             const statusText = tx.status === 'PENDING' ? 'В обработке' : tx.status === 'COMPLETED' ? 'Выполнен' : 'Отклонён';
@@ -1085,13 +1079,13 @@ if (!BOT_TOKEN) {
             const addr = tx.walletAddress || '—';
             const shortAddr = addr.length > 10 ? `${addr.slice(0,6)}...${addr.slice(-4)}` : addr;
 
-            msg += `${statusEmoji} *${txAmount.toFixed(8)} USDT*\n` +
-                   `Адрес: \`${shortAddr}\`\n` +
+            msg += `${statusEmoji} ${txAmount.toFixed(8)} USDT\n` +
+                   `Адрес: ${shortAddr}\n` +
                    `Статус: ${statusText}\n` +
                    `ID: ${tx.id}\n\n`;
           }
 
-          await ctx.reply(msg, { parse_mode: 'Markdown', ...getMainMenuKeyboard(user.isAdmin) });
+          await ctx.reply(msg, getMainMenuKeyboard(user.isAdmin));
           break;
         }
 
@@ -1102,7 +1096,7 @@ if (!BOT_TOKEN) {
           }
 
           await ctx.reply(
-            `⚙️ *Админ Панель*\n\nВыберите действие:`,
+            `⚙️ Админ Панель\n\nВыберите действие:`,
             {
               reply_markup: {
                 inline_keyboard: [
@@ -1110,8 +1104,7 @@ if (!BOT_TOKEN) {
                   [{ text: '🎫 Заявки поддержки', callback_data: 'admin_show_tickets' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
-              },
-              parse_mode: 'Markdown'
+              }
             }
           );
           break;
@@ -1119,7 +1112,7 @@ if (!BOT_TOKEN) {
 
         default: {
           const menu = getMainMenuKeyboard(user.isAdmin);
-          await ctx.reply('📋 *Выберите действие:*', menu);
+          await ctx.reply('📋 Выберите действие:', menu);
         }
       }
     } catch (error) {
@@ -1146,7 +1139,7 @@ if (!BOT_TOKEN) {
     });
     const menu = getMainMenuKeyboard(user?.isAdmin || false);
     
-    await ctx.reply('📋 *Выберите действие:*', menu);
+    await ctx.reply('📋 Выберите действие:', menu);
     await ctx.answerCbQuery();
   });
 
