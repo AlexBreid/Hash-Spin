@@ -4,53 +4,60 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-// ВАЖНО: Убедитесь, что Ngrok ЗАПУЩЕН и это его АКТУАЛЬНЫЙ HTTPS-адрес
-// Если Ngrok перезапустится, этот адрес ИЗМЕНИТСЯ, и его нужно будет обновить здесь!
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+// Ключи для localStorage (должны совпадать с AuthContext)
+const TOKEN_KEY = 'casino_jwt_token';
+const USER_KEY = 'user';
 
 const AuthHandler: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [status, setStatus] = useState('Авторизация...');
 
-    // Определяем, идет ли загрузка, для отображения анимации
     const isLoading = status === 'Авторизация...';
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const oneTimeToken = params.get('token');
 
+        // 🆕 FIX: Проверяем, авторизован ли пользователь УЖЕ
+        const existingToken = localStorage.getItem(TOKEN_KEY);
+        const existingUser = localStorage.getItem(USER_KEY);
+
+        if (existingToken && existingUser) {
+            console.log('✅ [AuthHandler] Пользователь уже авторизован, пропускаем автологин');
+            // Уже авторизован - просто редиректим на главную
+            navigate('/', { replace: true });
+            return;
+        }
+
         if (!oneTimeToken) {
             setStatus('Ошибка: Токен не найден. Перенаправление на страницу входа.');
-            // Добавляем replace: true, чтобы не оставлять страницу с токеном в истории
             navigate('/login', { replace: true }); 
             return;
         }
 
         const handleLogin = async () => {
             try {
-                // 1. Отправляем токен на бэкенд для обмена
                 const response = await axios.post(`${API_BASE_URL}/api/v1/auth/login-with-token`, { 
                     token: oneTimeToken
                 });
 
                 const { token: sessionToken, user } = response.data;
                 
-                // 2. Сохраняем постоянный токен
-                localStorage.setItem('casino_jwt_token', sessionToken);
+                // 🆕 Сохраняем и токен, и пользователя
+                localStorage.setItem(TOKEN_KEY, sessionToken);
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
                 
                 setStatus(`Успешный вход! Добро пожаловать, ${user.firstName || user.username}.`);
                 
-                // 3. Очищаем URL и перенаправляем на главную
                 navigate('/', { replace: true }); 
 
             } catch (error) {
-                // Обработка ошибки, которая сейчас происходит (Token rejected)
-                // Ошибка авторизации. Токен недействителен или просрочен.
                 setStatus('Ошибка авторизации. Проблема с токеном или API. Пожалуйста, попробуйте снова.'); 
                 console.error("Auth Error:", error);
 
-                // Если ошибка - перенаправляем на /login, чтобы избежать бесконечного цикла
                 navigate('/login', { replace: true }); 
             }
         };

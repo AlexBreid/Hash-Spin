@@ -52,15 +52,12 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
 
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('📊 Загрузка баланса...'); // DEBUG
       loadBalance()
         .catch(err => {
-          console.error('❌ Ошибка загрузки баланса:', err);
           // Дефолтное значение при ошибке
           setWalletData({ balance: 0, main: 0, bonus: 0, currency: 'USDT' }); 
         })
         .finally(() => {
-          console.log('✅ Загрузка завершена'); // DEBUG
           setLoading(false);
         });
     }
@@ -68,8 +65,6 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
 
   // 3. Обновляем данные при получении ответа
   useEffect(() => {
-    console.log('📊 balanceData изменился:', balanceData); // DEBUG
-    
     if (balanceData && Array.isArray(balanceData) && balanceData.length > 0) {
       // Находим MAIN и BONUS
       const mainBalance = balanceData.find((item: BalanceItem) => item.type === 'MAIN');
@@ -79,11 +74,6 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
       const bonusAmount = bonusBalance?.amount || 0;
       const totalAmount = mainAmount + bonusAmount;  // ✅ ОБЪЕДИНЁННЫЙ БАЛАНС
       const symbol = mainBalance?.symbol || 'USDT';
-
-      console.log(`📊 Установка walletData:
-         Main: ${mainAmount.toFixed(8)}
-         Bonus: ${bonusAmount.toFixed(8)}
-         Total: ${totalAmount.toFixed(8)}`); // DEBUG
       
       setWalletData({
         balance: totalAmount,  // ОБЪЕДИНЁННЫЙ
@@ -94,7 +84,6 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     } 
     // Если пустой массив
     else if (balanceData && Array.isArray(balanceData) && balanceData.length === 0) {
-      console.log('📊 Пустой массив данных'); // DEBUG
       setWalletData({
         balance: 0,
         main: 0,
@@ -122,9 +111,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     setShowDepositModal(false);
     // Перезагружаем баланс после пополнения
     if (loadBalance) {
-      loadBalance().catch(err => {
-        console.error('❌ Ошибка перезагрузки баланса:', err);
-      });
+      loadBalance().catch(() => {});
     }
   };
 

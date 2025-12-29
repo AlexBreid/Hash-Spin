@@ -22,6 +22,9 @@ const STORAGE_KEY = 'crash_game_history';
 const MAX_HISTORY_ITEMS = 10;
 const MIN_BET = 0.1;
 
+// 🔧 FIX #1: Буфер для сглаживания множителя (предотвращает резкие скачки)
+const MULTIPLIER_LERP_SPEED = 0.3; // Скорость интерполяции (0.1 = медленно, 1.0 = мгновенно)
+
 interface CrashHistory {
   id: string;
   gameId?: string;
@@ -68,6 +71,15 @@ export function CrashGame() {
   const [activeCrash, setActiveCrash] = useState<CrashHistory | null>(null);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const crashHistoryRef = useRef<HTMLDivElement>(null);
+
+  // 🔧 FIX #2: Ref для серверного множителя (истинное значение с сервера)
+  const serverMultiplierRef = useRef<number>(1.0);
+  // Визуальный множитель для плавной анимации
+  const visualMultiplierRef = useRef<number>(1.0);
+  // Флаг что игра крашнулась (для мгновенной остановки анимации)
+  const isCrashedRef = useRef<boolean>(false);
+  // Точка краша с сервера
+  const crashPointRef = useRef<number | null>(null);
 
   const sessionKeys = useMemo(() => ({
     betId: `crash_pending_bet_${user?.id}`,
@@ -141,6 +153,12 @@ export function CrashGame() {
         setCurrentBet(0);
         setBalanceType(null);
         setUserBonusId(null);
+        
+        // 🔧 FIX: Сброс ref-ов
+        serverMultiplierRef.current = 1.0;
+        visualMultiplierRef.current = 1.0;
+        isCrashedRef.current = false;
+        crashPointRef.current = null;
         
         sessionStorage.removeItem(sessionKeys.betId);
         sessionStorage.removeItem(sessionKeys.currentBet);
@@ -221,16 +239,38 @@ export function CrashGame() {
     }
   }, [crashHistory, saveHistoryToStorage]);
 
+  // 🔧 FIX #3: Используем визуальный множитель для отображения
+  // При краше - показываем точку краша, иначе - плавно интерполированное значение
   const currentCrashPoint = activeCrash?.crashPoint ?? gameState.crashPoint;
   const displayMultiplier = gameState.status === 'crashed' && currentCrashPoint 
     ? currentCrashPoint 
-    : gameState.multiplier;
+    : visualMultiplierRef.current;
 
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // 🔧 FIX #4: Интерполяция множителя для плавной анимации
+    // Если игра крашнулась - мгновенно показываем точку краша
+    if (isCrashedRef.current && crashPointRef.current !== null) {
+      visualMultiplierRef.current = crashPointRef.current;
+    } else if (gameState.status === 'flying') {
+      // Плавная интерполяция к серверному значению
+      const diff = serverMultiplierRef.current - visualMultiplierRef.current;
+      visualMultiplierRef.current += diff * MULTIPLIER_LERP_SPEED;
+      
+      // Если разница минимальна - синхронизируем полностью
+      if (Math.abs(diff) < 0.001) {
+        visualMultiplierRef.current = serverMultiplierRef.current;
+      }
+    } else if (gameState.status === 'waiting') {
+      visualMultiplierRef.current = 1.0;
+      serverMultiplierRef.current = 1.0;
+    }
+
+    const currentVisualMultiplier = visualMultiplierRef.current;
 
     const w = canvas.width;
     const h = canvas.height;
@@ -281,17 +321,17 @@ export function CrashGame() {
       return;
     }
 
-    const maxMult = Math.max(5, Math.ceil(displayMultiplier * 1.3));
+    const maxMult = Math.max(5, Math.ceil(currentVisualMultiplier * 1.3));
     
     const multToY = (mult: number): number => {
       const normalized = Math.min(mult, maxMult) / maxMult;
       return h - padding - normalized * graphHeight;
     };
 
-    const progress = Math.min(1, (displayMultiplier - 1) / (maxMult - 1));
+    const progress = Math.min(1, (currentVisualMultiplier - 1) / (maxMult - 1));
     const curveProgress = Math.pow(progress, 0.6);
     const headX = padding + curveProgress * graphWidth;
-    const headY = multToY(displayMultiplier);
+    const headY = multToY(currentVisualMultiplier);
 
     const points: { x: number; y: number; mult: number }[] = [];
     const steps = 150;
@@ -300,7 +340,7 @@ export function CrashGame() {
       const t = i / steps;
       const mult = 1 + Math.pow(t, 1.5) * (maxMult - 1);
       
-      if (mult > displayMultiplier) break;
+      if (mult > currentVisualMultiplier) break;
 
       const x = padding + t * graphWidth;
       const y = multToY(mult);
@@ -391,10 +431,12 @@ export function CrashGame() {
       ctx.shadowBlur = 30;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 2;
-      ctx.fillText(`КРАХ @ ${gameState.crashPoint?.toFixed(2)}x`, w / 2, h / 2);
+      // 🔧 FIX: Показываем точную точку краша с сервера
+      const crashDisplay = crashPointRef.current ?? gameState.crashPoint ?? currentVisualMultiplier;
+      ctx.fillText(`КРАХ @ ${crashDisplay.toFixed(2)}x`, w / 2, h / 2);
       ctx.shadowBlur = 0;
     }
-  }, [gameState, displayMultiplier]);
+  }, [gameState.status, gameState.crashPoint]);
 
   useEffect(() => {
     drawChartRef.current = drawChart;
@@ -463,14 +505,24 @@ export function CrashGame() {
   }, []);
 
   const waitingProgress = Math.min(100, (gameState.countdown / MAX_WAIT_TIME) * 100);
-  const potentialWinnings = gameState.multiplier * parseFloat(inputBet);
+  // 🔧 FIX: Используем серверный множитель для расчёта выигрыша (не визуальный!)
+  const potentialWinnings = serverMultiplierRef.current * parseFloat(inputBet);
 
   useEffect(() => {
     const handleGameCrashed = (data: any) => {
+      // 🔧 FIX #5: КРИТИЧНО - сначала устанавливаем флаг краша и точку краша
+      // ДО обновления state, чтобы анимация сразу остановилась на правильном значении
+      isCrashedRef.current = true;
+      crashPointRef.current = parseFloat(data.crashPoint.toString());
+      visualMultiplierRef.current = crashPointRef.current;
+      serverMultiplierRef.current = crashPointRef.current;
+      
+      console.log(`💥 [CRASH] Сервер сообщил о краше: ${crashPointRef.current}x`);
+      
       setGameState((prev) => ({
         ...prev,
         status: 'crashed',
-        crashPoint: data.crashPoint,
+        crashPoint: crashPointRef.current,
         gameId: data.gameId,
       }));
       setCanCashout(false);
@@ -488,7 +540,7 @@ export function CrashGame() {
       const newCrash: CrashHistory = {
         id: data.gameId || `crash_${Date.now()}_${Math.random()}`,
         gameId: data.gameId,
-        crashPoint: parseFloat(data.crashPoint.toString()),
+        crashPoint: crashPointRef.current!,
         timestamp: Date.now(),
       };
 
@@ -551,6 +603,14 @@ export function CrashGame() {
     };
 
     const handleGameStatus = (data: CrashGameState) => {
+      // 🔧 FIX: Сброс флагов при новой игре
+      if (data.status === 'waiting') {
+        isCrashedRef.current = false;
+        crashPointRef.current = null;
+        serverMultiplierRef.current = 1.0;
+        visualMultiplierRef.current = 1.0;
+      }
+      
       setGameState(data);
       if (data.status === 'waiting') {
         setCanCashout(false);
@@ -566,8 +626,13 @@ export function CrashGame() {
     };
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
-      setGameState((prev) => ({ ...prev, multiplier: data.multiplier, status: 'flying' }));
-      setCanCashout(betPlaced);
+      // 🔧 FIX #6: Обновляем серверный множитель (визуальный интерполируется в drawChart)
+      // Игнорируем обновления если уже крашнулись
+      if (!isCrashedRef.current) {
+        serverMultiplierRef.current = data.multiplier;
+        setGameState((prev) => ({ ...prev, multiplier: data.multiplier, status: 'flying' }));
+        setCanCashout(betPlaced);
+      }
     };
     
     const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
@@ -593,6 +658,22 @@ export function CrashGame() {
     };
   }, [betPlaced, currentBet, fetchBalances, sessionKeys]);
 
+  // 🔧 FIX #7: State для отслеживания визуального множителя в UI
+  const [uiMultiplier, setUiMultiplier] = useState(1.0);
+  
+  // Обновляем UI множитель из ref каждые 50ms
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUiMultiplier(visualMultiplierRef.current);
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Финальный множитель для отображения в UI
+  const finalDisplayMultiplier = gameState.status === 'crashed' && crashPointRef.current 
+    ? crashPointRef.current 
+    : uiMultiplier;
+
   return (
     <div className="game-page" style={{ paddingBottom: '96px' }}>
       <GameHeader 
@@ -612,6 +693,7 @@ export function CrashGame() {
               className="w-full h-full block"
             />
             
+            {/* 🔧 FIX #8: Убрали mode="wait" - это причина мерцания */}
             <AnimatePresence>
               {gameState.status === 'waiting' ? (
                 <motion.div
@@ -619,6 +701,7 @@ export function CrashGame() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }} // Быстрее переход
                   className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
                 >
                   <div className="flex flex-col items-center gap-2">
@@ -637,13 +720,14 @@ export function CrashGame() {
                         }}
                         initial={{ width: '0%' }}
                         animate={{ width: `${waitingProgress}%` }}
-                        transition={{ duration: 0.5 }}
+                        transition={{ duration: 0.3 }} // Плавнее
                       />
                     </div>
                     <motion.div 
                       key={gameState.countdown}
-                      initial={{ scale: 1.5, opacity: 0 }}
+                      initial={{ scale: 1.2, opacity: 0.5 }}
                       animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.15 }}
                       className="text-3xl font-black text-yellow-300 font-mono"
                     >
                       {gameState.countdown.toFixed(0)}s
@@ -652,9 +736,11 @@ export function CrashGame() {
                 </motion.div>
               ) : (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    key="flying"
+                    initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
                     className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
                   >
                     <div
@@ -664,9 +750,9 @@ export function CrashGame() {
                     >
                       <motion.div
                         animate={gameState.status === 'crashed' ? { scale: [1, 1.1, 1] } : {}}
-                        transition={{ duration: 0.5 }}
+                        transition={{ duration: 0.3 }}
                       >
-                        {displayMultiplier.toFixed(2)}x
+                        {finalDisplayMultiplier.toFixed(2)}x
                       </motion.div>
                     </div>
                   </motion.div>
@@ -716,13 +802,15 @@ export function CrashGame() {
               </div>
             </div>
 
-            <AnimatePresence mode="wait">
+            {/* 🔧 FIX #9: Убрали mode="wait" здесь тоже */}
+            <AnimatePresence>
               {canCashout ? (
                 <motion.button
                   key="cashout"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.1 }}
                   onClick={handleCashout}
                   disabled={isLoading}
                   className={`w-full px-4 py-3 font-black rounded-xl transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 transition-all text-sm border-2 ${
@@ -732,14 +820,16 @@ export function CrashGame() {
                   }`}
                 >
                   <Zap className="w-4 h-4" />
-                  {cashoutStatus === 'won' ? '✅ УСПЕШНО' : 'ЗАБРАТЬ'} ${potentialWinnings.toFixed(2)}
+                  {/* 🔧 FIX: Показываем серверный множитель для точного расчёта выигрыша */}
+                  {cashoutStatus === 'won' ? '✅ УСПЕШНО' : 'ЗАБРАТЬ'} ${(serverMultiplierRef.current * parseFloat(inputBet)).toFixed(2)}
                 </motion.button>
               ) : betPlaced ? (
                 <motion.div
                   key="placed"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.1 }}
                   className={`w-full px-4 py-3 font-bold rounded-xl text-center animate-pulse border-2 ${
                     cashoutStatus === 'lost'
                       ? 'border-red-500/50 bg-red-500/10 text-red-400'
@@ -751,9 +841,10 @@ export function CrashGame() {
               ) : (
                 <motion.button
                   key="place"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.1 }}
                   onClick={handlePlaceBet}
                   disabled={!isHistoryLoaded || isLoading}
                   className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all text-sm flex items-center justify-center gap-2 border-2 border-indigo-400"

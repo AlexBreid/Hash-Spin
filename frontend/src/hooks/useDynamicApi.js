@@ -30,8 +30,6 @@ export function useApiEndpoints() {
         setLoading(true);
         setError(null);
 
-        console.log(`🔄 Загружаю endpoints с ${API_BASE_URL}/api-endpoints...`);
-
         const response = await fetch(`${API_BASE_URL}/api-endpoints`, {
           method: 'GET',
           headers: {
@@ -42,14 +40,11 @@ export function useApiEndpoints() {
           },
         });
 
-        console.log(`📡 Ответ от сервера: ${response.status}`);
-
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log('📋 Получены данные:', data);
 
         if (!data.success) {
           throw new Error(data.error || 'Не удалось загрузить endpoints');
@@ -58,13 +53,8 @@ export function useApiEndpoints() {
         // Кэшируем endpoints в глобальную переменную
         apiEndpoints = data.endpoints;
         setEndpoints(apiEndpoints);
-
-        console.log(
-          `✅ Загружено ${data.totalEndpoints} API endpoints (${Object.keys(apiEndpoints).length} ключей)`
-        );
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error('❌ Ошибка загрузки endpoints:', errorMessage);
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -173,16 +163,11 @@ export function useFetch(apiKey, method = 'GET') {
         throw new Error('Пожалуйста, войдите в систему');
       }
 
-      console.log(`🔄 Ждём endpoints перед запросом ${apiKey}...`);
-
       // ЖДЁМ загрузки endpoints перед запросом
       await waitForEndpoints();
 
-      console.log(`✅ Endpoints загружены, делаю запрос ${apiKey}...`);
-
       // Получаем полный URL
       const url = getFullUrl(apiKey);
-      console.log(`📍 URL: ${url}`);
 
       const options = {
         method,
@@ -204,7 +189,6 @@ export function useFetch(apiKey, method = 'GET') {
         response = await fetch(url, options);
       } catch (fetchErr) {
         const errorMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        console.error(`❌ Fetch ошибка для ${apiKey}:`, errorMsg);
 
         // Специальная обработка ERR_INSUFFICIENT_RESOURCES
         if (errorMsg.includes('Failed to fetch') || errorMsg.includes('net::')) {
@@ -214,8 +198,6 @@ export function useFetch(apiKey, method = 'GET') {
         }
         throw fetchErr;
       }
-
-      console.log(`📡 Ответ сервера: ${response.status}`);
 
       // 304 Not Modified - кэшированный ответ без body
       if (response.status === 304) {
@@ -227,7 +209,6 @@ export function useFetch(apiKey, method = 'GET') {
       if (!response.ok) {
         if (response.status === 401) {
           // Автоматический выход при истечении сессии
-          console.log('🔴 Сессия истекла, выполняю автоматический выход...');
           logout();
           throw new Error('Сессия истекла. Пожалуйста, войдите заново.');
         }
@@ -241,10 +222,8 @@ export function useFetch(apiKey, method = 'GET') {
       }
 
       const result = await response.json();
-      console.log(`📦 Полный ответ ${apiKey}:`, result);
 
       if (result.success) {
-        console.log(`✅ ${apiKey} успешно загружено`);
         setData(result.data);
         return result.data;
       } else {
@@ -252,7 +231,6 @@ export function useFetch(apiKey, method = 'GET') {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error(`❌ Ошибка ${apiKey}:`, errorMessage);
       setError(errorMessage);
       throw err;
     } finally {

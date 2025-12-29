@@ -100,13 +100,11 @@ function AppContent() {
 
                 if (response.status === 401) {
                     // Сессия истекла, logout уже выполнен в useDynamicApi
-                    console.log('🔴 Сессия истекла при проверке бонуса');
                     setHasBonusAvailable(false);
                     return;
                 }
 
                 if (!response.ok) {
-                    console.error('❌ Failed to check bonus availability');
                     setHasBonusAvailable(false);
                     return;
                 }
@@ -114,7 +112,6 @@ function AppContent() {
                 const data = await response.json();
                 setHasBonusAvailable(data.canUseBonus === true);
             } catch (error) {
-                console.error('❌ Error checking bonus:', error);
                 setHasBonusAvailable(false);
             }
         };
@@ -157,7 +154,6 @@ function AppContent() {
     // Автоматический редирект на логин при выходе из системы
     useEffect(() => {
         if (!loading && !isAuthenticated && AUTH_REQUIRED_PAGES.includes(currentPage)) {
-            console.log('🔴 Пользователь не авторизован, редирект на логин');
             navigate('/login');
             setCurrentPage('login');
         }
