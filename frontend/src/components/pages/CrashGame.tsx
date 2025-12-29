@@ -201,15 +201,15 @@ export function CrashGame() {
     }
   }, [crashHistory, saveHistoryToStorage]);
 
-  // 🔧 УПРОЩЁННАЯ отрисовка - напрямую с сервера, без интерполяции
+  // 🔧 УПРОЩЁННАЯ отрисовка - напрямую с сервера, без state updates
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Используем ref напрямую, БЕЗ вызова setState!
     const currentMult = currentMultiplierRef.current;
-    setDisplayMultiplier(currentMult);
 
     const w = canvas.width;
     const h = canvas.height;
@@ -442,6 +442,7 @@ export function CrashGame() {
       isCrashedRef.current = true;
       crashPointRef.current = parseFloat(data.crashPoint.toString());
       currentMultiplierRef.current = crashPointRef.current;
+      setDisplayMultiplier(crashPointRef.current); // Мгновенно обновляем UI
       
       setGameState((prev) => ({
         ...prev,
@@ -533,12 +534,14 @@ export function CrashGame() {
         isCrashedRef.current = false;
         crashPointRef.current = null;
         currentMultiplierRef.current = 1.0;
+        setDisplayMultiplier(1.0);
       }
       
       if (normalizedStatus === 'flying') {
         isCrashedRef.current = false;
         crashPointRef.current = null;
         currentMultiplierRef.current = data.multiplier || 1.0;
+        setDisplayMultiplier(data.multiplier || 1.0);
       }
       
       setGameState(normalizedData);
@@ -558,8 +561,15 @@ export function CrashGame() {
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
       if (!isCrashedRef.current) {
+        // Обновляем ТОЛЬКО ref, state не трогаем для производительности
         currentMultiplierRef.current = data.multiplier;
-        setGameState((prev) => ({ ...prev, multiplier: data.multiplier, status: 'flying' }));
+        // gameState.status обновляем только если был waiting
+        setGameState((prev) => {
+          if (prev.status === 'waiting') {
+            return { ...prev, status: 'flying' };
+          }
+          return prev; // Не создаём новый объект если статус уже flying
+        });
         setCanCashout(betPlaced);
       }
     };
@@ -568,6 +578,7 @@ export function CrashGame() {
       isCrashedRef.current = false;
       crashPointRef.current = null;
       currentMultiplierRef.current = 1.0;
+      setDisplayMultiplier(1.0); // Мгновенный сброс UI
       
       setGameState(prev => ({
         ...prev,
@@ -607,6 +618,17 @@ export function CrashGame() {
     ? crashPointRef.current 
     : displayMultiplier;
 
+  // 🔧 FIX: Обновляем displayMultiplier отдельным интервалом, не в animation frame
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isCrashedRef.current) {
+        setDisplayMultiplier(currentMultiplierRef.current);
+      }
+    }, 50); // 20 FPS для UI достаточно
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const totalPlayersDisplay = playersCount + FAKE_PLAYERS_OFFSET;
 
   return (
@@ -628,54 +650,24 @@ export function CrashGame() {
             className="w-full h-full block"
           />
           
-          {/* 🆕 КРАСИВЫЕ БЛОКИ СВЕРХУ */}
-          <div className="absolute top-3 left-3 right-3 flex justify-between z-20 pointer-events-none gap-2">
-            {/* Game ID блок */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="pointer-events-auto"
-            >
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600/80 to-purple-600/80 backdrop-blur-md border border-white/20 shadow-lg">
-                <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">
-                  <Hash className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-white/60 uppercase tracking-wider font-medium">Раунд</span>
-                  <span className="text-xs font-bold text-white font-mono">
-                    {gameState.gameId?.slice(0, 8) || '--------'}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
+          {/* 🆕 КОМПАКТНЫЕ БЛОКИ ПО УГЛАМ */}
+          {/* Game ID - левый верхний угол */}
+          <div className="absolute top-2 left-2 z-20">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10">
+              <Hash className="w-3 h-3 text-indigo-400" />
+              <span className="text-[10px] font-bold text-white/80 font-mono">
+                {gameState.gameId?.slice(0, 6) || '------'}
+              </span>
+            </div>
+          </div>
 
-            {/* Players count блок */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="pointer-events-auto"
-            >
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600/80 to-teal-600/80 backdrop-blur-md border border-white/20 shadow-lg">
-                <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">
-                  <Users className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-white/60 uppercase tracking-wider font-medium">Онлайн</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold text-white font-mono">{totalPlayersDisplay}</span>
-                    <span className="text-[10px] text-emerald-300 font-medium">
-                      игроков
-                    </span>
-                  </div>
-                </div>
-                {/* Пульсирующий индикатор */}
-                <div className="relative ml-1">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                  <div className="absolute inset-0 w-2 h-2 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
-                </div>
-              </div>
-            </motion.div>
+          {/* Players - правый верхний угол */}
+          <div className="absolute top-2 right-2 z-20">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10">
+              <Users className="w-3 h-3 text-emerald-400" />
+              <span className="text-[10px] font-bold text-white/80 font-mono">{totalPlayersDisplay}</span>
+              <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
+            </div>
           </div>
           
           {/* Статус игры */}
