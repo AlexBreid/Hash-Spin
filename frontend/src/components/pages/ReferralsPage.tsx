@@ -163,11 +163,44 @@ export function ReferralsPage() {
     }
   }
 
-  const copyTelegramLink = () => {
-    if (stats?.myReferralCode) {
-      const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
-      navigator.clipboard.writeText(telegramLink)
-      toast.success('✅ Ссылка на Telegram бота скопирована')
+  const copyTelegramLink = async () => {
+    if (!stats?.myReferralCode) return
+    
+    const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
+    
+    try {
+      // Пробуем использовать современный API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(telegramLink)
+        toast.success('✅ Ссылка на Telegram бота скопирована')
+      } else {
+        // Fallback для старых браузеров и мобильных устройств
+        const textArea = document.createElement('textarea')
+        textArea.value = telegramLink
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          const successful = document.execCommand('copy')
+          if (successful) {
+            toast.success('✅ Ссылка на Telegram бота скопирована')
+          } else {
+            throw new Error('Copy command failed')
+          }
+        } catch (err) {
+          // Если и это не сработало, показываем ссылку для ручного копирования
+          toast.error('Не удалось скопировать. Ссылка: ' + telegramLink)
+        } finally {
+          document.body.removeChild(textArea)
+        }
+      }
+    } catch (err) {
+      // Если ничего не сработало, показываем ссылку
+      toast.error('Не удалось скопировать. Ссылка: ' + telegramLink)
     }
   }
 
@@ -411,16 +444,28 @@ export function ReferralsPage() {
                     <p style={{ color: colors.mutedForeground }} className="text-xs mb-2">
                       Ссылка на Telegram бота:
                     </p>
-                    <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: colors.card }}>
-                      <Send className="w-4 h-4" style={{ color: colors.foreground }} />
+                    <div 
+                      className="flex items-center gap-2 p-3 rounded-lg cursor-pointer active:opacity-80 transition-opacity touch-manipulation"
+                      style={{ backgroundColor: colors.card, WebkitTapHighlightColor: 'transparent' }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        copyTelegramLink()
+                      }}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        copyTelegramLink()
+                      }}
+                      title="Нажмите чтобы скопировать ссылку"
+                    >
+                      <Send className="w-4 h-4 flex-shrink-0" style={{ color: colors.foreground }} />
                       <div
-                        className="text-sm font-mono flex-1 truncate select-all cursor-text"
-                        style={{ color: '#0088cc' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          copyTelegramLink()
-                        }}
-                        title="Нажмите чтобы скопировать"
+                        className="text-sm font-mono flex-1 truncate select-all pointer-events-none"
+                        style={{ color: '#0088cc', userSelect: 'all', WebkitUserSelect: 'all' }}
                       >
                         t.me/SafariUpbot?start=ref_{stats.myReferralCode}
                       </div>
@@ -430,7 +475,12 @@ export function ReferralsPage() {
                           e.stopPropagation()
                           copyTelegramLink()
                         }}
-                        className="p-1.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
+                        onTouchEnd={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          copyTelegramLink()
+                        }}
+                        className="p-2 rounded hover:opacity-80 active:scale-95 transition-all flex-shrink-0 touch-manipulation"
                         style={{ backgroundColor: colors.background }}
                         title="Скопировать ссылку"
                       >
@@ -442,7 +492,12 @@ export function ReferralsPage() {
                           e.stopPropagation()
                           openTelegramLink()
                         }}
-                        className="p-1.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
+                        onTouchEnd={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          openTelegramLink()
+                        }}
+                        className="p-2 rounded hover:opacity-80 active:scale-95 transition-all flex-shrink-0 touch-manipulation"
                         style={{ backgroundColor: colors.background }}
                         title="Открыть в Telegram"
                       >
