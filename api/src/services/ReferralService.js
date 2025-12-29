@@ -1,14 +1,15 @@
 /**
- * ✅ ReferralService.js - ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ
+ * ✅ ReferralService.js - ИСПРАВЛЕННЫЙ ПОДСЧЁТ РЕФЕРАЛОВ
  * 
- * ПРОБЛЕМА: WORKER считал комиссии с нуля каждый раз от totalLosses
- * РЕШЕНИЕ: 
- * - REGULAR использует newTurnoverSinceLastPayout (обнуляется после выплаты)
- * - WORKER использует newLossesSinceLastPayout (обнуляется после выплаты)
+ * ИСПРАВЛЕНИЯ:
+ * 1. getReferrerStats теперь считает рефералов по User.referredById (не по ReferralStats)
+ * 2. Правильный расчёт комиссий для REGULAR и WORKER
  * 
  * КОМИССИИ:
  * 1. REGULAR: (House Edge × newTurnover / 2) × Commission Rate
- * 2. WORKER: 5% от newLosses (обновляется при каждом проигрыше, обнуляется после выплаты)
+ *    Пример: (0.02 × 1000 / 2) × 0.30 = 3 USDT
+ * 2. WORKER: 5% от newLosses
+ *    Пример: 100 × 0.05 = 5 USDT
  */
 
 const prisma = require('../../prismaClient');
@@ -34,9 +35,9 @@ class ReferralService {
     BONUS_EXPIRY_DAYS: 7,
     
     // КОМИССИИ
-    HOUSE_EDGE: 0.02,           // 2% HE (преимущество казино) от оборота
+    HOUSE_EDGE: 0.02,               // 2% HE (преимущество казино) от оборота
     REGULAR_COMMISSION_RATE: 30,    // 30% от (HE × Turnover / 2)
-    WORKER_PROFIT_SHARE: 5.0,   // 5% от потерь рефералов (казино выигрывает)
+    WORKER_PROFIT_SHARE: 5.0,       // 5% от потерь рефералов
     
     // ПОРОГ ВЫПЛАТЫ
     COMMISSION_PAYOUT_THRESHOLD: 1  // Выплачивать только если > 1 USDT
@@ -185,7 +186,7 @@ class ReferralService {
             where: { id: stats.id },
             data: {
               totalTurnover: { increment: betNum },
-              newTurnoverSinceLastPayout: { increment: betNum }  // ⭐ НОВЫЙ ОБОРОТ ДЛЯ REGULAR
+              newTurnoverSinceLastPayout: { increment: betNum }
             }
           });
         } else {
@@ -197,7 +198,7 @@ class ReferralService {
               tokenId,
               totalTurnover: betNum,
               newTurnoverSinceLastPayout: betNum,
-              newLossesSinceLastPayout: 0,  // ⭐ ИНИЦИАЛИЗИРУЕМ ДЛЯ WORKER
+              newLossesSinceLastPayout: 0,
               totalCommissionPaid: '0',
               totalLosses: '0',
               totalWinnings: '0'
@@ -232,8 +233,6 @@ class ReferralService {
 
   /**
    * 📊 ОБНОВИТЬ РЕЗУЛЬТАТЫ ИГРЫ (ПОТЕРИ/ВЫИГРЫШИ)
-   * ⭐ ВАЖНО: обновляем ТОЛЬКО totalLosses/totalWinnings для истории
-   * И обновляем newLossesSinceLastPayout для расчета комиссии WORKER
    */
   async recordGameResult(referrerId, refereeId, tokenId, losses, winnings) {
     try {
@@ -242,7 +241,6 @@ class ReferralService {
 
       if (isNaN(lossesNum) || isNaN(winningsNum)) return;
 
-      // ⭐ ОБНОВЛЯЕМ СТАТИСТИКУ
       await prisma.referralStats.updateMany({
         where: {
           referrerId,
@@ -252,7 +250,6 @@ class ReferralService {
         data: {
           totalLosses: { increment: lossesNum },
           totalWinnings: { increment: winningsNum },
-          // ⭐ ВАЖНО: обновляем newLossesSinceLastPayout для WORKER
           newLossesSinceLastPayout: { increment: lossesNum }
         }
       });
@@ -371,7 +368,9 @@ class ReferralService {
   }
 
   /**
-   * 👥 ПОЛУЧИТЬ СТАТИСТИКУ РЕФЕРЕРА (ИЗ БАЗЫ, БЕЗ ПЕРЕСЧЕТА)
+   * 👥 ПОЛУЧИТЬ СТАТИСТИКУ РЕФЕРЕРА
+   * ⭐ ИСПРАВЛЕНО: считаем рефералов по User.referredById, а не по ReferralStats
+   * 
    * 🟢 REGULAR: (House Edge × newTurnover / 2) × Commission Rate
    * 🔴 WORKER: 5% от newLosses
    */
@@ -387,7 +386,14 @@ class ReferralService {
 
       if (!user) return null;
 
-      // ⭐ Получаем ВСЮ статистику из БД
+      // ⭐ ИСПРАВЛЕНИЕ: Считаем рефералов по User.referredById
+      const referralsCount = await prisma.user.count({
+        where: { referredById: userIdNum }
+      });
+
+      console.log(`📊 [getReferrerStats] userId=${userIdNum}, referralsCount=${referralsCount}`);
+
+      // Получаем статистику из ReferralStats
       const stats = await prisma.referralStats.findMany({
         where: { referrerId: userIdNum }
       });
@@ -395,45 +401,58 @@ class ReferralService {
       let totalTurnover = new Decimal(0);
       let totalCommissionPaid = new Decimal(0);
       let totalLosses = new Decimal(0);
+      let totalWinnings = new Decimal(0);
       let pendingCommission = new Decimal(0);
 
       for (const stat of stats) {
-        totalTurnover = totalTurnover.plus(stat.totalTurnover);
-        totalCommissionPaid = totalCommissionPaid.plus(stat.totalCommissionPaid);
+        totalTurnover = totalTurnover.plus(stat.totalTurnover || 0);
+        totalCommissionPaid = totalCommissionPaid.plus(stat.totalCommissionPaid || 0);
         totalLosses = totalLosses.plus(stat.totalLosses || 0);
+        totalWinnings = totalWinnings.plus(stat.totalWinnings || 0);
 
         // Считаем ожидаемую комиссию на основе типа реферера
         if (user.referrerType === 'REGULAR') {
-          // ✅ Используем newTurnoverSinceLastPayout
+          // ✅ REGULAR: (HE × newTurnover / 2) × CommissionRate
           const turnover = new Decimal(stat.newTurnoverSinceLastPayout || 0);
-          const houseEdge = new Decimal(ReferralService.CONFIG.HOUSE_EDGE);
-          const commissionRate = new Decimal(ReferralService.CONFIG.REGULAR_COMMISSION_RATE);
-          const commission = houseEdge
-            .times(turnover)
-            .dividedBy(2)
-            .times(commissionRate)
-            .dividedBy(100);
-          pendingCommission = pendingCommission.plus(commission);
+          if (turnover.greaterThan(0)) {
+            const houseEdge = new Decimal(ReferralService.CONFIG.HOUSE_EDGE);
+            const commissionRate = new Decimal(ReferralService.CONFIG.REGULAR_COMMISSION_RATE);
+            // Формула: (0.02 × turnover / 2) × 0.30
+            const commission = houseEdge
+              .times(turnover)
+              .dividedBy(2)
+              .times(commissionRate)
+              .dividedBy(100);
+            pendingCommission = pendingCommission.plus(commission);
+          }
         } else if (user.referrerType === 'WORKER') {
-          // ✅ Используем newLossesSinceLastPayout (НЕ totalLosses!)
+          // ✅ WORKER: 5% от newLosses
           const losses = new Decimal(stat.newLossesSinceLastPayout || 0);
-          const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
-          const commission = losses.times(workerShare).dividedBy(100);
-          pendingCommission = pendingCommission.plus(commission);
+          if (losses.greaterThan(0)) {
+            const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
+            const commission = losses.times(workerShare).dividedBy(100);
+            pendingCommission = pendingCommission.plus(commission);
+          }
         }
       }
 
-      return {
-        referralsCount: stats.length,
-        totalTurnover: parseFloat(totalTurnover.toString()),
-        totalCommissionPaid: parseFloat(totalCommissionPaid.toString()),
-        totalLosses: parseFloat(totalLosses.toString()),
-        potentialCommission: parseFloat(pendingCommission.toString()),
+      const result = {
+        // ⭐ ИСПРАВЛЕНО: используем реальное количество рефералов
+        referralsCount: referralsCount,
+        totalTurnover: parseFloat(totalTurnover.toFixed(8)),
+        totalCommissionPaid: parseFloat(totalCommissionPaid.toFixed(8)),
+        totalLosses: parseFloat(totalLosses.toFixed(8)),
+        totalWinnings: parseFloat(totalWinnings.toFixed(8)),
+        potentialCommission: parseFloat(pendingCommission.toFixed(8)),
         commissionRate: user.referrerType === 'REGULAR' 
           ? ReferralService.CONFIG.REGULAR_COMMISSION_RATE
           : ReferralService.CONFIG.WORKER_PROFIT_SHARE,
         referrerType: user.referrerType
       };
+
+      console.log(`📊 [getReferrerStats] Result:`, JSON.stringify(result, null, 2));
+
+      return result;
 
     } catch (error) {
       logger.error('REFERRAL', 'Error getting referrer stats', { error: error.message });
@@ -493,22 +512,28 @@ class ReferralService {
 
   /**
    * 💰 ОБРАБОТАТЬ ВСЕ НАКОПЛЕННЫЕ КОМИССИИ
-   * ⭐ ГЛАВНОЕ: 
-   * - REGULAR считает на основе newTurnoverSinceLastPayout
-   * - WORKER считает на основе newLossesSinceLastPayout
-   * - ОБА обнуляют свои счетчики после выплаты!
+   * 
+   * REGULAR: (House Edge × newTurnover / 2) × Commission Rate
+   * Пример: Оборот 1000 USDT
+   *   - House Edge = 2% = 0.02
+   *   - Преимущество казино = 1000 × 0.02 = 20 USDT
+   *   - Делим на 2 (fair share) = 10 USDT
+   *   - Комиссия 30% = 10 × 0.30 = 3 USDT
+   * 
+   * WORKER: 5% от потерь рефералов
+   * Пример: Потери 100 USDT
+   *   - Комиссия = 100 × 0.05 = 5 USDT
    */
   async processAllPendingCommissions(tokenId = 2) {
     console.log(`\n💰 [PROCESS COMMISSIONS] Starting...`);
     console.log(`📅 Time: ${new Date().toISOString()}`);
     
     try {
-      // ⭐ Находим ВСЕ статистики
       const allStats = await prisma.referralStats.findMany({
         where: { tokenId },
         include: {
-          referrer: { select: { id: true, referrerType: true } },
-          referee: { select: { id: true } }
+          referrer: { select: { id: true, referrerType: true, username: true } },
+          referee: { select: { id: true, username: true } }
         }
       });
 
@@ -522,6 +547,7 @@ class ReferralService {
         try {
           const referrerType = stat.referrer.referrerType;
           let commission = new Decimal(0);
+          let calculationDetails = '';
 
           if (referrerType === 'REGULAR') {
             // 🟢 REGULAR: (HE × newTurnover / 2) × CommRate
@@ -531,30 +557,30 @@ class ReferralService {
               const houseEdge = new Decimal(ReferralService.CONFIG.HOUSE_EDGE);
               const commissionRate = new Decimal(ReferralService.CONFIG.REGULAR_COMMISSION_RATE);
               
-              commission = houseEdge
-                .times(turnover)
-                .dividedBy(2)
-                .times(commissionRate)
-                .dividedBy(100);
+              // Формула: (0.02 × turnover / 2) × 0.30
+              const houseProfit = houseEdge.times(turnover);  // 2% от оборота
+              const fairShare = houseProfit.dividedBy(2);     // делим на 2
+              commission = fairShare.times(commissionRate).dividedBy(100);
 
-              console.log(`   🟢 REGULAR ${stat.referrer.id}: Turnover=${turnover.toFixed(2)}, Commission=${commission.toFixed(8)}`);
+              calculationDetails = `Turnover=${turnover.toFixed(2)}, HouseProfit=${houseProfit.toFixed(4)}, FairShare=${fairShare.toFixed(4)}, Commission=${commission.toFixed(8)}`;
+              console.log(`   🟢 REGULAR ${stat.referrer.username || stat.referrer.id}: ${calculationDetails}`);
             }
 
           } else if (referrerType === 'WORKER') {
-            // 🔴 WORKER: 5% от newLosses (⭐ НЕ totalLosses!)
+            // 🔴 WORKER: 5% от newLosses
             const losses = new Decimal(stat.newLossesSinceLastPayout || 0);
             
             if (losses.greaterThan(0)) {
               const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
               commission = losses.times(workerShare).dividedBy(100);
 
-              console.log(`   🔴 WORKER ${stat.referrer.id}: newLosses=${losses.toFixed(2)}, Commission=${commission.toFixed(8)}`);
+              calculationDetails = `Losses=${losses.toFixed(2)}, Commission=${commission.toFixed(8)} (${workerShare}%)`;
+              console.log(`   🔴 WORKER ${stat.referrer.username || stat.referrer.id}: ${calculationDetails}`);
             }
           }
 
           // Только если комиссия выше порога
           if (commission.greaterThanOrEqualTo(ReferralService.CONFIG.COMMISSION_PAYOUT_THRESHOLD)) {
-            // ⭐ Выплачиваем и обнуляем счетчики
             const result = await prisma.$transaction(async (tx) => {
               // Добавляем комиссию в баланс реферера
               await tx.balance.upsert({
@@ -576,12 +602,12 @@ class ReferralService {
                 }
               });
 
-              // ⭐ ГЛАВНОЕ: Обнулить оба счетчика!
+              // ⭐ Обнуляем счётчики после выплаты
               await tx.referralStats.update({
                 where: { id: stat.id },
                 data: {
-                  newTurnoverSinceLastPayout: 0,      // ⭐ Обнулить для REGULAR
-                  newLossesSinceLastPayout: 0,        // ⭐ Обнулить для WORKER
+                  newTurnoverSinceLastPayout: 0,
+                  newLossesSinceLastPayout: 0,
                   totalCommissionPaid: { increment: commission.toFixed(18) },
                   lastPayoutAt: new Date()
                 }
@@ -604,6 +630,7 @@ class ReferralService {
             });
 
             success++;
+            console.log(`   ✅ Paid ${result.toFixed(8)} USDT to ${stat.referrer.username || stat.referrer.id}`);
 
             if (referrerType === 'REGULAR') {
               breakdown.regular++;
@@ -612,7 +639,7 @@ class ReferralService {
               breakdown.workers++;
               breakdown.workersAmount += parseFloat(result.toString());
             }
-          } else {
+          } else if (commission.greaterThan(0)) {
             console.log(`   ⏭️ Commission ${commission.toFixed(8)} < threshold ${ReferralService.CONFIG.COMMISSION_PAYOUT_THRESHOLD}, skipped`);
           }
 
@@ -645,7 +672,7 @@ class ReferralService {
   }
 
   /**
-   * 💰 КОНФИГУРАЦИЯ
+   * 💰 КОНФИГУРАЦИЯ (статический метод)
    */
   static getLimits() {
     return {
