@@ -413,19 +413,17 @@ export function ReferralsPage() {
                     </p>
                     <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: colors.card }}>
                       <Send className="w-4 h-4" style={{ color: colors.foreground }} />
-                      <a
-                        href={`https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-mono flex-1 truncate hover:underline cursor-pointer"
+                      <div
+                        className="text-sm font-mono flex-1 truncate select-all cursor-text"
                         style={{ color: '#0088cc' }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          openTelegramLink()
+                          copyTelegramLink()
                         }}
+                        title="Нажмите чтобы скопировать"
                       >
                         t.me/SafariUpbot?start=ref_{stats.myReferralCode}
-                      </a>
+                      </div>
                       <button
                         onClick={(e) => {
                           e.preventDefault()
@@ -437,6 +435,18 @@ export function ReferralsPage() {
                         title="Скопировать ссылку"
                       >
                         <Copy className="w-4 h-4" style={{ color: colors.foreground }} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          openTelegramLink()
+                        }}
+                        className="p-1.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
+                        style={{ backgroundColor: colors.background }}
+                        title="Открыть в Telegram"
+                      >
+                        <ExternalLink className="w-4 h-4" style={{ color: colors.foreground }} />
                       </button>
                     </div>
                   </div>

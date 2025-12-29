@@ -63,11 +63,15 @@ export default function PlinkoGame() {
   const SIDE_PAD = 30;
 
   // Параметры детерминированной анимации
-  const ANIMATION_DURATION = 2500; // Длительность анимации в мс (2.5 секунды)
+  const ANIMATION_DURATION = 4000; // Длительность анимации в мс (4 секунды - медленнее)
   const BOUNCE_AMPLITUDE = 8; // Амплитуда отскока от пина
+  // Физика падения с ускорением (как будто шарик имеет вес)
+  // Используем функцию, которая имитирует падение с гравитацией - ускорение в начале, затем более равномерная скорость
   const EASING_FUNCTION = (t: number) => {
-    // Ease-out cubic для плавного падения
-    return 1 - Math.pow(1 - t, 3);
+    // Используем квадратичную функцию с корнем для более плавного ускорения
+    // Это дает эффект: шарик начинает медленно, ускоряется, затем движется более равномерно
+    // t^1.5 дает более плавное ускорение чем t^2, но все еще ощущается как падение с весом
+    return Math.pow(t, 1.5); // Плавное ускорение, имитирующее падение под действием гравитации
   };
 
   const rowHeight = (BOT_Y - TOP_Y) / ROWS;
@@ -405,18 +409,39 @@ export default function PlinkoGame() {
           return;
         }
 
-        // Применяем easing функцию
-        const easedProgress = EASING_FUNCTION(ball.animationProgress);
-
-        // Интерполируем позицию по траектории
+        // Вычисляем позицию на основе времени с равномерной скоростью
+        // Распределяем время пропорционально длине сегментов для равномерной скорости
         if (ball.trajectory.length > 1) {
-          // Находим сегмент траектории для текущего прогресса
-          const totalSegments = ball.trajectory.length - 1;
-          const segmentProgress = easedProgress * totalSegments;
-          const segmentIndex = Math.floor(segmentProgress);
-          const segmentT = segmentProgress - segmentIndex;
+          // Вычисляем общую длину траектории
+          let totalLength = 0;
+          const segmentLengths: number[] = [];
+          for (let i = 0; i < ball.trajectory.length - 1; i++) {
+            const dx = ball.trajectory[i + 1].x - ball.trajectory[i].x;
+            const dy = ball.trajectory[i + 1].y - ball.trajectory[i].y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            segmentLengths.push(length);
+            totalLength += length;
+          }
 
-          if (segmentIndex < totalSegments) {
+          // Применяем easing для имитации ускорения (как падение с весом)
+          const easedProgress = EASING_FUNCTION(ball.animationProgress);
+          const targetDistance = easedProgress * totalLength;
+
+          // Находим сегмент и позицию в нем
+          let accumulatedLength = 0;
+          let segmentIndex = 0;
+          let segmentT = 0;
+
+          for (let i = 0; i < segmentLengths.length; i++) {
+            if (accumulatedLength + segmentLengths[i] >= targetDistance) {
+              segmentIndex = i;
+              segmentT = (targetDistance - accumulatedLength) / segmentLengths[i];
+              break;
+            }
+            accumulatedLength += segmentLengths[i];
+          }
+
+          if (segmentIndex < ball.trajectory.length - 1) {
             const startPoint = ball.trajectory[segmentIndex];
             const endPoint = ball.trajectory[segmentIndex + 1];
 
@@ -440,8 +465,15 @@ export default function PlinkoGame() {
               }
             }
           } else {
-            // Последний сегмент - финальное движение к слоту
+            // Достигли конца траектории
             const lastPoint = ball.trajectory[ball.trajectory.length - 1];
+            ball.x = lastPoint.x;
+            ball.y = lastPoint.y;
+          }
+        } else {
+          // Если траектория пуста или только одна точка
+          const lastPoint = ball.trajectory[ball.trajectory.length - 1];
+          if (lastPoint) {
             ball.x = lastPoint.x;
             ball.y = lastPoint.y;
           }
