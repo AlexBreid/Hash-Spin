@@ -159,7 +159,7 @@ function waitForEndpoints() {
  * execute({ amount: 100 });
  */
 export function useFetch(apiKey, method = 'GET') {
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, logout } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -226,6 +226,9 @@ export function useFetch(apiKey, method = 'GET') {
 
       if (!response.ok) {
         if (response.status === 401) {
+          // Автоматический выход при истечении сессии
+          console.log('🔴 Сессия истекла, выполняю автоматический выход...');
+          logout();
           throw new Error('Сессия истекла. Пожалуйста, войдите заново.');
         }
         if (response.status === 403) {

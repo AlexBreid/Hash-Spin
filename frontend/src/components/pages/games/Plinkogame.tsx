@@ -30,6 +30,7 @@ interface Ball {
   trajectory: Array<{ x: number; y: number; pinIndex?: number }>;
   startTime: number;
   duration: number;
+  finalBalance: number | null; // Баланс для обновления после падения
 }
 
 export default function PlinkoGame() {
@@ -226,16 +227,18 @@ export default function PlinkoGame() {
         return toast.error(d.error || 'Ошибка при броске');
       }
 
-      if (d.newBalance !== undefined) {
-        setBalance(parseFloat(d.newBalance));
-      } else if (d.balance !== undefined) {
-        setBalance(parseFloat(d.balance));
-      } else {
-        await loadBalance();
-      }
+      // Сразу вычитаем ставку из баланса (показываем что деньги списались)
+      setBalance(prev => prev - bet);
 
       const targetX = getSlotX(d.ball.slot);
       const trajectory = generateTrajectory(d.ball.directions, targetX, pinsRef.current, W, TOP_Y, BOT_Y, rowHeight, SIDE_PAD, PIN_R, BOUNCE_AMPLITUDE);
+      
+      // Сохраняем новый баланс для обновления после падения шарика
+      const finalBalance = d.newBalance !== undefined 
+        ? parseFloat(d.newBalance) 
+        : d.balance !== undefined 
+          ? parseFloat(d.balance) 
+          : null;
       
       const ball: Ball = {
         id: Date.now() + Math.random(),
@@ -253,7 +256,8 @@ export default function PlinkoGame() {
         currentPinIndex: 0,
         trajectory: trajectory,
         startTime: Date.now(),
-        duration: ANIMATION_DURATION
+        duration: ANIMATION_DURATION,
+        finalBalance: finalBalance // Сохраняем баланс для обновления после падения
       };
 
       ballsRef.current.push(ball);
@@ -348,6 +352,14 @@ export default function PlinkoGame() {
           ball.x = ball.targetX;
           ball.y = slotY - BALL_R;
           ball.done = true;
+
+          // ✅ Обновляем баланс ПОСЛЕ падения шарика (добавляем выигрыш)
+          if (ball.finalBalance !== null) {
+            setBalance(ball.finalBalance);
+          } else {
+            // Если нет finalBalance, добавляем выигрыш к текущему балансу
+            setBalance(prev => prev + ball.win);
+          }
 
           const p = ball.win - ball.bet;
           setProfit(pr => pr + p);

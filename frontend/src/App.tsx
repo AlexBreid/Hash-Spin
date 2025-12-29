@@ -17,7 +17,7 @@ import { LoginPage } from './components/pages/LoginPage';
 import { CrashGame } from './components/pages/CrashGame';
 import { WithdrawPage } from './components/pages/WithdrawPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
-import PlinkoGame from './components/pages/games/Plinkogame';  // ✅ Исправлено
+import PlinkoGame from './components/pages/games/Plinkogame';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
@@ -26,17 +26,38 @@ import { PaymentSuccessPage } from './components/pages/PaymentSuccessPage';
 import { PaymentFailedPage } from './components/pages/PaymentFailedPage';
 import { CryptoCloudCallback } from './components/pages/CryptoCloudCallback';
 
-const AUTH_REQUIRED_PAGES = ['home', 'records', 'referrals', 'account', 'settings', 'support', 'crash', 'withdraw', 'minesweeper', 'plinko'];
+// Новые компоненты
+import { WelcomePage } from './components/pages/WelcomePage';
+import { AuthModal } from './components/modals/AuthModal';
+import { NotAuthenticated } from './components/pages/NotAuthenticated';
+
+// Страницы, требующие авторизации (home и support доступны всем)
+const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'minesweeper', 'plinko'];
+
+// Ключ для localStorage - показывалась ли welcome страница
+const WELCOME_SHOWN_KEY = 'safarix_welcome_shown';
 
 function AppContent() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { isAuthenticated, loading, user } = useAuth();
+    const { isAuthenticated, loading, user, login } = useAuth();
     
     const [showBonusModal, setShowBonusModal] = useState(false);
     const [hasBonusAvailable, setHasBonusAvailable] = useState(false);
     const [showFloatingButton, setShowFloatingButton] = useState(false);
     const [floatingButtonIndex, setFloatingButtonIndex] = useState(0);
+    
+    // Новые состояния для welcome и auth
+    const [showWelcome, setShowWelcome] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(false);
+
+    // Проверяем, показывать ли welcome страницу при первом входе
+    useEffect(() => {
+        const welcomeShown = localStorage.getItem(WELCOME_SHOWN_KEY);
+        if (!welcomeShown && !isAuthenticated) {
+            setShowWelcome(true);
+        }
+    }, []);
 
     const getCurrentPageFromURL = () => {
         const path = location.pathname.toLowerCase();
@@ -76,6 +97,13 @@ function AppContent() {
                         'Authorization': `Bearer ${token}`
                     }
                 });
+
+                if (response.status === 401) {
+                    // Сессия истекла, logout уже выполнен в useDynamicApi
+                    console.log('🔴 Сессия истекла при проверке бонуса');
+                    setHasBonusAvailable(false);
+                    return;
+                }
 
                 if (!response.ok) {
                     console.error('❌ Failed to check bonus availability');
@@ -126,21 +154,12 @@ function AppContent() {
         setCurrentPage(getCurrentPageFromURL());
     }, [location.pathname]);
 
+    // Автоматический редирект на логин при выходе из системы
     useEffect(() => {
-        if (loading) {
-            return;
-        }
-
-        if (!isAuthenticated && currentPage !== 'login') {
-            console.log('❌ Не аутентифицирован, редирект на login');
+        if (!loading && !isAuthenticated && AUTH_REQUIRED_PAGES.includes(currentPage)) {
+            console.log('🔴 Пользователь не авторизован, редирект на логин');
             navigate('/login');
             setCurrentPage('login');
-        }
-
-        if (isAuthenticated && currentPage === 'login') {
-            console.log('✅ Аутентифицирован, перенаправление на home');
-            navigate('/');
-            setCurrentPage('home');
         }
     }, [isAuthenticated, loading, currentPage, navigate]);
 
@@ -152,14 +171,29 @@ function AppContent() {
         }
     }, [isDarkMode]);
 
+    // Обработчик завершения Welcome страницы
+    const handleWelcomeEnter = () => {
+        localStorage.setItem(WELCOME_SHOWN_KEY, 'true');
+        setShowWelcome(false);
+    };
+
+    // Обработчик успешного входа из модалки
+    const handleAuthModalSuccess = () => {
+        setShowAuthModal(false);
+        // Перезагружаем страницу чтобы обновить состояние
+        window.location.reload();
+    };
+
+    // Обработчик открытия модалки авторизации
+    const handleOpenAuthModal = () => {
+        setShowAuthModal(true);
+    };
+
     const handlePageChange = (page: string) => {
-        if (!isAuthenticated && AUTH_REQUIRED_PAGES.includes(page)) {
-            navigate('/login');
-            setCurrentPage('login');
-        } else {
-            navigate(`/${page === 'home' ? '' : page}`);
-            setCurrentPage(page);
-        }
+        // Переходим на страницу независимо от авторизации
+        // Заглушка NotAuthenticated покажется при рендере если нужно
+        navigate(`/${page === 'home' ? '' : page}`);
+        setCurrentPage(page);
     };
 
     const handleThemeToggle = () => {
@@ -176,6 +210,21 @@ function AppContent() {
     };
 
     const renderCurrentPage = () => {
+        // Проверяем нужна ли авторизация для этой страницы
+        const needsAuth = AUTH_REQUIRED_PAGES.includes(currentPage);
+        
+        // Если нужна авторизация, но пользователь не авторизован - показываем NotAuthenticated
+        if (needsAuth && !isAuthenticated) {
+            return (
+                <NotAuthenticated 
+                    title="Вы не авторизованы"
+                    description="Войдите или зарегистрируйтесь, чтобы получить доступ к этому разделу"
+                    onLogin={handleOpenAuthModal}
+                    onRegister={() => window.open('https://t.me/SafariXCasinoBot', '_blank')}
+                />
+            );
+        }
+
         switch (currentPage) {
             case 'login':
                 return <LoginPage onLoginSuccess={() => {
@@ -189,7 +238,7 @@ function AppContent() {
             case 'minesweeper':
                 return <MinesweeperPage onBack={() => handlePageChange('home')} />;
             case 'plinko':
-                return <PlinkoGame />;  // ✅ Используем правильный компонент
+                return <PlinkoGame />;
             case 'withdraw':
                 return <WithdrawPage />;
             case 'records':
@@ -215,10 +264,7 @@ function AppContent() {
             case 'failed-payment':
                 return <PaymentFailedPage />;
             default:
-                return isAuthenticated ? <HomePage /> : <LoginPage onLoginSuccess={() => {
-                    navigate('/');
-                    setCurrentPage('home');
-                }} />;
+                return <HomePage />;
         }
     };
 
@@ -235,6 +281,15 @@ function AppContent() {
         return (
             <div className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto flex items-center justify-center">
                 <p className="text-muted-foreground">Загружение...</p>
+            </div>
+        );
+    }
+
+    // Показываем Welcome страницу для новых пользователей
+    if (showWelcome) {
+        return (
+            <div className="min-h-screen w-full max-w-[390px] mx-auto" style={{ height: '850px' }}>
+                <WelcomePage onEnter={handleWelcomeEnter} />
             </div>
         );
     }
@@ -275,6 +330,13 @@ function AppContent() {
                     onLearnMore={handleBonusLearnMore}
                 />
             )}
+
+            {/* Модалка авторизации */}
+            <AuthModal 
+                isOpen={showAuthModal}
+                onClose={() => setShowAuthModal(false)}
+                onLoginSuccess={handleAuthModalSuccess}
+            />
 
             <Toaster />
         </div>

@@ -4,6 +4,7 @@ import { useFetch } from '../hooks/useDynamicApi';
 import { Button } from './ui/button';
 import DepositPage from './pages/DepositPage';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import logoSU from '../assets/SU.png';
 
 // --- Интерфейсы ---
@@ -30,6 +31,7 @@ interface WalletData {
 
 export function TopNavigation({ onProfileClick }: TopNavigationProps) {
   const { theme } = useTheme();
+  const { isAuthenticated } = useAuth();
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -43,6 +45,11 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
 
   // 2. Первичная загрузка при монтировании
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       console.log('📊 Загрузка баланса...'); // DEBUG
@@ -57,7 +64,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           setLoading(false);
         });
     }
-  }, [loadBalance]); 
+  }, [loadBalance, isAuthenticated]); 
 
   // 3. Обновляем данные при получении ответа
   useEffect(() => {

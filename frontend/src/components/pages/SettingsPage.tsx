@@ -109,8 +109,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             >
               <MessageCircle className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <div className="font-semibold">Условия бонуса</div>
-                <div className="text-xs opacity-70">Полная информация о бонусах</div>
+                <div className="font-semibold">Бонус для рефералов</div>
+                <div className="text-xs opacity-70">Информация о бонусе при регистрации по реферальной ссылке</div>
               </div>
             </Button>
 
