@@ -22,8 +22,9 @@ const STORAGE_KEY = 'crash_game_history';
 const MAX_HISTORY_ITEMS = 10;
 const MIN_BET = 0.1;
 
-// 🔧 FIX #1: Буфер для сглаживания множителя (предотвращает резкие скачки)
-const MULTIPLIER_LERP_SPEED = 0.3; // Скорость интерполяции (0.1 = медленно, 1.0 = мгновенно)
+// 🔧 FIX: Улучшенные параметры интерполяции
+const MULTIPLIER_LERP_SPEED = 0.5;  // Было 0.3, теперь быстрее догоняет
+const MULTIPLIER_SNAP_THRESHOLD = 0.01;  // Порог для мгновенной синхронизации
 
 interface CrashHistory {
   id: string;
@@ -252,20 +253,27 @@ export function CrashGame() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 🔧 FIX #4: Интерполяция множителя для плавной анимации
-    // Если игра крашнулась - мгновенно показываем точку краша
+    // 🔧 FIX: Улучшенная интерполяция множителя
     if (isCrashedRef.current && crashPointRef.current !== null) {
+      // При краше - мгновенно показываем точку краша
       visualMultiplierRef.current = crashPointRef.current;
     } else if (gameState.status === 'flying') {
-      // Плавная интерполяция к серверному значению
-      const diff = serverMultiplierRef.current - visualMultiplierRef.current;
-      visualMultiplierRef.current += diff * MULTIPLIER_LERP_SPEED;
+      const target = serverMultiplierRef.current;
+      const current = visualMultiplierRef.current;
+      const diff = target - current;
       
-      // Если разница минимальна - синхронизируем полностью
-      if (Math.abs(diff) < 0.001) {
-        visualMultiplierRef.current = serverMultiplierRef.current;
+      // 🆕 Если визуальный множитель сильно отстал (например после краша) - мгновенный сброс
+      if (current > target + 0.5 || current < 0.9) {
+        visualMultiplierRef.current = target;
+      } else if (Math.abs(diff) < MULTIPLIER_SNAP_THRESHOLD) {
+        // Если разница минимальна - синхронизируем полностью
+        visualMultiplierRef.current = target;
+      } else {
+        // Плавная интерполяция
+        visualMultiplierRef.current += diff * MULTIPLIER_LERP_SPEED;
       }
     } else if (gameState.status === 'waiting') {
+      // 🆕 При ожидании - принудительный сброс на 1.0
       visualMultiplierRef.current = 1.0;
       serverMultiplierRef.current = 1.0;
     }
@@ -603,16 +611,34 @@ export function CrashGame() {
     };
 
     const handleGameStatus = (data: CrashGameState) => {
-      // 🔧 FIX: Сброс флагов при новой игре
-      if (data.status === 'waiting') {
+      // 🔧 FIX: Нормализуем статус - сервер может отправить 'in_progress' или 'flying'
+      const normalizedStatus = data.status === 'in_progress' ? 'flying' : data.status;
+      const normalizedData = { ...data, status: normalizedStatus as 'waiting' | 'flying' | 'crashed' };
+      
+      console.log(`📊 [gameStatus] status=${normalizedStatus}, multiplier=${data.multiplier}`);
+      
+      // Сброс флагов при новой игре (waiting)
+      if (normalizedStatus === 'waiting') {
         isCrashedRef.current = false;
         crashPointRef.current = null;
         serverMultiplierRef.current = 1.0;
         visualMultiplierRef.current = 1.0;
       }
       
-      setGameState(data);
-      if (data.status === 'waiting') {
+      // 🆕 FIX: При переходе в flying - ПОЛНЫЙ СБРОС для новой игры!
+      if (normalizedStatus === 'flying') {
+        isCrashedRef.current = false;
+        crashPointRef.current = null;
+        // 🆕 Сбрасываем множители на начальное значение или на то что пришло с сервера
+        const startMultiplier = data.multiplier || 1.0;
+        serverMultiplierRef.current = startMultiplier;
+        visualMultiplierRef.current = startMultiplier;  // 🆕 Мгновенный сброс визуального!
+        console.log(`🚀 [gameStatus] Новый раунд! Сброс множителей на ${startMultiplier}`);
+      }
+      
+      setGameState(normalizedData);
+      
+      if (normalizedStatus === 'waiting') {
         setCanCashout(false);
         if (!betPlaced) {
           sessionStorage.removeItem(sessionKeys.betId);
@@ -620,13 +646,12 @@ export function CrashGame() {
           sessionStorage.removeItem(sessionKeys.balanceType);
           sessionStorage.removeItem(sessionKeys.userBonusId);
         }
-      } else if (data.status === 'flying') {
+      } else if (normalizedStatus === 'flying') {
         setCanCashout(betPlaced);
       }
     };
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
-      // 🔧 FIX #6: Обновляем серверный множитель (визуальный интерполируется в drawChart)
       // Игнорируем обновления если уже крашнулись
       if (!isCrashedRef.current) {
         serverMultiplierRef.current = data.multiplier;
@@ -634,11 +659,32 @@ export function CrashGame() {
         setCanCashout(betPlaced);
       }
     };
+
+    // 🆕 FIX: Обработчик старта нового раунда - ПОЛНЫЙ сброс анимации!
+    const handleRoundStarted = (data: { gameId: string }) => {
+      console.log(`🚀 [roundStarted] Новый раунд: ${data.gameId}`);
+      
+      // Полный сброс всех ref-ов
+      isCrashedRef.current = false;
+      crashPointRef.current = null;
+      serverMultiplierRef.current = 1.0;
+      visualMultiplierRef.current = 1.0;
+      
+      // Сброс state
+      setGameState(prev => ({
+        ...prev,
+        gameId: data.gameId,
+        status: 'flying',
+        multiplier: 1.0,
+        crashPoint: null,
+      }));
+    };
     
     const handleError = (data: { message: string }) => toast.error(`❌ ${data.message}`);
 
     crashGameService.on('gameStatus', handleGameStatus);
     crashGameService.on('multiplierUpdate', handleMultiplierUpdate);
+    crashGameService.on('roundStarted', handleRoundStarted);  // 🆕
     crashGameService.on('gameCrashed', handleGameCrashed);
     crashGameService.on('playerJoined', handlePlayerJoined);
     crashGameService.on('betPlaced', handleBetPlaced);
@@ -649,6 +695,7 @@ export function CrashGame() {
     return () => {
       crashGameService.off('gameStatus', handleGameStatus);
       crashGameService.off('multiplierUpdate', handleMultiplierUpdate);
+      crashGameService.off('roundStarted', handleRoundStarted);  // 🆕
       crashGameService.off('gameCrashed', handleGameCrashed);
       crashGameService.off('playerJoined', handlePlayerJoined);
       crashGameService.off('betPlaced', handleBetPlaced);
