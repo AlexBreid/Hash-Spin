@@ -70,7 +70,8 @@ export function CrashGame() {
   const smoothMultiplierRef = useRef<number>(1.0);
   const isCrashedRef = useRef<boolean>(false);
   const crashPointRef = useRef<number | null>(null);
-  const lastUpdateTimeRef = useRef<number>(Date.now());
+  const lastMultiplierRef = useRef<number>(1.0);
+  const lastMultiplierTimeRef = useRef<number>(Date.now());
 
   // Для отображения в UI
   const [displayMultiplier, setDisplayMultiplier] = useState(1.0);
@@ -141,12 +142,15 @@ export function CrashGame() {
         setBalanceType(null);
         setUserBonusId(null);
         
-        currentMultiplierRef.current = 1.0;
-        targetMultiplierRef.current = 1.0;
-        smoothMultiplierRef.current = 1.0;
+        const resetValue = 1.0;
+        currentMultiplierRef.current = resetValue;
+        targetMultiplierRef.current = resetValue;
+        smoothMultiplierRef.current = resetValue;
+        lastMultiplierRef.current = resetValue;
+        lastMultiplierTimeRef.current = Date.now();
         isCrashedRef.current = false;
         crashPointRef.current = null;
-        setDisplayMultiplier(1.0);
+        setDisplayMultiplier(resetValue);
         
         sessionStorage.removeItem(sessionKeys.betId);
         sessionStorage.removeItem(sessionKeys.currentBet);
@@ -474,10 +478,13 @@ export function CrashGame() {
     const handleGameCrashed = (data: any) => {
       isCrashedRef.current = true;
       crashPointRef.current = parseFloat(data.crashPoint.toString());
-      currentMultiplierRef.current = crashPointRef.current;
-      targetMultiplierRef.current = crashPointRef.current;
-      smoothMultiplierRef.current = crashPointRef.current;
-      setDisplayMultiplier(crashPointRef.current); // Мгновенно обновляем UI
+      const crashValue = crashPointRef.current;
+      currentMultiplierRef.current = crashValue;
+      targetMultiplierRef.current = crashValue;
+      smoothMultiplierRef.current = crashValue;
+      lastMultiplierRef.current = crashValue;
+      lastMultiplierTimeRef.current = Date.now();
+      setDisplayMultiplier(crashValue); // Мгновенно обновляем UI
       
       setGameState((prev) => ({
         ...prev,
@@ -568,10 +575,13 @@ export function CrashGame() {
       if (normalizedStatus === 'waiting') {
         isCrashedRef.current = false;
         crashPointRef.current = null;
-        currentMultiplierRef.current = 1.0;
-        targetMultiplierRef.current = 1.0;
-        smoothMultiplierRef.current = 1.0;
-        setDisplayMultiplier(1.0);
+        const resetValue = 1.0;
+        currentMultiplierRef.current = resetValue;
+        targetMultiplierRef.current = resetValue;
+        smoothMultiplierRef.current = resetValue;
+        lastMultiplierRef.current = resetValue;
+        lastMultiplierTimeRef.current = Date.now();
+        setDisplayMultiplier(resetValue);
       }
       
       if (normalizedStatus === 'flying') {
@@ -581,6 +591,8 @@ export function CrashGame() {
         currentMultiplierRef.current = mult;
         targetMultiplierRef.current = mult;
         smoothMultiplierRef.current = mult;
+        lastMultiplierRef.current = mult;
+        lastMultiplierTimeRef.current = Date.now();
         setDisplayMultiplier(mult);
       }
       
@@ -601,9 +613,17 @@ export function CrashGame() {
 
     const handleMultiplierUpdate = (data: { multiplier: number }) => {
       if (!isCrashedRef.current) {
-        // Обновляем целевое значение для плавной интерполяции
-        targetMultiplierRef.current = data.multiplier;
-        currentMultiplierRef.current = data.multiplier;
+        const newMultiplier = data.multiplier;
+        
+        // Обновляем целевое значение
+        targetMultiplierRef.current = newMultiplier;
+        currentMultiplierRef.current = newMultiplier;
+        
+        // Если множитель увеличился, обновляем время последнего обновления
+        if (newMultiplier > lastMultiplierRef.current) {
+          lastMultiplierTimeRef.current = Date.now();
+        }
+        
         // gameState.status обновляем только если был waiting
         setGameState((prev) => {
           if (prev.status === 'waiting') {
@@ -618,10 +638,13 @@ export function CrashGame() {
     const handleRoundStarted = (data: { gameId: string }) => {
       isCrashedRef.current = false;
       crashPointRef.current = null;
-      currentMultiplierRef.current = 1.0;
-      targetMultiplierRef.current = 1.0;
-      smoothMultiplierRef.current = 1.0;
-      setDisplayMultiplier(1.0); // Мгновенный сброс UI
+      const resetValue = 1.0;
+      currentMultiplierRef.current = resetValue;
+      targetMultiplierRef.current = resetValue;
+      smoothMultiplierRef.current = resetValue;
+      lastMultiplierRef.current = resetValue;
+      lastMultiplierTimeRef.current = Date.now();
+      setDisplayMultiplier(resetValue); // Мгновенный сброс UI
       
       // Извлекаем номер раунда из gameId (если есть) или увеличиваем счетчик
       if (data.gameId) {
@@ -674,26 +697,33 @@ export function CrashGame() {
     ? crashPointRef.current 
     : displayMultiplier;
 
-  // 🔧 ПЛАВНАЯ АНИМАЦИЯ: Интерполяция множителя для плавности
+  // 🔧 ПЛАВНАЯ АНИМАЦИЯ: Линейная интерполяция с фиксированной скоростью
   useEffect(() => {
     let animationFrameId: number;
     
     const smoothUpdate = () => {
-      const now = Date.now();
-      lastUpdateTimeRef.current = now;
-
       if (!isCrashedRef.current) {
-        // Плавная интерполяция к целевому значению
         const target = targetMultiplierRef.current;
         const current = smoothMultiplierRef.current;
         const diff = target - current;
         
-        // Используем экспоненциальное сглаживание для плавности
-        const smoothingFactor = 0.15; // Чем меньше, тем плавнее (0.1-0.3 оптимально)
-        smoothMultiplierRef.current = current + diff * smoothingFactor;
-        
-        // Обновляем UI только если изменение заметное
-        if (Math.abs(diff) > 0.001) {
+        // Если разница очень мала, устанавливаем точное значение
+        if (Math.abs(diff) < 0.001) {
+          if (current !== target) {
+            smoothMultiplierRef.current = target;
+            setDisplayMultiplier(target);
+          }
+        } else {
+          // Фиксированная скорость изменения для плавности
+          // Используем небольшую скорость для плавного движения
+          const speed = 0.08; // Скорость приближения к целевому значению (0.05-0.15 оптимально)
+          const step = diff * speed;
+          
+          // Ограничиваем максимальное изменение за кадр для предотвращения скачков
+          const maxStep = 0.02;
+          const clampedStep = Math.sign(step) * Math.min(Math.abs(step), maxStep);
+          
+          smoothMultiplierRef.current = Math.max(1.0, current + clampedStep);
           setDisplayMultiplier(smoothMultiplierRef.current);
         }
       }
