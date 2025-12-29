@@ -1,6 +1,9 @@
 // ========================
-// ✅ ИСПРАВЛЕННЫЙ GAME SERVER
-// ИСПРАВЛЕНИЕ: cashout отправляется СРАЗУ на бэк
+// ✅ ИСПРАВЛЕННЫЙ GAME SERVER v2
+// ИСПРАВЛЕНИЯ:
+// 1. Краш проверяется ДО отправки multiplierUpdate
+// 2. При краше отправляется точный crashPoint, а не округлённый multiplier
+// 3. Убрано мерцание countdown
 // ========================
 
 const express = require('express');
@@ -72,7 +75,6 @@ function calculateCrashPointFromRandom(randomValue) {
 
 // ========================
 // ХРАНИЛИЩЕ ИСТОРИИ КРАШЕЙ (В ПАМЯТИ)
-// ✅ ПРИМЕЧАНИЕ: Основная история теперь в БД, это только для live-обновлений
 // ========================
 let crashHistory = [];
 
@@ -84,7 +86,6 @@ function addToCrashHistory(gameId, crashPoint, timestamp) {
     timestamp: new Date(timestamp),
   });
   
-  // Храним максимум 50 последних крашей в памяти (для сокетов)
   if (crashHistory.length > 50) {
     crashHistory = crashHistory.slice(0, 50);
   }
@@ -107,6 +108,9 @@ class GameRoom {
     this.countdownTimer = 5;
     this.roundKeys = this.generateRoundKeys();
     this.finalizationInProgress = false;
+    
+    // 🆕 Флаг что краш уже обработан (предотвращает повторную отправку)
+    this.crashHandled = false;
   }
 
   generateRoundKeys() {
@@ -146,6 +150,7 @@ class GameRoom {
     this.status = 'in_progress';
     this.multiplier = 1.0;
     this.finalizationInProgress = false;
+    this.crashHandled = false;  // 🆕 Сброс флага
 
     this.players.forEach(p => (p.cashed_out = false));
 
@@ -162,24 +167,56 @@ class GameRoom {
       clientSeed: this.roundKeys.clientSeed,
     });
 
+    // 🔧 FIX: Изменённый game loop
     this.gameLoopInterval = setInterval(() => {
+      // 🆕 Если краш уже обработан - не делаем ничего
+      if (this.crashHandled) {
+        return;
+      }
+      
       const elapsed = (Date.now() - this.startTime) / 1000;
-      this.multiplier = Math.pow(1.1, elapsed);
+      const newMultiplier = Math.pow(1.1, elapsed);
 
+      // 🔧 FIX #1: СНАЧАЛА проверяем краш, ПОТОМ отправляем multiplier
+      if (newMultiplier >= this.crashPoint) {
+        // 🆕 Устанавливаем флаг СРАЗУ чтобы предотвратить race condition
+        this.crashHandled = true;
+        
+        // 🔧 FIX #2: Устанавливаем multiplier ТОЧНО на crashPoint
+        this.multiplier = this.crashPoint;
+        
+        // 🔧 FIX #3: Отправляем ПОСЛЕДНИЙ multiplierUpdate с точным crashPoint
+        // ДО события gameCrashed!
+        io.to('crash-room').emit('multiplierUpdate', {
+          multiplier: this.crashPoint,  // 🆕 Точное значение, не округлённое!
+          gameId: this.gameId,
+          isFinal: true,  // 🆕 Флаг что это последний апдейт
+        });
+        
+        // 🔧 FIX #4: Небольшая задержка чтобы клиент успел получить multiplierUpdate
+        setTimeout(() => {
+          this.crash();
+        }, 10);  // 10ms достаточно для гарантии порядка
+        
+        return;
+      }
+
+      // Обычный апдейт множителя
+      this.multiplier = newMultiplier;
+      
       io.to('crash-room').emit('multiplierUpdate', {
         multiplier: parseFloat(this.multiplier.toFixed(2)),
         gameId: this.gameId,
+        isFinal: false,
       });
-
-      if (this.multiplier >= this.crashPoint) {
-        this.crash();
-      }
     }, 50);
   }
 
   async crash() {
     clearInterval(this.gameLoopInterval);
     this.status = 'crashed';
+    
+    // 🔧 FIX: Гарантируем что multiplier = crashPoint
     this.multiplier = this.crashPoint;
 
     if (this.finalizationInProgress) {
@@ -210,8 +247,9 @@ class GameRoom {
       log.error(`Ошибка финализации: ${error.message}`);
     }
 
+    // 🔧 FIX: Отправляем gameCrashed с ТОЧНЫМ crashPoint
     io.to('crash-room').emit('gameCrashed', {
-      crashPoint: this.crashPoint,
+      crashPoint: this.crashPoint,  // 🆕 Точное значение
       gameId: this.gameId,
       timestamp: crashTimestamp,
       winners: winners.map(w => ({
@@ -236,7 +274,15 @@ class GameRoom {
   }
 
   countdown() {
+    // 🔧 FIX: Отправляем countdown СРАЗУ при старте (не ждём 1 секунду)
+    io.to('crash-room').emit('countdownUpdate', {
+      seconds: this.countdownTimer,
+    });
+    
     const timer = setInterval(() => {
+      this.countdownTimer--;
+      
+      // 🔧 FIX: Отправляем gameStatus вместе с countdown для синхронизации
       io.to('crash-room').emit('countdownUpdate', {
         seconds: this.countdownTimer,
       });
@@ -245,7 +291,6 @@ class GameRoom {
         clearInterval(timer);
         this.startRound();
       }
-      this.countdownTimer--;
     }, 1000);
   }
 
@@ -289,6 +334,12 @@ class GameRoom {
         }
 
         const isWinner = winners.find(w => w.userId === player.userId);
+        
+        // 🆕 Пропускаем игроков которые уже получили выигрыш через immediate cashout
+        if (isWinner && player.cashoutFinalized) {
+          log.info(`⏭️ Пропускаю ${player.userName} - уже финализирован через immediate cashout`);
+          return;
+        }
 
         try {
           const url = `${BACKEND_URL}${API_VERSION}/crash/cashout-result`;
@@ -347,7 +398,6 @@ class GameRoom {
     }
   }
 
-  // 🆕 НЕМЕДЛЕННАЯ ФИНАЛИЗАЦИЯ при кэшауте (ДО конца раунда!)
   async finalizeSingleCashout(player) {
     if (!player.betId) {
       log.error(`❌ Нет betId для player ${player.userId}!`);
@@ -364,7 +414,7 @@ class GameRoom {
         winnings: parseFloat(player.winnings.toString()),
         exitMultiplier: parseFloat(player.multiplier.toString()),
         gameId: this.gameId,
-        result: 'won',  // 🆕 Всегда 'won' при кэшауте!
+        result: 'won',
         balanceType: player.balanceType || 'MAIN',
         userBonusId: player.userBonusId || null
       };
@@ -382,6 +432,8 @@ class GameRoom {
       );
 
       if (response.data.success) {
+        // 🆕 Помечаем что кэшаут уже финализирован
+        player.cashoutFinalized = true;
         log.success(`✅ [IMMEDIATE CASHOUT] Деньги зачислены СРАЗУ для ${player.userName}`);
       } else {
         log.error(`❌ Server error for ${player.userId}: ${response.data.error}`);
@@ -426,6 +478,7 @@ io.on('connection', socket => {
       betId: null,
       balanceType: 'MAIN',
       userBonusId: null,
+      cashoutFinalized: false,  // 🆕
     });
 
     log.info(`${userName} присоединился. Всего: ${gameRoom.players.size}`);
@@ -525,6 +578,7 @@ io.on('connection', socket => {
       player.betId = createBetResponse.data.data.betId;
       player.balanceType = createBetResponse.data.data.balanceType;
       player.userBonusId = createBetResponse.data.data.userBonusId;
+      player.cashoutFinalized = false;  // 🆕 Сброс флага
 
       log.success(`Ставка принята: betId=${player.betId}, tokenId=${player.tokenId}, balanceType=${player.balanceType}`);
 
@@ -547,7 +601,6 @@ io.on('connection', socket => {
     }
   });
 
-  // 🆕 ИСПРАВЛЕННЫЙ HANDLER: Отправляет результат СРАЗУ!
   socket.on('cashout', async (data) => {
     const player = gameRoom.players.get(socket.id);
 
@@ -563,6 +616,12 @@ io.on('connection', socket => {
 
     if (player.cashed_out) {
       socket.emit('error', 'Already cashed out');
+      return;
+    }
+
+    // 🔧 FIX: Проверяем что краш ещё не произошёл
+    if (gameRoom.crashHandled) {
+      socket.emit('error', 'Game already crashed');
       return;
     }
 
@@ -589,7 +648,6 @@ io.on('connection', socket => {
 
     log.success(`💰 ${player.userName} вышел на ${gameRoom.multiplier}x с ${player.winnings}`);
 
-    // 🆕 ОТПРАВЛЯЕМ РЕЗУЛЬТАТ СРАЗУ!
     await gameRoom.finalizeSingleCashout(player);
   });
 
