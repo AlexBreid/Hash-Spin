@@ -68,6 +68,53 @@ const getThemeColors = () => ({
   border: 'var(--border)',
 })
 
+// ✅ Универсальная функция копирования для всех устройств
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  // Метод 1: Современный Clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch (err) {
+      console.log('Clipboard API failed, trying fallback')
+    }
+  }
+
+  // Метод 2: Fallback через textarea
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    
+    // Стили чтобы textarea была невидима но доступна
+    textArea.style.position = 'fixed'
+    textArea.style.top = '0'
+    textArea.style.left = '0'
+    textArea.style.width = '2em'
+    textArea.style.height = '2em'
+    textArea.style.padding = '0'
+    textArea.style.border = 'none'
+    textArea.style.outline = 'none'
+    textArea.style.boxShadow = 'none'
+    textArea.style.background = 'transparent'
+    textArea.style.fontSize = '16px' // Предотвращает зум на iOS
+    
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    // Для iOS
+    textArea.setSelectionRange(0, 99999)
+    
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    
+    return successful
+  } catch (err) {
+    console.error('Fallback copy failed:', err)
+    return false
+  }
+}
+
 export function ReferralsPage() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -78,6 +125,7 @@ export function ReferralsPage() {
   const [showBonusModal, setShowBonusModal] = useState(false)
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [loadingReferrals, setLoadingReferrals] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const hasLoadedRef = useRef(false)
 
   const { execute: loadStats } = useFetch('REFERRAL_GET_referral_stats', 'GET')
@@ -156,51 +204,37 @@ export function ReferralsPage() {
     }
   }
 
-  const copyCode = () => {
+  const copyCode = async () => {
     if (stats?.myReferralCode) {
-      navigator.clipboard.writeText(stats.myReferralCode)
-      toast.success('✅ Код скопирован')
+      const success = await copyToClipboard(stats.myReferralCode)
+      if (success) {
+        toast.success('✅ Код скопирован')
+      } else {
+        toast.error('Не удалось скопировать')
+      }
     }
   }
 
+  // ✅ Исправленная функция копирования Telegram ссылки
   const copyTelegramLink = async () => {
     if (!stats?.myReferralCode) return
     
     const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
     
-    try {
-      // Пробуем использовать современный API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(telegramLink)
-        toast.success('✅ Ссылка на Telegram бота скопирована')
-      } else {
-        // Fallback для старых браузеров и мобильных устройств
-        const textArea = document.createElement('textarea')
-        textArea.value = telegramLink
-        textArea.style.position = 'fixed'
-        textArea.style.left = '-999999px'
-        textArea.style.top = '-999999px'
-        document.body.appendChild(textArea)
-        textArea.focus()
-        textArea.select()
-        
-        try {
-          const successful = document.execCommand('copy')
-          if (successful) {
-            toast.success('✅ Ссылка на Telegram бота скопирована')
-          } else {
-            throw new Error('Copy command failed')
-          }
-        } catch (err) {
-          // Если и это не сработало, показываем ссылку для ручного копирования
-          toast.error('Не удалось скопировать. Ссылка: ' + telegramLink)
-        } finally {
-          document.body.removeChild(textArea)
-        }
-      }
-    } catch (err) {
-      // Если ничего не сработало, показываем ссылку
-      toast.error('Не удалось скопировать. Ссылка: ' + telegramLink)
+    const success = await copyToClipboard(telegramLink)
+    
+    if (success) {
+      setCopiedLink(true)
+      toast.success('✅ Ссылка скопирована!')
+      
+      // Сбросить состояние через 2 секунды
+      setTimeout(() => setCopiedLink(false), 2000)
+    } else {
+      // Если копирование не сработало, показываем prompt
+      toast.info('Скопируйте ссылку вручную', {
+        description: telegramLink,
+        duration: 5000
+      })
     }
   }
 
@@ -438,72 +472,44 @@ export function ReferralsPage() {
                   {stats?.myReferralCode || '...'}
                 </p>
                 
-                {/* Telegram ссылка */}
+                {/* ✅ ИСПРАВЛЕННАЯ Telegram ссылка */}
                 {stats?.myReferralCode && (
                   <div className="mt-4 pt-4 border-t" style={{ borderColor: colors.border }}>
-                    <p style={{ color: colors.mutedForeground }} className="text-xs mb-2">
+                    <p style={{ color: colors.mutedForeground }} className="text-xs mb-3">
                       Ссылка на Telegram бота:
                     </p>
-                    <div 
-                      className="flex items-center gap-2 p-3 rounded-lg cursor-pointer active:opacity-80 transition-opacity touch-manipulation"
-                      style={{ backgroundColor: colors.card, WebkitTapHighlightColor: 'transparent' }}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        copyTelegramLink()
+                    
+                    {/* Кликабельная область для копирования */}
+                    <button
+                      onClick={copyTelegramLink}
+                      className="w-full flex items-center gap-2 p-3 rounded-lg transition-all active:scale-[0.98] select-none"
+                      style={{ 
+                        backgroundColor: copiedLink ? 'rgba(34, 197, 94, 0.2)' : colors.card,
+                        border: copiedLink ? '1px solid rgba(34, 197, 94, 0.5)' : `1px solid ${colors.border}`
                       }}
-                      onTouchStart={(e) => {
-                        e.stopPropagation()
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        copyTelegramLink()
-                      }}
-                      title="Нажмите чтобы скопировать ссылку"
                     >
-                      <Send className="w-4 h-4 flex-shrink-0" style={{ color: colors.foreground }} />
-                      <div
-                        className="text-sm font-mono flex-1 truncate select-all pointer-events-none"
-                        style={{ color: '#0088cc', userSelect: 'all', WebkitUserSelect: 'all' }}
+                      <Send className="w-4 h-4 flex-shrink-0 text-[#0088cc]" />
+                      <span 
+                        className="text-sm font-mono flex-1 truncate text-left"
+                        style={{ color: '#0088cc' }}
                       >
                         t.me/SafariUpbot?start=ref_{stats.myReferralCode}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          copyTelegramLink()
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          copyTelegramLink()
-                        }}
-                        className="p-2 rounded hover:opacity-80 active:scale-95 transition-all flex-shrink-0 touch-manipulation"
-                        style={{ backgroundColor: colors.background }}
-                        title="Скопировать ссылку"
-                      >
-                        <Copy className="w-4 h-4" style={{ color: colors.foreground }} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          openTelegramLink()
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          openTelegramLink()
-                        }}
-                        className="p-2 rounded hover:opacity-80 active:scale-95 transition-all flex-shrink-0 touch-manipulation"
-                        style={{ backgroundColor: colors.background }}
-                        title="Открыть в Telegram"
-                      >
-                        <ExternalLink className="w-4 h-4" style={{ color: colors.foreground }} />
-                      </button>
-                    </div>
+                      </span>
+                      {copiedLink ? (
+                        <CheckCircle className="w-5 h-5 flex-shrink-0 text-green-500" />
+                      ) : (
+                        <Copy className="w-5 h-5 flex-shrink-0" style={{ color: colors.mutedForeground }} />
+                      )}
+                    </button>
+                    
+                    {/* Отдельная кнопка "Открыть в Telegram" */}
+                    <button
+                      onClick={openTelegramLink}
+                      className="w-full mt-2 flex items-center justify-center gap-2 p-3 rounded-lg transition-all active:scale-[0.98] bg-[#0088cc] text-white font-medium"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Открыть в Telegram
+                    </button>
                   </div>
                 )}
               </div>
