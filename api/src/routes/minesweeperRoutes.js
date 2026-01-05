@@ -60,17 +60,18 @@ router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
 router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { difficultyId, betAmount, tokenId } = req.body;
+    const { minesCount, betAmount, tokenId } = req.body;
     const DEFAULT_TOKEN_ID = tokenId || 2;
     
     console.log('🎮 [MINESWEEPER START] Начинаю игру');
     console.log('   userId:', userId);
+    console.log('   minesCount:', minesCount);
     console.log('   betAmount:', betAmount);
 
-    if (!difficultyId || !betAmount || betAmount <= 0) {
+    if (!minesCount || minesCount < 1 || !betAmount || betAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Некорректные параметры',
+        message: 'Некорректные параметры (minesCount должен быть >= 1)',
       });
     }
 
@@ -87,11 +88,11 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     }
     console.log(`✅ [START] Списано ${betAmount} с ${deductResult.balanceType}`);
 
-    // 🎮 Создаём игру
+    // 🎮 Создаём игру (теперь передаём minesCount вместо difficultyId)
     const gameData = await minesweeperService.createGame(
       userId,
       DEFAULT_TOKEN_ID,
-      difficultyId,
+      parseInt(minesCount),
       betAmount
     );
 
