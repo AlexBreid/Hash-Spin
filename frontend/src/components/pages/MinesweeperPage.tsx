@@ -4,18 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { ArrowLeft, Loader, Trophy, Coins, Zap } from 'lucide-react';
+import { Loader, Coins, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { GameHeader } from './games/GameHeader';
 import './games/games.css';
-
-interface Difficulty {
-  id: number;
-  name: string;
-  minesCount: number;
-  multiplier: number;
-  gridSize: number;
-}
 
 interface GridCell {
   revealed: boolean;
@@ -40,13 +32,51 @@ const getThemeColors = () => ({
   border: 'var(--border)',
 });
 
+// Функция для расчета максимального множителя
+// ВСЕГДА 24.8x независимо от количества мин
+function calculateMaxMultiplier(minesCount: number): number {
+  return 24.8;
+}
+
+// Функция для расчета базового множителя (первая клетка)
+function calculateBaseMultiplier(minesCount: number): number {
+  const gridSize = 5;
+  const totalSafeCells = (gridSize * gridSize) - minesCount;
+  const maxMultiplier = calculateMaxMultiplier(minesCount);
+  
+  // Если всего 1 безопасная клетка (24 мины), базовый = максимальный
+  if (totalSafeCells === 1) {
+    return maxMultiplier;
+  }
+  
+  if (minesCount === 1) {
+    return 1.03; // При 1 мине первая клетка = 1.03x
+  } else if (minesCount === 15) {
+    return 2.48; // При 15 минах первая клетка = 2.48x
+  } else if (minesCount >= 24) {
+    // При 24+ минах базовый множитель близок к максимальному
+    return maxMultiplier * 0.95;
+  } else {
+    // Линейная интерполяция между 1.03 (1 мина) и 2.48 (15 мин)
+    // Для значений больше 15 используем экспоненциальный рост
+    if (minesCount < 15) {
+      const slope = (2.48 - 1.03) / (15 - 1);
+      return 1.03 + (minesCount - 1) * slope;
+    } else {
+      // Экспоненциальный рост от 2.48 (15 мин) до maxMultiplier * 0.95 (24 мин)
+      const progress = (minesCount - 15) / (24 - 15);
+      const targetBase = maxMultiplier * 0.95;
+      return 2.48 + (targetBase - 2.48) * Math.pow(progress, 1.5);
+    }
+  }
+}
+
 export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { token } = useAuth();
   const colors = getThemeColors();
 
   const [step, setStep] = useState<'SELECT' | 'PLAYING' | 'REVEAL_BOARD' | 'RESULT'>('SELECT');
-  const [difficulties, setDifficulties] = useState<Difficulty[]>([]);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null);
+  const [minesCount, setMinesCount] = useState<number>(1);
   const [betAmount, setBetAmount] = useState('10');
   const [loading, setLoading] = useState(false);
   const [gameId, setGameId] = useState<number | null>(null);
@@ -70,7 +100,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [cellLoading, setCellLoading] = useState(false);
   const [openedCells, setOpenedCells] = useState<Map<string, boolean>>(new Map());
 
-  const { execute: getDifficulties } = useFetch('MINESWEEPER_GET_minesweeper_difficulties', 'GET');
   const { execute: startGame } = useFetch('MINESWEEPER_POST_minesweeper_start', 'POST');
   const { execute: revealCell } = useFetch('MINESWEEPER_POST_minesweeper_reveal', 'POST');
   const { execute: cashOut } = useFetch('MINESWEEPER_POST_minesweeper_cashout', 'POST');
@@ -86,57 +115,57 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   }, [step]);
 
   useEffect(() => {
-    console.log('📊 [MINESWEEPER] Инициализирую компонент...');
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
     
     const loadBalance = async () => {
       try {
-        console.log('📊 [MINESWEEPER] Загружаю баланс...');
-        const response = await getBalance();
-        const data = response.data || response;
+        // Таймаут на случай, если запрос зависнет
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Timeout')), 5000);
+        });
+
+        const response = await Promise.race([
+          getBalance(),
+          timeoutPromise
+        ]) as any;
+        
+        clearTimeout(timeoutId);
+        
+        const data = response?.data || response;
+
+        if (!isMounted) return;
 
         if (Array.isArray(data)) {
-          console.log(`📊 [MINESWEEPER] Получено ${data.length} балансов:`, data);
-
           const main = data.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
           const bonus = data.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
           const total = main + bonus;
-
-          console.log(`💰 [MINESWEEPER] Main: ${main}, Bonus: ${bonus}, Total: ${total}`);
 
           setMainBalance(main);
           setBonusBalance(bonus);
           setTotalBalance(total);
         }
       } catch (err) {
-        console.error('❌ [MINESWEEPER] Ошибка загрузки баланса:', err);
-        toast.error('Не удалось загрузить баланс');
+        if (timeoutId) clearTimeout(timeoutId);
+        if (!isMounted) return;
+        // Не показываем ошибку, просто устанавливаем 0
         setMainBalance(0);
         setBonusBalance(0);
         setTotalBalance(0);
       } finally {
-        setBalanceLoading(false);
-      }
-    };
-
-    const loadDifficulties = async () => {
-      try {
-        console.log('📊 [MINESWEEPER] Загружаю сложности...');
-        const response = await getDifficulties();
-        const data = response.data || response;
-        
-        if (Array.isArray(data)) {
-          console.log(`✅ [MINESWEEPER] Получено ${data.length} сложностей`);
-          setDifficulties(data);
+        if (isMounted) {
+          setBalanceLoading(false);
         }
-      } catch (err) {
-        console.error('❌ [MINESWEEPER] Ошибка загрузки сложностей:', err);
-        toast.error('Не удалось загрузить сложности');
       }
     };
 
     loadBalance();
-    loadDifficulties();
 
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshBalance = async () => {
@@ -159,8 +188,8 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleStartGame = async () => {
-    if (!selectedDifficulty) {
-      toast.error('Выберите сложность');
+    if (minesCount < 1 || minesCount > 24) {
+      toast.error('Количество мин должно быть от 1 до 24');
       return;
     }
 
@@ -177,17 +206,46 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
     setLoading(true);
     try {
-      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}`);
+      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}, мин: ${minesCount}`);
       const response = await startGame({
-        difficultyId: selectedDifficulty.id,
+        minesCount: minesCount,
         betAmount: amount,
         tokenId: 2,
       });
 
-      const gameData = response;
+      console.log('📦 [MINESWEEPER] Ответ от сервера:', response);
 
-      if (!gameData || typeof gameData.gameId !== 'number' || !Array.isArray(gameData.grid) || gameData.grid.length === 0) {
-        throw new Error('Сервер вернул повреждённые данные');
+      // Проверяем структуру ответа (может быть response.data или response)
+      const gameData = response?.data || response;
+
+      console.log('📦 [MINESWEEPER] Обработанные данные:', gameData);
+
+      if (!gameData) {
+        throw new Error('Сервер не вернул данные');
+      }
+
+      if (typeof gameData.gameId !== 'number') {
+        console.error('❌ [MINESWEEPER] Некорректный gameId:', gameData.gameId);
+        throw new Error('Сервер вернул некорректный ID игры');
+      }
+
+      if (!Array.isArray(gameData.grid)) {
+        console.error('❌ [MINESWEEPER] Некорректный grid:', gameData.grid);
+        throw new Error('Сервер вернул некорректное поле');
+      }
+
+      // Временно создаем правильное поле 5x5 если сервер вернул 6x6 (для совместимости)
+      let finalGrid = gameData.grid;
+      if (gameData.grid.length === 6) {
+        console.warn('⚠️ [MINESWEEPER] Сервер вернул поле 6x6, создаю 5x5');
+        finalGrid = Array(5).fill(null).map(() =>
+          Array(5).fill(null).map(() => ({
+            revealed: false,
+          }))
+        );
+      } else if (gameData.grid.length !== 5) {
+        console.error('❌ [MINESWEEPER] Неправильный размер grid:', gameData.grid.length);
+        throw new Error(`Ожидалось поле 5x5, получено ${gameData.grid.length}x${gameData.grid[0]?.length || '?'}`);
       }
 
       // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
@@ -196,13 +254,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setUserBonusId(gameData.userBonusId);
 
       setGameId(gameData.gameId);
-      setGrid(gameData.grid);
+      setGrid(finalGrid);
       setOpenedCells(new Map());
       setCurrentMultiplier(parseFloat(gameData.currentMultiplier) || 1.0);
       setNextMultiplier(parseFloat(gameData.nextMultiplier) || 1.0);
       setMaxMultiplier(parseFloat(gameData.maxMultiplier) || 0);
       setPotentialWin(gameData.potentialWin?.toString() || '0');
+      setGameStatus('PLAYING');
+      
+      console.log('✅ [MINESWEEPER] Все данные установлены:');
+      console.log('   gameId:', gameData.gameId);
+      console.log('   grid размер:', gameData.grid.length, 'x', gameData.grid[0]?.length);
+      console.log('   currentMultiplier:', gameData.currentMultiplier);
+      console.log('   maxMultiplier:', gameData.maxMultiplier);
+      
+      // Устанавливаем step в последнюю очередь
       setStep('PLAYING');
+      console.log('✅ [MINESWEEPER] step установлен в PLAYING');
+      
       toast.success('Игра начата!');
 
       setTimeout(() => {
@@ -405,7 +474,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         }
         .minesweeper-grid {
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
+          grid-template-columns: repeat(5, 1fr);
           gap: 8px;
           padding: 16px;
           border-radius: 12px;
@@ -529,13 +598,13 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         />
 
         <div className="minesweeper-content">
-          {step === 'SELECT' && (
+          {(!step || step === 'SELECT') && (
             <Card className="card-animated p-4 border transition-colors" style={{
               backgroundColor: colors.card,
               borderColor: colors.border
             }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold" style={{ color: colors.foreground }}>🎮 Выберите уровень</h2>
+                <h2 className="text-lg font-bold" style={{ color: colors.foreground }}>🎮 Выберите количество мин</h2>
                 <div className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors font-bold" style={{
                   backgroundColor: '#FBBF24',
                   border: '2px solid #F59E0B'
@@ -554,46 +623,32 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
-                {difficulties.length === 0 ? (
-                  <div className="text-center py-8" style={{ color: colors.mutedForeground }}>
-                    <Loader className="animate-spin inline mr-2" size={24} />
-                    <span>Загрузка...</span>
-                  </div>
-                ) : (
-                  difficulties.map((diff) => (
-                    <button
-                      key={diff.id}
-                      onClick={() => setSelectedDifficulty(diff)}
-                      className={`difficulty-btn w-full p-4 rounded-2xl border-2 transition-all text-sm font-bold`}
-                      style={{
-                        borderColor: selectedDifficulty?.id === diff.id ? '#FBBF24' : colors.border,
-                        backgroundColor: selectedDifficulty?.id === diff.id 
-                          ? '#FBBF24'
-                          : colors.card,
-                        color: selectedDifficulty?.id === diff.id ? '#000000' : colors.foreground
-                      }}
-                    >
-                      <div className="flex justify-between items-center gap-2">
-                        <div className="text-left min-w-0">
-                          <p className="font-black text-base">{diff.name}</p>
-                          <p className="text-xs mt-1" style={{ color: selectedDifficulty?.id === diff.id ? '#1f2937' : colors.mutedForeground }}>
-                            💣 {diff.minesCount} мин • 6×6
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end flex-shrink-0">
-                          <Trophy
-                            size={20}
-                            className={selectedDifficulty?.id === diff.id ? 'text-black' : 'text-gray-500'}
-                          />
-                          <p className="text-xs font-bold mt-1" style={{ color: selectedDifficulty?.id === diff.id ? '#000000' : '#10b981' }}>
-                            ×{((36 - diff.minesCount) / (6 - Math.sqrt(diff.minesCount))).toFixed(1)}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                )}
+              <div className="mb-4">
+                <label className="block text-xs mb-2 font-bold" style={{ color: colors.mutedForeground }}>
+                  Количество мин (1-24)
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="24"
+                  step="1"
+                  value={minesCount}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    if (val >= 1 && val <= 24) {
+                      setMinesCount(val);
+                    }
+                  }}
+                  className="bet-input w-full"
+                  style={{ color: colors.foreground }}
+                />
+                <div className="mt-2 text-xs" style={{ color: colors.mutedForeground }}>
+                  💣 {minesCount} мин на поле 5×5
+                  <br />
+                  🎯 Первая клетка: ×{calculateBaseMultiplier(minesCount).toFixed(2)}
+                  <br />
+                  🎯 Максимальный множитель: ×{calculateMaxMultiplier(minesCount).toFixed(2)}
+                </div>
               </div>
 
               <div className="mb-4">
@@ -612,7 +667,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
               <Button
                 onClick={handleStartGame}
-                disabled={!selectedDifficulty || loading || balanceLoading || difficulties.length === 0}
+                disabled={minesCount < 1 || minesCount > 24 || loading || balanceLoading}
                 className="w-full font-black py-3 rounded-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 text-lg"
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
@@ -633,7 +688,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
             </Card>
           )}
 
-          {step === 'PLAYING' && Array.isArray(grid) && grid.length === 6 && (
+          {step === 'PLAYING' && Array.isArray(grid) && grid.length === 5 && (
             <Card className="card-animated p-5 border transition-colors" style={{
               backgroundColor: colors.card,
               borderColor: colors.border
@@ -706,13 +761,16 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
             </Card>
           )}
 
-          {step === 'PLAYING' && (!Array.isArray(grid) || grid.length !== 6) && (
-            <div className="flex justify-center items-center h-64">
+          {step === 'PLAYING' && (!Array.isArray(grid) || grid.length !== 5) && (
+            <div className="flex flex-col justify-center items-center h-64 gap-4">
               <Loader className="animate-spin text-blue-400" size={40} />
+              <p className="text-sm text-gray-400">
+                Загрузка поля... {grid.length > 0 ? `Размер: ${grid.length}x${grid[0]?.length || '?'}` : 'Пусто'}
+              </p>
             </div>
           )}
 
-          {(step === 'REVEAL_BOARD' || step === 'RESULT') && Array.isArray(grid) && grid.length === 6 && (
+          {(step === 'REVEAL_BOARD' || step === 'RESULT') && Array.isArray(grid) && grid.length === 5 && (
             <Card className="card-animated p-5 border transition-colors" style={{
               backgroundColor: colors.card,
               borderColor: colors.border

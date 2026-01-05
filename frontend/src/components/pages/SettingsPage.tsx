@@ -1,6 +1,6 @@
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { LogOut, HelpCircle, MessageCircle, LogIn, Moon, Sun } from 'lucide-react';
+import { LogOut, HelpCircle, MessageCircle, LogIn, Moon, Sun, Mail, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -191,11 +191,81 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         </motion.div>
       )}
 
-      {/* INFO CARD */}
+      {/* КОНТАКТЫ И ИНФОРМАЦИЯ */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
+      >
+        <Card className="p-6 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border-2 border-indigo-400/60 dark:from-indigo-950/40 dark:to-purple-950/20 dark:border-indigo-700/60">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-3 bg-indigo-600/20 rounded-xl">
+              <MessageCircle className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-200">Контакты и информация</h3>
+          </div>
+
+          <div className="space-y-4">
+            {/* О ПРОЕКТЕ */}
+            <div className="p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-indigo-400/50 dark:border-indigo-700/50">
+              <h4 className="font-semibold text-foreground mb-2">📋 О проекте</h4>
+              <p className="text-sm text-muted-foreground">
+                SafariUp — это современная платформа для криптовалютных игр с мгновенными выплатами и прозрачной системой бонусов.
+              </p>
+            </div>
+
+            {/* НАШИ ИГРЫ */}
+            <div className="p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-indigo-400/50 dark:border-indigo-700/50">
+              <h4 className="font-semibold text-foreground mb-2">🎮 Наши игры</h4>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Сапёр — классическая игра на логику с настраиваемым количеством мин</li>
+                <li>Краш — динамичная игра на удачу с растущим множителем</li>
+                <li>Плинко — захватывающая игра с физикой и случайными траекториями</li>
+              </ul>
+            </div>
+
+            {/* КОНТАКТЫ */}
+            <div className="p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-indigo-400/50 dark:border-indigo-700/50">
+              <h4 className="font-semibold text-foreground mb-3">📧 Контакты</h4>
+              <div className="space-y-2">
+                <a 
+                  href="mailto:sakodo5@gmail.com"
+                  className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>sakodo5@gmail.com</span>
+                </a>
+                <a 
+                  href="https://t.me/sakodo1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>@sakodo1</span>
+                </a>
+              </div>
+            </div>
+
+            {/* ПРЕИМУЩЕСТВА */}
+            <div className="p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-indigo-400/50 dark:border-indigo-700/50">
+              <h4 className="font-semibold text-foreground mb-2">💎 Преимущества</h4>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Мгновенные депозиты и выводы</li>
+                <li>Безопасные криптовалютные транзакции</li>
+                <li>Реферальная программа с бонусами</li>
+                <li>Честная игра с прозрачными правилами</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* INFO CARD */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
       >
         <Card className="p-4 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900/50 dark:to-slate-800/30 border border-slate-300/50 dark:border-slate-700/50">
           <div className="flex gap-3">
