@@ -229,20 +229,20 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
               <h4 className="font-semibold text-foreground mb-3">📧 Контакты</h4>
               <div className="space-y-2">
                 <a 
-                  href="mailto:sakodo5@gmail.com"
+                  href="mailto:safariuptech@gmail.com"
                   className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
                 >
                   <Mail className="w-4 h-4" />
-                  <span>sakodo5@gmail.com</span>
+                  <span>safariuptech@gmail.com</span>
                 </a>
                 <a 
-                  href="https://t.me/sakodo1"
+                  href="https://t.me/Safariup_support"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
                 >
                   <Send className="w-4 h-4" />
-                  <span>@sakodo1</span>
+                  <span>@Safariup_support</span>
                 </a>
               </div>
             </div>

@@ -26,7 +26,7 @@ interface WelcomePageProps {
   onEnter: () => void;
 }
 
-const TELEGRAM_BOT_URL = 'https://t.me/SafariXCasinoBot';
+const TELEGRAM_BOT_URL = 'https://t.me/SafariUpbot';
 
 // Цвета темы
 const COLORS = {
@@ -96,7 +96,7 @@ export function WelcomePage({ onEnter }: WelcomePageProps) {
 
           <h1 className="text-4xl font-black mb-3">
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              SafariX Casino
+              SafariUp Casino
             </span>
           </h1>
           
@@ -160,7 +160,7 @@ export function WelcomePage({ onEnter }: WelcomePageProps) {
         >
           <h3 style={{ color: COLORS.foreground }} className="font-bold mb-3 flex items-center gap-2">
             <Trophy className="w-5 h-5" style={{ color: COLORS.gold }} />
-            Почему SafariX?
+            Почему SafariUp?
           </h3>
           
           <ul className="space-y-2 text-sm" style={{ color: COLORS.mutedForeground }}>
@@ -345,8 +345,8 @@ function TermsContent() {
       <section>
         <h3 style={{ color: COLORS.foreground }} className="font-bold mb-2">1. Общие положения</h3>
         <p>
-          Добро пожаловать в SafariX Casino. Используя наш сервис, вы соглашаетесь с настоящими условиями.
-          SafariX Casino предоставляет онлайн-игры на криптовалюту исключительно в развлекательных целях.
+          Добро пожаловать в SafariUp Casino. Используя наш сервис, вы соглашаетесь с настоящими условиями.
+          SafariUp Casino предоставляет онлайн-игры на криптовалюту исключительно в развлекательных целях.
         </p>
       </section>
 
@@ -423,7 +423,7 @@ function TermsContent() {
       <section>
         <h3 style={{ color: COLORS.foreground }} className="font-bold mb-2">9. Ограничение ответственности</h3>
         <p>
-          SafariX Casino не несёт ответственности за убытки, возникшие в результате 
+          SafariUp Casino не несёт ответственности за убытки, возникшие в результате 
           использования сервиса. Все игры носят развлекательный характер, и вы играете 
           на свой страх и риск.
         </p>
@@ -451,7 +451,7 @@ function PrivacyContent() {
       <section>
         <h3 style={{ color: COLORS.foreground }} className="font-bold mb-2">1. Введение</h3>
         <p>
-          SafariX Casino уважает вашу конфиденциальность и стремится защитить ваши персональные данные.
+          SafariUp Casino уважает вашу конфиденциальность и стремится защитить ваши персональные данные.
           Настоящая политика описывает, как мы собираем, используем и защищаем вашу информацию.
         </p>
       </section>
