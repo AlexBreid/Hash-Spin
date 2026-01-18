@@ -443,6 +443,95 @@ class MinesweeperService {
     }
 
     /**
+     * 🔍 Получить активную игру пользователя
+     */
+    async getActiveGame(userId) {
+        try {
+            const game = await prisma.minesweeperGame.findFirst({
+                where: {
+                    userId: userId,
+                    status: 'PLAYING',
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            });
+
+            if (!game) {
+                return null;
+            }
+
+            // Получаем gameState с метаданными
+            let gameStateData;
+            try {
+                // Если gameState уже объект (Prisma автоматически парсит JSON)
+                if (typeof game.gameState === 'object') {
+                    gameStateData = game.gameState;
+                } else {
+                    gameStateData = JSON.parse(game.gameState);
+                }
+            } catch (parseError) {
+                console.error('❌ Ошибка парсинга gameState:', parseError);
+                throw new Error('Некорректный формат gameState');
+            }
+
+            const grid = Array.isArray(gameStateData) ? gameStateData : (gameStateData?.grid || []);
+            const minesCount = gameStateData?.minesCount || 6;
+            const gridSize = gameStateData?.gridSize || 5;
+
+            // Проверяем, что grid - это массив массивов
+            if (!Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0])) {
+                console.error('❌ Некорректный формат grid:', grid);
+                throw new Error('Некорректный формат игрового поля');
+            }
+
+            // Подготавливаем сетку для фронтенда (только раскрытые клетки)
+            const frontGrid = this.prepareGridForFront(grid);
+
+            // Создаем пустое поле и заполняем только раскрытыми клетками
+            const emptyGrid = Array(gridSize).fill(null).map(() =>
+                Array(gridSize).fill(null).map(() => ({
+                    revealed: false,
+                }))
+            );
+
+            // Копируем раскрытые клетки из исходной сетки
+            for (let y = 0; y < gridSize && y < frontGrid.length; y++) {
+                if (!frontGrid[y]) continue;
+                for (let x = 0; x < gridSize && x < frontGrid[y].length; x++) {
+                    if (frontGrid[y][x]?.revealed) {
+                        emptyGrid[y][x] = {
+                            revealed: true,
+                            isMine: frontGrid[y][x].isMine,
+                        };
+                    }
+                }
+            }
+
+            const nextMultiplier = this.getNextMultiplier(game.revealedCells, minesCount);
+            const maxMultiplier = this.getMaxMultiplier(minesCount);
+            const potentialWin = new Decimal(game.betAmount).mul(game.multiplier);
+
+            return {
+                gameId: game.id,
+                grid: emptyGrid,
+                currentMultiplier: parseFloat(game.multiplier.toString()),
+                nextMultiplier: nextMultiplier,
+                maxMultiplier: maxMultiplier,
+                potentialWin: potentialWin.toString(),
+                minesCount: minesCount,
+                revealedCells: game.revealedCells,
+                betAmount: parseFloat(game.betAmount.toString()),
+            };
+
+        } catch (error) {
+            console.error('❌ Ошибка получения активной игры:', error.message);
+            console.error('   Stack:', error.stack);
+            throw error;
+        }
+    }
+
+    /**
      * 💰 Забрать выигрыш (Кэшаут)
      */
     async cashOutGame(gameId, userId) {

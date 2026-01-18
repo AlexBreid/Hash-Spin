@@ -127,6 +127,10 @@
       "path": "/api/v1/minesweeper/reveal",
       "method": "POST"
     },
+    "MINESWEEPER_GET_minesweeper_active": {
+      "path": "/api/v1/minesweeper/active",
+      "method": "GET"
+    },
     "MINESWEEPER_GET_minesweeper_history": {
       "path": "/api/v1/minesweeper/history",
       "method": "GET"

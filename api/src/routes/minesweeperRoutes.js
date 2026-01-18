@@ -298,6 +298,43 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
 });
 
 /**
+ * 🎮 GET активная игра пользователя
+ */
+router.get('/api/v1/minesweeper/active', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log(`🔍 [ACTIVE] Проверяю активную игру для пользователя ${userId}`);
+
+    const activeGame = await minesweeperService.getActiveGame(userId);
+
+    if (!activeGame) {
+      console.log(`   ℹ️ Активная игра не найдена`);
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Нет активной игры',
+      });
+    }
+
+    console.log(`   ✅ Активная игра найдена: ID ${activeGame.gameId}`);
+
+    res.json({
+      success: true,
+      data: activeGame,
+    });
+  } catch (error) {
+    console.error('❌ [ACTIVE] Ошибка:', error.message);
+    logger.error('MINESWEEPER', 'Failed to get active game', { error: error.message });
+    
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения активной игры',
+    });
+  }
+});
+
+/**
  * 🎮 GET история игр
  */
 router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) => {
