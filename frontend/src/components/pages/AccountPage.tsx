@@ -509,7 +509,7 @@ export function AccountPage() {
 
             {/* УРОВЕНЬ ИГРОКА */}
             <div
-              className="rounded-2xl p-6 border transition-all"
+              className="rounded-2xl p-6 border transition-all mb-6"
               style={{
                 background: `color-mix(in srgb, ${COLORS.primary} 20%, transparent)`,
                 borderColor: COLORS.primary,
@@ -527,51 +527,47 @@ export function AccountPage() {
               </p>
             </div>
 
-            {/* КНОПКИ ПОПОЛНЕНИЯ И ВЫВОДА */}
-            <div className="grid grid-cols-2 gap-4 mt-6">
+            {/* КНОПКИ ПОПОЛНЕНИЯ И ВЫВОДА - КОМПАКТНЫЙ ДИЗАЙН */}
+            <div className="grid grid-cols-2 gap-4">
               <motion.button
                 onClick={() => setShowDeposit(true)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="rounded-xl p-4 border transition-all flex items-center justify-center gap-3 font-semibold"
+                className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm min-w-0"
                 style={{
-                  background: `linear-gradient(135deg, ${COLORS.success}, #10b981)`,
+                  background: `color-mix(in srgb, ${COLORS.success} 15%, transparent)`,
                   borderColor: COLORS.success,
-                  color: '#fff',
-                  boxShadow: `0 4px 16px color-mix(in srgb, ${COLORS.success} 30%, transparent)`,
+                  borderOpacity: 0.3,
+                  color: COLORS.success,
                 }}
               >
-                <CreditCard size={20} />
-                <span>Пополнить</span>
+                <CreditCard size={18} />
+                <span className="truncate">Пополнить</span>
               </motion.button>
 
               <motion.button
                 onClick={() => setShowWithdraw(true)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="rounded-xl p-4 border transition-all flex items-center justify-center gap-3 font-semibold"
+                className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm min-w-0"
                 style={{
-                  background: `linear-gradient(135deg, ${COLORS.primary}, #3b82f6)`,
+                  background: `color-mix(in srgb, ${COLORS.primary} 15%, transparent)`,
                   borderColor: COLORS.primary,
-                  color: '#fff',
-                  boxShadow: `0 4px 16px color-mix(in srgb, ${COLORS.primary} 30%, transparent)`,
+                  borderOpacity: 0.3,
+                  color: COLORS.primary,
                 }}
               >
-                <ArrowUpCircle size={20} />
-                <span>Вывести</span>
+                <ArrowUpCircle size={18} />
+                <span className="truncate">Вывести</span>
               </motion.button>
             </div>
           </motion.div>
 
           {/* 🎁 АКТИВНЫЙ БОНУС */}
-          {activeBonus ? (
+          {activeBonus && (
             <>
               <BonusCard bonus={activeBonus} />
             </>
-          ) : (
-            <div style={{ color: COLORS.mutedForeground }} className="text-center text-sm mb-6">
-              🎁 Нет активных бонусов
-            </div>
           )}
 
           {/* 📊 ОСНОВНЫЕ МЕТРИКИ */}
@@ -609,12 +605,12 @@ export function AccountPage() {
             )}
           </div>
 
-          {/* WIN RATE И ПОРАЖЕНИЯ */}
+          {/* WIN RATE */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="rounded-2xl p-6 border grid grid-cols-2 gap-4 transition-all"
+            className="rounded-2xl p-6 border transition-all"
             style={{
               background: `color-mix(in srgb, ${COLORS.primary} 10%, ${COLORS.card})`,
               borderColor: COLORS.border,
@@ -626,14 +622,6 @@ export function AccountPage() {
               </p>
               <p style={{ color: COLORS.success }} className="text-2xl font-bold">
                 {winRate}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
-                Поражений
-              </p>
-              <p style={{ color: '#EF4444' }} className="text-2xl font-bold">
-                {lossCount.toLocaleString('ru-RU')}
               </p>
             </div>
           </motion.div>

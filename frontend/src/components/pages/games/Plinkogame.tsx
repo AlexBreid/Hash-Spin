@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../../../context/ThemeContext';
 import { GameHeader } from './GameHeader';
@@ -35,7 +34,6 @@ interface Ball {
 
 export default function PlinkoGame() {
   const { token, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ballsRef = useRef<Ball[]>([]);
@@ -51,18 +49,25 @@ export default function PlinkoGame() {
   const [history, setHistory] = useState<{ m: number }[]>([]);
   const [profit, setProfit] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  
+  // Анимация слотов при попадании шарика (используем ref для доступа в requestAnimationFrame)
+  const slotAnimationsRef = useRef<Record<number, number>>({});
 
-  const W = 400;
-  const H = 650;
-  const PIN_R = 3;
-  const BALL_R = 3;
-  const TOP_Y = 60;
-  const BOT_Y = H - 100;
-  const SIDE_PAD = 30;
+  const W = 850;
+  const H = 900;
+  const PIN_R = 5;
+  const BALL_R = 6.5; // Увеличен размер шарика
+  const TOP_Y = 100;
+  const BOT_Y = H - 140;
+  const SIDE_PAD = 60;
 
-  const ANIMATION_DURATION = 4000;
-  const BOUNCE_AMPLITUDE = 8;
-  const EASING_FUNCTION = (t: number) => Math.pow(t, 1.5);
+  const ANIMATION_DURATION = 3000; // Быстрее для динамичности
+  const BOUNCE_AMPLITUDE = 6;
+  // Реалистичное ускорение под действием гравитации (ease-in с квадратичным ускорением)
+  const EASING_FUNCTION = (t: number) => {
+    // Квадратичное ускорение - шарик быстро разгоняется под действием гравитации
+    return t * t * (2.5 - 1.5 * t); // Быстрое ускорение, затем плавное замедление
+  };
 
   const rowHeight = (BOT_Y - TOP_Y) / ROWS;
 
@@ -82,12 +87,10 @@ export default function PlinkoGame() {
   }, []);
 
   const handleInputBlur = useCallback(() => {
-    setKeyboardOpen(false);
-    
-    // Возвращаем скролл наверх
+    // Задержка для плавного закрытия клавиатуры
     setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
+      setKeyboardOpen(false);
+    }, 300); // Даём время клавиатуре закрыться перед изменением классов
   }, []);
 
   // ✅ Обработка Enter - закрываем клавиатуру
@@ -155,7 +158,8 @@ export default function PlinkoGame() {
       let nearestPinIndex = -1;
       let minDist = Infinity;
       
-      pins.forEach((pin, idx) => {
+      for (let idx = 0; idx < pins.length; idx++) {
+        const pin = pins[idx];
         const pinRow = Math.floor((pin.y - topY) / rowH);
         if (pinRow === row) {
           const dist = Math.abs(pin.x - currentX);
@@ -165,25 +169,40 @@ export default function PlinkoGame() {
             nearestPinIndex = idx;
           }
         }
-      });
+      }
       
       if (nearestPin) {
-        const offsetX = direction * baseSpacing * 0.6;
-        const targetXAfterPin = nearestPin.x + offsetX;
-        const hitY = nearestPin.y - pinR * 0.3;
-        trajectory.push({ x: nearestPin.x, y: hitY, pinIndex: nearestPinIndex });
-        const bounceY = hitY - bounceAmp;
-        trajectory.push({ x: targetXAfterPin, y: bounceY });
-        currentX = targetXAfterPin;
-        currentY = bounceY;
+        // Шарик проходит между пинами, не касаясь их напрямую
+        const pinGap = baseSpacing * 0.4; // Расстояние между пинами
+        const offsetX = direction * pinGap;
+        
+        // Точка ПЕРЕД пином (шарик движется к пину, но не касается)
+        const beforePinX = nearestPin.x - (direction > 0 ? pinGap * 0.3 : -pinGap * 0.3);
+        const beforePinY = nearestPin.y - pinR - BALL_R - 2; // Над пином с запасом
+        
+        // Точка ПОСЛЕ пина (шарик отскакивает в сторону)
+        const afterPinX = nearestPin.x + offsetX;
+        const afterPinY = nearestPin.y + pinR + BALL_R + 2; // Под пином
+        
+        // Промежуточная точка для плавного перехода
+        const midX = (beforePinX + afterPinX) / 2;
+        const midY = (beforePinY + afterPinY) / 2 - bounceAmp * 0.5; // Легкий отскок
+        
+        trajectory.push({ x: beforePinX, y: beforePinY });
+        trajectory.push({ x: midX, y: midY, pinIndex: nearestPinIndex });
+        trajectory.push({ x: afterPinX, y: afterPinY });
+        
+        currentX = afterPinX;
+        currentY = afterPinY;
       } else {
-        const offsetX = direction * baseSpacing * 0.5;
+        // Плавное движение между рядами без пинов
+        const offsetX = direction * baseSpacing * 0.45;
         currentX += offsetX;
         trajectory.push({ x: currentX, y: rowY });
       }
     }
     
-    const slotY = botY + 25;
+    const slotY = botY + 35;
     trajectory.push({ x: targetX, y: slotY - BALL_R });
     
     return trajectory;
@@ -287,10 +306,11 @@ export default function PlinkoGame() {
       };
     }
 
-    const slotY = BOT_Y + 25;
-    const slotHeight = 35;
+    const slotY = BOT_Y + 35;
+    const slotHeight = 50;
 
     const render = () => {
+      const currentTime = Date.now(); // ✅ Обновляем время на каждом кадре
       const isDark = theme === 'dark';
       const bgColor = isDark ? '#0A0F1E' : '#f8f9fa';
       const pinColor1 = isDark ? '#3B82F6' : '#1E3A8A';
@@ -323,21 +343,47 @@ export default function PlinkoGame() {
         else if (m >= 0.3) col = isDark ? '#FCD34D' : '#FBBF24';
         else col = isDark ? '#94A3B8' : '#636e72';
 
+        // Анимация подпрыгивания слота
+        let bounceY = 0;
+        let scale = 1;
+        const animationStartTime = slotAnimationsRef.current[i];
+        if (animationStartTime) {
+          const elapsed = currentTime - animationStartTime;
+          if (elapsed < 600) { // Анимация 600мс
+            const progress = elapsed / 600;
+            // Эффект подпрыгивания: сначала вверх, потом вниз с затуханием
+            const bounce = Math.sin(progress * Math.PI) * (1 - progress) * 12; // Подъём до 12px
+            bounceY = -bounce;
+            // Легкое увеличение при подпрыгивании
+            scale = 1 + Math.sin(progress * Math.PI) * 0.15 * (1 - progress);
+          } else {
+            // Убираем завершённую анимацию
+            delete slotAnimationsRef.current[i];
+          }
+        }
+
+        ctx.save();
+        // Применяем трансформацию для анимации
+        ctx.translate(x + slotWidth / 2, slotY + slotHeight / 2 + bounceY);
+        ctx.scale(scale, scale);
+        ctx.translate(-(x + slotWidth / 2), -(slotY + slotHeight / 2));
+
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.roundRect(x, slotY, slotWidth, slotHeight, 5);
         ctx.fill();
 
         ctx.fillStyle = textColor;
-        ctx.font = 'bold 9px Arial';
+        ctx.font = 'bold 13px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const displayText = m >= 100 ? String(m) : m + 'x';
         ctx.fillText(displayText, x + slotWidth / 2, slotY + slotHeight / 2);
+        
+        ctx.restore();
       });
 
       const toRemove: number[] = [];
-      const currentTime = Date.now();
 
       ballsRef.current.forEach((ball, idx) => {
         if (ball.done) {
@@ -352,6 +398,13 @@ export default function PlinkoGame() {
           ball.x = ball.targetX;
           ball.y = slotY - BALL_R;
           ball.done = true;
+
+          // 🎯 Запускаем анимацию слота при попадании шарика
+          const targetSlot = ball.targetSlot;
+          if (targetSlot !== undefined && targetSlot >= 0 && targetSlot < MULTS.length) {
+            // Сохраняем время начала анимации в ref (доступно сразу в requestAnimationFrame)
+            slotAnimationsRef.current[targetSlot] = currentTime;
+          }
 
           // ✅ Обновляем баланс ПОСЛЕ падения шарика (добавляем выигрыш)
           if (ball.finalBalance !== null) {
@@ -405,15 +458,31 @@ export default function PlinkoGame() {
           if (segmentIndex < ball.trajectory.length - 1) {
             const startPoint = ball.trajectory[segmentIndex];
             const endPoint = ball.trajectory[segmentIndex + 1];
-            ball.x = startPoint.x + (endPoint.x - startPoint.x) * segmentT;
-            ball.y = startPoint.y + (endPoint.y - startPoint.y) * segmentT;
+            
+            // Динамичная интерполяция - быстро вниз (гравитация), естественно на поворотах
+            const isDownward = endPoint.y > startPoint.y;
+            let smoothT: number;
+            
+            if (isDownward) {
+              // Вниз - быстрое ускорение под действием гравитации
+              smoothT = segmentT * segmentT * (2 - segmentT); // Ускорение с естественным замедлением
+            } else {
+              // На поворотах - более плавное движение
+              smoothT = segmentT * (1.5 - segmentT * 0.5); // Линейное с легким ускорением
+            }
+            
+            // Ограничиваем значение до [0, 1]
+            smoothT = Math.max(0, Math.min(1, smoothT));
+            
+            ball.x = startPoint.x + (endPoint.x - startPoint.x) * smoothT;
+            ball.y = startPoint.y + (endPoint.y - startPoint.y) * smoothT;
 
+            // Плавный эффект отскока при прохождении мимо пина
             if (endPoint.pinIndex !== undefined) {
-              if (segmentT < 0.5) {
-                ball.y -= Math.sin(segmentT * 2 * Math.PI * 0.5) * 2;
-              } else {
-                ball.y -= Math.sin((segmentT - 0.5) * 2 * Math.PI) * BOUNCE_AMPLITUDE;
-              }
+              // Синусоидальный отскок с затуханием
+              const bounceProgress = Math.sin(segmentT * Math.PI);
+              const bounceAmount = bounceProgress * BOUNCE_AMPLITUDE * (1 - segmentT * 0.3); // Затухание
+              ball.y -= bounceAmount;
             }
           } else {
             const lastPoint = ball.trajectory[ball.trajectory.length - 1];

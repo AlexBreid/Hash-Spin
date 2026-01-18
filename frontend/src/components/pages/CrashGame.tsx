@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameHeader } from './games/GameHeader';
+import { BigWinModal } from '../modals/BigWinModal';
 import './games/games.css';
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
@@ -58,6 +59,10 @@ export function CrashGame() {
   
   const [balanceType, setBalanceType] = useState<string | null>(null);
   const [userBonusId, setUserBonusId] = useState<string | null>(null);
+  
+  // Big Win Modal
+  const [isBigWinModalOpen, setIsBigWinModalOpen] = useState(false);
+  const [bigWinData, setBigWinData] = useState<{ winAmount: number; multiplier: number } | null>(null);
   
   const [crashHistory, setCrashHistory] = useState<CrashHistory[]>([]);
   const [activeCrash, setActiveCrash] = useState<CrashHistory | null>(null);
@@ -557,6 +562,12 @@ export function CrashGame() {
       setBalanceType(null);
       setUserBonusId(null);
       
+      // Проверяем условия для Big Win Modal: множитель >= 5x ИЛИ выигрыш >= $1000
+      if (data.multiplier >= 5 || data.winnings >= 1000) {
+        setBigWinData({ winAmount: data.winnings, multiplier: data.multiplier });
+        setIsBigWinModalOpen(true);
+      }
+      
       setTimeout(() => {
         fetchBalances();
         setCashoutStatus(null);
@@ -1028,6 +1039,20 @@ export function CrashGame() {
         div::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.3); border-radius: 4px; }
         div::-webkit-scrollbar-thumb:hover { background: rgba(34, 197, 94, 0.5); }
       `}</style>
+
+      {/* Big Win Modal */}
+      {bigWinData && (
+        <BigWinModal
+          isOpen={isBigWinModalOpen}
+          onClose={() => {
+            setIsBigWinModalOpen(false);
+            setBigWinData(null);
+          }}
+          winAmount={bigWinData.winAmount}
+          multiplier={bigWinData.multiplier}
+          gameType="crash"
+        />
+      )}
     </div>
   );
 }

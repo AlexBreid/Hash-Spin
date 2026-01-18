@@ -4,9 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Loader, Coins, Zap } from 'lucide-react';
+import { Loader, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { GameHeader } from './games/GameHeader';
+import { BigWinModal } from '../modals/BigWinModal';
 import './games/games.css';
 
 interface GridCell {
@@ -96,6 +97,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [balanceType, setBalanceType] = useState<string | null>(null);
   const [userBonusId, setUserBonusId] = useState<string | null>(null);
   
+  // Big Win Modal
+  const [isBigWinModalOpen, setIsBigWinModalOpen] = useState(false);
+  const [bigWinData, setBigWinData] = useState<{ winAmount: number; multiplier: number } | null>(null);
+  
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [cellLoading, setCellLoading] = useState(false);
   const [openedCells, setOpenedCells] = useState<Map<string, boolean>>(new Map());
@@ -104,6 +109,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { execute: revealCell } = useFetch('MINESWEEPER_POST_minesweeper_reveal', 'POST');
   const { execute: cashOut } = useFetch('MINESWEEPER_POST_minesweeper_cashout', 'POST');
   const { execute: getBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
+  const { execute: getActiveGame } = useFetch('MINESWEEPER_GET_minesweeper_active', 'GET');
 
   useEffect(() => {
     if (step === 'REVEAL_BOARD') {
@@ -113,6 +119,77 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [step]);
+
+  // 🔍 Проверка активной игры при загрузке
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkActiveGame = async () => {
+      try {
+        console.log('🔍 [MINESWEEPER] Проверяю активную игру...');
+        const response = await getActiveGame() as any;
+        const data = response?.data || response;
+
+        if (!isMounted) return;
+
+        if (data && data.gameId) {
+          console.log('✅ [MINESWEEPER] Найдена активная игра:', data.gameId);
+          toast.info('Восстанавливаю активную игру...');
+          
+          // Восстанавливаем состояние игры
+          setGameId(data.gameId);
+          setGrid(data.grid || []);
+          setCurrentMultiplier(parseFloat(data.currentMultiplier?.toString() || '1.0'));
+          setNextMultiplier(parseFloat(data.nextMultiplier?.toString() || '1.0'));
+          setMaxMultiplier(parseFloat(data.maxMultiplier?.toString() || '0'));
+          setPotentialWin(data.potentialWin?.toString() || '0');
+          setMinesCount(data.minesCount || 1);
+          setGameStatus('PLAYING');
+          
+          // Восстанавливаем balanceType и userBonusId из sessionStorage
+          const savedBalanceType = sessionStorage.getItem(`minesweeper_balanceType_${data.gameId}`);
+          const savedUserBonusId = sessionStorage.getItem(`minesweeper_userBonusId_${data.gameId}`);
+          if (savedBalanceType) {
+            setBalanceType(savedBalanceType);
+          }
+          if (savedUserBonusId) {
+            setUserBonusId(savedUserBonusId);
+          }
+          
+          // Восстанавливаем открытые клетки
+          const opened = new Map<string, boolean>();
+          if (data.grid && Array.isArray(data.grid)) {
+            for (let y = 0; y < data.grid.length; y++) {
+              for (let x = 0; x < data.grid[y]?.length || 0; x++) {
+                if (data.grid[y][x]?.revealed) {
+                  opened.set(`${x}-${y}`, !data.grid[y][x].isMine);
+                }
+              }
+            }
+          }
+          setOpenedCells(opened);
+          
+          setStep('PLAYING');
+          console.log('✅ [MINESWEEPER] Игра восстановлена');
+          toast.success('Игра восстановлена!');
+        } else {
+          console.log('ℹ️ [MINESWEEPER] Активная игра не найдена');
+        }
+      } catch (err: any) {
+        console.error('❌ [MINESWEEPER] Ошибка проверки активной игры:', err);
+        // Не показываем ошибку пользователю, это нормально если игры нет
+      }
+    };
+
+    if (token) {
+      checkActiveGame();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     let isMounted = true;
@@ -252,6 +329,14 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       console.log(`🆕 [START] Сохраняю balanceType=${gameData.balanceType}, userBonusId=${gameData.userBonusId}`);
       setBalanceType(gameData.balanceType);
       setUserBonusId(gameData.userBonusId);
+      
+      // Сохраняем в sessionStorage для восстановления
+      if (gameData.balanceType) {
+        sessionStorage.setItem(`minesweeper_balanceType_${gameData.gameId}`, gameData.balanceType);
+      }
+      if (gameData.userBonusId) {
+        sessionStorage.setItem(`minesweeper_userBonusId_${gameData.gameId}`, gameData.userBonusId);
+      }
 
       setGameId(gameData.gameId);
       setGrid(finalGrid);
@@ -332,6 +417,22 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           setGrid(result.fullGrid);
         }
         setStep('REVEAL_BOARD');
+        
+        // Очищаем sessionStorage
+        if (gameId) {
+          sessionStorage.removeItem(`minesweeper_balanceType_${gameId}`);
+          sessionStorage.removeItem(`minesweeper_userBonusId_${gameId}`);
+        }
+        
+        const winAmountNum = parseFloat(result.winAmount || '0');
+        const multiplierNum = parseFloat(result.currentMultiplier || '1');
+        
+        // Проверяем условия для Big Win Modal: множитель >= 5x ИЛИ выигрыш >= $1000
+        if (multiplierNum >= 5 || winAmountNum >= 1000) {
+          setBigWinData({ winAmount: winAmountNum, multiplier: multiplierNum });
+          setIsBigWinModalOpen(true);
+        }
+        
         toast.success(`🎉 Вы открыли всё поле! Выигрыш: ${result.winAmount} USDT`);
 
         setTimeout(() => {
@@ -343,6 +444,13 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           setGrid(result.fullGrid);
         }
         setStep('REVEAL_BOARD');
+        
+        // Очищаем sessionStorage
+        if (gameId) {
+          sessionStorage.removeItem(`minesweeper_balanceType_${gameId}`);
+          sessionStorage.removeItem(`minesweeper_userBonusId_${gameId}`);
+        }
+        
         toast.error('💣 Вы попали в мину!');
 
         setTimeout(() => {
@@ -381,6 +489,22 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         setGrid(result.fullGrid);
       }
       setStep('REVEAL_BOARD');
+      
+      // Очищаем sessionStorage
+      if (gameId) {
+        sessionStorage.removeItem(`minesweeper_balanceType_${gameId}`);
+        sessionStorage.removeItem(`minesweeper_userBonusId_${gameId}`);
+      }
+      
+      const winAmountNum = parseFloat(result.winAmount || '0');
+      const multiplierNum = currentMultiplier; // Используем текущий множитель
+      
+      // Проверяем условия для Big Win Modal: множитель >= 5x ИЛИ выигрыш >= $1000
+      if (multiplierNum >= 5 || winAmountNum >= 1000) {
+        setBigWinData({ winAmount: winAmountNum, multiplier: multiplierNum });
+        setIsBigWinModalOpen(true);
+      }
+      
       toast.success(`💸 Вы забрали ${result.winAmount} USDT`);
 
       setTimeout(() => {
@@ -603,66 +727,79 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
               backgroundColor: colors.card,
               borderColor: colors.border
             }}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold" style={{ color: colors.foreground }}>🎮 Выберите количество мин</h2>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors font-bold" style={{
-                  backgroundColor: '#FBBF24',
-                  border: '2px solid #F59E0B'
-                }}>
-                  <Coins size={18} style={{ color: '#000000' }} />
-                  {balanceLoading ? (
-                    <Loader className="animate-spin" size={16} style={{ color: '#000000' }} />
-                  ) : (
-                    <>
-                      <span className="text-sm" style={{ color: '#000000' }}>💰 {totalBalance.toFixed(2)}</span>
-                      {bonusBalance > 0 && (
-                        <span className="text-xs" style={{ color: '#7c2d12' }}>💛+{bonusBalance.toFixed(2)}</span>
-                      )}
-                    </>
-                  )}
+              {/* Компактные настройки сверху */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs mb-1.5 font-semibold" style={{ color: colors.mutedForeground }}>
+                    💣 Мины (1-24)
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="24"
+                    step="1"
+                    value={minesCount}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      if (val >= 1 && val <= 24) {
+                        setMinesCount(val);
+                      }
+                    }}
+                    className="bet-input w-full text-center font-bold"
+                    style={{ color: colors.foreground }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1.5 font-semibold" style={{ color: colors.mutedForeground }}>
+                    💰 Ставка (USDT)
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={betAmount}
+                    onChange={(e) => setBetAmount(e.target.value)}
+                    placeholder="10"
+                    className="bet-input w-full text-center font-bold"
+                    style={{ color: colors.foreground }}
+                  />
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs mb-2 font-bold" style={{ color: colors.mutedForeground }}>
-                  Количество мин (1-24)
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="24"
-                  step="1"
-                  value={minesCount}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 1;
-                    if (val >= 1 && val <= 24) {
-                      setMinesCount(val);
-                    }
-                  }}
-                  className="bet-input w-full"
-                  style={{ color: colors.foreground }}
-                />
-                <div className="mt-2 text-xs" style={{ color: colors.mutedForeground }}>
-                  💣 {minesCount} мин на поле 5×5
-                  <br />
-                  🎯 Первая клетка: ×{calculateBaseMultiplier(minesCount).toFixed(2)}
-                  <br />
-                  🎯 Максимальный множитель: ×{calculateMaxMultiplier(minesCount).toFixed(2)}
+              {/* Информация о множителях */}
+              <div className="mb-4 p-3 rounded-xl" style={{
+                backgroundColor: `color-mix(in srgb, ${colors.primary} 8%, transparent)`,
+                border: `1px solid ${colors.border}`
+              }}>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span style={{ color: colors.mutedForeground }}>Первая клетка:</span>
+                    <span className="font-bold ml-1" style={{ color: colors.primary }}>×{calculateBaseMultiplier(minesCount).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: colors.mutedForeground }}>Максимум:</span>
+                    <span className="font-bold ml-1" style={{ color: '#F59E0B' }}>×{calculateMaxMultiplier(minesCount).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs mb-2 font-bold" style={{ color: colors.mutedForeground }}>Ставка (USDT)</label>
-                <Input
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
-                  placeholder="10"
-                  className="bet-input w-full"
-                  style={{ color: colors.foreground }}
-                />
+              {/* Декоративное пустое поле 5x5 */}
+              <div className="minesweeper-grid mb-4" style={{
+                backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
+                borderColor: colors.border,
+                opacity: 0.5
+              }}>
+                {Array.from({ length: 5 }).map((_, y) =>
+                  Array.from({ length: 5 }).map((_, x) => (
+                    <div
+                      key={`${x}-${y}`}
+                      className="minesweeper-cell hidden"
+                      style={{ cursor: 'default' }}
+                    >
+                      <span className="cell-content">?</span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <Button
@@ -689,11 +826,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           )}
 
           {step === 'PLAYING' && Array.isArray(grid) && grid.length === 5 && (
-            <Card className="card-animated p-5 border transition-colors" style={{
+            <Card className="card-animated p-4 border transition-colors" style={{
               backgroundColor: colors.card,
               borderColor: colors.border
             }}>
-              <div className="stats-container">
+              {/* Компактная статистика сверху */}
+              <div className="stats-container mb-4">
                 <div className="stat-box" style={{
                   backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
                   borderColor: colors.border
@@ -719,21 +857,13 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
                   borderColor: colors.border
                 }}>
-                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Потенциальный</div>
+                  <div className="stat-label" style={{ color: colors.mutedForeground }}>Выигрыш</div>
                   <div className="stat-value text-yellow-400">{potentialWin} USDT</div>
                 </div>
               </div>
 
-              <Button
-                onClick={handleCashOut}
-                disabled={cellLoading}
-                className="w-full mb-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg flex items-center justify-center gap-2 border-0 font-bold py-2"
-              >
-                <Zap size={18} />
-                Забрать выигрыш
-              </Button>
-
-              <div className="minesweeper-grid" style={{
+              {/* Игровое поле */}
+              <div className="minesweeper-grid mb-4" style={{
                 backgroundColor: `color-mix(in srgb, ${colors.primary} 10%, transparent)`,
                 borderColor: colors.primary
               }}>
@@ -758,6 +888,16 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   ) : null
                 )}
               </div>
+
+              {/* Кнопка забрать выигрыш */}
+              <Button
+                onClick={handleCashOut}
+                disabled={cellLoading}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl flex items-center justify-center gap-2 border-0 font-bold py-3 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Zap size={18} />
+                Забрать выигрыш
+              </Button>
             </Card>
           )}
 
@@ -859,6 +999,20 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Big Win Modal */}
+      {bigWinData && (
+        <BigWinModal
+          isOpen={isBigWinModalOpen}
+          onClose={() => {
+            setIsBigWinModalOpen(false);
+            setBigWinData(null);
+          }}
+          winAmount={bigWinData.winAmount}
+          multiplier={bigWinData.multiplier}
+          gameType="minesweeper"
+        />
+      )}
     </div>
   );
 }

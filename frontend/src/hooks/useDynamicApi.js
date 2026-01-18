@@ -100,7 +100,7 @@ export function getFullUrl(key) {
 /**
  * Ждёт загрузки endpoints (возвращает Promise)
  */
-function waitForEndpoints() {
+export function waitForEndpoints() {
   if (apiEndpoints) {
     return Promise.resolve(apiEndpoints);
   }

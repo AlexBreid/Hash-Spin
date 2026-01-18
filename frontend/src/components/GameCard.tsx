@@ -1,11 +1,12 @@
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Play, Brain, TrendingUp, Target } from 'lucide-react';
+import { Play, Brain, TrendingUp, Target, Users } from 'lucide-react';
 
 interface GameCardProps {
   title: string;
   image: string;
   category: string;
   onClick: () => void;
+  playersCount?: number;
 }
 
 const getCategoryIcon = (category: string, title?: string) => {
@@ -24,7 +25,9 @@ const getCategoryIcon = (category: string, title?: string) => {
   }
 };
 
-export function GameCard({ title, image, category, onClick }: GameCardProps) {
+export function GameCard({ title, image, category, onClick, playersCount }: GameCardProps) {
+  console.log(`[GameCard] ${title}: playersCount =`, playersCount, typeof playersCount);
+  
   return (
     <div 
       onClick={onClick}
@@ -51,6 +54,12 @@ export function GameCard({ title, image, category, onClick }: GameCardProps) {
       </div>
       
       <div className="p-4">
+        {playersCount ? (
+          <div className="flex items-center gap-1.5 mb-2">
+            <Users className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-medium text-card-foreground">{playersCount}</span>
+          </div>
+        ) : null}
         <h3 className="font-semibold text-card-foreground truncate">{title}</h3>
         <div className="mt-2 w-full h-1 bg-primary/20 rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full w-0 group-hover:w-full transition-all duration-500"></div>

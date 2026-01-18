@@ -26,14 +26,15 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
       >
+        <div className="mb-6">
         <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
           ⚙️ Настройки
         </h1>
         {isAuthenticated && user && (
           <p className="text-muted-foreground text-sm mt-1">Аккаунт: <span className="font-semibold text-foreground">{user?.username || user?.email}</span></p>
         )}
+        </div>
       </motion.div>
 
       {/* ТЕМА */}
@@ -93,35 +94,38 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
           <div className="space-y-3">
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50 whitespace-normal h-auto min-h-fit"
+              style={{ overflow: 'visible', alignItems: 'flex-start' }}
               onClick={() => navigate('/support')}
             >
-              <HelpCircle className="w-5 h-5 mr-3" />
-              <div className="text-left">
+              <HelpCircle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
+              <div className="text-left flex-1 min-w-0">
                 <div className="font-semibold">Справка и FAQ</div>
-                <div className="text-xs opacity-70">Ответы на все вопросы</div>
+                <div className="text-xs opacity-70 break-words">Ответы на все вопросы</div>
               </div>
             </Button>
             
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50 whitespace-normal h-auto min-h-fit"
+              style={{ overflow: 'visible', wordBreak: 'normal', alignItems: 'flex-start' }}
               onClick={() => navigate('/support?section=bonus')}
             >
-              <MessageCircle className="w-5 h-5 mr-3" />
-              <div className="text-left">
+              <MessageCircle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
+              <div className="text-left flex-1 min-w-0" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'visible' }}>
                 <div className="font-semibold">Бонус для рефералов</div>
-                <div className="text-xs opacity-70">Информация о бонусе при регистрации по реферальной ссылке</div>
+                <div className="text-xs opacity-70" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Информация о бонусе при регистрации по реферальной ссылке</div>
               </div>
             </Button>
 
             <Button 
-              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50"
+              className="w-full justify-start py-3 rounded-xl bg-green-600/20 hover:bg-green-600 text-green-900 dark:text-green-200 hover:text-white dark:hover:text-white transition-all border border-green-400/50 whitespace-normal h-auto min-h-fit"
+              style={{ overflow: 'visible', alignItems: 'flex-start' }}
               onClick={() => navigate('/support?section=referral')}
             >
-              <MessageCircle className="w-5 h-5 mr-3" />
-              <div className="text-left">
+              <MessageCircle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
+              <div className="text-left flex-1 min-w-0">
                 <div className="font-semibold">Программа рефералов</div>
-                <div className="text-xs opacity-70">Как зарабатывать на друзьях</div>
+                <div className="text-xs opacity-70 break-words">Информация о программе рефералов</div>
               </div>
             </Button>
           </div>

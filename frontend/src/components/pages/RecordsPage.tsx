@@ -3,7 +3,8 @@ import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Trophy, Medal, Award, Crown, Loader } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import { useFetch } from '../../hooks/useDynamicApi';
+import { getFullUrl, waitForEndpoints } from '../../hooks/useDynamicApi';
+import { useAuth } from '../../context/AuthContext';
 
 interface LeaderboardEntry {
   id: string;
@@ -14,49 +15,111 @@ interface LeaderboardEntry {
   rank: number;
   gamesCount: number;
   photoUrl: string | null;
+  gameType?: string; // Тип игры: 'crash', 'minesweeper', 'plinko'
 }
 
 export function RecordsPage() {
+  const { token } = useAuth();
   const [period, setPeriod] = useState('this-month');
   const [game, setGame] = useState('all-games');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [topThree, setTopThree] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef(false);
-
-  // Загружаем таблицу лидеров с параметрами
-  const { 
-    data: leaderboardData, 
-    loading: leaderboardLoading, 
-    error: leaderboardError, 
-    execute: loadLeaderboard 
-  } = useFetch(
-    'LEADERBOARD_GET_leaderboard',
-    'GET'
-  );
-
-  // Загружаем топ-3 с параметрами
-  const { 
-    data: topThreeData, 
-    loading: topThreeLoading, 
-    execute: loadTopThree 
-  } = useFetch(
-    'LEADERBOARD_GET_leaderboard_top3',
-    'GET'
-  );
 
   // Функция для загрузки данных с параметрами
   const fetchLeaderboardData = async (newPeriod: string, newGame: string) => {
+    if (!token) {
+      console.error('Нет токена авторизации');
+      return;
+    }
+    
     try {
-      // Передаём параметры как query string в URL
-      const leaderboardUrl = `LEADERBOARD_GET_leaderboard?period=${newPeriod}&game=${newGame}&limit=100`;
-      const topThreeUrl = `LEADERBOARD_GET_leaderboard_top3?period=${newPeriod}`;
+      setLoading(true);
+      // Ждем загрузки endpoints
+      await waitForEndpoints();
       
-      console.log(`🔄 Загружаю лидеров: период=${newPeriod}, игра=${newGame}`);
+      // Передаём параметр игры как есть, включая "all-games"
+      const gameParam = newGame;
+      console.log(`🔄 Загружаю лидеров: период=${newPeriod}, игра=${gameParam}`);
       
-      await loadLeaderboard();
-      await loadTopThree();
+      // Получаем базовый URL и добавляем query параметры
+      const leaderboardBaseUrl = getFullUrl('LEADERBOARD_GET_leaderboard');
+      const leaderboardUrl = `${leaderboardBaseUrl}?period=${encodeURIComponent(newPeriod)}&game=${encodeURIComponent(gameParam)}&limit=100`;
+      
+      // Для top3
+      const topThreeBaseUrl = getFullUrl('LEADERBOARD_GET_leaderboard_top3');
+      const topThreeUrl = `${topThreeBaseUrl}?period=${encodeURIComponent(newPeriod)}&game=${encodeURIComponent(gameParam)}`;
+      
+      // Выполняем запросы напрямую
+      const [leaderboardResponse, topThreeResponse] = await Promise.all([
+        fetch(leaderboardUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch(topThreeUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
+      
+      // Обрабатываем ответы, даже если статус не 200 (может быть 400 для неподдерживаемых игр)
+      let leaderboardResult;
+      try {
+        // Пытаемся распарсить JSON независимо от статуса
+        const responseText = await leaderboardResponse.text();
+        if (responseText) {
+          leaderboardResult = JSON.parse(responseText);
+        } else {
+          leaderboardResult = { success: false };
+        }
+        
+        // Если бэкенд вернул ошибку (400 или success: false), показываем пустой массив
+        if (!leaderboardResult.success || leaderboardResponse.status === 400) {
+          leaderboardResult = { success: true, data: { leaderboard: [], period: newPeriod, game: gameParam, total: 0 } };
+        }
+      } catch (e) {
+        // Если не удалось распарсить JSON, создаем пустой результат
+        console.warn('⚠️ Не удалось распарсить ответ leaderboard:', e);
+        leaderboardResult = { success: true, data: { leaderboard: [], period: newPeriod, game: gameParam, total: 0 } };
+      }
+      
+      let topThreeResult;
+      try {
+        topThreeResult = topThreeResponse.ok ? await topThreeResponse.json() : { success: false, data: [] };
+      } catch (e) {
+        topThreeResult = { success: false, data: [] };
+      }
+      
+      console.log('📊 Leaderboard response:', leaderboardResult);
+      console.log('🏆 Top3 response:', topThreeResult);
+      
+      // Обрабатываем leaderboard
+      if (leaderboardResult.success) {
+        const leaderboardData = leaderboardResult.data?.leaderboard || leaderboardResult.leaderboard || [];
+        setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
+      } else {
+        // Если ошибка, показываем пустой массив
+        setLeaderboard([]);
+      }
+      
+      // Обрабатываем top3
+      if (topThreeResult.success) {
+        const topThreeData = topThreeResult.data || topThreeResult;
+        setTopThree(Array.isArray(topThreeData) ? topThreeData : []);
+      } else {
+        setTopThree([]);
+      }
     } catch (err) {
       console.error('Ошибка загрузки:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,18 +131,6 @@ export function RecordsPage() {
     }
   }, []);
 
-  // Обновляем данные при получении
-  useEffect(() => {
-    if (leaderboardData?.leaderboard) {
-      setLeaderboard(leaderboardData.leaderboard);
-    }
-  }, [leaderboardData]);
-
-  useEffect(() => {
-    if (topThreeData && Array.isArray(topThreeData)) {
-      setTopThree(topThreeData);
-    }
-  }, [topThreeData]);
 
   const handlePeriodChange = async (newPeriod: string) => {
     setPeriod(newPeriod);
@@ -104,7 +155,7 @@ export function RecordsPage() {
     }
   };
 
-  if (leaderboardLoading) {
+  if (loading) {
     return (
       <div className="pb-24 pt-6 px-4 flex items-center justify-center h-screen">
         <div className="flex flex-col items-center space-y-4">
@@ -123,20 +174,19 @@ export function RecordsPage() {
 
       {/* Filters */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <Select defaultValue="all-games" onValueChange={handleGameChange}>
+        <Select value={game} onValueChange={handleGameChange}>
           <SelectTrigger className="rounded-2xl">
             <SelectValue placeholder="Выберите игру" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all-games">Все игры</SelectItem>
             <SelectItem value="crash">Краш</SelectItem>
-            <SelectItem value="roulette">Рулетка</SelectItem>
-            <SelectItem value="blackjack">Блэкджек</SelectItem>
-            <SelectItem value="slot">Слот</SelectItem>
+            <SelectItem value="minesweeper">Сапёр</SelectItem>
+            <SelectItem value="plinko">Плинко</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select defaultValue="this-month" onValueChange={handlePeriodChange}>
+        <Select value={period} onValueChange={handlePeriodChange}>
           <SelectTrigger className="rounded-2xl">
             <SelectValue placeholder="Период" />
           </SelectTrigger>
@@ -237,7 +287,18 @@ export function RecordsPage() {
 
                 <div className="flex-1">
                   <p className="font-bold text-card-foreground">{player.username}</p>
-                  <p className="text-sm text-muted-foreground">{player.gamesCount} ставок</p>
+                  <div className="flex items-center gap-2">
+                    {player.gameType && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">
+                        {player.gameType === 'crash' ? 'Краш' : 
+                         player.gameType === 'minesweeper' ? 'Сапёр' : 
+                         player.gameType === 'plinko' ? 'Плинко' : player.gameType}
+                      </span>
+                    )}
+                    {player.gamesCount && (
+                      <p className="text-sm text-muted-foreground">{player.gamesCount} ставок</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="text-right">
@@ -246,7 +307,12 @@ export function RecordsPage() {
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-center py-8">Данные ещё не загружены</p>
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg mb-2">Нет данных</p>
+              <p className="text-sm text-muted-foreground/70">
+                Для выбранного периода и игры пока нет записей в таблице лидеров
+              </p>
+            </div>
           )}
         </div>
       </Card>

@@ -1,0 +1,10 @@
+/* Скрытие скроллбара для слайдера игр */
+.game-slider-container {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+.game-slider-container::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+}
+

@@ -188,8 +188,8 @@ function AppContent() {
     const handlePageChange = (page: string) => {
         // Переходим на страницу независимо от авторизации
         // Заглушка NotAuthenticated покажется при рендере если нужно
-        navigate(`/${page === 'home' ? '' : page}`);
-        setCurrentPage(page);
+            navigate(`/${page === 'home' ? '' : page}`);
+            setCurrentPage(page);
     };
 
     const handleThemeToggle = () => {

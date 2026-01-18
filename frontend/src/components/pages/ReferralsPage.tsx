@@ -16,9 +16,7 @@ import {
   Star,
   Unlock,
   Rocket,
-  Send,
-  ExternalLink,
-  Share2
+  Send
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useFetch } from '../../hooks/useDynamicApi'
@@ -160,6 +158,7 @@ export function ReferralsPage() {
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const hasLoadedRef = useRef(false)
+  const sliderRef = useRef<HTMLDivElement>(null)
 
   const { execute: loadStats } = useFetch('REFERRAL_GET_referral_stats', 'GET')
   const { execute: linkReferrer } = useFetch('REFERRAL_POST_referral_link-referrer', 'POST')
@@ -245,30 +244,6 @@ export function ReferralsPage() {
     }
   }
 
-  // ✅ Поделиться через Telegram (нативно)
-  const shareTelegram = () => {
-    if (!stats?.myReferralCode) return
-    const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
-    const shareText = `🎰 Присоединяйся к SafariUp Casino! 💎 Получи бонус +100% на первый депозит! 👉 `
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(telegramLink)}&text=${encodeURIComponent(shareText)}`
-    
-    if (isTelegramWebApp() && window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(shareUrl)
-    } else {
-      window.open(shareUrl, '_blank')
-    }
-  }
-
-  // ✅ Открыть ссылку в Telegram
-  const openTelegramLink = () => {
-    if (!stats?.myReferralCode) return
-    const telegramLink = `https://t.me/SafariUpbot?start=ref_${stats.myReferralCode}`
-    if (isTelegramWebApp() && window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(telegramLink)
-    } else {
-      window.open(telegramLink, '_blank')
-    }
-  }
 
   if (!isAuthenticated) {
     return (
@@ -388,55 +363,35 @@ export function ReferralsPage() {
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0 mix-blend-overlay" />
           
           <div className="relative z-10 p-6 md:p-8 flex flex-col items-center text-center">
-            <p style={{ color: colors.mutedForeground }} className="text-xs font-bold tracking-[0.2em] uppercase mb-4">Поделись с друзьями</p>
+            <p style={{ color: colors.mutedForeground }} className="text-xs font-bold tracking-[0.2em] uppercase mb-6">Поделись с друзьями</p>
 
-            <div style={{ backgroundColor: colors.background, borderColor: colors.border }} className="w-full backdrop-blur-md border rounded-2xl p-6 mb-6">
-              
-              {/* КОД */}
-              <p style={{ color: colors.foreground }} className="font-mono text-3xl md:text-4xl font-black tracking-widest drop-shadow-lg select-all mb-4">
-                {stats?.myReferralCode || '...'}
-              </p>
-              
-              {/* TELEGRAM ССЫЛКА */}
-              {stats?.myReferralCode && (
-                <div className="mt-4 pt-4 border-t" style={{ borderColor: colors.border }}>
-                  <p style={{ color: colors.mutedForeground }} className="text-xs mb-3">Ссылка на Telegram бота:</p>
+            {/* КОД */}
+            <p style={{ color: colors.foreground }} className="font-mono text-2xl md:text-3xl font-black tracking-widest drop-shadow-lg select-all mb-6 break-all">
+              {stats?.myReferralCode || '...'}
+            </p>
+            
+            {/* TELEGRAM ССЫЛКА - КОМПАКТНЫЙ ДИЗАЙН */}
+            {stats?.myReferralCode && (
+              <div className="w-full mb-6">
+                <div style={{ backgroundColor: colors.background, borderColor: colors.border }} className="w-full backdrop-blur-md border rounded-xl p-4">
+                  {/* Текст ссылки с переносом */}
+                  <p className="text-xs font-mono break-all mb-3" style={{ color: '#0088cc', wordBreak: 'break-all' }}>
+                    t.me/SafariUpbot?start=ref_{stats.myReferralCode}
+                  </p>
                   
-                  {/* Текст ссылки */}
-                  <div className="p-3 rounded-lg mb-3 break-all" style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
-                    <p className="text-sm font-mono" style={{ color: '#0088cc' }}>
-                      t.me/SafariUpbot?start=ref_{stats.myReferralCode}
-                    </p>
-                  </div>
-                  
-                  {/* КНОПКИ */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Копировать */}
-                    <button onClick={copyTelegramLink}
-                      className="flex items-center justify-center gap-2 p-3 rounded-lg font-medium transition-all active:scale-95"
-                      style={{ 
-                        backgroundColor: copiedLink ? 'rgba(34, 197, 94, 0.3)' : colors.card,
-                        border: copiedLink ? '1px solid rgba(34, 197, 94, 0.5)' : `1px solid ${colors.border}`,
-                        color: copiedLink ? '#22c55e' : colors.foreground
-                      }}>
-                      {copiedLink ? <><CheckCircle className="w-4 h-4" /><span className="text-sm">Скопировано!</span></> : <><Copy className="w-4 h-4" /><span className="text-sm">Копировать</span></>}
-                    </button>
-                    
-                    {/* Поделиться */}
-                    <button onClick={shareTelegram} className="flex items-center justify-center gap-2 p-3 rounded-lg font-medium transition-all active:scale-95 bg-[#0088cc] text-white">
-                      <Share2 className="w-4 h-4" /><span className="text-sm">Поделиться</span>
-                    </button>
-                  </div>
-                  
-                  {/* Открыть */}
-                  <button onClick={openTelegramLink}
-                    className="w-full mt-2 flex items-center justify-center gap-2 p-3 rounded-lg transition-all active:scale-95 font-medium"
-                    style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}`, color: colors.foreground }}>
-                    <ExternalLink className="w-4 h-4" /> Открыть в Telegram
+                  {/* Кнопка копировать внутри окошка */}
+                  <button onClick={copyTelegramLink}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all active:scale-95"
+                    style={{ 
+                      backgroundColor: copiedLink ? 'rgba(34, 197, 94, 0.3)' : colors.card,
+                      border: copiedLink ? '1px solid rgba(34, 197, 94, 0.5)' : `1px solid ${colors.border}`,
+                      color: copiedLink ? '#22c55e' : colors.foreground
+                    }}>
+                    {copiedLink ? <><CheckCircle className="w-4 h-4" /> <span>Скопировано!</span></> : <><Copy className="w-4 h-4" /> <span>Копировать ссылку</span></>}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Копировать код */}
             <Button onClick={copyCode}

@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { GameCard } from './GameCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import '../styles/gameSlider.css';
 
 interface Game {
   id: string;
@@ -12,9 +13,10 @@ interface Game {
 interface GameSliderProps {
   games: Game[];
   onGameClick?: (gameId: string) => void;
+  playersCount?: Record<string, number>;
 }
 
-export function GameSlider({ games, onGameClick }: GameSliderProps) {
+export function GameSlider({ games, onGameClick, playersCount }: GameSliderProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -80,10 +82,14 @@ export function GameSlider({ games, onGameClick }: GameSliderProps) {
 
       <div
         ref={scrollContainerRef}
-        className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2"
+        className="flex gap-2 px-4 py-2 game-slider-container"
         style={{
           scrollBehavior: 'smooth',
           WebkitOverflowScrolling: 'touch',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none', // Firefox
+          msOverflowStyle: 'none', // IE/Edge
         }}
       >
         {games.map((game) => (
@@ -96,6 +102,7 @@ export function GameSlider({ games, onGameClick }: GameSliderProps) {
               image={game.image}
               category={game.category}
               onClick={() => handleCardClick(game.id)}
+              playersCount={playersCount?.[game.id]}
             />
           </div>
         ))}

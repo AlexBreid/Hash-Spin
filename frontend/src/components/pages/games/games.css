@@ -58,6 +58,7 @@
 }
 
 .game-input {
+  scroll-margin: 0; /* Предотвращает автоматический скролл при фокусе */
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
