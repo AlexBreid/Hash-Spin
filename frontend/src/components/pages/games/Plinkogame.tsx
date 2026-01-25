@@ -588,7 +588,6 @@ export default function PlinkoGame() {
             onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
             step="0.1"
-            min="0.1"
             className="game-input"
           />
           <button onClick={() => setBet(b => Math.min(balance, +(b * 2).toFixed(2)))}>2×</button>

@@ -735,7 +735,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   </label>
                   <Input
                     type="number"
-                    min="1"
                     max="24"
                     step="1"
                     value={minesCount}
@@ -755,7 +754,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   </label>
                   <Input
                     type="number"
-                    min="1"
                     step="0.01"
                     value={betAmount}
                     onChange={(e) => setBetAmount(e.target.value)}
