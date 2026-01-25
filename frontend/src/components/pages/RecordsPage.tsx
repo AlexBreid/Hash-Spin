@@ -11,11 +11,12 @@ interface LeaderboardEntry {
   username: string;
   avatar: string;
   score: number;
-  games: string;
+  games?: string;
   rank: number;
-  gamesCount: number;
-  photoUrl: string | null;
+  gamesCount?: number;
+  photoUrl?: string | null;
   gameType?: string; // Тип игры: 'crash', 'minesweeper', 'plinko'
+  isFake?: boolean; // Флаг для липовых данных
 }
 
 export function RecordsPage() {
@@ -27,97 +28,101 @@ export function RecordsPage() {
   const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef(false);
 
-  // Функция для загрузки данных с параметрами
+  // Функция для загрузки данных из API и JSON файла
   const fetchLeaderboardData = async (newPeriod: string, newGame: string) => {
-    if (!token) {
-      console.error('Нет токена авторизации');
-      return;
-    }
-    
     try {
       setLoading(true);
-      // Ждем загрузки endpoints
-      await waitForEndpoints();
+      console.log(`🔄 Загружаю рекорды: период=${newPeriod}, игра=${newGame}`);
       
-      // Передаём параметр игры как есть, включая "all-games"
-      const gameParam = newGame;
-      console.log(`🔄 Загружаю лидеров: период=${newPeriod}, игра=${gameParam}`);
+      let allRecords: LeaderboardEntry[] = [];
       
-      // Получаем базовый URL и добавляем query параметры
-      const leaderboardBaseUrl = getFullUrl('LEADERBOARD_GET_leaderboard');
-      const leaderboardUrl = `${leaderboardBaseUrl}?period=${encodeURIComponent(newPeriod)}&game=${encodeURIComponent(gameParam)}&limit=100`;
-      
-      // Для top3
-      const topThreeBaseUrl = getFullUrl('LEADERBOARD_GET_leaderboard_top3');
-      const topThreeUrl = `${topThreeBaseUrl}?period=${encodeURIComponent(newPeriod)}&game=${encodeURIComponent(gameParam)}`;
-      
-      // Выполняем запросы напрямую
-      const [leaderboardResponse, topThreeResponse] = await Promise.all([
-        fetch(leaderboardUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        fetch(topThreeUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-      ]);
-      
-      // Обрабатываем ответы, даже если статус не 200 (может быть 400 для неподдерживаемых игр)
-      let leaderboardResult;
+      // 1. Загружаем настоящие данные из API (если есть токен)
       try {
-        // Пытаемся распарсить JSON независимо от статуса
-        const responseText = await leaderboardResponse.text();
-        if (responseText) {
-          leaderboardResult = JSON.parse(responseText);
-        } else {
-          leaderboardResult = { success: false };
+        if (token) {
+          await waitForEndpoints();
+          const leaderboardBaseUrl = getFullUrl('LEADERBOARD_GET_leaderboard');
+          const leaderboardUrl = `${leaderboardBaseUrl}?period=${encodeURIComponent(newPeriod)}&game=${encodeURIComponent(newGame)}&limit=200`;
+          
+          const response = await fetch(leaderboardUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data?.leaderboard) {
+              const apiRecords = result.data.leaderboard.map((entry: any) => ({
+                id: entry.id,
+                username: entry.username,
+                score: entry.score,
+                gameType: entry.gameType,
+                avatar: entry.avatar || (entry.username || 'A').substring(0, 2).toUpperCase(),
+                isFake: false
+              }));
+              allRecords.push(...apiRecords);
+              console.log(`✅ Загружено ${apiRecords.length} записей из API`);
+            }
+          }
         }
+      } catch (apiError) {
+        console.warn('⚠️ Не удалось загрузить данные из API:', apiError);
+      }
+      
+      // 2. Загружаем липовые данные из JSON файла
+      try {
+        const fakeResponse = await fetch('/users_records.json');
+        const fakeRecords: LeaderboardEntry[] = await fakeResponse.json();
+        allRecords.push(...fakeRecords);
+        console.log(`✅ Загружено ${fakeRecords.length} записей из JSON`);
+      } catch (jsonError) {
+        console.warn('⚠️ Не удалось загрузить данные из JSON:', jsonError);
+      }
+      
+      // 3. Фильтруем по типу игры
+      let filteredRecords = allRecords;
+      if (newGame !== 'all-games') {
+        filteredRecords = allRecords.filter(record => record.gameType === newGame);
+      }
+      
+      // 4. Для каждого пользователя в каждой игре оставляем только максимальный выигрыш
+      const uniqueRecords = new Map<string, LeaderboardEntry>();
+      
+      filteredRecords.forEach(record => {
+        const key = `${record.username}_${record.gameType}`;
+        const existing = uniqueRecords.get(key);
         
-        // Если бэкенд вернул ошибку (400 или success: false), показываем пустой массив
-        if (!leaderboardResult.success || leaderboardResponse.status === 400) {
-          leaderboardResult = { success: true, data: { leaderboard: [], period: newPeriod, game: gameParam, total: 0 } };
+        if (!existing || record.score > existing.score) {
+          uniqueRecords.set(key, record);
         }
-      } catch (e) {
-        // Если не удалось распарсить JSON, создаем пустой результат
-        console.warn('⚠️ Не удалось распарсить ответ leaderboard:', e);
-        leaderboardResult = { success: true, data: { leaderboard: [], period: newPeriod, game: gameParam, total: 0 } };
-      }
+      });
       
-      let topThreeResult;
-      try {
-        topThreeResult = topThreeResponse.ok ? await topThreeResponse.json() : { success: false, data: [] };
-      } catch (e) {
-        topThreeResult = { success: false, data: [] };
-      }
+      // 5. Преобразуем Map обратно в массив и сортируем
+      const finalRecords = Array.from(uniqueRecords.values());
+      finalRecords.sort((a, b) => b.score - a.score);
       
-      console.log('📊 Leaderboard response:', leaderboardResult);
-      console.log('🏆 Top3 response:', topThreeResult);
+      // 6. Ограничиваем до 100 записей
+      const limitedRecords = finalRecords.slice(0, 100);
       
-      // Обрабатываем leaderboard
-      if (leaderboardResult.success) {
-        const leaderboardData = leaderboardResult.data?.leaderboard || leaderboardResult.leaderboard || [];
-        setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
-      } else {
-        // Если ошибка, показываем пустой массив
-        setLeaderboard([]);
-      }
+      // 7. Добавляем ранги
+      const rankedRecords = limitedRecords.map((record, index) => ({
+        ...record,
+        rank: index + 1
+      }));
       
-      // Обрабатываем top3
-      if (topThreeResult.success) {
-        const topThreeData = topThreeResult.data || topThreeResult;
-        setTopThree(Array.isArray(topThreeData) ? topThreeData : []);
-      } else {
-        setTopThree([]);
-      }
+      // Устанавливаем данные
+      setLeaderboard(rankedRecords);
+      
+      // Top 3 - первые 3 записи
+      setTopThree(rankedRecords.slice(0, 3));
+      
+      console.log(`✅ Итого уникальных записей: ${rankedRecords.length} (из ${finalRecords.length} всего)`);
     } catch (err) {
       console.error('Ошибка загрузки:', err);
+      setLeaderboard([]);
+      setTopThree([]);
     } finally {
       setLoading(false);
     }
