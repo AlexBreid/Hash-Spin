@@ -1,0 +1,3718 @@
+{
+  "users": [
+    {
+      "userId": 1,
+      "username": "Hellstaff",
+      "crash": {
+        "userId": 1,
+        "username": "Hellstaff",
+        "tokenId": 2,
+        "betAmount": 440.64,
+        "exitMultiplier": 2.84,
+        "winnings": 1249.43,
+        "result": "won",
+        "gameId": "crash-1769344425147-0",
+        "roundId": 1
+      },
+      "minesweeper": {
+        "userId": 1,
+        "username": "Hellstaff",
+        "tokenId": 2,
+        "betAmount": 438.09,
+        "winAmount": 1882.33,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.3,
+        "revealedCells": 13
+      },
+      "plinko": {
+        "userId": 1,
+        "username": "Hellstaff",
+        "tokenId": 2,
+        "betAmount": 1213.24,
+        "winAmount": 2560.12,
+        "multiplier": 2.11,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[1,1,0,1,0,0,0,1,1,1]"
+      }
+    },
+    {
+      "userId": 2,
+      "username": "LØV€ YØỮ",
+      "crash": {
+        "userId": 2,
+        "username": "LØV€ YØỮ",
+        "tokenId": 2,
+        "betAmount": 1155.74,
+        "exitMultiplier": 1.89,
+        "winnings": 2189.76,
+        "result": "won",
+        "gameId": "crash-1769344425147-1",
+        "roundId": 2
+      },
+      "minesweeper": {
+        "userId": 2,
+        "username": "LØV€ YØỮ",
+        "tokenId": 2,
+        "betAmount": 736.2,
+        "winAmount": 2131.18,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.89,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 2,
+        "username": "LØV€ YØỮ",
+        "tokenId": 2,
+        "betAmount": 386.72,
+        "winAmount": 1072.25,
+        "multiplier": 2.77,
+        "status": "COMPLETED",
+        "finalPosition": 2,
+        "ballPath": "[0,0,0,1,0,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 3,
+      "username": "ᴜɴɪᴄᴏʀɴ",
+      "crash": {
+        "userId": 3,
+        "username": "ᴜɴɪᴄᴏʀɴ",
+        "tokenId": 2,
+        "betAmount": 1184.4,
+        "exitMultiplier": 2.05,
+        "winnings": 2425,
+        "result": "won",
+        "gameId": "crash-1769344425147-2",
+        "roundId": 3
+      },
+      "minesweeper": {
+        "userId": 3,
+        "username": "ᴜɴɪᴄᴏʀɴ",
+        "tokenId": 2,
+        "betAmount": 343.58,
+        "winAmount": 1496.95,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.36,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 3,
+        "username": "ᴜɴɪᴄᴏʀɴ",
+        "tokenId": 2,
+        "betAmount": 1140.13,
+        "winAmount": 1448.24,
+        "multiplier": 1.27,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[0,1,0,1,0,1,0,1,0,0]"
+      }
+    },
+    {
+      "userId": 4,
+      "username": "I ℓ٥ﻻ ﻉ√٥υ",
+      "crash": {
+        "userId": 4,
+        "username": "I ℓ٥ﻻ ﻉ√٥υ",
+        "tokenId": 2,
+        "betAmount": 563.47,
+        "exitMultiplier": 3.05,
+        "winnings": 1716.39,
+        "result": "won",
+        "gameId": "crash-1769344425147-3",
+        "roundId": 4
+      },
+      "minesweeper": {
+        "userId": 4,
+        "username": "I ℓ٥ﻻ ﻉ√٥υ",
+        "tokenId": 2,
+        "betAmount": 1278.17,
+        "winAmount": 2958.89,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.31,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 4,
+        "username": "I ℓ٥ﻻ ﻉ√٥υ",
+        "tokenId": 2,
+        "betAmount": 1230.82,
+        "winAmount": 2814.44,
+        "multiplier": 2.29,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,1,0,1,1,0,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 5,
+      "username": "Mr_KiLLaURa",
+      "crash": {
+        "userId": 5,
+        "username": "Mr_KiLLaURa",
+        "tokenId": 2,
+        "betAmount": 607.38,
+        "exitMultiplier": 3.41,
+        "winnings": 2070.82,
+        "result": "won",
+        "gameId": "crash-1769344425147-4",
+        "roundId": 5
+      },
+      "minesweeper": {
+        "userId": 5,
+        "username": "Mr_KiLLaURa",
+        "tokenId": 2,
+        "betAmount": 648.99,
+        "winAmount": 1566.08,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.41,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 5,
+        "username": "Mr_KiLLaURa",
+        "tokenId": 2,
+        "betAmount": 829.93,
+        "winAmount": 1522.41,
+        "multiplier": 1.83,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[1,1,1,0,0,0,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 6,
+      "username": "Dominator",
+      "crash": {
+        "userId": 6,
+        "username": "Dominator",
+        "tokenId": 2,
+        "betAmount": 848.45,
+        "exitMultiplier": 2.75,
+        "winnings": 2336.04,
+        "result": "won",
+        "gameId": "crash-1769344425147-5",
+        "roundId": 6
+      },
+      "minesweeper": {
+        "userId": 6,
+        "username": "Dominator",
+        "tokenId": 2,
+        "betAmount": 303.02,
+        "winAmount": 1062.6,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.51,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 6,
+        "username": "Dominator",
+        "tokenId": 2,
+        "betAmount": 1706.16,
+        "winAmount": 2627.07,
+        "multiplier": 1.54,
+        "status": "COMPLETED",
+        "finalPosition": 2,
+        "ballPath": "[1,1,0,0,1,1,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 7,
+      "username": "black coffe",
+      "crash": {
+        "userId": 7,
+        "username": "black coffe",
+        "tokenId": 2,
+        "betAmount": 728.64,
+        "exitMultiplier": 2.14,
+        "winnings": 1559.68,
+        "result": "won",
+        "gameId": "crash-1769344425147-6",
+        "roundId": 7
+      },
+      "minesweeper": {
+        "userId": 7,
+        "username": "black coffe",
+        "tokenId": 2,
+        "betAmount": 686.8,
+        "winAmount": 2971.26,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.33,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 7,
+        "username": "black coffe",
+        "tokenId": 2,
+        "betAmount": 1525.39,
+        "winAmount": 2184.54,
+        "multiplier": 1.43,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[1,1,1,1,0,1,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 8,
+      "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+      "crash": {
+        "userId": 8,
+        "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+        "tokenId": 2,
+        "betAmount": 354.05,
+        "exitMultiplier": 2.9,
+        "winnings": 1026.8,
+        "result": "won",
+        "gameId": "crash-1769344425147-7",
+        "roundId": 8
+      },
+      "minesweeper": {
+        "userId": 8,
+        "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+        "tokenId": 2,
+        "betAmount": 687.56,
+        "winAmount": 2342.91,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.41,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 8,
+        "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+        "tokenId": 2,
+        "betAmount": 1402.06,
+        "winAmount": 2218.92,
+        "multiplier": 1.58,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[0,1,0,1,0,1,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 9,
+      "username": "JOEN JUNGKOOK",
+      "crash": {
+        "userId": 9,
+        "username": "JOEN JUNGKOOK",
+        "tokenId": 2,
+        "betAmount": 1305.66,
+        "exitMultiplier": 2.02,
+        "winnings": 2638.05,
+        "result": "won",
+        "gameId": "crash-1769344425147-8",
+        "roundId": 9
+      },
+      "minesweeper": {
+        "userId": 9,
+        "username": "JOEN JUNGKOOK",
+        "tokenId": 2,
+        "betAmount": 756.24,
+        "winAmount": 2252.77,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.98,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 9,
+        "username": "JOEN JUNGKOOK",
+        "tokenId": 2,
+        "betAmount": 1530.15,
+        "winAmount": 2694.62,
+        "multiplier": 1.76,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[0,0,1,0,1,0,1,0,0,1]"
+      }
+    },
+    {
+      "userId": 10,
+      "username": "Darkshaper",
+      "crash": {
+        "userId": 10,
+        "username": "Darkshaper",
+        "tokenId": 2,
+        "betAmount": 642.96,
+        "exitMultiplier": 1.74,
+        "winnings": 1116.28,
+        "result": "won",
+        "gameId": "crash-1769344425147-9",
+        "roundId": 10
+      },
+      "minesweeper": {
+        "userId": 10,
+        "username": "Darkshaper",
+        "tokenId": 2,
+        "betAmount": 860.63,
+        "winAmount": 2566.33,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.98,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 10,
+        "username": "Darkshaper",
+        "tokenId": 2,
+        "betAmount": 981.86,
+        "winAmount": 1392.67,
+        "multiplier": 1.42,
+        "status": "COMPLETED",
+        "finalPosition": 9,
+        "ballPath": "[1,0,1,1,0,1,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 11,
+      "username": "Āłł_Ÿøūrš",
+      "crash": {
+        "userId": 11,
+        "username": "Āłł_Ÿøūrš",
+        "tokenId": 2,
+        "betAmount": 684.99,
+        "exitMultiplier": 3.33,
+        "winnings": 2281.34,
+        "result": "won",
+        "gameId": "crash-1769344425147-10",
+        "roundId": 11
+      },
+      "minesweeper": {
+        "userId": 11,
+        "username": "Āłł_Ÿøūrš",
+        "tokenId": 2,
+        "betAmount": 868.24,
+        "winAmount": 2463.22,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.84,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 11,
+        "username": "Āłł_Ÿøūrš",
+        "tokenId": 2,
+        "betAmount": 637.59,
+        "winAmount": 1359.11,
+        "multiplier": 2.13,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[1,0,0,1,1,1,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 12,
+      "username": "რฉςh",
+      "crash": {
+        "userId": 12,
+        "username": "რฉςh",
+        "tokenId": 2,
+        "betAmount": 1076.81,
+        "exitMultiplier": 2.71,
+        "winnings": 2921.55,
+        "result": "won",
+        "gameId": "crash-1769344425147-11",
+        "roundId": 12
+      },
+      "minesweeper": {
+        "userId": 12,
+        "username": "რฉςh",
+        "tokenId": 2,
+        "betAmount": 667.87,
+        "winAmount": 2644.38,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.96,
+        "revealedCells": 17
+      },
+      "plinko": {
+        "userId": 12,
+        "username": "რฉςh",
+        "tokenId": 2,
+        "betAmount": 1074.13,
+        "winAmount": 1844.08,
+        "multiplier": 1.72,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[0,0,0,1,1,0,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 13,
+      "username": "u n i v e r s e",
+      "crash": {
+        "userId": 13,
+        "username": "u n i v e r s e",
+        "tokenId": 2,
+        "betAmount": 947.07,
+        "exitMultiplier": 2.53,
+        "winnings": 2398.32,
+        "result": "won",
+        "gameId": "crash-1769344425147-12",
+        "roundId": 13
+      },
+      "minesweeper": {
+        "userId": 13,
+        "username": "u n i v e r s e",
+        "tokenId": 2,
+        "betAmount": 645.1,
+        "winAmount": 1365.11,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.12,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 13,
+        "username": "u n i v e r s e",
+        "tokenId": 2,
+        "betAmount": 996.21,
+        "winAmount": 1202.43,
+        "multiplier": 1.21,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[1,1,0,0,1,0,1,1,0,1]"
+      }
+    },
+    {
+      "userId": 14,
+      "username": "GAMER",
+      "crash": {
+        "userId": 14,
+        "username": "GAMER",
+        "tokenId": 2,
+        "betAmount": 1329.27,
+        "exitMultiplier": 1.96,
+        "winnings": 2599.94,
+        "result": "won",
+        "gameId": "crash-1769344425147-13",
+        "roundId": 14
+      },
+      "minesweeper": {
+        "userId": 14,
+        "username": "GAMER",
+        "tokenId": 2,
+        "betAmount": 476.36,
+        "winAmount": 2340.51,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.91,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 14,
+        "username": "GAMER",
+        "tokenId": 2,
+        "betAmount": 822.69,
+        "winAmount": 1549.05,
+        "multiplier": 1.88,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[1,0,1,0,0,1,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 15,
+      "username": "Skillet",
+      "crash": {
+        "userId": 15,
+        "username": "Skillet",
+        "tokenId": 2,
+        "betAmount": 769.99,
+        "exitMultiplier": 2.45,
+        "winnings": 1889.24,
+        "result": "won",
+        "gameId": "crash-1769344425147-14",
+        "roundId": 15
+      },
+      "minesweeper": {
+        "userId": 15,
+        "username": "Skillet",
+        "tokenId": 2,
+        "betAmount": 1217.92,
+        "winAmount": 2963.19,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.43,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 15,
+        "username": "Skillet",
+        "tokenId": 2,
+        "betAmount": 550.14,
+        "winAmount": 1557.84,
+        "multiplier": 2.83,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[0,1,1,0,1,0,0,1,1,1]"
+      }
+    },
+    {
+      "userId": 16,
+      "username": "FEISKO",
+      "crash": {
+        "userId": 16,
+        "username": "FEISKO",
+        "tokenId": 2,
+        "betAmount": 395.09,
+        "exitMultiplier": 2.72,
+        "winnings": 1074.92,
+        "result": "won",
+        "gameId": "crash-1769344425147-15",
+        "roundId": 16
+      },
+      "minesweeper": {
+        "userId": 16,
+        "username": "FEISKO",
+        "tokenId": 2,
+        "betAmount": 700.6,
+        "winAmount": 1836.63,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.62,
+        "revealedCells": 10
+      },
+      "plinko": {
+        "userId": 16,
+        "username": "FEISKO",
+        "tokenId": 2,
+        "betAmount": 715.94,
+        "winAmount": 2010.8,
+        "multiplier": 2.81,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[0,0,1,0,0,1,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 17,
+      "username": "Bloodray",
+      "crash": {
+        "userId": 17,
+        "username": "Bloodray",
+        "tokenId": 2,
+        "betAmount": 654.74,
+        "exitMultiplier": 2.67,
+        "winnings": 1750.09,
+        "result": "won",
+        "gameId": "crash-1769344425147-16",
+        "roundId": 17
+      },
+      "minesweeper": {
+        "userId": 17,
+        "username": "Bloodray",
+        "tokenId": 2,
+        "betAmount": 652.14,
+        "winAmount": 2874.46,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.41,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 17,
+        "username": "Bloodray",
+        "tokenId": 2,
+        "betAmount": 662.31,
+        "winAmount": 1182.73,
+        "multiplier": 1.79,
+        "status": "COMPLETED",
+        "finalPosition": 0,
+        "ballPath": "[0,0,1,1,0,0,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 18,
+      "username": "AnnyMars",
+      "crash": {
+        "userId": 18,
+        "username": "AnnyMars",
+        "tokenId": 2,
+        "betAmount": 807.06,
+        "exitMultiplier": 2.92,
+        "winnings": 2360.54,
+        "result": "won",
+        "gameId": "crash-1769344425147-17",
+        "roundId": 18
+      },
+      "minesweeper": {
+        "userId": 18,
+        "username": "AnnyMars",
+        "tokenId": 2,
+        "betAmount": 901.12,
+        "winAmount": 2496.62,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.77,
+        "revealedCells": 26
+      },
+      "plinko": {
+        "userId": 18,
+        "username": "AnnyMars",
+        "tokenId": 2,
+        "betAmount": 997.43,
+        "winAmount": 1600.49,
+        "multiplier": 1.6,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[0,0,1,0,0,0,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 19,
+      "username": "Delan",
+      "crash": {
+        "userId": 19,
+        "username": "Delan",
+        "tokenId": 2,
+        "betAmount": 687.95,
+        "exitMultiplier": 3.22,
+        "winnings": 2211.99,
+        "result": "won",
+        "gameId": "crash-1769344425147-18",
+        "roundId": 19
+      },
+      "minesweeper": {
+        "userId": 19,
+        "username": "Delan",
+        "tokenId": 2,
+        "betAmount": 522.96,
+        "winAmount": 1918.69,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.67,
+        "revealedCells": 22
+      },
+      "plinko": {
+        "userId": 19,
+        "username": "Delan",
+        "tokenId": 2,
+        "betAmount": 411.16,
+        "winAmount": 1066.17,
+        "multiplier": 2.59,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,1,0,1,0,0,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 20,
+      "username": "Simple",
+      "crash": {
+        "userId": 20,
+        "username": "Simple",
+        "tokenId": 2,
+        "betAmount": 430.7,
+        "exitMultiplier": 3.11,
+        "winnings": 1341.16,
+        "result": "won",
+        "gameId": "crash-1769344425147-19",
+        "roundId": 20
+      },
+      "minesweeper": {
+        "userId": 20,
+        "username": "Simple",
+        "tokenId": 2,
+        "betAmount": 721.23,
+        "winAmount": 2011.32,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.79,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 20,
+        "username": "Simple",
+        "tokenId": 2,
+        "betAmount": 1645.45,
+        "winAmount": 2542.86,
+        "multiplier": 1.55,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[1,1,0,0,1,1,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 21,
+      "username": "Alien",
+      "crash": {
+        "userId": 21,
+        "username": "Alien",
+        "tokenId": 2,
+        "betAmount": 1338.13,
+        "exitMultiplier": 1.73,
+        "winnings": 2317.48,
+        "result": "won",
+        "gameId": "crash-1769344425147-20",
+        "roundId": 21
+      },
+      "minesweeper": {
+        "userId": 21,
+        "username": "Alien",
+        "tokenId": 2,
+        "betAmount": 424.24,
+        "winAmount": 2075.13,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.89,
+        "revealedCells": 15
+      },
+      "plinko": {
+        "userId": 21,
+        "username": "Alien",
+        "tokenId": 2,
+        "betAmount": 1508.93,
+        "winAmount": 2630.5,
+        "multiplier": 1.74,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[1,0,1,0,0,1,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 22,
+      "username": "Blackseeker",
+      "crash": {
+        "userId": 22,
+        "username": "Blackseeker",
+        "tokenId": 2,
+        "betAmount": 1186.67,
+        "exitMultiplier": 2.01,
+        "winnings": 2382.77,
+        "result": "won",
+        "gameId": "crash-1769344425147-21",
+        "roundId": 22
+      },
+      "minesweeper": {
+        "userId": 22,
+        "username": "Blackseeker",
+        "tokenId": 2,
+        "betAmount": 476.72,
+        "winAmount": 1702.05,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.57,
+        "revealedCells": 15
+      },
+      "plinko": {
+        "userId": 22,
+        "username": "Blackseeker",
+        "tokenId": 2,
+        "betAmount": 412.52,
+        "winAmount": 1164.54,
+        "multiplier": 2.82,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[0,1,1,1,0,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 23,
+      "username": "Crazy",
+      "crash": {
+        "userId": 23,
+        "username": "Crazy",
+        "tokenId": 2,
+        "betAmount": 1251.05,
+        "exitMultiplier": 1.72,
+        "winnings": 2146.75,
+        "result": "won",
+        "gameId": "crash-1769344425147-22",
+        "roundId": 23
+      },
+      "minesweeper": {
+        "userId": 23,
+        "username": "Crazy",
+        "tokenId": 2,
+        "betAmount": 597.43,
+        "winAmount": 2085.48,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.49,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 23,
+        "username": "Crazy",
+        "tokenId": 2,
+        "betAmount": 932.8,
+        "winAmount": 2438.75,
+        "multiplier": 2.61,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[1,1,1,0,0,0,1,0,0,1]"
+      }
+    },
+    {
+      "userId": 24,
+      "username": "Dark_Sun",
+      "crash": {
+        "userId": 24,
+        "username": "Dark_Sun",
+        "tokenId": 2,
+        "betAmount": 765.72,
+        "exitMultiplier": 3.13,
+        "winnings": 2398.43,
+        "result": "won",
+        "gameId": "crash-1769344425147-23",
+        "roundId": 24
+      },
+      "minesweeper": {
+        "userId": 24,
+        "username": "Dark_Sun",
+        "tokenId": 2,
+        "betAmount": 677.86,
+        "winAmount": 1924.13,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.84,
+        "revealedCells": 22
+      },
+      "plinko": {
+        "userId": 24,
+        "username": "Dark_Sun",
+        "tokenId": 2,
+        "betAmount": 510.64,
+        "winAmount": 1192.27,
+        "multiplier": 2.33,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[1,0,1,0,1,0,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 25,
+      "username": "Kerry",
+      "crash": {
+        "userId": 25,
+        "username": "Kerry",
+        "tokenId": 2,
+        "betAmount": 449.74,
+        "exitMultiplier": 2.33,
+        "winnings": 1050.03,
+        "result": "won",
+        "gameId": "crash-1769344425147-24",
+        "roundId": 25
+      },
+      "minesweeper": {
+        "userId": 25,
+        "username": "Kerry",
+        "tokenId": 2,
+        "betAmount": 294.13,
+        "winAmount": 1403.59,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.77,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 25,
+        "username": "Kerry",
+        "tokenId": 2,
+        "betAmount": 784.76,
+        "winAmount": 1228.71,
+        "multiplier": 1.57,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[0,1,1,1,0,1,0,1,1,1]"
+      }
+    },
+    {
+      "userId": 26,
+      "username": "mym Ђудęm ęгσ НuK",
+      "crash": {
+        "userId": 26,
+        "username": "mym Ђудęm ęгσ НuK",
+        "tokenId": 2,
+        "betAmount": 995.99,
+        "exitMultiplier": 2.43,
+        "winnings": 2421.82,
+        "result": "won",
+        "gameId": "crash-1769344425147-25",
+        "roundId": 26
+      },
+      "minesweeper": {
+        "userId": 26,
+        "username": "mym Ђудęm ęгσ НuK",
+        "tokenId": 2,
+        "betAmount": 1125.78,
+        "winAmount": 2518.8,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.24,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 26,
+        "username": "mym Ђудęm ęгσ НuK",
+        "tokenId": 2,
+        "betAmount": 634.94,
+        "winAmount": 1458.81,
+        "multiplier": 2.3,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[1,1,0,1,1,1,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 27,
+      "username": "Bloodfire",
+      "crash": {
+        "userId": 27,
+        "username": "Bloodfire",
+        "tokenId": 2,
+        "betAmount": 505.45,
+        "exitMultiplier": 2.1,
+        "winnings": 1063.62,
+        "result": "won",
+        "gameId": "crash-1769344425147-26",
+        "roundId": 27
+      },
+      "minesweeper": {
+        "userId": 27,
+        "username": "Bloodfire",
+        "tokenId": 2,
+        "betAmount": 558.57,
+        "winAmount": 1423.16,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.55,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 27,
+        "username": "Bloodfire",
+        "tokenId": 2,
+        "betAmount": 2001.95,
+        "winAmount": 2751.18,
+        "multiplier": 1.37,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[0,0,1,0,0,0,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 28,
+      "username": "ℓo√ﻉ",
+      "crash": {
+        "userId": 28,
+        "username": "ℓo√ﻉ",
+        "tokenId": 2,
+        "betAmount": 609.95,
+        "exitMultiplier": 2.9,
+        "winnings": 1769.03,
+        "result": "won",
+        "gameId": "crash-1769344425147-27",
+        "roundId": 28
+      },
+      "minesweeper": {
+        "userId": 28,
+        "username": "ℓo√ﻉ",
+        "tokenId": 2,
+        "betAmount": 332.6,
+        "winAmount": 1389.73,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.18,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 28,
+        "username": "ℓo√ﻉ",
+        "tokenId": 2,
+        "betAmount": 732.06,
+        "winAmount": 1164.27,
+        "multiplier": 1.59,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,0,0,0,0,0,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 29,
+      "username": "Black_Hawk_Down",
+      "crash": {
+        "userId": 29,
+        "username": "Black_Hawk_Down",
+        "tokenId": 2,
+        "betAmount": 790.69,
+        "exitMultiplier": 1.59,
+        "winnings": 1253.9,
+        "result": "won",
+        "gameId": "crash-1769344425147-28",
+        "roundId": 29
+      },
+      "minesweeper": {
+        "userId": 29,
+        "username": "Black_Hawk_Down",
+        "tokenId": 2,
+        "betAmount": 568.75,
+        "winAmount": 1685.66,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.96,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 29,
+        "username": "Black_Hawk_Down",
+        "tokenId": 2,
+        "betAmount": 1157.64,
+        "winAmount": 2823.8,
+        "multiplier": 2.44,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[1,1,0,0,1,1,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 30,
+      "username": "Cherry The Countess",
+      "crash": {
+        "userId": 30,
+        "username": "Cherry The Countess",
+        "tokenId": 2,
+        "betAmount": 818.92,
+        "exitMultiplier": 2.25,
+        "winnings": 1844.31,
+        "result": "won",
+        "gameId": "crash-1769344425147-29",
+        "roundId": 30
+      },
+      "minesweeper": {
+        "userId": 30,
+        "username": "Cherry The Countess",
+        "tokenId": 2,
+        "betAmount": 331.99,
+        "winAmount": 1017.47,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.06,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 30,
+        "username": "Cherry The Countess",
+        "tokenId": 2,
+        "betAmount": 2283.59,
+        "winAmount": 2872.27,
+        "multiplier": 1.26,
+        "status": "COMPLETED",
+        "finalPosition": 2,
+        "ballPath": "[1,1,0,0,0,1,0,1,0,0]"
+      }
+    },
+    {
+      "userId": 31,
+      "username": "Aria",
+      "crash": {
+        "userId": 31,
+        "username": "Aria",
+        "tokenId": 2,
+        "betAmount": 824.72,
+        "exitMultiplier": 2.7,
+        "winnings": 2227.97,
+        "result": "won",
+        "gameId": "crash-1769344425147-30",
+        "roundId": 31
+      },
+      "minesweeper": {
+        "userId": 31,
+        "username": "Aria",
+        "tokenId": 2,
+        "betAmount": 247.85,
+        "winAmount": 1174.47,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.74,
+        "revealedCells": 12
+      },
+      "plinko": {
+        "userId": 31,
+        "username": "Aria",
+        "tokenId": 2,
+        "betAmount": 1248.68,
+        "winAmount": 1650.29,
+        "multiplier": 1.32,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,1,0,0,1,0,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 32,
+      "username": "Mr_Mix",
+      "crash": {
+        "userId": 32,
+        "username": "Mr_Mix",
+        "tokenId": 2,
+        "betAmount": 1002.94,
+        "exitMultiplier": 2.21,
+        "winnings": 2218.55,
+        "result": "won",
+        "gameId": "crash-1769344425147-31",
+        "roundId": 32
+      },
+      "minesweeper": {
+        "userId": 32,
+        "username": "Mr_Mix",
+        "tokenId": 2,
+        "betAmount": 772.97,
+        "winAmount": 2161.6,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.8,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 32,
+        "username": "Mr_Mix",
+        "tokenId": 2,
+        "betAmount": 1454.68,
+        "winAmount": 1841.04,
+        "multiplier": 1.27,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[0,0,0,0,1,0,1,1,0,1]"
+      }
+    },
+    {
+      "userId": 33,
+      "username": "Anen",
+      "crash": {
+        "userId": 33,
+        "username": "Anen",
+        "tokenId": 2,
+        "betAmount": 532.89,
+        "exitMultiplier": 3.07,
+        "winnings": 1634.92,
+        "result": "won",
+        "gameId": "crash-1769344425147-32",
+        "roundId": 33
+      },
+      "minesweeper": {
+        "userId": 33,
+        "username": "Anen",
+        "tokenId": 2,
+        "betAmount": 708.06,
+        "winAmount": 1902.74,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.69,
+        "revealedCells": 29
+      },
+      "plinko": {
+        "userId": 33,
+        "username": "Anen",
+        "tokenId": 2,
+        "betAmount": 884.05,
+        "winAmount": 2186.49,
+        "multiplier": 2.47,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[0,1,0,1,1,1,0,0,0,1]"
+      }
+    },
+    {
+      "userId": 34,
+      "username": "Kirizan",
+      "crash": {
+        "userId": 34,
+        "username": "Kirizan",
+        "tokenId": 2,
+        "betAmount": 1679.88,
+        "exitMultiplier": 1.68,
+        "winnings": 2819.8,
+        "result": "won",
+        "gameId": "crash-1769344425147-33",
+        "roundId": 34
+      },
+      "minesweeper": {
+        "userId": 34,
+        "username": "Kirizan",
+        "tokenId": 2,
+        "betAmount": 1210.95,
+        "winAmount": 2602.6,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.15,
+        "revealedCells": 19
+      },
+      "plinko": {
+        "userId": 34,
+        "username": "Kirizan",
+        "tokenId": 2,
+        "betAmount": 659.83,
+        "winAmount": 1027.31,
+        "multiplier": 1.56,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[1,0,0,1,1,1,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 35,
+      "username": "Lightseeker",
+      "crash": {
+        "userId": 35,
+        "username": "Lightseeker",
+        "tokenId": 2,
+        "betAmount": 731.26,
+        "exitMultiplier": 1.56,
+        "winnings": 1144.17,
+        "result": "won",
+        "gameId": "crash-1769344425147-34",
+        "roundId": 35
+      },
+      "minesweeper": {
+        "userId": 35,
+        "username": "Lightseeker",
+        "tokenId": 2,
+        "betAmount": 406.78,
+        "winAmount": 1216.93,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.99,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 35,
+        "username": "Lightseeker",
+        "tokenId": 2,
+        "betAmount": 1016.16,
+        "winAmount": 1262.77,
+        "multiplier": 1.24,
+        "status": "COMPLETED",
+        "finalPosition": 0,
+        "ballPath": "[0,1,0,0,1,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 36,
+      "username": "WOGY",
+      "crash": {
+        "userId": 36,
+        "username": "WOGY",
+        "tokenId": 2,
+        "betAmount": 830.02,
+        "exitMultiplier": 1.89,
+        "winnings": 1571.54,
+        "result": "won",
+        "gameId": "crash-1769344425147-35",
+        "roundId": 36
+      },
+      "minesweeper": {
+        "userId": 36,
+        "username": "WOGY",
+        "tokenId": 2,
+        "betAmount": 426.9,
+        "winAmount": 1568.46,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.67,
+        "revealedCells": 10
+      },
+      "plinko": {
+        "userId": 36,
+        "username": "WOGY",
+        "tokenId": 2,
+        "betAmount": 975.41,
+        "winAmount": 1553.03,
+        "multiplier": 1.59,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[0,1,1,1,0,0,1,0,0,1]"
+      }
+    },
+    {
+      "userId": 37,
+      "username": "Quemal",
+      "crash": {
+        "userId": 37,
+        "username": "Quemal",
+        "tokenId": 2,
+        "betAmount": 1044.85,
+        "exitMultiplier": 2.76,
+        "winnings": 2885.57,
+        "result": "won",
+        "gameId": "crash-1769344425147-36",
+        "roundId": 37
+      },
+      "minesweeper": {
+        "userId": 37,
+        "username": "Quemal",
+        "tokenId": 2,
+        "betAmount": 366.54,
+        "winAmount": 1677.57,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.58,
+        "revealedCells": 29
+      },
+      "plinko": {
+        "userId": 37,
+        "username": "Quemal",
+        "tokenId": 2,
+        "betAmount": 1563.18,
+        "winAmount": 2823.04,
+        "multiplier": 1.81,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,1,1,0,0,0,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 38,
+      "username": "iSlate",
+      "crash": {
+        "userId": 38,
+        "username": "iSlate",
+        "tokenId": 2,
+        "betAmount": 484.39,
+        "exitMultiplier": 3.5,
+        "winnings": 1695.33,
+        "result": "won",
+        "gameId": "crash-1769344425147-37",
+        "roundId": 38
+      },
+      "minesweeper": {
+        "userId": 38,
+        "username": "iSlate",
+        "tokenId": 2,
+        "betAmount": 853.56,
+        "winAmount": 1821.18,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.13,
+        "revealedCells": 17
+      },
+      "plinko": {
+        "userId": 38,
+        "username": "iSlate",
+        "tokenId": 2,
+        "betAmount": 1240.22,
+        "winAmount": 2884.59,
+        "multiplier": 2.33,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[0,0,1,0,0,0,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 39,
+      "username": "Blackstalker",
+      "crash": {
+        "userId": 39,
+        "username": "Blackstalker",
+        "tokenId": 2,
+        "betAmount": 486.52,
+        "exitMultiplier": 3.02,
+        "winnings": 1469.12,
+        "result": "won",
+        "gameId": "crash-1769344425147-38",
+        "roundId": 39
+      },
+      "minesweeper": {
+        "userId": 39,
+        "username": "Blackstalker",
+        "tokenId": 2,
+        "betAmount": 994.95,
+        "winAmount": 2201.25,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.21,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 39,
+        "username": "Blackstalker",
+        "tokenId": 2,
+        "betAmount": 1964.66,
+        "winAmount": 2766.72,
+        "multiplier": 1.41,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[0,0,0,0,0,1,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 40,
+      "username": "Loni",
+      "crash": {
+        "userId": 40,
+        "username": "Loni",
+        "tokenId": 2,
+        "betAmount": 511.58,
+        "exitMultiplier": 2.52,
+        "winnings": 1291.39,
+        "result": "won",
+        "gameId": "crash-1769344425147-39",
+        "roundId": 40
+      },
+      "minesweeper": {
+        "userId": 40,
+        "username": "Loni",
+        "tokenId": 2,
+        "betAmount": 462.86,
+        "winAmount": 1958.58,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.23,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 40,
+        "username": "Loni",
+        "tokenId": 2,
+        "betAmount": 1356.58,
+        "winAmount": 2382.05,
+        "multiplier": 1.76,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[1,0,1,1,0,1,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 41,
+      "username": "Nuliax",
+      "crash": {
+        "userId": 41,
+        "username": "Nuliax",
+        "tokenId": 2,
+        "betAmount": 738,
+        "exitMultiplier": 2.97,
+        "winnings": 2195.19,
+        "result": "won",
+        "gameId": "crash-1769344425147-40",
+        "roundId": 41
+      },
+      "minesweeper": {
+        "userId": 41,
+        "username": "Nuliax",
+        "tokenId": 2,
+        "betAmount": 534.72,
+        "winAmount": 1926.78,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.6,
+        "revealedCells": 21
+      },
+      "plinko": {
+        "userId": 41,
+        "username": "Nuliax",
+        "tokenId": 2,
+        "betAmount": 1151.86,
+        "winAmount": 2087.54,
+        "multiplier": 1.81,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[0,1,0,1,1,0,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 42,
+      "username": "GawelleN",
+      "crash": {
+        "userId": 42,
+        "username": "GawelleN",
+        "tokenId": 2,
+        "betAmount": 718.79,
+        "exitMultiplier": 3.06,
+        "winnings": 2196.88,
+        "result": "won",
+        "gameId": "crash-1769344425147-41",
+        "roundId": 42
+      },
+      "minesweeper": {
+        "userId": 42,
+        "username": "GawelleN",
+        "tokenId": 2,
+        "betAmount": 427.11,
+        "winAmount": 1812.49,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.24,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 42,
+        "username": "GawelleN",
+        "tokenId": 2,
+        "betAmount": 716.17,
+        "winAmount": 1063.55,
+        "multiplier": 1.49,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[0,0,1,1,1,1,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 43,
+      "username": "Ironfire",
+      "crash": {
+        "userId": 43,
+        "username": "Ironfire",
+        "tokenId": 2,
+        "betAmount": 1324.4,
+        "exitMultiplier": 1.56,
+        "winnings": 2069.48,
+        "result": "won",
+        "gameId": "crash-1769344425147-42",
+        "roundId": 43
+      },
+      "minesweeper": {
+        "userId": 43,
+        "username": "Ironfire",
+        "tokenId": 2,
+        "betAmount": 494.19,
+        "winAmount": 2232.13,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.52,
+        "revealedCells": 26
+      },
+      "plinko": {
+        "userId": 43,
+        "username": "Ironfire",
+        "tokenId": 2,
+        "betAmount": 650,
+        "winAmount": 1334.27,
+        "multiplier": 2.05,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[0,1,1,1,1,0,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 44,
+      "username": "Kezan",
+      "crash": {
+        "userId": 44,
+        "username": "Kezan",
+        "tokenId": 2,
+        "betAmount": 1042.82,
+        "exitMultiplier": 2.67,
+        "winnings": 2781.82,
+        "result": "won",
+        "gameId": "crash-1769344425147-43",
+        "roundId": 44
+      },
+      "minesweeper": {
+        "userId": 44,
+        "username": "Kezan",
+        "tokenId": 2,
+        "betAmount": 1079.64,
+        "winAmount": 2613.76,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.42,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 44,
+        "username": "Kezan",
+        "tokenId": 2,
+        "betAmount": 1554.19,
+        "winAmount": 2301.28,
+        "multiplier": 1.48,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[0,1,1,0,1,1,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 45,
+      "username": "Kitaxe",
+      "crash": {
+        "userId": 45,
+        "username": "Kitaxe",
+        "tokenId": 2,
+        "betAmount": 517.3,
+        "exitMultiplier": 3.41,
+        "winnings": 1766.19,
+        "result": "won",
+        "gameId": "crash-1769344425147-44",
+        "roundId": 45
+      },
+      "minesweeper": {
+        "userId": 45,
+        "username": "Kitaxe",
+        "tokenId": 2,
+        "betAmount": 561.92,
+        "winAmount": 1150.69,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.05,
+        "revealedCells": 12
+      },
+      "plinko": {
+        "userId": 45,
+        "username": "Kitaxe",
+        "tokenId": 2,
+        "betAmount": 1152.59,
+        "winAmount": 2586.98,
+        "multiplier": 2.24,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[1,0,1,0,0,1,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 46,
+      "username": "Miromice",
+      "crash": {
+        "userId": 46,
+        "username": "Miromice",
+        "tokenId": 2,
+        "betAmount": 680.69,
+        "exitMultiplier": 1.52,
+        "winnings": 1035.78,
+        "result": "won",
+        "gameId": "crash-1769344425147-45",
+        "roundId": 46
+      },
+      "minesweeper": {
+        "userId": 46,
+        "username": "Miromice",
+        "tokenId": 2,
+        "betAmount": 454.51,
+        "winAmount": 1951.34,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.29,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 46,
+        "username": "Miromice",
+        "tokenId": 2,
+        "betAmount": 1095.55,
+        "winAmount": 2123.76,
+        "multiplier": 1.94,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[1,0,0,1,1,0,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 47,
+      "username": "breakingthesystem",
+      "crash": {
+        "userId": 47,
+        "username": "breakingthesystem",
+        "tokenId": 2,
+        "betAmount": 478.03,
+        "exitMultiplier": 3.5,
+        "winnings": 1672.93,
+        "result": "won",
+        "gameId": "crash-1769344425147-46",
+        "roundId": 47
+      },
+      "minesweeper": {
+        "userId": 47,
+        "username": "breakingthesystem",
+        "tokenId": 2,
+        "betAmount": 404.98,
+        "winAmount": 1768.37,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.37,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 47,
+        "username": "breakingthesystem",
+        "tokenId": 2,
+        "betAmount": 1072.75,
+        "winAmount": 2320.78,
+        "multiplier": 2.16,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[1,1,1,1,1,0,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 48,
+      "username": "Jay",
+      "crash": {
+        "userId": 48,
+        "username": "Jay",
+        "tokenId": 2,
+        "betAmount": 897.12,
+        "exitMultiplier": 2.19,
+        "winnings": 1968.03,
+        "result": "won",
+        "gameId": "crash-1769344425147-47",
+        "roundId": 48
+      },
+      "minesweeper": {
+        "userId": 48,
+        "username": "Jay",
+        "tokenId": 2,
+        "betAmount": 682.78,
+        "winAmount": 2587.65,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.79,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 48,
+        "username": "Jay",
+        "tokenId": 2,
+        "betAmount": 1870.79,
+        "winAmount": 2436.82,
+        "multiplier": 1.3,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[1,0,1,1,0,0,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 49,
+      "username": "Juce",
+      "crash": {
+        "userId": 49,
+        "username": "Juce",
+        "tokenId": 2,
+        "betAmount": 738.73,
+        "exitMultiplier": 2.52,
+        "winnings": 1860.08,
+        "result": "won",
+        "gameId": "crash-1769344425147-48",
+        "roundId": 49
+      },
+      "minesweeper": {
+        "userId": 49,
+        "username": "Juce",
+        "tokenId": 2,
+        "betAmount": 839.82,
+        "winAmount": 1848.58,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.2,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 49,
+        "username": "Juce",
+        "tokenId": 2,
+        "betAmount": 596.95,
+        "winAmount": 1700.46,
+        "multiplier": 2.85,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[1,1,1,0,0,0,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 50,
+      "username": "Modar",
+      "crash": {
+        "userId": 50,
+        "username": "Modar",
+        "tokenId": 2,
+        "betAmount": 609.04,
+        "exitMultiplier": 2.04,
+        "winnings": 1244.03,
+        "result": "won",
+        "gameId": "crash-1769344425147-49",
+        "roundId": 50
+      },
+      "minesweeper": {
+        "userId": 50,
+        "username": "Modar",
+        "tokenId": 2,
+        "betAmount": 345.72,
+        "winAmount": 1315.81,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.81,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 50,
+        "username": "Modar",
+        "tokenId": 2,
+        "betAmount": 1507.78,
+        "winAmount": 1821.27,
+        "multiplier": 1.21,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[0,0,1,0,0,1,1,1,0,1]"
+      }
+    },
+    {
+      "userId": 51,
+      "username": "Kizshura",
+      "crash": {
+        "userId": 51,
+        "username": "Kizshura",
+        "tokenId": 2,
+        "betAmount": 559.32,
+        "exitMultiplier": 3.46,
+        "winnings": 1936.33,
+        "result": "won",
+        "gameId": "crash-1769344425147-50",
+        "roundId": 51
+      },
+      "minesweeper": {
+        "userId": 51,
+        "username": "Kizshura",
+        "tokenId": 2,
+        "betAmount": 353.01,
+        "winAmount": 1347.42,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.82,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 51,
+        "username": "Kizshura",
+        "tokenId": 2,
+        "betAmount": 1063.15,
+        "winAmount": 2074.35,
+        "multiplier": 1.95,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[0,1,1,1,0,0,1,1,0,1]"
+      }
+    },
+    {
+      "userId": 52,
+      "username": "Rageseeker",
+      "crash": {
+        "userId": 52,
+        "username": "Rageseeker",
+        "tokenId": 2,
+        "betAmount": 819.45,
+        "exitMultiplier": 2.34,
+        "winnings": 1913.56,
+        "result": "won",
+        "gameId": "crash-1769344425147-51",
+        "roundId": 52
+      },
+      "minesweeper": {
+        "userId": 52,
+        "username": "Rageseeker",
+        "tokenId": 2,
+        "betAmount": 1050.48,
+        "winAmount": 2793.64,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.66,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 52,
+        "username": "Rageseeker",
+        "tokenId": 2,
+        "betAmount": 1493.43,
+        "winAmount": 2611.13,
+        "multiplier": 1.75,
+        "status": "COMPLETED",
+        "finalPosition": 4,
+        "ballPath": "[0,0,1,1,0,1,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 53,
+      "username": "Bliss",
+      "crash": {
+        "userId": 53,
+        "username": "Bliss",
+        "tokenId": 2,
+        "betAmount": 637.08,
+        "exitMultiplier": 2.15,
+        "winnings": 1369.98,
+        "result": "won",
+        "gameId": "crash-1769344425147-52",
+        "roundId": 53
+      },
+      "minesweeper": {
+        "userId": 53,
+        "username": "Bliss",
+        "tokenId": 2,
+        "betAmount": 432.8,
+        "winAmount": 1918.12,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.43,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 53,
+        "username": "Bliss",
+        "tokenId": 2,
+        "betAmount": 615.63,
+        "winAmount": 1499.84,
+        "multiplier": 2.44,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[0,1,1,1,0,0,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 54,
+      "username": "Topmen",
+      "crash": {
+        "userId": 54,
+        "username": "Topmen",
+        "tokenId": 2,
+        "betAmount": 526.32,
+        "exitMultiplier": 3.06,
+        "winnings": 1612.16,
+        "result": "won",
+        "gameId": "crash-1769344425147-53",
+        "roundId": 54
+      },
+      "minesweeper": {
+        "userId": 54,
+        "username": "Topmen",
+        "tokenId": 2,
+        "betAmount": 645.12,
+        "winAmount": 2729.8,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.23,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 54,
+        "username": "Topmen",
+        "tokenId": 2,
+        "betAmount": 701.65,
+        "winAmount": 1378.76,
+        "multiplier": 1.97,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,1,0,1,1,0,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 55,
+      "username": "Dark Devil",
+      "crash": {
+        "userId": 55,
+        "username": "Dark Devil",
+        "tokenId": 2,
+        "betAmount": 921.85,
+        "exitMultiplier": 2.88,
+        "winnings": 2659.32,
+        "result": "won",
+        "gameId": "crash-1769344425147-54",
+        "roundId": 55
+      },
+      "minesweeper": {
+        "userId": 55,
+        "username": "Dark Devil",
+        "tokenId": 2,
+        "betAmount": 423.39,
+        "winAmount": 1517.93,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.59,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 55,
+        "username": "Dark Devil",
+        "tokenId": 2,
+        "betAmount": 976.47,
+        "winAmount": 1250.64,
+        "multiplier": 1.28,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[1,0,0,0,1,0,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 56,
+      "username": "DrayLOVE",
+      "crash": {
+        "userId": 56,
+        "username": "DrayLOVE",
+        "tokenId": 2,
+        "betAmount": 756.45,
+        "exitMultiplier": 2.93,
+        "winnings": 2212.93,
+        "result": "won",
+        "gameId": "crash-1769344425147-55",
+        "roundId": 56
+      },
+      "minesweeper": {
+        "userId": 56,
+        "username": "DrayLOVE",
+        "tokenId": 2,
+        "betAmount": 527.36,
+        "winAmount": 2506.81,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.75,
+        "revealedCells": 19
+      },
+      "plinko": {
+        "userId": 56,
+        "username": "DrayLOVE",
+        "tokenId": 2,
+        "betAmount": 833.3,
+        "winAmount": 2358.58,
+        "multiplier": 2.83,
+        "status": "COMPLETED",
+        "finalPosition": 0,
+        "ballPath": "[0,1,0,1,1,1,0,1,0,0]"
+      }
+    },
+    {
+      "userId": 57,
+      "username": "Kit",
+      "crash": {
+        "userId": 57,
+        "username": "Kit",
+        "tokenId": 2,
+        "betAmount": 1064.29,
+        "exitMultiplier": 2.37,
+        "winnings": 2517.8,
+        "result": "won",
+        "gameId": "crash-1769344425147-56",
+        "roundId": 57
+      },
+      "minesweeper": {
+        "userId": 57,
+        "username": "Kit",
+        "tokenId": 2,
+        "betAmount": 391.88,
+        "winAmount": 1867.07,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.76,
+        "revealedCells": 29
+      },
+      "plinko": {
+        "userId": 57,
+        "username": "Kit",
+        "tokenId": 2,
+        "betAmount": 741.72,
+        "winAmount": 1115.11,
+        "multiplier": 1.5,
+        "status": "COMPLETED",
+        "finalPosition": 3,
+        "ballPath": "[0,1,1,0,0,0,0,1,1,1]"
+      }
+    },
+    {
+      "userId": 58,
+      "username": "Xisyaco",
+      "crash": {
+        "userId": 58,
+        "username": "Xisyaco",
+        "tokenId": 2,
+        "betAmount": 681.73,
+        "exitMultiplier": 2.87,
+        "winnings": 1958.24,
+        "result": "won",
+        "gameId": "crash-1769344425147-57",
+        "roundId": 58
+      },
+      "minesweeper": {
+        "userId": 58,
+        "username": "Xisyaco",
+        "tokenId": 2,
+        "betAmount": 470.73,
+        "winAmount": 1367.69,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.91,
+        "revealedCells": 26
+      },
+      "plinko": {
+        "userId": 58,
+        "username": "Xisyaco",
+        "tokenId": 2,
+        "betAmount": 674.58,
+        "winAmount": 2011.83,
+        "multiplier": 2.98,
+        "status": "COMPLETED",
+        "finalPosition": 8,
+        "ballPath": "[0,1,0,0,1,0,0,1,1,0]"
+      }
+    },
+    {
+      "userId": 59,
+      "username": "Alsantrius",
+      "crash": {
+        "userId": 59,
+        "username": "Alsantrius",
+        "tokenId": 2,
+        "betAmount": 420.52,
+        "exitMultiplier": 3.32,
+        "winnings": 1394.89,
+        "result": "won",
+        "gameId": "crash-1769344425147-58",
+        "roundId": 59
+      },
+      "minesweeper": {
+        "userId": 59,
+        "username": "Alsantrius",
+        "tokenId": 2,
+        "betAmount": 1341.82,
+        "winAmount": 2991.57,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.23,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 59,
+        "username": "Alsantrius",
+        "tokenId": 2,
+        "betAmount": 874.81,
+        "winAmount": 2398.48,
+        "multiplier": 2.74,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[1,1,0,0,1,1,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 60,
+      "username": "Envias",
+      "crash": {
+        "userId": 60,
+        "username": "Envias",
+        "tokenId": 2,
+        "betAmount": 532.07,
+        "exitMultiplier": 2.75,
+        "winnings": 1463.43,
+        "result": "won",
+        "gameId": "crash-1769344425147-59",
+        "roundId": 60
+      },
+      "minesweeper": {
+        "userId": 60,
+        "username": "Envias",
+        "tokenId": 2,
+        "betAmount": 518.54,
+        "winAmount": 1592.53,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.07,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 60,
+        "username": "Envias",
+        "tokenId": 2,
+        "betAmount": 1286.68,
+        "winAmount": 2548.73,
+        "multiplier": 1.98,
+        "status": "COMPLETED",
+        "finalPosition": 0,
+        "ballPath": "[0,1,0,1,1,0,0,1,1,0]"
+      }
+    },
+    {
+      "userId": 61,
+      "username": "Gralinda",
+      "crash": {
+        "userId": 61,
+        "username": "Gralinda",
+        "tokenId": 2,
+        "betAmount": 609.73,
+        "exitMultiplier": 3.3,
+        "winnings": 2011.25,
+        "result": "won",
+        "gameId": "crash-1769344425147-60",
+        "roundId": 61
+      },
+      "minesweeper": {
+        "userId": 61,
+        "username": "Gralinda",
+        "tokenId": 2,
+        "betAmount": 518.89,
+        "winAmount": 1631.14,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.14,
+        "revealedCells": 29
+      },
+      "plinko": {
+        "userId": 61,
+        "username": "Gralinda",
+        "tokenId": 2,
+        "betAmount": 468.95,
+        "winAmount": 1290.72,
+        "multiplier": 2.75,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[0,0,0,0,0,1,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 62,
+      "username": "Halloween",
+      "crash": {
+        "userId": 62,
+        "username": "Halloween",
+        "tokenId": 2,
+        "betAmount": 1001.35,
+        "exitMultiplier": 1.68,
+        "winnings": 1684.05,
+        "result": "won",
+        "gameId": "crash-1769344425147-61",
+        "roundId": 62
+      },
+      "minesweeper": {
+        "userId": 62,
+        "username": "Halloween",
+        "tokenId": 2,
+        "betAmount": 660.26,
+        "winAmount": 1850.89,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.8,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 62,
+        "username": "Halloween",
+        "tokenId": 2,
+        "betAmount": 1183.48,
+        "winAmount": 2344.26,
+        "multiplier": 1.98,
+        "status": "COMPLETED",
+        "finalPosition": 8,
+        "ballPath": "[0,0,1,0,1,0,0,1,1,0]"
+      }
+    },
+    {
+      "userId": 63,
+      "username": "krot",
+      "crash": {
+        "userId": 63,
+        "username": "krot",
+        "tokenId": 2,
+        "betAmount": 701.24,
+        "exitMultiplier": 1.91,
+        "winnings": 1341.86,
+        "result": "won",
+        "gameId": "crash-1769344425147-62",
+        "roundId": 63
+      },
+      "minesweeper": {
+        "userId": 63,
+        "username": "krot",
+        "tokenId": 2,
+        "betAmount": 921.42,
+        "winAmount": 2885.59,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.13,
+        "revealedCells": 12
+      },
+      "plinko": {
+        "userId": 63,
+        "username": "krot",
+        "tokenId": 2,
+        "betAmount": 1100.58,
+        "winAmount": 2162.08,
+        "multiplier": 1.96,
+        "status": "COMPLETED",
+        "finalPosition": 2,
+        "ballPath": "[0,0,0,0,1,1,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 64,
+      "username": "Manesenci",
+      "crash": {
+        "userId": 64,
+        "username": "Manesenci",
+        "tokenId": 2,
+        "betAmount": 833.21,
+        "exitMultiplier": 2.39,
+        "winnings": 1993.34,
+        "result": "won",
+        "gameId": "crash-1769344425147-63",
+        "roundId": 64
+      },
+      "minesweeper": {
+        "userId": 64,
+        "username": "Manesenci",
+        "tokenId": 2,
+        "betAmount": 432.71,
+        "winAmount": 1936.55,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.48,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 64,
+        "username": "Manesenci",
+        "tokenId": 2,
+        "betAmount": 373.24,
+        "winAmount": 1001.43,
+        "multiplier": 2.68,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[0,0,1,0,0,1,1,0,0,1]"
+      }
+    },
+    {
+      "userId": 65,
+      "username": "SkyHorz",
+      "crash": {
+        "userId": 65,
+        "username": "SkyHorz",
+        "tokenId": 2,
+        "betAmount": 827.56,
+        "exitMultiplier": 3.34,
+        "winnings": 2761.59,
+        "result": "won",
+        "gameId": "crash-1769344425147-64",
+        "roundId": 65
+      },
+      "minesweeper": {
+        "userId": 65,
+        "username": "SkyHorz",
+        "tokenId": 2,
+        "betAmount": 711.1,
+        "winAmount": 2687.06,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.78,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 65,
+        "username": "SkyHorz",
+        "tokenId": 2,
+        "betAmount": 1536.65,
+        "winAmount": 2927.51,
+        "multiplier": 1.91,
+        "status": "COMPLETED",
+        "finalPosition": 4,
+        "ballPath": "[0,0,0,0,1,1,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 66,
+      "username": "Blackbrand",
+      "crash": {
+        "userId": 66,
+        "username": "Blackbrand",
+        "tokenId": 2,
+        "betAmount": 719.12,
+        "exitMultiplier": 2.39,
+        "winnings": 1716.16,
+        "result": "won",
+        "gameId": "crash-1769344425147-65",
+        "roundId": 66
+      },
+      "minesweeper": {
+        "userId": 66,
+        "username": "Blackbrand",
+        "tokenId": 2,
+        "betAmount": 792.02,
+        "winAmount": 2187.98,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.76,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 66,
+        "username": "Blackbrand",
+        "tokenId": 2,
+        "betAmount": 1254.4,
+        "winAmount": 2945.9,
+        "multiplier": 2.35,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[0,0,0,1,0,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 67,
+      "username": "Kison",
+      "crash": {
+        "userId": 67,
+        "username": "Kison",
+        "tokenId": 2,
+        "betAmount": 785.46,
+        "exitMultiplier": 1.61,
+        "winnings": 1266.24,
+        "result": "won",
+        "gameId": "crash-1769344425147-66",
+        "roundId": 67
+      },
+      "minesweeper": {
+        "userId": 67,
+        "username": "Kison",
+        "tokenId": 2,
+        "betAmount": 558.81,
+        "winAmount": 1806.74,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.23,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 67,
+        "username": "Kison",
+        "tokenId": 2,
+        "betAmount": 970.02,
+        "winAmount": 2394,
+        "multiplier": 2.47,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[0,1,0,0,0,1,1,1,0,1]"
+      }
+    },
+    {
+      "userId": 68,
+      "username": "Never mind",
+      "crash": {
+        "userId": 68,
+        "username": "Never mind",
+        "tokenId": 2,
+        "betAmount": 1370.44,
+        "exitMultiplier": 1.76,
+        "winnings": 2407.29,
+        "result": "won",
+        "gameId": "crash-1769344425147-67",
+        "roundId": 68
+      },
+      "minesweeper": {
+        "userId": 68,
+        "username": "Never mind",
+        "tokenId": 2,
+        "betAmount": 600.33,
+        "winAmount": 1509.28,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.51,
+        "revealedCells": 20
+      },
+      "plinko": {
+        "userId": 68,
+        "username": "Never mind",
+        "tokenId": 2,
+        "betAmount": 691.64,
+        "winAmount": 1420.63,
+        "multiplier": 2.05,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[1,0,1,1,1,0,0,1,0,0]"
+      }
+    },
+    {
+      "userId": 69,
+      "username": "Quashant",
+      "crash": {
+        "userId": 69,
+        "username": "Quashant",
+        "tokenId": 2,
+        "betAmount": 642.89,
+        "exitMultiplier": 1.69,
+        "winnings": 1085.82,
+        "result": "won",
+        "gameId": "crash-1769344425147-68",
+        "roundId": 69
+      },
+      "minesweeper": {
+        "userId": 69,
+        "username": "Quashant",
+        "tokenId": 2,
+        "betAmount": 588.35,
+        "winAmount": 2856.33,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.85,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 69,
+        "username": "Quashant",
+        "tokenId": 2,
+        "betAmount": 682.32,
+        "winAmount": 1659.05,
+        "multiplier": 2.43,
+        "status": "COMPLETED",
+        "finalPosition": 8,
+        "ballPath": "[1,0,0,0,1,1,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 70,
+      "username": "your problem",
+      "crash": {
+        "userId": 70,
+        "username": "your problem",
+        "tokenId": 2,
+        "betAmount": 831.45,
+        "exitMultiplier": 2.81,
+        "winnings": 2337.98,
+        "result": "won",
+        "gameId": "crash-1769344425147-69",
+        "roundId": 70
+      },
+      "minesweeper": {
+        "userId": 70,
+        "username": "your problem",
+        "tokenId": 2,
+        "betAmount": 1002,
+        "winAmount": 2210.92,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.21,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 70,
+        "username": "your problem",
+        "tokenId": 2,
+        "betAmount": 2028.82,
+        "winAmount": 2797.78,
+        "multiplier": 1.38,
+        "status": "COMPLETED",
+        "finalPosition": 4,
+        "ballPath": "[0,0,1,0,1,0,0,0,1,1]"
+      }
+    },
+    {
+      "userId": 71,
+      "username": "DART-SKRIMER",
+      "crash": {
+        "userId": 71,
+        "username": "DART-SKRIMER",
+        "tokenId": 2,
+        "betAmount": 792.47,
+        "exitMultiplier": 2.38,
+        "winnings": 1885.48,
+        "result": "won",
+        "gameId": "crash-1769344425147-70",
+        "roundId": 71
+      },
+      "minesweeper": {
+        "userId": 71,
+        "username": "DART-SKRIMER",
+        "tokenId": 2,
+        "betAmount": 772.55,
+        "winAmount": 2037.7,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.64,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 71,
+        "username": "DART-SKRIMER",
+        "tokenId": 2,
+        "betAmount": 818.55,
+        "winAmount": 2357.76,
+        "multiplier": 2.88,
+        "status": "COMPLETED",
+        "finalPosition": 9,
+        "ballPath": "[0,0,1,1,0,0,0,1,1,0]"
+      }
+    },
+    {
+      "userId": 72,
+      "username": "Do not lie",
+      "crash": {
+        "userId": 72,
+        "username": "Do not lie",
+        "tokenId": 2,
+        "betAmount": 601.02,
+        "exitMultiplier": 2.44,
+        "winnings": 1466.7,
+        "result": "won",
+        "gameId": "crash-1769344425147-71",
+        "roundId": 72
+      },
+      "minesweeper": {
+        "userId": 72,
+        "username": "Do not lie",
+        "tokenId": 2,
+        "betAmount": 514.96,
+        "winAmount": 2480.92,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.82,
+        "revealedCells": 15
+      },
+      "plinko": {
+        "userId": 72,
+        "username": "Do not lie",
+        "tokenId": 2,
+        "betAmount": 1591.72,
+        "winAmount": 1998.36,
+        "multiplier": 1.26,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[1,0,1,1,1,1,0,0,0,1]"
+      }
+    },
+    {
+      "userId": 73,
+      "username": "Dr.What",
+      "crash": {
+        "userId": 73,
+        "username": "Dr.What",
+        "tokenId": 2,
+        "betAmount": 774.41,
+        "exitMultiplier": 2.58,
+        "winnings": 1995.23,
+        "result": "won",
+        "gameId": "crash-1769344425147-72",
+        "roundId": 73
+      },
+      "minesweeper": {
+        "userId": 73,
+        "username": "Dr.What",
+        "tokenId": 2,
+        "betAmount": 623.66,
+        "winAmount": 2902,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.65,
+        "revealedCells": 17
+      },
+      "plinko": {
+        "userId": 73,
+        "username": "Dr.What",
+        "tokenId": 2,
+        "betAmount": 1665.59,
+        "winAmount": 2946.13,
+        "multiplier": 1.77,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[1,1,0,0,1,1,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 74,
+      "username": "Ese",
+      "crash": {
+        "userId": 74,
+        "username": "Ese",
+        "tokenId": 2,
+        "betAmount": 835.09,
+        "exitMultiplier": 3.06,
+        "winnings": 2552.29,
+        "result": "won",
+        "gameId": "crash-1769344425147-73",
+        "roundId": 74
+      },
+      "minesweeper": {
+        "userId": 74,
+        "username": "Ese",
+        "tokenId": 2,
+        "betAmount": 652.51,
+        "winAmount": 2336.87,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.58,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 74,
+        "username": "Ese",
+        "tokenId": 2,
+        "betAmount": 532.48,
+        "winAmount": 1207.28,
+        "multiplier": 2.27,
+        "status": "COMPLETED",
+        "finalPosition": 8,
+        "ballPath": "[0,0,0,0,1,0,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 75,
+      "username": "Gavirus",
+      "crash": {
+        "userId": 75,
+        "username": "Gavirus",
+        "tokenId": 2,
+        "betAmount": 1371.82,
+        "exitMultiplier": 2.11,
+        "winnings": 2896.99,
+        "result": "won",
+        "gameId": "crash-1769344425147-74",
+        "roundId": 75
+      },
+      "minesweeper": {
+        "userId": 75,
+        "username": "Gavirus",
+        "tokenId": 2,
+        "betAmount": 1017.48,
+        "winAmount": 2328.21,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 2.29,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 75,
+        "username": "Gavirus",
+        "tokenId": 2,
+        "betAmount": 733.02,
+        "winAmount": 1320.19,
+        "multiplier": 1.8,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[0,1,1,0,0,0,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 76,
+      "username": "GAZANIK",
+      "crash": {
+        "userId": 76,
+        "username": "GAZANIK",
+        "tokenId": 2,
+        "betAmount": 817.34,
+        "exitMultiplier": 2.64,
+        "winnings": 2159.18,
+        "result": "won",
+        "gameId": "crash-1769344425147-75",
+        "roundId": 76
+      },
+      "minesweeper": {
+        "userId": 76,
+        "username": "GAZANIK",
+        "tokenId": 2,
+        "betAmount": 645.72,
+        "winAmount": 1531.49,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.37,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 76,
+        "username": "GAZANIK",
+        "tokenId": 2,
+        "betAmount": 1616.51,
+        "winAmount": 2322.86,
+        "multiplier": 1.44,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,0,1,0,0,0,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 77,
+      "username": "Kakashkaliandiia",
+      "crash": {
+        "userId": 77,
+        "username": "Kakashkaliandiia",
+        "tokenId": 2,
+        "betAmount": 1097.24,
+        "exitMultiplier": 1.81,
+        "winnings": 1983.82,
+        "result": "won",
+        "gameId": "crash-1769344425148-76",
+        "roundId": 77
+      },
+      "minesweeper": {
+        "userId": 77,
+        "username": "Kakashkaliandiia",
+        "tokenId": 2,
+        "betAmount": 661.38,
+        "winAmount": 2593.83,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.92,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 77,
+        "username": "Kakashkaliandiia",
+        "tokenId": 2,
+        "betAmount": 1120.64,
+        "winAmount": 2767.39,
+        "multiplier": 2.47,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[0,0,0,0,0,0,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 78,
+      "username": "Knights from Bernin",
+      "crash": {
+        "userId": 78,
+        "username": "Knights from Bernin",
+        "tokenId": 2,
+        "betAmount": 472.3,
+        "exitMultiplier": 2.76,
+        "winnings": 1303.19,
+        "result": "won",
+        "gameId": "crash-1769344425148-77",
+        "roundId": 78
+      },
+      "minesweeper": {
+        "userId": 78,
+        "username": "Knights from Bernin",
+        "tokenId": 2,
+        "betAmount": 381.14,
+        "winAmount": 1686.03,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.42,
+        "revealedCells": 23
+      },
+      "plinko": {
+        "userId": 78,
+        "username": "Knights from Bernin",
+        "tokenId": 2,
+        "betAmount": 706.76,
+        "winAmount": 2103.84,
+        "multiplier": 2.98,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,1,0,1,1,0,0,0,0,1]"
+      }
+    },
+    {
+      "userId": 79,
+      "username": "LOVE NEW YORK",
+      "crash": {
+        "userId": 79,
+        "username": "LOVE NEW YORK",
+        "tokenId": 2,
+        "betAmount": 1076.94,
+        "exitMultiplier": 2.71,
+        "winnings": 2916.82,
+        "result": "won",
+        "gameId": "crash-1769344425148-78",
+        "roundId": 79
+      },
+      "minesweeper": {
+        "userId": 79,
+        "username": "LOVE NEW YORK",
+        "tokenId": 2,
+        "betAmount": 583.39,
+        "winAmount": 2725.41,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.67,
+        "revealedCells": 17
+      },
+      "plinko": {
+        "userId": 79,
+        "username": "LOVE NEW YORK",
+        "tokenId": 2,
+        "betAmount": 932.11,
+        "winAmount": 2697.21,
+        "multiplier": 2.89,
+        "status": "COMPLETED",
+        "finalPosition": 1,
+        "ballPath": "[1,0,1,0,0,0,0,1,1,1]"
+      }
+    },
+    {
+      "userId": 80,
+      "username": "Not for you",
+      "crash": {
+        "userId": 80,
+        "username": "Not for you",
+        "tokenId": 2,
+        "betAmount": 852.28,
+        "exitMultiplier": 2.56,
+        "winnings": 2177.98,
+        "result": "won",
+        "gameId": "crash-1769344425148-79",
+        "roundId": 80
+      },
+      "minesweeper": {
+        "userId": 80,
+        "username": "Not for you",
+        "tokenId": 2,
+        "betAmount": 1243.05,
+        "winAmount": 2858.16,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.3,
+        "revealedCells": 25
+      },
+      "plinko": {
+        "userId": 80,
+        "username": "Not for you",
+        "tokenId": 2,
+        "betAmount": 926.89,
+        "winAmount": 2353.93,
+        "multiplier": 2.54,
+        "status": "COMPLETED",
+        "finalPosition": 14,
+        "ballPath": "[1,0,1,0,1,0,0,1,0,0]"
+      }
+    },
+    {
+      "userId": 81,
+      "username": "someone",
+      "crash": {
+        "userId": 81,
+        "username": "someone",
+        "tokenId": 2,
+        "betAmount": 1103.59,
+        "exitMultiplier": 2.62,
+        "winnings": 2891.44,
+        "result": "won",
+        "gameId": "crash-1769344425148-80",
+        "roundId": 81
+      },
+      "minesweeper": {
+        "userId": 81,
+        "username": "someone",
+        "tokenId": 2,
+        "betAmount": 925.52,
+        "winAmount": 2883.76,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.12,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 81,
+        "username": "someone",
+        "tokenId": 2,
+        "betAmount": 935.24,
+        "winAmount": 2115.49,
+        "multiplier": 2.26,
+        "status": "COMPLETED",
+        "finalPosition": 6,
+        "ballPath": "[1,0,0,0,0,0,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 82,
+      "username": "Zipp↙️",
+      "crash": {
+        "userId": 82,
+        "username": "Zipp↙️",
+        "tokenId": 2,
+        "betAmount": 1255.26,
+        "exitMultiplier": 2.04,
+        "winnings": 2554.99,
+        "result": "won",
+        "gameId": "crash-1769344425148-81",
+        "roundId": 82
+      },
+      "minesweeper": {
+        "userId": 82,
+        "username": "Zipp↙️",
+        "tokenId": 2,
+        "betAmount": 981.2,
+        "winAmount": 2939.29,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3,
+        "revealedCells": 15
+      },
+      "plinko": {
+        "userId": 82,
+        "username": "Zipp↙️",
+        "tokenId": 2,
+        "betAmount": 659.18,
+        "winAmount": 1493.93,
+        "multiplier": 2.27,
+        "status": "COMPLETED",
+        "finalPosition": 9,
+        "ballPath": "[1,1,1,1,1,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 83,
+      "username": "do not",
+      "crash": {
+        "userId": 83,
+        "username": "do not",
+        "tokenId": 2,
+        "betAmount": 571.29,
+        "exitMultiplier": 2.94,
+        "winnings": 1678.9,
+        "result": "won",
+        "gameId": "crash-1769344425148-82",
+        "roundId": 83
+      },
+      "minesweeper": {
+        "userId": 83,
+        "username": "do not",
+        "tokenId": 2,
+        "betAmount": 628.22,
+        "winAmount": 1992.38,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.17,
+        "revealedCells": 16
+      },
+      "plinko": {
+        "userId": 83,
+        "username": "do not",
+        "tokenId": 2,
+        "betAmount": 1032.07,
+        "winAmount": 1646.02,
+        "multiplier": 1.59,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[1,1,0,1,1,1,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 84,
+      "username": "Erienan",
+      "crash": {
+        "userId": 84,
+        "username": "Erienan",
+        "tokenId": 2,
+        "betAmount": 592.7,
+        "exitMultiplier": 2.56,
+        "winnings": 1517.43,
+        "result": "won",
+        "gameId": "crash-1769344425148-83",
+        "roundId": 84
+      },
+      "minesweeper": {
+        "userId": 84,
+        "username": "Erienan",
+        "tokenId": 2,
+        "betAmount": 396.68,
+        "winAmount": 1806.9,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.56,
+        "revealedCells": 27
+      },
+      "plinko": {
+        "userId": 84,
+        "username": "Erienan",
+        "tokenId": 2,
+        "betAmount": 1227.36,
+        "winAmount": 2469.17,
+        "multiplier": 2.01,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[0,0,0,0,1,0,0,0,1,0]"
+      }
+    },
+    {
+      "userId": 85,
+      "username": "Error parents",
+      "crash": {
+        "userId": 85,
+        "username": "Error parents",
+        "tokenId": 2,
+        "betAmount": 661.17,
+        "exitMultiplier": 1.65,
+        "winnings": 1088.27,
+        "result": "won",
+        "gameId": "crash-1769344425148-84",
+        "roundId": 85
+      },
+      "minesweeper": {
+        "userId": 85,
+        "username": "Error parents",
+        "tokenId": 2,
+        "betAmount": 284.39,
+        "winAmount": 1152.76,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.05,
+        "revealedCells": 22
+      },
+      "plinko": {
+        "userId": 85,
+        "username": "Error parents",
+        "tokenId": 2,
+        "betAmount": 1653.66,
+        "winAmount": 2481.18,
+        "multiplier": 1.5,
+        "status": "COMPLETED",
+        "finalPosition": 2,
+        "ballPath": "[0,1,0,1,1,0,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 86,
+      "username": "Eyalanev",
+      "crash": {
+        "userId": 86,
+        "username": "Eyalanev",
+        "tokenId": 2,
+        "betAmount": 659.39,
+        "exitMultiplier": 2.81,
+        "winnings": 1850.76,
+        "result": "won",
+        "gameId": "crash-1769344425148-85",
+        "roundId": 86
+      },
+      "minesweeper": {
+        "userId": 86,
+        "username": "Eyalanev",
+        "tokenId": 2,
+        "betAmount": 573.46,
+        "winAmount": 1915.94,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 3.34,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 86,
+        "username": "Eyalanev",
+        "tokenId": 2,
+        "betAmount": 2072.11,
+        "winAmount": 2999.72,
+        "multiplier": 1.45,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[0,0,1,0,1,1,1,1,1,0]"
+      }
+    },
+    {
+      "userId": 87,
+      "username": "Fluffy Ratchet",
+      "crash": {
+        "userId": 87,
+        "username": "Fluffy Ratchet",
+        "tokenId": 2,
+        "betAmount": 1253.68,
+        "exitMultiplier": 1.66,
+        "winnings": 2079.52,
+        "result": "won",
+        "gameId": "crash-1769344425148-86",
+        "roundId": 87
+      },
+      "minesweeper": {
+        "userId": 87,
+        "username": "Fluffy Ratchet",
+        "tokenId": 2,
+        "betAmount": 675.45,
+        "winAmount": 2292.39,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 3.39,
+        "revealedCells": 19
+      },
+      "plinko": {
+        "userId": 87,
+        "username": "Fluffy Ratchet",
+        "tokenId": 2,
+        "betAmount": 417.13,
+        "winAmount": 1229.25,
+        "multiplier": 2.95,
+        "status": "COMPLETED",
+        "finalPosition": 10,
+        "ballPath": "[1,1,0,0,0,1,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 88,
+      "username": "Hellblade",
+      "crash": {
+        "userId": 88,
+        "username": "Hellblade",
+        "tokenId": 2,
+        "betAmount": 804.43,
+        "exitMultiplier": 3.3,
+        "winnings": 2655.07,
+        "result": "won",
+        "gameId": "crash-1769344425148-87",
+        "roundId": 88
+      },
+      "minesweeper": {
+        "userId": 88,
+        "username": "Hellblade",
+        "tokenId": 2,
+        "betAmount": 1009.41,
+        "winAmount": 2256.72,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.24,
+        "revealedCells": 19
+      },
+      "plinko": {
+        "userId": 88,
+        "username": "Hellblade",
+        "tokenId": 2,
+        "betAmount": 832.83,
+        "winAmount": 2445.22,
+        "multiplier": 2.94,
+        "status": "COMPLETED",
+        "finalPosition": 0,
+        "ballPath": "[0,1,0,0,1,0,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 89,
+      "username": "HELLO",
+      "crash": {
+        "userId": 89,
+        "username": "HELLO",
+        "tokenId": 2,
+        "betAmount": 1207.85,
+        "exitMultiplier": 2.18,
+        "winnings": 2629.12,
+        "result": "won",
+        "gameId": "crash-1769344425148-88",
+        "roundId": 89
+      },
+      "minesweeper": {
+        "userId": 89,
+        "username": "HELLO",
+        "tokenId": 2,
+        "betAmount": 913.56,
+        "winAmount": 2907.89,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.18,
+        "revealedCells": 14
+      },
+      "plinko": {
+        "userId": 89,
+        "username": "HELLO",
+        "tokenId": 2,
+        "betAmount": 770.17,
+        "winAmount": 1772.45,
+        "multiplier": 2.3,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,0,0,0,0,0,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 90,
+      "username": "hotmilk",
+      "crash": {
+        "userId": 90,
+        "username": "hotmilk",
+        "tokenId": 2,
+        "betAmount": 416.06,
+        "exitMultiplier": 2.61,
+        "winnings": 1083.84,
+        "result": "won",
+        "gameId": "crash-1769344425148-89",
+        "roundId": 90
+      },
+      "minesweeper": {
+        "userId": 90,
+        "username": "hotmilk",
+        "tokenId": 2,
+        "betAmount": 626.82,
+        "winAmount": 2747.12,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.38,
+        "revealedCells": 17
+      },
+      "plinko": {
+        "userId": 90,
+        "username": "hotmilk",
+        "tokenId": 2,
+        "betAmount": 590.18,
+        "winAmount": 1469.12,
+        "multiplier": 2.49,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[0,0,0,1,0,0,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 91,
+      "username": "JUST",
+      "crash": {
+        "userId": 91,
+        "username": "JUST",
+        "tokenId": 2,
+        "betAmount": 1058.17,
+        "exitMultiplier": 1.7,
+        "winnings": 1800.21,
+        "result": "won",
+        "gameId": "crash-1769344425148-90",
+        "roundId": 91
+      },
+      "minesweeper": {
+        "userId": 91,
+        "username": "JUST",
+        "tokenId": 2,
+        "betAmount": 606.05,
+        "winAmount": 2687.14,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 4.43,
+        "revealedCells": 22
+      },
+      "plinko": {
+        "userId": 91,
+        "username": "JUST",
+        "tokenId": 2,
+        "betAmount": 783.28,
+        "winAmount": 1185.1,
+        "multiplier": 1.51,
+        "status": "COMPLETED",
+        "finalPosition": 4,
+        "ballPath": "[0,0,0,1,1,1,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 92,
+      "username": "Kamick",
+      "crash": {
+        "userId": 92,
+        "username": "Kamick",
+        "tokenId": 2,
+        "betAmount": 905.45,
+        "exitMultiplier": 2.95,
+        "winnings": 2668.26,
+        "result": "won",
+        "gameId": "crash-1769344425148-91",
+        "roundId": 92
+      },
+      "minesweeper": {
+        "userId": 92,
+        "username": "Kamick",
+        "tokenId": 2,
+        "betAmount": 230.58,
+        "winAmount": 1126.39,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.89,
+        "revealedCells": 22
+      },
+      "plinko": {
+        "userId": 92,
+        "username": "Kamick",
+        "tokenId": 2,
+        "betAmount": 827.01,
+        "winAmount": 1619.92,
+        "multiplier": 1.96,
+        "status": "COMPLETED",
+        "finalPosition": 5,
+        "ballPath": "[0,0,1,1,1,1,1,0,1,0]"
+      }
+    },
+    {
+      "userId": 93,
+      "username": "Oveley",
+      "crash": {
+        "userId": 93,
+        "username": "Oveley",
+        "tokenId": 2,
+        "betAmount": 1646.33,
+        "exitMultiplier": 1.73,
+        "winnings": 2843.45,
+        "result": "won",
+        "gameId": "crash-1769344425148-92",
+        "roundId": 93
+      },
+      "minesweeper": {
+        "userId": 93,
+        "username": "Oveley",
+        "tokenId": 2,
+        "betAmount": 622.51,
+        "winAmount": 1822.87,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.93,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 93,
+        "username": "Oveley",
+        "tokenId": 2,
+        "betAmount": 844.48,
+        "winAmount": 1475.23,
+        "multiplier": 1.75,
+        "status": "COMPLETED",
+        "finalPosition": 9,
+        "ballPath": "[0,1,0,0,1,1,1,0,1,1]"
+      }
+    },
+    {
+      "userId": 94,
+      "username": "Tempus",
+      "crash": {
+        "userId": 94,
+        "username": "Tempus",
+        "tokenId": 2,
+        "betAmount": 722.27,
+        "exitMultiplier": 2.57,
+        "winnings": 1856.38,
+        "result": "won",
+        "gameId": "crash-1769344425148-93",
+        "roundId": 94
+      },
+      "minesweeper": {
+        "userId": 94,
+        "username": "Tempus",
+        "tokenId": 2,
+        "betAmount": 618.36,
+        "winAmount": 2477.14,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 4.01,
+        "revealedCells": 12
+      },
+      "plinko": {
+        "userId": 94,
+        "username": "Tempus",
+        "tokenId": 2,
+        "betAmount": 1019.66,
+        "winAmount": 2700.82,
+        "multiplier": 2.65,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[1,0,0,0,1,0,0,0,0,0]"
+      }
+    },
+    {
+      "userId": 95,
+      "username": "AfinaS",
+      "crash": {
+        "userId": 95,
+        "username": "AfinaS",
+        "tokenId": 2,
+        "betAmount": 615.58,
+        "exitMultiplier": 2.9,
+        "winnings": 1784.46,
+        "result": "won",
+        "gameId": "crash-1769344425148-94",
+        "roundId": 95
+      },
+      "minesweeper": {
+        "userId": 95,
+        "username": "AfinaS",
+        "tokenId": 2,
+        "betAmount": 626.23,
+        "winAmount": 2081.7,
+        "status": "WON",
+        "difficultyId": 2,
+        "multiplier": 3.32,
+        "revealedCells": 28
+      },
+      "plinko": {
+        "userId": 95,
+        "username": "AfinaS",
+        "tokenId": 2,
+        "betAmount": 824.81,
+        "winAmount": 1893.61,
+        "multiplier": 2.3,
+        "status": "COMPLETED",
+        "finalPosition": 11,
+        "ballPath": "[1,0,0,0,0,0,0,1,0,1]"
+      }
+    },
+    {
+      "userId": 96,
+      "username": "Azago",
+      "crash": {
+        "userId": 96,
+        "username": "Azago",
+        "tokenId": 2,
+        "betAmount": 801.35,
+        "exitMultiplier": 2.26,
+        "winnings": 1809.15,
+        "result": "won",
+        "gameId": "crash-1769344425148-95",
+        "roundId": 96
+      },
+      "minesweeper": {
+        "userId": 96,
+        "username": "Azago",
+        "tokenId": 2,
+        "betAmount": 798.23,
+        "winAmount": 2214.72,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.77,
+        "revealedCells": 19
+      },
+      "plinko": {
+        "userId": 96,
+        "username": "Azago",
+        "tokenId": 2,
+        "betAmount": 1661.7,
+        "winAmount": 2938.31,
+        "multiplier": 1.77,
+        "status": "COMPLETED",
+        "finalPosition": 4,
+        "ballPath": "[1,0,1,0,1,1,1,0,0,0]"
+      }
+    },
+    {
+      "userId": 97,
+      "username": "Elastic Skunk",
+      "crash": {
+        "userId": 97,
+        "username": "Elastic Skunk",
+        "tokenId": 2,
+        "betAmount": 1276.12,
+        "exitMultiplier": 1.65,
+        "winnings": 2103.53,
+        "result": "won",
+        "gameId": "crash-1769344425148-96",
+        "roundId": 97
+      },
+      "minesweeper": {
+        "userId": 97,
+        "username": "Elastic Skunk",
+        "tokenId": 2,
+        "betAmount": 434.14,
+        "winAmount": 1932.33,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 4.45,
+        "revealedCells": 11
+      },
+      "plinko": {
+        "userId": 97,
+        "username": "Elastic Skunk",
+        "tokenId": 2,
+        "betAmount": 1413.61,
+        "winAmount": 2429.14,
+        "multiplier": 1.72,
+        "status": "COMPLETED",
+        "finalPosition": 12,
+        "ballPath": "[1,1,0,0,0,0,1,1,0,0]"
+      }
+    },
+    {
+      "userId": 98,
+      "username": "Erennge",
+      "crash": {
+        "userId": 98,
+        "username": "Erennge",
+        "tokenId": 2,
+        "betAmount": 655.3,
+        "exitMultiplier": 2.19,
+        "winnings": 1433.45,
+        "result": "won",
+        "gameId": "crash-1769344425148-97",
+        "roundId": 98
+      },
+      "minesweeper": {
+        "userId": 98,
+        "username": "Erennge",
+        "tokenId": 2,
+        "betAmount": 854.83,
+        "winAmount": 1826.72,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.14,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 98,
+        "username": "Erennge",
+        "tokenId": 2,
+        "betAmount": 768.98,
+        "winAmount": 1918.78,
+        "multiplier": 2.5,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,1,1,0,0,0,1,1,1,1]"
+      }
+    },
+    {
+      "userId": 99,
+      "username": "Forest Hänter",
+      "crash": {
+        "userId": 99,
+        "username": "Forest Hänter",
+        "tokenId": 2,
+        "betAmount": 485.75,
+        "exitMultiplier": 3.25,
+        "winnings": 1580.55,
+        "result": "won",
+        "gameId": "crash-1769344425148-98",
+        "roundId": 99
+      },
+      "minesweeper": {
+        "userId": 99,
+        "username": "Forest Hänter",
+        "tokenId": 2,
+        "betAmount": 463.46,
+        "winAmount": 1032.43,
+        "status": "WON",
+        "difficultyId": 3,
+        "multiplier": 2.23,
+        "revealedCells": 24
+      },
+      "plinko": {
+        "userId": 99,
+        "username": "Forest Hänter",
+        "tokenId": 2,
+        "betAmount": 1271.97,
+        "winAmount": 2534.33,
+        "multiplier": 1.99,
+        "status": "COMPLETED",
+        "finalPosition": 7,
+        "ballPath": "[1,1,1,0,0,1,0,1,1,0]"
+      }
+    },
+    {
+      "userId": 100,
+      "username": "Funny duck",
+      "crash": {
+        "userId": 100,
+        "username": "Funny duck",
+        "tokenId": 2,
+        "betAmount": 878.49,
+        "exitMultiplier": 2.92,
+        "winnings": 2563.55,
+        "result": "won",
+        "gameId": "crash-1769344425148-99",
+        "roundId": 100
+      },
+      "minesweeper": {
+        "userId": 100,
+        "username": "Funny duck",
+        "tokenId": 2,
+        "betAmount": 587.45,
+        "winAmount": 1497.68,
+        "status": "WON",
+        "difficultyId": 1,
+        "multiplier": 2.55,
+        "revealedCells": 18
+      },
+      "plinko": {
+        "userId": 100,
+        "username": "Funny duck",
+        "tokenId": 2,
+        "betAmount": 816.62,
+        "winAmount": 1956.93,
+        "multiplier": 2.4,
+        "status": "COMPLETED",
+        "finalPosition": 13,
+        "ballPath": "[0,1,0,1,0,0,0,0,0,1]"
+      }
+    }
+  ],
+  "metadata": {
+    "totalUsers": 100,
+    "games": [
+      "crash",
+      "minesweeper",
+      "plinko"
+    ],
+    "winRange": {
+      "min": 1000,
+      "max": 3000
+    },
+    "tokenId": 2,
+    "generatedAt": "2026-01-25T12:33:45.147Z"
+  }
+}
