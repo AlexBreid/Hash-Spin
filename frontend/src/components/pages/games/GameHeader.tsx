@@ -2,19 +2,41 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../../context/ThemeContext';
+import { CurrencySelector, CurrencyInfo } from '../../CurrencySelector';
 
 interface GameHeaderProps {
   title: string;
   icon?: React.ReactNode;
   balance: number;
+  currency?: string;
   onRefreshBalance?: () => void;
+  onCurrencyChange?: (currency: CurrencyInfo) => void;
   status?: string;
 }
 
-export function GameHeader({ title, icon, balance, onRefreshBalance, status }: GameHeaderProps) {
+export function GameHeader({ 
+  title, 
+  icon, 
+  balance, 
+  currency = 'USDT',
+  onRefreshBalance, 
+  onCurrencyChange,
+  status 
+}: GameHeaderProps) {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  // Форматирование баланса
+  const formatBalance = (bal: number) => {
+    if (bal >= 10000) {
+      return bal.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    }
+    if (bal >= 100) {
+      return bal.toLocaleString('en-US', { maximumFractionDigits: 4 });
+    }
+    return bal.toLocaleString('en-US', { maximumFractionDigits: 8 });
+  };
 
   return (
     <header 
@@ -25,8 +47,9 @@ export function GameHeader({ title, icon, balance, onRefreshBalance, status }: G
         padding: '12px 16px'
       }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        {/* Левая часть: Назад + Название */}
+        <div className="flex items-center gap-3 flex-shrink-0">
           <button
             onClick={() => navigate('/')}
             className="p-2 rounded-xl transition-all border"
@@ -47,7 +70,7 @@ export function GameHeader({ title, icon, balance, onRefreshBalance, status }: G
           </button>
           <div>
             <h1 
-              className="text-xl font-black flex items-center gap-2"
+              className="text-lg font-black flex items-center gap-2"
               style={{
                 background: isDark 
                   ? 'linear-gradient(135deg, #10b981, #3b82f6)'
@@ -71,51 +94,63 @@ export function GameHeader({ title, icon, balance, onRefreshBalance, status }: G
           </div>
         </div>
 
-        <div 
-          className="px-4 py-2 flex items-center gap-2 rounded-full border"
-          style={{
-            background: isDark 
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.1))'
-              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.05))',
-            borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
-          }}
-        >
-          <div className="text-right">
-            <p 
-              className="text-xs"
-              style={{ color: isDark ? '#94a3b8' : '#64748b' }}
-            >
-              Баланс
-            </p>
-            <p 
-              className="text-sm font-black"
-              style={{ color: isDark ? '#10b981' : '#059669' }}
-            >
-              {balance.toFixed(2)} USDT
-            </p>
-          </div>
-          {onRefreshBalance && (
-            <button 
-              onClick={onRefreshBalance} 
-              className="p-1.5 rounded-lg transition-all hover:opacity-80"
-              style={{
-                background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)'
-              }}
-            >
-              <motion.div
-                whileHover={{ rotate: 180 }}
-                transition={{ duration: 0.5 }}
-              >
-                <RefreshCw 
-                  className="w-3.5 h-3.5" 
-                  style={{ color: isDark ? '#10b981' : '#059669' }}
-                />
-              </motion.div>
-            </button>
+        {/* Правая часть: Селектор валюты + Баланс */}
+        <div className="flex items-center gap-2">
+          {/* Селектор валюты */}
+          {onCurrencyChange && (
+            <CurrencySelector
+              compact
+              showBalance={false}
+              onCurrencyChange={onCurrencyChange}
+            />
           )}
+          
+          {/* Баланс */}
+          <div 
+            className="px-3 py-2 flex items-center gap-2 rounded-xl border"
+            style={{
+              background: isDark 
+                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.1))'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.05))',
+              borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+            }}
+          >
+            <div className="text-right">
+              <p 
+                className="text-xs"
+                style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+              >
+                Баланс
+              </p>
+              <p 
+                className="text-sm font-black"
+                style={{ color: isDark ? '#10b981' : '#059669' }}
+              >
+                {formatBalance(balance)} {currency}
+              </p>
+            </div>
+            {onRefreshBalance && (
+              <button 
+                onClick={onRefreshBalance} 
+                className="p-1.5 rounded-lg transition-all hover:opacity-80"
+                style={{
+                  background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)'
+                }}
+              >
+                <motion.div
+                  whileHover={{ rotate: 180 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <RefreshCw 
+                    className="w-3.5 h-3.5" 
+                    style={{ color: isDark ? '#10b981' : '#059669' }}
+                  />
+                </motion.div>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </header>
   );
 }
-

@@ -32,17 +32,51 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
   });
 
   const [selectedBalance, setSelectedBalance] = useState<BalanceData | null>(null);
+  const [availableTokens, setAvailableTokens] = useState<any[]>([]);
+  const [tokensLoading, setTokensLoading] = useState(true);
   const hasLoadedRef = useRef(false);
 
   const { data: balanceData, execute: fetchBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
 
-  // Загружаем баланс
+  // Загружаем баланс и доступные валюты
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       fetchBalance().catch(err => console.error('❌ Ошибка баланса:', err));
+      loadAvailableTokens();
     }
   }, []);
+
+  const loadAvailableTokens = async () => {
+    try {
+      setTokensLoading(true);
+      const token = localStorage.getItem('casino_jwt_token')
+        || localStorage.getItem('authToken')
+        || localStorage.getItem('token');
+
+      if (!token) {
+        setTokensLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/wallet/tokens`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setAvailableTokens(data.data);
+        }
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки валют:', err);
+    } finally {
+      setTokensLoading(false);
+    }
+  };
 
   // Обновляем баланс
   useEffect(() => {
@@ -172,6 +206,33 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
             {/* STEP 1: ФОРМА */}
             {step === 'FORM' && (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Выбор валюты */}
+                {availableTokens.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Валюта</label>
+                    <select
+                      value={selectedBalance?.tokenId || ''}
+                      onChange={(e) => {
+                        const tokenId = parseInt(e.target.value);
+                        const balance = balances.find(b => b.tokenId === tokenId);
+                        if (balance) {
+                          setSelectedBalance(balance);
+                        }
+                      }}
+                      className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:border-gray-700"
+                    >
+                      {balances.map(balance => {
+                        const token = availableTokens.find(t => t.id === balance.tokenId);
+                        return (
+                          <option key={balance.tokenId} value={balance.tokenId}>
+                            {token ? `${token.symbol} (${token.network})` : balance.symbol} - {balance.amount.toFixed(2)}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+
                 {/* Текущий баланс */}
                 {selectedBalance && (
                   <motion.div

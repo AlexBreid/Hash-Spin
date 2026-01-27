@@ -3,6 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { toast } from 'sonner';
 import { useTheme } from '../../../context/ThemeContext';
 import { GameHeader } from './GameHeader';
+import { CurrencyInfo, getGlobalCurrency } from '../../CurrencySelector';
 import './plinko.css';
 import './games.css';
 
@@ -49,6 +50,8 @@ export default function PlinkoGame() {
   const [history, setHistory] = useState<{ m: number }[]>([]);
   const [profit, setProfit] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null);
+  const [tokenId, setTokenId] = useState<number | null>(null);
   
   // Анимация слотов при попадании шарика (используем ref для доступа в requestAnimationFrame)
   const slotAnimationsRef = useRef<Record<number, number>>({});
@@ -208,10 +211,14 @@ export default function PlinkoGame() {
     return trajectory;
   };
 
-  const loadBalance = useCallback(async () => {
+  const loadBalance = useCallback(async (currencyTokenId?: number) => {
     if (!token) return;
+    const tid = currencyTokenId || tokenId;
     try {
-      const r = await fetch(`${API}/api/v1/plinko/balance`, {
+      const url = tid 
+        ? `${API}/api/v1/plinko/balance?tokenId=${tid}`
+        : `${API}/api/v1/plinko/balance`;
+      const r = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!r.ok) return;
@@ -222,7 +229,25 @@ export default function PlinkoGame() {
     } catch (err) {
       console.error('[PLINKO] Ошибка загрузки баланса:', err);
     }
-  }, [token]);
+  }, [token, tokenId]);
+
+  // Обработчик смены валюты
+  const handleCurrencyChange = useCallback((currency: CurrencyInfo) => {
+    setSelectedCurrency(currency);
+    setTokenId(currency.tokenId);
+    setBalance(currency.balance);
+    // Перезагружаем баланс для новой валюты
+    loadBalance(currency.tokenId);
+  }, [loadBalance]);
+
+  // Инициализация: получаем глобально выбранную валюту
+  useEffect(() => {
+    const globalCurrency = getGlobalCurrency();
+    if (globalCurrency) {
+      setSelectedCurrency(globalCurrency);
+      setTokenId(globalCurrency.tokenId);
+    }
+  }, []);
 
   const drop = async () => {
     if (bet > balance) return toast.error('Недостаточно средств');
@@ -232,7 +257,7 @@ export default function PlinkoGame() {
       const r = await fetch(`${API}/api/v1/plinko/drop`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ betAmount: bet })
+        body: JSON.stringify({ betAmount: bet, tokenId: tokenId })
       });
       
       if (!r.ok) {
@@ -555,7 +580,10 @@ export default function PlinkoGame() {
       <GameHeader 
         title="PLINKO" 
         balance={balance}
+        currency={selectedCurrency?.symbol || 'USDT'}
         icon="🎯"
+        onCurrencyChange={handleCurrencyChange}
+        onRefreshBalance={() => loadBalance()}
       />
 
       <div className="plinko-board">

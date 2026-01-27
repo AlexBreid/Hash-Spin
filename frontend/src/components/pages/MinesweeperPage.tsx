@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/card';
@@ -8,6 +8,7 @@ import { Loader, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { GameHeader } from './games/GameHeader';
 import { BigWinModal } from '../modals/BigWinModal';
+import { CurrencyInfo, getGlobalCurrency } from '../CurrencySelector';
 import './games/games.css';
 
 interface GridCell {
@@ -93,6 +94,10 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
   
+  // 🆕 Выбранная валюта
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null);
+  const [tokenId, setTokenId] = useState<number | null>(null);
+  
   // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
   const [balanceType, setBalanceType] = useState<string | null>(null);
   const [userBonusId, setUserBonusId] = useState<string | null>(null);
@@ -108,7 +113,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const { execute: startGame } = useFetch('MINESWEEPER_POST_minesweeper_start', 'POST');
   const { execute: revealCell } = useFetch('MINESWEEPER_POST_minesweeper_reveal', 'POST');
   const { execute: cashOut } = useFetch('MINESWEEPER_POST_minesweeper_cashout', 'POST');
-  const { execute: getBalance } = useFetch('WALLET_GET_wallet_balance', 'GET');
+  const { execute: getBalance } = useFetch('BALANCE_GET_wallet_balance', 'GET');
   const { execute: getActiveGame } = useFetch('MINESWEEPER_GET_minesweeper_active', 'GET');
 
   useEffect(() => {
@@ -251,8 +256,13 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       const data = response.data || response;
 
       if (Array.isArray(data)) {
-        const main = data.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
-        const bonus = data.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
+        // Фильтруем по выбранному tokenId
+        const filteredData = tokenId 
+          ? data.filter((b: BalanceItem) => b.tokenId === tokenId)
+          : data;
+        
+        const main = filteredData.find((b: BalanceItem) => b.type === 'MAIN')?.amount ?? 0;
+        const bonus = filteredData.find((b: BalanceItem) => b.type === 'BONUS')?.amount ?? 0;
         const total = main + bonus;
 
         setMainBalance(main);
@@ -263,6 +273,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       console.error('❌ [MINESWEEPER] Ошибка обновления баланса:', err);
     }
   };
+  
+  // 🆕 Обработчик смены валюты
+  const handleCurrencyChange = useCallback((currency: CurrencyInfo) => {
+    setSelectedCurrency(currency);
+    setTokenId(currency.tokenId);
+    setTotalBalance(currency.balance);
+    setMainBalance(currency.balance - currency.bonus);
+    setBonusBalance(currency.bonus);
+  }, []);
+  
+  // 🆕 Инициализация из глобальной валюты
+  useEffect(() => {
+    const globalCurrency = getGlobalCurrency();
+    if (globalCurrency) {
+      setSelectedCurrency(globalCurrency);
+      setTokenId(globalCurrency.tokenId);
+    }
+  }, []);
 
   const handleStartGame = async () => {
     if (minesCount < 1 || minesCount > 24) {
@@ -283,11 +311,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
     setLoading(true);
     try {
-      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}, мин: ${minesCount}`);
+      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}, мин: ${minesCount}, tokenId: ${tokenId}`);
       const response = await startGame({
         minesCount: minesCount,
         betAmount: amount,
-        tokenId: 2,
+        tokenId: tokenId || undefined,
       });
 
       console.log('📦 [MINESWEEPER] Ответ от сервера:', response);
@@ -719,6 +747,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           title="САПЁР" 
           icon="🎮"
           balance={totalBalance}
+          currency={selectedCurrency?.symbol || 'USDT'}
+          onCurrencyChange={handleCurrencyChange}
+          onRefreshBalance={refreshBalance}
         />
 
         <div className="minesweeper-content">

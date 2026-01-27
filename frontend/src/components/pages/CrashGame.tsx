@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameHeader } from './games/GameHeader';
 import { BigWinModal } from '../modals/BigWinModal';
+import { CurrencyInfo, getGlobalCurrency } from '../CurrencySelector';
 import './games/games.css';
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
@@ -45,7 +46,7 @@ export function CrashGame() {
   });
 
   const [inputBet, setInputBet] = useState('10');
-  const [selectedTokenId, setSelectedTokenId] = useState(2);
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [betPlaced, setBetPlaced] = useState(false);
   const [currentBet, setCurrentBet] = useState(0);
   const [canCashout, setCanCashout] = useState(false);
@@ -56,6 +57,9 @@ export function CrashGame() {
   const [mainBalance, setMainBalance] = useState<number>(0);
   const [bonusBalance, setBonusBalance] = useState<number>(0);
   const [totalBalance, setTotalBalance] = useState<number>(0);
+  
+  // 🆕 Выбранная валюта
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null);
   
   const [balanceType, setBalanceType] = useState<string | null>(null);
   const [userBonusId, setUserBonusId] = useState<string | null>(null);
@@ -118,13 +122,36 @@ export function CrashGame() {
 
   useEffect(() => {
     if (balances && Array.isArray(balances)) {
-      const main = parseFloat((balances.find((b: any) => b.type === 'MAIN')?.amount ?? 0).toString());
-      const bonus = parseFloat((balances.find((b: any) => b.type === 'BONUS')?.amount ?? 0).toString());
+      // Фильтруем по выбранному tokenId
+      const filteredBalances = selectedTokenId 
+        ? balances.filter((b: any) => b.tokenId === selectedTokenId)
+        : balances;
+      
+      const main = parseFloat((filteredBalances.find((b: any) => b.type === 'MAIN')?.amount ?? 0).toString());
+      const bonus = parseFloat((filteredBalances.find((b: any) => b.type === 'BONUS')?.amount ?? 0).toString());
       setMainBalance(main);
       setBonusBalance(bonus);
       setTotalBalance(main + bonus);
     }
-  }, [balances]);
+  }, [balances, selectedTokenId]);
+  
+  // 🆕 Обработчик смены валюты
+  const handleCurrencyChange = useCallback((currency: CurrencyInfo) => {
+    setSelectedCurrency(currency);
+    setSelectedTokenId(currency.tokenId);
+    setTotalBalance(currency.balance);
+    setMainBalance(currency.balance - currency.bonus);
+    setBonusBalance(currency.bonus);
+  }, []);
+  
+  // 🆕 Инициализация из глобальной валюты
+  useEffect(() => {
+    const globalCurrency = getGlobalCurrency();
+    if (globalCurrency) {
+      setSelectedCurrency(globalCurrency);
+      setSelectedTokenId(globalCurrency.tokenId);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user || !token) {
@@ -759,6 +786,8 @@ export function CrashGame() {
         title="CRASH" 
         icon={<Flame className="w-6 h-6" style={{ color: '#f59e0b' }} />}
         balance={totalBalance}
+        currency={selectedCurrency?.symbol || 'USDT'}
+        onCurrencyChange={handleCurrencyChange}
         onRefreshBalance={fetchBalances}
         status={isHistoryLoaded ? '🟢 OK' : '🟡 LOAD...'}
       />

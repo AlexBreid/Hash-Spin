@@ -9,11 +9,18 @@ type DepositStep = 'FORM' | 'BONUS_CHOICE' | 'PAYMENT' | 'PENDING' | 'SUCCESS' |
 
 interface CryptoCloudInvoice {
   invoiceId: string;
-  payUrl: string;
-  amount: number;
+  payUrl: string | null;  // null для статического кошелька
+  amount: number;  // Сумма в криптовалюте
+  amountUSD?: number;  // Сумма в USD
   currency: string;
+  network?: string;
   withBonus: boolean;
   orderId: string;
+  // Данные для встроенного виджета (статический кошелёк)
+  address?: string;  // Адрес для оплаты
+  staticWallet?: boolean;  // Флаг статического кошелька
+  warning?: string;  // Предупреждение
+  testMode?: boolean;  // Тестовый режим (без статического кошелька)
 }
 
 interface BonusInfo {
@@ -29,19 +36,82 @@ interface BonusInfo {
   };
 }
 
-export default function DepositPage({ onBack }: { onBack: () => void }) {
+interface CryptoToken {
+  id: number;
+  symbol: string;
+  name: string;
+  network: string;
+  decimals: number;
+}
+
+interface DepositPageProps {
+  onBack: () => void;
+  defaultCurrency?: string | null; // Предвыбранная валюта (USDT, BTC, ETH и т.д.)
+}
+
+export default function DepositPage({ onBack, defaultCurrency }: DepositPageProps) {
   const [step, setStep] = useState<DepositStep>('FORM');
   const [depositAmount, setDepositAmount] = useState<number>(0);
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('USDT');
+  const [selectedToken, setSelectedToken] = useState<CryptoToken | null>(null);
+  const [availableTokens, setAvailableTokens] = useState<CryptoToken[]>([]);
+  const [tokensLoading, setTokensLoading] = useState(true);
   const [invoice, setInvoice] = useState<CryptoCloudInvoice | null>(null);
   const [bonusInfo, setBonusInfo] = useState<BonusInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Загружаем информацию о бонусе при монтировании
+  // Загружаем информацию о бонусе и валютах при монтировании
   useEffect(() => {
     loadBonusInfo();
+    loadAvailableCurrencies();
   }, []);
+
+  const loadAvailableCurrencies = async () => {
+    try {
+      setTokensLoading(true);
+      const token = localStorage.getItem('casino_jwt_token') 
+        || localStorage.getItem('authToken') 
+        || localStorage.getItem('token');
+
+      if (!token) {
+        setTokensLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/deposit/currencies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setAvailableTokens(data.data);
+          
+          // Если передана defaultCurrency — выбираем её
+          let tokenToSelect: CryptoToken | undefined;
+          
+          if (defaultCurrency) {
+            tokenToSelect = data.data.find((t: CryptoToken) => t.symbol === defaultCurrency);
+          }
+          
+          // Иначе выбираем USDT или первую доступную
+          if (!tokenToSelect) {
+            tokenToSelect = data.data.find((t: CryptoToken) => t.symbol === 'USDT') || data.data[0];
+          }
+          
+          if (tokenToSelect) {
+            setSelectedToken(tokenToSelect);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки валют:', err);
+    } finally {
+      setTokensLoading(false);
+    }
+  };
 
   const loadBonusInfo = async () => {
     try {
@@ -69,7 +139,7 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
   };
 
   // Обработка отправки формы
-  const handleFormSubmit = async (formData: { amount: string; currency: string }) => {
+  const handleFormSubmit = async (formData: { amount: string; currency: string; tokenId?: number }) => {
     setLoading(true);
     setError(null);
 
@@ -79,15 +149,24 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
         throw new Error('Некорректная сумма');
       }
 
+      // Находим выбранный токен
+      const token = availableTokens.find(t => 
+        t.symbol === formData.currency || t.id === formData.tokenId
+      ) || selectedToken;
+
+      if (!token) {
+        throw new Error('Валюта не выбрана');
+      }
+
       setDepositAmount(amount);
-      setSelectedCurrency(formData.currency);
+      setSelectedToken(token);
 
       // Если доступен бонус и валюта USDT, показываем выбор бонуса
-      if (bonusInfo?.canUseBonus && formData.currency === 'USDT') {
+      if (bonusInfo?.canUseBonus && token.symbol === 'USDT') {
         setStep('BONUS_CHOICE');
       } else {
         // Сразу создаем депозит без бонуса
-        await createDeposit(amount, false);
+        await createDeposit(amount, false, token);
       }
     } catch (err) {
       console.error('❌ Ошибка:', err);
@@ -99,25 +178,32 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
   };
 
   // Создать депозит
-  const createDeposit = async (amount: number, withBonus: boolean) => {
+  const createDeposit = async (amount: number, withBonus: boolean, token?: CryptoToken) => {
     try {
-      const token = localStorage.getItem('casino_jwt_token') 
+      const authToken = localStorage.getItem('casino_jwt_token') 
         || localStorage.getItem('authToken') 
         || localStorage.getItem('token');
 
-      if (!token) {
+      if (!authToken) {
         throw new Error('Токен авторизации не найден. Авторизуйтесь заново.');
+      }
+
+      const selectedTokenForDeposit = token || selectedToken;
+      if (!selectedTokenForDeposit) {
+        throw new Error('Валюта не выбрана');
       }
 
       const response = await fetch(`${API_BASE_URL}/api/v1/deposit/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           amount: amount,
-          withBonus: withBonus
+          withBonus: withBonus,
+          tokenId: selectedTokenForDeposit.id,
+          currency: `${selectedTokenForDeposit.symbol}_${selectedTokenForDeposit.network}`
         }),
       });
 
@@ -246,8 +332,8 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
             onSubmit={handleFormSubmit}
             loading={loading}
             error={error}
-            availableTokens={[{ id: 1, symbol: 'USDT', name: 'Tether USD', network: 'CryptoCloud', decimals: 8 }]}
-            tokensLoading={false}
+            availableTokens={availableTokens}
+            tokensLoading={tokensLoading}
           />
         )}
 
@@ -263,7 +349,7 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
               🎁 Доступен бонус +100%!
             </h2>
             <p style={{ marginBottom: '24px', color: 'var(--muted, #a0aac0)', fontSize: '14px' }}>
-              Пополнение на {depositAmount.toFixed(2)} {selectedCurrency}
+              Пополнение на {depositAmount.toFixed(2)} {selectedToken?.symbol || 'USDT'} ({selectedToken?.network || 'TRC-20'})
             </p>
 
             {/* Вариант с бонусом */}
@@ -432,50 +518,182 @@ export default function DepositPage({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* STEP 4: ОЖИДАНИЕ ПЛАТЕЖА */}
+        {/* STEP 4: ОЖИДАНИЕ ПЛАТЕЖА - ВСТРОЕННЫЙ ВИДЖЕТ */}
         {step === 'PENDING' && invoice && (
           <div className="pending-section" style={{
             padding: '24px',
-            textAlign: 'center',
           }}>
+            {/* Заголовок */}
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                margin: '0 auto 16px',
+                border: '3px solid #10b981',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <h2 style={{ fontSize: '20px', color: 'var(--text, #fafafa)', marginBottom: '8px' }}>
+                Ожидание оплаты
+              </h2>
+            </div>
+
+            {/* Сумма к оплате */}
             <div style={{
-              width: '80px',
-              height: '80px',
-              margin: '0 auto 24px',
-              border: '4px solid #3b82f6',
-              borderTopColor: 'transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-            }} />
-            <h2 style={{ fontSize: '24px', color: 'var(--text, #fafafa)', marginBottom: '8px' }}>
-              Ожидание оплаты...
-            </h2>
-            <p style={{ color: 'var(--muted, #a0aac0)', marginBottom: '16px' }}>
-              Сумма: {invoice.amount.toFixed(2)} {invoice.currency}
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '16px',
+              padding: '20px',
+              textAlign: 'center',
+              marginBottom: '20px',
+            }}>
+              <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '12px', marginBottom: '8px' }}>
+                Отправьте точно:
+              </p>
+              <p style={{ 
+                fontSize: '28px', 
+                fontWeight: '700', 
+                color: '#10b981',
+                margin: '0 0 4px 0',
+              }}>
+                {invoice.amount} {invoice.currency}
+              </p>
+              {invoice.amountUSD && (
+                <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '14px', margin: '8px 0 0 0' }}>
+                  ≈ ${invoice.amountUSD.toFixed(2)} USD
+                </p>
+              )}
+              {invoice.network && (
+                <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '12px', marginTop: '4px' }}>
+                  Сеть: <strong>{invoice.network}</strong>
+                </p>
+              )}
+            </div>
+
+            {/* Адрес для оплаты (статический кошелёк - БОЕВОЙ РЕЖИМ) */}
+            {invoice.address && invoice.staticWallet && (
+              <>
+                <div style={{
+                  background: 'var(--card-bg, #1f2937)',
+                  border: '1px solid var(--border, #374151)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}>
+                  <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '12px', marginBottom: '8px' }}>
+                    📍 Адрес для оплаты ({invoice.currency}):
+                  </p>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                    <code style={{
+                      flex: 1,
+                      background: 'rgba(0,0,0,0.4)',
+                      padding: '14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      wordBreak: 'break-all',
+                      color: '#10b981',
+                      fontFamily: 'monospace',
+                      lineHeight: '1.4',
+                    }}>
+                      {invoice.address}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(invoice.address || '');
+                        alert('Адрес скопирован!');
+                      }}
+                      style={{
+                        padding: '14px 16px',
+                        background: '#10b981',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      📋 Копировать
+                    </button>
+                  </div>
+                </div>
+
+                {/* Предупреждение для статического кошелька */}
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}>
+                  <p style={{ color: '#ef4444', fontSize: '13px', margin: 0, lineHeight: '1.6' }}>
+                    ⚠️ <strong>ВАЖНО:</strong><br/>
+                    • Отправляйте <strong>ТОЛЬКО {invoice.currency}</strong> на этот адрес!<br/>
+                    • Сеть: <strong>{invoice.network}</strong><br/>
+                    • Другие валюты будут <strong>ПОТЕРЯНЫ</strong>!<br/>
+                    • Минимум 1 подтверждение сети
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Кнопка оплаты (ТЕСТОВЫЙ РЕЖИМ или обычный инвойс) */}
+            {invoice.payUrl && (
+              <>
+                {invoice.testMode && (
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    marginBottom: '16px',
+                    textAlign: 'center',
+                  }}>
+                    <p style={{ color: '#f59e0b', fontSize: '12px', margin: 0 }}>
+                      🧪 Тестовый режим: оплата через страницу CryptoCloud
+                    </p>
+                  </div>
+                )}
+                
+                <button
+                  onClick={handleOpenPayment}
+                  style={{
+                    width: '100%',
+                    padding: '16px 24px',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <ExternalLink size={18} />
+                  Перейти к оплате
+                </button>
+              </>
+            )}
+
+            {/* Статус */}
+            <p style={{ 
+              color: 'var(--muted, #a0aac0)', 
+              fontSize: '12px',
+              textAlign: 'center',
+            }}>
+              После оплаты баланс обновится автоматически (1-30 мин)
             </p>
-            <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '14px' }}>
-              Мы проверяем статус платежа. Это может занять несколько минут.
-            </p>
-            <button
-              onClick={handleOpenPayment}
-              style={{
-                marginTop: '20px',
-                padding: '12px 24px',
-                background: 'var(--card-bg, #1f2937)',
-                color: 'var(--text, #fafafa)',
-                border: '1px solid var(--border, #374151)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: '20px auto 0',
-              }}
-            >
-              <ExternalLink size={16} />
-              Открыть страницу оплаты
-            </button>
           </div>
         )}
 
