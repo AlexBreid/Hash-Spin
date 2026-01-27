@@ -139,57 +139,117 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
 
 /**
  * 💳 Списать ставку с правильного баланса
+ * АТОМАРНАЯ ОПЕРАЦИЯ - защита от race condition
  */
 async function deductBetFromBalance(userId, betAmount, tokenId) {
   console.log(`\n💳 [DEDUCT BET] Списание ставки ${betAmount.toFixed(8)}...`);
 
   try {
-    const { balanceType, balance, amount, userBonusId } = await determineBalanceForBet(userId, betAmount, tokenId);
+    // Используем транзакцию для атомарной проверки и списания
+    const result = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Проверяем активный BONUS
+      const activeBonus = await tx.userBonus.findFirst({
+        where: {
+          userId,
+          tokenId,
+          isActive: true,
+          isCompleted: false,
+          expiresAt: { gt: new Date() }
+        }
+      });
 
-    if (balanceType === 'NONE' || !balance) {
-      console.log(`❌ [DEDUCT BET] Баланс не найден или недостаточно средств`);
+      let balanceType = 'MAIN';
+      let userBonusId = null;
+
+      // 2️⃣ Пробуем списать с BONUS (если есть активный бонус)
+      if (activeBonus) {
+        const bonusBalance = await tx.balance.findUnique({
+          where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } }
+        });
+
+        const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
+
+        if (bonusAmount >= betAmount) {
+          // Атомарно списываем с BONUS
+          const updated = await tx.balance.update({
+            where: { id: bonusBalance.id },
+            data: { amount: { decrement: betAmount } }
+          });
+
+          const newBalance = parseFloat(updated.amount.toString());
+          
+          // Проверка на отрицательный баланс (защита)
+          if (newBalance < 0) {
+            throw new Error('INSUFFICIENT_BALANCE');
+          }
+
+          console.log(`   ✅ Списано ${betAmount.toFixed(8)} с BONUS. Остаток: ${newBalance.toFixed(8)}`);
+          
+          return {
+            success: true,
+            balanceType: 'BONUS',
+            newBalance,
+            fromBonus: true,
+            userBonusId: activeBonus.id
+          };
+        }
+      }
+
+      // 3️⃣ Списываем с MAIN
+      const mainBalance = await tx.balance.findUnique({
+        where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } }
+      });
+
+      const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
+
+      if (mainAmount < betAmount) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+
+      // Атомарно списываем с MAIN
+      const updated = await tx.balance.update({
+        where: { id: mainBalance.id },
+        data: { amount: { decrement: betAmount } }
+      });
+
+      const newBalance = parseFloat(updated.amount.toString());
+      
+      // Проверка на отрицательный баланс (защита)
+      if (newBalance < 0) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+
+      console.log(`   ✅ Списано ${betAmount.toFixed(8)} с MAIN. Остаток: ${newBalance.toFixed(8)}`);
+
+      return {
+        success: true,
+        balanceType: 'MAIN',
+        newBalance,
+        fromBonus: false,
+        userBonusId: null
+      };
+    }, {
+      isolationLevel: 'Serializable' // Максимальная изоляция для предотвращения race condition
+    });
+
+    // Отслеживаем для реферальной системы (вне транзакции, т.к. не критично)
+    await trackBet(userId, betAmount, tokenId, result.balanceType);
+
+    console.log(`✅ [DEDUCT BET] УСПЕХ: ${result.balanceType}\n`);
+
+    return result;
+
+  } catch (error) {
+    if (error.message === 'INSUFFICIENT_BALANCE') {
+      console.log(`❌ [DEDUCT BET] Недостаточно средств`);
       return { 
         success: false, 
-        error: 'Insufficient balance',
+        error: 'Недостаточно средств',
         balanceType: 'NONE',
         userBonusId: null
       };
     }
 
-    if (amount < betAmount) {
-      console.log(`❌ [DEDUCT BET] ${balanceType} баланс < ставке (${amount.toFixed(8)} < ${betAmount.toFixed(8)})`);
-      return { 
-        success: false, 
-        error: `Insufficient ${balanceType} balance`,
-        balanceType,
-        userBonusId: null
-      };
-    }
-
-    console.log(`   💸 Списываю ${betAmount.toFixed(8)} с ${balanceType} баланса...`);
-    
-    const updated = await prisma.balance.update({
-      where: { id: balance.id },
-      data: { amount: { decrement: betAmount } }
-    });
-
-    const newBalance = parseFloat(updated.amount.toString());
-    console.log(`   ✅ Списано! ${balanceType} баланс: ${newBalance.toFixed(8)}`);
-
-    // Отслеживаем для реферальной системы
-    await trackBet(userId, betAmount, tokenId, balanceType);
-
-    console.log(`✅ [DEDUCT BET] УСПЕХ: ${balanceType}, userBonusId=${userBonusId}\n`);
-
-    return {
-      success: true,
-      balanceType,
-      newBalance,
-      fromBonus: balanceType === 'BONUS',
-      userBonusId
-    };
-
-  } catch (error) {
     console.error(`❌ [DEDUCT BET] ОШИБКА:`, error.message);
     logger.error('BALANCE', 'Failed to deduct bet', { error: error.message });
     

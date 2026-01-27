@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const currencySyncService = require('../services/currencySyncService');
 
 const { 
   deductBetFromBalance, 
@@ -346,6 +347,31 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       const token = await prisma.cryptoToken.findUnique({
         where: { id: tokenId }
       });
+
+      if (!token) {
+        console.log(`❌ [CREATE-BET] Токен не найден: ${tokenId}`);
+        return res.status(404).json({ success: false, error: 'Token not found' });
+      }
+
+      // Проверяем лимиты ставок для валюты
+      const minBet = currencySyncService.getMinBetForCurrency(token.symbol);
+      const maxBet = currencySyncService.getMaxBetForCurrency(token.symbol);
+
+      if (betAmount < minBet) {
+        console.log(`❌ [CREATE-BET] Ставка меньше минимума: ${betAmount} < ${minBet}`);
+        return res.status(400).json({ 
+          success: false, 
+          error: `Минимальная ставка ${minBet} ${token.symbol}` 
+        });
+      }
+
+      if (betAmount > maxBet) {
+        console.log(`❌ [CREATE-BET] Ставка больше максимума: ${betAmount} > ${maxBet}`);
+        return res.status(400).json({ 
+          success: false, 
+          error: `Максимальная ставка ${maxBet} ${token.symbol}` 
+        });
+      }
 
       if (!token) {
         console.log(`❌ [CREATE-BET] Токен не найден: ID=${tokenId}`);

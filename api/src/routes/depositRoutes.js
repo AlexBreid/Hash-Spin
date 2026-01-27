@@ -3,16 +3,18 @@ const router = express.Router();
 const prisma = require('../../prismaClient');
 const cryptoCloudService = require('../services/cryptoCloudService');
 const referralService = require('../services/ReferralService');
+const currencySyncService = require('../services/currencySyncService');
+const walletService = require('../services/walletService');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const logger = require('../utils/logger');
 
 /**
  * POST /api/v1/deposit/create
- * Создать депозит через CryptoCloud
+ * Создать депозит через CryptoCloud или CryptoBot
  */
 router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
   try {
-    const { amount, withBonus } = req.body;
+    const { amount, withBonus, currency, tokenId, method = 'cryptocloud' } = req.body;
     const userId = req.user.userId;
 
     // Валидация суммы
@@ -24,11 +26,41 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
       });
     }
 
-    // Минимальная сумма депозита
-    if (amountNum < 1) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Минимальная сумма депозита: 1 USD' 
+    // Определяем валюту
+    let selectedToken = null;
+    if (tokenId) {
+      selectedToken = await prisma.cryptoToken.findUnique({
+        where: { id: parseInt(tokenId) }
+      });
+    } else if (currency) {
+      // Если передан currency (например, "USDT_TRC20"), парсим его
+      const [symbol, network] = currency.split('_');
+      selectedToken = await currencySyncService.getCurrencyBySymbolAndNetwork(symbol, network || 'ERC-20');
+    }
+
+    // Если токен не найден, используем USDT по умолчанию
+    if (!selectedToken) {
+      selectedToken = await prisma.cryptoToken.findFirst({
+        where: {
+          symbol: 'USDT',
+          network: 'TRC-20'
+        }
+      });
+    }
+
+    if (!selectedToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Валюта не найдена. Пожалуйста, выберите валюту из списка.'
+      });
+    }
+
+    // ✅ Проверяем минимальную сумму депозита для выбранной валюты
+    const minDeposit = currencySyncService.getMinDepositForCurrency(selectedToken.symbol);
+    if (amountNum < minDeposit) {
+      return res.status(400).json({
+        success: false,
+        message: `Минимальная сумма пополнения: ${minDeposit} ${selectedToken.symbol} (≈$10)`
       });
     }
 
@@ -48,18 +80,42 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
       }
     }
 
-    // Создаем счет в CryptoCloud
-    const invoice = await cryptoCloudService.createInvoice(amountNum, userId, canUseBonus);
+    // Создаем счет в зависимости от метода
+    let invoice;
+    if (method === 'cryptobot') {
+      // Для Crypto Bot нужна интеграция через Telegram бота
+      return res.status(400).json({
+        success: false,
+        message: 'Crypto Bot доступен только через Telegram бота'
+      });
+    } else {
+      // CryptoCloud - используем СТАТИЧЕСКИЙ КОШЕЛЁК
+      // Это единственный способ гарантировать оплату ТОЛЬКО выбранной криптой
+      invoice = await cryptoCloudService.createStaticWalletInvoice(
+        amountNum, 
+        userId, 
+        canUseBonus,
+        selectedToken.symbol, // Криптовалюта (BTC, ETH, USDT и т.д.)
+        selectedToken.network // Сеть (TRC-20, ERC-20, BTC и т.д.)
+      );
+    }
 
     res.json({
       success: true,
       data: {
         invoiceId: invoice.invoiceId,
         payUrl: invoice.payUrl,
-        amount: invoice.amount,
-        currency: invoice.currency,
+        amount: invoice.amount,  // Сумма в крипте
+        amountUSD: invoice.amountUSD,  // Сумма в USD
+        currency: selectedToken.symbol,
+        network: selectedToken.network,
+        tokenId: selectedToken.id,
         withBonus: canUseBonus,
-        orderId: invoice.orderId
+        orderId: invoice.orderId,
+        // ✅ Данные для встроенного виджета (статический кошелёк)
+        address: invoice.address || null,  // Адрес для оплаты
+        staticWallet: invoice.staticWallet || false,  // Флаг статического кошелька
+        warning: invoice.warning || null  // Предупреждение
       }
     });
 
@@ -392,6 +448,130 @@ router.get('/api/v1/deposit/history', authenticateToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message || 'Ошибка при получении истории' 
+    });
+  }
+});
+
+/**
+ * GET /api/v1/deposit/currencies
+ * Получить список УНИКАЛЬНЫХ валют для депозита (один USDT, один USDC и т.д.)
+ * Сети для пополнения доступны через /api/v1/wallet/deposit-networks/:symbol
+ */
+router.get('/api/v1/deposit/currencies', authenticateToken, async (req, res) => {
+  try {
+    // ✅ Используем getBaseTokens() для получения уникальных валют
+    const currencies = await currencySyncService.getBaseTokens();
+    
+    // ✅ Добавляем минимальный депозит для каждой валюты
+    const currenciesWithLimits = currencies.map(c => ({
+      ...c,
+      minDeposit: currencySyncService.getMinDepositForCurrency(c.symbol),
+      minDepositUSD: 10
+    }));
+    
+    res.json({
+      success: true,
+      data: currenciesWithLimits
+    });
+  } catch (error) {
+    console.error('❌ Error fetching currencies:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка при получении списка валют'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/deposit/limits
+ * Получить минимальные лимиты депозита для всех валют
+ */
+router.get('/api/v1/deposit/limits', authenticateToken, async (req, res) => {
+  try {
+    const limits = currencySyncService.getAllDepositLimits();
+    
+    res.json({
+      success: true,
+      data: {
+        baseMinDepositUSD: 10,
+        limits
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching deposit limits:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка при получении лимитов'
+    });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/static-wallet
+ * Создать статический кошелёк для конкретной криптовалюты
+ * Пользователь сможет пополнять ТОЛЬКО этой криптой на этот адрес
+ */
+router.post('/api/v1/deposit/static-wallet', authenticateToken, async (req, res) => {
+  try {
+    const { currency, network } = req.body;
+    const userId = req.user.userId;
+
+    if (!currency) {
+      return res.status(400).json({
+        success: false,
+        message: 'Укажите криптовалюту (currency)'
+      });
+    }
+
+    // Создаём статический кошелёк
+    const wallet = await cryptoCloudService.createStaticWallet(
+      userId,
+      currency,
+      network || 'ERC-20'
+    );
+
+    res.json({
+      success: true,
+      data: {
+        address: wallet.address,
+        currency: wallet.currency,
+        network: wallet.network,
+        uuid: wallet.uuid,
+        message: `Отправляйте только ${wallet.currency} на этот адрес. Другие валюты будут потеряны!`
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating static wallet:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка создания кошелька'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/deposit/rates
+ * Получить актуальные курсы валют (обновляются каждые 5 минут)
+ */
+router.get('/api/v1/deposit/rates', authenticateToken, async (req, res) => {
+  try {
+    // Получаем актуальные курсы (обновляет кэш если устарел)
+    const rates = await currencySyncService.fetchLiveRates();
+    
+    res.json({
+      success: true,
+      data: {
+        rates,
+        updatedAt: new Date().toISOString(),
+        cacheTTL: 300 // 5 минут
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching rates:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка при получении курсов'
     });
   }
 });

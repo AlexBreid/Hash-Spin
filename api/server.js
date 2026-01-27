@@ -256,6 +256,15 @@ try {
   console.error('❌ Error loading plinko routes:', err.message);
 }
 
+// ✅ Явно подключаем walletRoutes
+try {
+  const walletRoutes = require('./src/routes/walletRoutes');
+  app.use('/', walletRoutes);
+  console.log('✅ Wallet routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading wallet routes:', err.message);
+}
+
 console.log(`✅ ${routers.length} route(s) loaded`);
 
 // ====================================
@@ -298,7 +307,22 @@ async function startServer() {
     await prisma.$connect();
     console.log('✅ Database: Connected to PostgreSQL');
 
-    // === ШАГ 2: Запуск Telegram Bot ===
+    // === ШАГ 2: Синхронизация валют ===
+    try {
+      console.log('\n💱 Syncing currencies...');
+      const currencySyncService = require('./src/services/currencySyncService');
+      await currencySyncService.syncCurrencies(true); // force=true для принудительной синхронизации при старте
+      console.log('✅ Currencies: Synchronized');
+      
+      // Загружаем актуальные курсы валют с CoinGecko
+      console.log('📊 Fetching live exchange rates...');
+      const rates = await currencySyncService.fetchLiveRates();
+      console.log('✅ Exchange Rates: Loaded (BTC=$' + rates.BTC + ', ETH=$' + rates.ETH + ')');
+    } catch (error) {
+      console.warn('⚠️ Currencies: Failed to sync -', error.message);
+    }
+
+    // === ШАГ 3: Запуск Telegram Bot ===
     if (telegramBot && telegramBot.start) {
       console.log('\n🤖 Starting Telegram Bot...');
       telegramBot.start();
@@ -307,16 +331,21 @@ async function startServer() {
       console.warn('⚠️ Telegram Bot: Not configured or start method missing');
     }
 
-    // === ШАГ 3: Запуск Cron Jobs ===
+    // === ШАГ 4: Запуск Cron Jobs ===
     try {
       const { startReferralCron } = require('./src/cron/referralCommissionCron');
       startReferralCron();
+      
+      // Leaderboard cron (фейковые ставки раз в день)
+      const { startLeaderboardCron } = require('./src/cron/leaderboardCron');
+      startLeaderboardCron();
+      
       console.log('✅ Cron Jobs: Started');
     } catch (error) {
       console.warn('⚠️ Cron Jobs: Failed to start -', error.message);
     }
 
-    // === ШАГ 4: Запуск HTTP сервера ===
+    // === ШАГ 5: Запуск HTTP сервера ===
     console.log('\n🚀 Starting HTTP Server...');
     httpServer = app.listen(PORT, () => {
       console.log(`✅ API Server: Running on ${API_BASE_URL}`);

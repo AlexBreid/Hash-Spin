@@ -45,6 +45,8 @@ class PlinkoService {
   async createGame(userId, tokenId, betAmount) {
     const result = this.generatePath();
     const winAmount = new Decimal(betAmount).mul(result.multiplier);
+    const betAmountNum = parseFloat(betAmount);
+    const multiplierNum = result.multiplier;
     
     console.log(`💰 [PLINKO CREATE] betAmount=${betAmount}, multiplier=${result.multiplier}x, winAmount=${winAmount.toString()}`);
     
@@ -60,6 +62,34 @@ class PlinkoService {
         status: 'COMPLETED'
       }
     });
+    
+    // Создаём PlinkoBet если ЛИБО ставка >= $50 ЛИБО множитель >= 5x (условие OR)
+    // Любое из этих условий достаточно для создания записи
+    const shouldCreateBet = betAmountNum >= 50 || multiplierNum >= 5;
+    
+    if (shouldCreateBet) {
+      try {
+        const winAmountNum = parseFloat(winAmount.toString());
+        const isWin = winAmountNum > betAmountNum;
+        
+        await prisma.plinkoBet.create({
+          data: {
+            userId,
+            tokenId,
+            gameId: game.id,
+            betAmount: betAmount.toString(),
+            winAmount: winAmount.toString(),
+            result: isWin ? 'won' : 'lost',
+            multiplier: multiplierNum,
+          }
+        });
+        
+        console.log(`✅ [PLINKO BET] Запись создана: betAmount=${betAmountNum}, multiplier=${multiplierNum}x, winAmount=${winAmountNum}`);
+      } catch (error) {
+        console.error('❌ [PLINKO BET] Ошибка создания записи:', error);
+        // Не прерываем выполнение, если не удалось создать PlinkoBet
+      }
+    }
     
     return {
       gameId: game.id,

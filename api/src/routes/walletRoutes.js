@@ -8,82 +8,245 @@ const tatumService = require('../services/tatumService');
  * Получить баланс пользователя
  * GET /api/v1/wallet/balance
  */
-router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
+// УДАЛЕНО: Дублирующий endpoint, используется из balanceRoutes.js
+// router.get('/api/v1/wallet/balance', ...) - перенесен в balanceRoutes.js
+
+/**
+ * ⭐ ENDPOINT: Получить или создать кошелек пользователя для валюты
+ * GET /api/v1/wallet/wallet/:tokenId
+ * Как в Stake - каждая валюта имеет свой отдельный кошелек
+ */
+router.get('/api/v1/wallet/wallet/:tokenId', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
+    const tokenId = parseInt(req.params.tokenId);
 
-    const balances = await prisma.balance.findMany({
-      where: { userId },
-      include: {
-        token: {
-          select: {
-            symbol: true,
-            name: true,
-            decimals: true,
-          },
-        },
-      },
-    });
+    if (!tokenId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Некорректный tokenId'
+      });
+    }
+
+    const walletService = require('../services/walletService');
+    const wallet = await walletService.getOrCreateWallet(userId, tokenId);
 
     res.json({
       success: true,
-      data: balances.map((b) => ({
-        tokenId: b.tokenId,
-        symbol: b.token.symbol,
-        amount: parseFloat(b.amount.toString()),
-        type: b.type,
-      })),
+      data: {
+        id: wallet.id,
+        address: wallet.address,
+        network: wallet.network,
+        token: {
+          id: wallet.token.id,
+          symbol: wallet.token.symbol,
+          name: wallet.token.name,
+          network: wallet.token.network
+        },
+        isActive: wallet.isActive,
+        lastUsedAt: wallet.lastUsedAt
+      }
     });
   } catch (error) {
-    console.error('❌ Error fetching balance:', error);
+    console.error('❌ Ошибка получения кошелька:', error.message);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch balance',
+      message: 'Ошибка получения кошелька',
+      error: error.message,
     });
   }
 });
 
 /**
- * ⭐ НОВЫЙ ENDPOINT: Получить все доступные токены
- * GET /api/v1/wallet/tokens
+ * ⭐ ENDPOINT: Получить все кошельки пользователя
+ * GET /api/v1/wallet/wallets
  */
-router.get('/api/v1/wallet/tokens', async (req, res) => {
+router.get('/api/v1/wallet/wallets', authenticateToken, async (req, res) => {
   try {
-    console.log('📋 Запрос списка доступных токенов');
-
-    const tokens = await prisma.cryptoToken.findMany({
-      select: {
-        id: true,
-        symbol: true,
-        name: true,
-        network: true,
-        decimals: true,
-      },
-      orderBy: {
-        symbol: 'asc',
-      },
-    });
-
-    if (tokens.length === 0) {
-      console.warn('⚠️ Токены не найдены в БД');
-      return res.json({
-        success: true,
-        data: [],
-        message: 'Нет доступных токенов',
-      });
-    }
-
-    console.log(`✅ Найдено ${tokens.length} токенов`);
+    const userId = req.user.userId;
+    const walletService = require('../services/walletService');
+    const wallets = await walletService.getUserWallets(userId);
 
     res.json({
       success: true,
-      data: tokens,
+      data: wallets.map(w => ({
+        id: w.id,
+        address: w.address,
+        network: w.network,
+        token: {
+          id: w.token.id,
+          symbol: w.token.symbol,
+          name: w.token.name,
+          network: w.token.network
+        },
+        isActive: w.isActive,
+        lastUsedAt: w.lastUsedAt
+      }))
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения кошельков:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения кошельков',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * ⭐ НОВЫЙ ENDPOINT: Получить максимальные ставки для всех валют
+ * GET /api/v1/wallet/bet-limits
+ */
+router.get('/api/v1/wallet/bet-limits', async (req, res) => {
+  try {
+    const currencySyncService = require('../services/currencySyncService');
+    const tokens = await prisma.cryptoToken.findMany({
+      orderBy: [
+        { symbol: 'asc' },
+        { network: 'asc' }
+      ]
+    });
+
+    const limits = tokens.map(token => ({
+      tokenId: token.id,
+      symbol: token.symbol,
+      network: token.network,
+      minBet: currencySyncService.getMinBetForCurrency(token.symbol),
+      maxBet: currencySyncService.getMaxBetForCurrency(token.symbol),
+      rateUSD: currencySyncService.CURRENCY_RATES[token.symbol] || 1.0
+    }));
+
+    res.json({
+      success: true,
+      data: limits
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения лимитов ставок:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения лимитов ставок',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * ⭐ НОВЫЙ ENDPOINT: Получить базовые токены для балансов
+ * GET /api/v1/wallet/tokens
+ * 
+ * Возвращает ТОЛЬКО базовые токены (USDT, USDC, BTC, etc.)
+ * Для пополнения используйте /api/v1/wallet/deposit-options
+ */
+const tokensCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 5000 // 5 секунд
+};
+
+const currencySyncService = require('../services/currencySyncService');
+
+router.get('/api/v1/wallet/tokens', async (req, res) => {
+  try {
+    // Проверяем кэш
+    const now = Date.now();
+    if (tokensCache.data && (now - tokensCache.timestamp) < tokensCache.ttl) {
+      return res.json({
+        success: true,
+        data: tokensCache.data,
+        cached: true
+      });
+    }
+    
+    console.log('📋 Запрос базовых токенов');
+
+    // Получаем базовые токены для балансов
+    const baseTokens = await currencySyncService.getBaseTokens();
+
+    if (baseTokens.length === 0) {
+      // Fallback: возвращаем все токены
+      const allTokens = await prisma.cryptoToken.findMany({
+        select: {
+          id: true,
+          symbol: true,
+          name: true,
+          network: true,
+          decimals: true,
+        },
+        orderBy: [{ symbol: 'asc' }],
+      });
+      
+      // Группируем по символу — берём первый токен для каждого символа
+      const uniqueTokens = [];
+      const seen = new Set();
+      for (const token of allTokens) {
+        if (!seen.has(token.symbol)) {
+          seen.add(token.symbol);
+          uniqueTokens.push(token);
+        }
+      }
+      
+      tokensCache.data = uniqueTokens;
+      tokensCache.timestamp = Date.now();
+      
+      return res.json({
+        success: true,
+        data: uniqueTokens,
+        cached: false
+      });
+    }
+
+    console.log(`✅ Найдено ${baseTokens.length} базовых токенов`);
+
+    // Обновляем кэш
+    tokensCache.data = baseTokens;
+    tokensCache.timestamp = Date.now();
+
+    res.json({
+      success: true,
+      data: baseTokens,
+      cached: false
     });
   } catch (error) {
     console.error('❌ Ошибка получения токенов:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения списка токенов',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * ⭐ НОВЫЙ ENDPOINT: Получить сети для пополнения конкретной валюты
+ * GET /api/v1/wallet/deposit-networks/:symbol
+ * 
+ * Возвращает список сетей для пополнения (TRC-20, ERC-20, BEP-20 и т.д.)
+ */
+router.get('/api/v1/wallet/deposit-networks/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    
+    if (!symbol) {
+      return res.status(400).json({
+        success: false,
+        message: 'Не указан символ валюты'
+      });
+    }
+    
+    const networks = currencySyncService.getDepositNetworks(symbol);
+    
+    res.json({
+      success: true,
+      data: {
+        symbol: symbol.toUpperCase(),
+        networks: networks
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения сетей:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения списка сетей',
       error: error.message,
     });
   }

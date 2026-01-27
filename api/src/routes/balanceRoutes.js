@@ -99,7 +99,8 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
 /**
  * GET /api/v1/wallet/balance
  * ALIAS для TopNavigation и других компонентов
- * Возвращает ОБА баланса + информацию о бонусе
+ * 
+ * ✅ ОБЪЕДИНЯЕТ балансы по СИМВОЛУ валюты (все USDT вместе, все USDC вместе и т.д.)
  */
 router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
   try {
@@ -118,18 +119,88 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
     // Получаем ВСЕ балансы пользователя
     const balances = await prisma.balance.findMany({
       where: { userId: userId },
-      include: { token: true },
+      include: { 
+        token: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            network: true,
+            decimals: true
+          }
+        }
+      },
     });
 
     console.log(`   ✅ Найдено ${balances.length} балансов`);
 
-    // ✅ Возвращаем в формате совместимом с TopNavigation
-    const formatted = balances.map(bal => ({
-      tokenId: bal.tokenId,
-      symbol: bal.token.symbol,
-      amount: parseFloat(bal.amount.toString()),
-      type: bal.type,  // 'MAIN' или 'BONUS'
-    }));
+    // ✅ ГРУППИРУЕМ балансы по СИМВОЛУ валюты
+    // Все USDT (TRC-20, ERC-20, BEP-20 etc.) → один USDT баланс
+    // Все USDC → один USDC баланс
+    const balancesBySymbol = new Map();
+    
+    for (const bal of balances) {
+      if (!bal.token) continue;
+      
+      const symbol = bal.token.symbol;
+      const amount = parseFloat(bal.amount.toString()) || 0;
+      const type = bal.type; // 'MAIN' или 'BONUS'
+      
+      if (!balancesBySymbol.has(symbol)) {
+        balancesBySymbol.set(symbol, {
+          symbol: symbol,
+          name: bal.token.name,
+          decimals: bal.token.decimals,
+          // Берём первый найденный tokenId для этого символа
+          tokenId: bal.tokenId,
+          main: 0,
+          bonus: 0
+        });
+      }
+      
+      const entry = balancesBySymbol.get(symbol);
+      if (type === 'MAIN') {
+        entry.main += amount;
+      } else if (type === 'BONUS') {
+        entry.bonus += amount;
+      }
+    }
+    
+    // Преобразуем Map в массив с отдельными записями для MAIN и BONUS
+    const formatted = [];
+    for (const [symbol, data] of balancesBySymbol) {
+      // Добавляем MAIN баланс
+      if (data.main > 0 || data.bonus === 0) {
+        formatted.push({
+          tokenId: data.tokenId,
+          symbol: data.symbol,
+          amount: data.main,
+          type: 'MAIN',
+          token: {
+            id: data.tokenId,
+            symbol: data.symbol,
+            name: data.name,
+            network: 'MULTI', // Указываем что это объединённый баланс
+          }
+        });
+      }
+      
+      // Добавляем BONUS баланс если он есть
+      if (data.bonus > 0) {
+        formatted.push({
+          tokenId: data.tokenId,
+          symbol: data.symbol,
+          amount: data.bonus,
+          type: 'BONUS',
+          token: {
+            id: data.tokenId,
+            symbol: data.symbol,
+            name: data.name,
+            network: 'MULTI',
+          }
+        });
+      }
+    }
 
     // Получаем информацию о бонусе
     const activeBonus = await prisma.userBonus.findFirst({
@@ -156,9 +227,12 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
     }
 
     // Логируем для отладки
-    const main = formatted.find(b => b.type === 'MAIN')?.amount || 0;
-    const bonus = formatted.find(b => b.type === 'BONUS')?.amount || 0;
-    console.log(`   💰 MAIN: ${main.toFixed(8)}, BONUS: ${bonus.toFixed(8)}, TOTAL: ${(main + bonus).toFixed(8)}`);
+    let totalMain = 0, totalBonus = 0;
+    for (const b of formatted) {
+      if (b.type === 'MAIN') totalMain += b.amount;
+      if (b.type === 'BONUS') totalBonus += b.amount;
+    }
+    console.log(`   💰 Объединённые балансы: ${balancesBySymbol.size} валют, MAIN: ${totalMain.toFixed(2)}, BONUS: ${totalBonus.toFixed(2)}`);
 
     res.json({
       success: true,
@@ -168,11 +242,17 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Ошибка получения баланса:', error);
-    logger.error('BALANCE', 'Failed to get wallet balance', { error: error.message });
+    console.error('❌ Stack trace:', error.stack);
+    logger.error('BALANCE', 'Failed to get wallet balance', { 
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.userId 
+    });
     
     res.status(500).json({
       success: false,
       error: 'Ошибка получения баланса',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });

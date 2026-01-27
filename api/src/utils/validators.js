@@ -240,9 +240,28 @@ function validateTransactionType(type) {
 
 /**
  * ✅ Валидировать ASSET (USDT, BTC, ETH и т.д.)
+ * Поддерживает все валюты из CryptoBot и CryptoCloud
+ * Синхронная версия для обратной совместимости
  */
 function validateAsset(asset) {
-  const validAssets = ['USDT', 'USDC', 'TON', 'BTC', 'ETH'];
+  // Базовый список основных валют
+  const validAssets = [
+    'USDT', 'USDC', 'TON', 'BTC', 'ETH', 'TRX', 'LTC', 
+    'BNB', 'SOL', 'SHIB', 'USDD', 'TUSD'
+  ];
+  
+  // Проверяем базовый список
+  return validAssets.includes(asset?.toUpperCase());
+}
+
+/**
+ * ✅ Синхронная версия validateAsset (для обратной совместимости)
+ */
+function validateAssetSync(asset) {
+  const validAssets = [
+    'USDT', 'USDC', 'TON', 'BTC', 'ETH', 'TRX', 'LTC', 
+    'BNB', 'SOL', 'SHIB', 'USDD', 'TUSD'
+  ];
   return validAssets.includes(asset?.toUpperCase());
 }
 
@@ -318,6 +337,7 @@ module.exports = {
   validateTransactionStatus,
   validateTransactionType,
   validateAsset,
+  validateAssetSync, // Синхронная версия для обратной совместимости
   
   // Комплексные валидаторы
   validateDepositRequest,

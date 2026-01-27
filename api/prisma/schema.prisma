@@ -14,7 +14,7 @@ datasource db {
 model CryptoToken {
   id Int @id @default(autoincrement())
 
-  symbol    String   @unique
+  symbol    String
   name      String
   network   String   @default("ERC-20")
   decimals  Int
@@ -24,16 +24,21 @@ model CryptoToken {
   crashBets           CrashBet[]            @relation("CrashTokenBets")
   crashTransactions   CrashTransaction[]    @relation("CrashTransactionTokens")
   minesweeperGames    MinesweeperGame[]     @relation("MinesweeperTokens")
-  minesweeperBets     MinesweeperBet[]      @relation("MinesweeperBetTokens")
-  plinkoGames         PlinkoGame[]          @relation("PlinkoGames")
-  plinkoBets          PlinkoBet[]           @relation("PlinkoBetTokens")
-  balances            Balance[]
-  transactions        Transaction[]
-  bets                Bet[]
-  leaderboard         LeaderboardEntry[]
-  userBonuses         UserBonus[]
-  referralCommissions ReferralTransaction[]
-  referralStats       ReferralStats[]
+        minesweeperBets     MinesweeperBet[]      @relation("MinesweeperBetTokens")
+        plinkoGames         PlinkoGame[]          @relation("PlinkoGames")
+        plinkoBets          PlinkoBet[]           @relation("PlinkoBetTokens")
+        balances            Balance[]
+        wallets             UserWallet[]
+        transactions        Transaction[]
+        bets                Bet[]
+        leaderboard         LeaderboardEntry[]
+        userBonuses         UserBonus[]
+        referralCommissions ReferralTransaction[]
+        referralStats       ReferralStats[]
+
+  // Уникальность по комбинации symbol + network (можно иметь USDT TRC-20, USDT ERC-20 и т.д.)
+  @@unique([symbol, network])
+  @@index([symbol])
 }
 
 enum GameType {
@@ -111,6 +116,7 @@ model User {
   plinkoGames        PlinkoGame[]          @relation("PlinkoGames")
   plinkoBets         PlinkoBet[]           @relation("PlinkoBets")
   balances           Balance[]
+  wallets            UserWallet[]
   transactions       Transaction[]
   bets               Bet[]
   leaderboardEntries LeaderboardEntry[]
@@ -144,6 +150,39 @@ model Balance {
 
   @@unique([userId, tokenId, type])
   @@index([userId])
+}
+
+// ====================================================
+// 2.1. КОШЕЛЬКИ ПОЛЬЗОВАТЕЛЕЙ (USER WALLETS)
+// ====================================================
+// Каждый пользователь имеет отдельный кошелек для каждой валюты
+// Как в Stake - валюта не пересекаются, у каждой свой кошелек
+
+model UserWallet {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenId Int
+  token   CryptoToken @relation(fields: [tokenId], references: [id])
+
+  // Адрес кошелька для пополнения (уникальный для каждой валюты)
+  address      String   @unique
+  privateKey   String?  // Зашифрованный приватный ключ (если нужен)
+  network      String   // Сеть (TRC-20, ERC-20, BTC и т.д.)
+  
+  // Метаданные
+  isActive     Boolean  @default(true)
+  lastUsedAt   DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Один кошелек на пользователя для каждой валюты
+  @@unique([userId, tokenId])
+  @@index([userId])
+  @@index([address])
 }
 
 // ====================================================
@@ -509,6 +548,7 @@ model PendingDeposit {
   invoiceId String   @unique
   amount    Float
   asset     String   @default("USDT")
+  network   String?  // Сеть валюты (TRC-20, ERC-20, BTC и т.д.)
   status    String   @default("pending")
   withBonus Boolean  @default(false)
   createdAt DateTime @default(now())

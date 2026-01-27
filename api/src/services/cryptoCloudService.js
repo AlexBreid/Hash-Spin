@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const prisma = require('../../prismaClient');
 const logger = require('../utils/logger');
 const referralService = require('./ReferralService');
+const { convertCryptoToUSD, getCurrencyRate } = require('./currencySyncService');
 
 // Конфигурация CryptoCloud
 const CRYPTO_CLOUD_API_URL = 'https://api.cryptocloud.plus/v2';
@@ -30,14 +31,57 @@ class CryptoCloudService {
   }
 
   /**
+   * Маппинг валют для CryptoCloud API
+   * CryptoCloud использует специфичные идентификаторы валют
+   */
+  getCryptoCloudCurrency(symbol, network) {
+    const mapping = {
+      // USDT на разных сетях
+      'USDT_TRC-20': 'USDT_TRC20',
+      'USDT_ERC-20': 'USDT_ERC20', 
+      'USDT_BEP-20': 'USDT_BSC',
+      'USDT_SOL': 'USDT_SOL',
+      'USDT_TON': 'USDT_TON',
+      'USDT_ARB': 'USDT_ARBITRUM',
+      'USDT_OP': 'USDT_OPTIMISM',
+      // USDC
+      'USDC_ERC-20': 'USDC_ERC20',
+      'USDC_BEP-20': 'USDC_BSC',
+      'USDC_SOL': 'USDC_SOL',
+      'USDC_ARB': 'USDC_ARBITRUM',
+      'USDC_OP': 'USDC_OPTIMISM',
+      'USDC_BASE': 'USDC_BASE',
+      // Основные криптовалюты
+      'BTC_BTC': 'BTC',
+      'ETH_ERC-20': 'ETH',
+      'ETH_ARB': 'ETH_ARBITRUM',
+      'ETH_OP': 'ETH_OPTIMISM',
+      'BNB_BEP-20': 'BNB_BSC',
+      'LTC_LTC': 'LTC',
+      'TRX_TRC-20': 'TRX',
+      'TON_TON': 'TON',
+      'SOL_SOL': 'SOL',
+      'SHIB_ERC-20': 'SHIB',
+    };
+    
+    const key = `${symbol.toUpperCase()}_${network}`;
+    return mapping[key] || symbol.toUpperCase();
+  }
+
+  /**
    * Создать счет на оплату
-   * @param {number} amount - Сумма в USD (или другой фиатной валюте)
+   * CryptoCloud API требует сумму в фиатной валюте (USD)
+   * Конвертируем сумму криптовалюты → USD для создания инвойса
+   * 
+   * @param {number} amount - Сумма в КРИПТОВАЛЮТЕ (5 BNB)
    * @param {number} userId - ID пользователя
    * @param {boolean} withBonus - Использовать ли бонус
-   * @param {string} fiatCurrency - Фиатная валюта (по умолчанию USD)
+   * @param {string} fiatCurrency - Фиатная валюта (USD)
+   * @param {string} cryptoCurrency - Криптовалюта (USDT, BNB, BTC и т.д.)
+   * @param {string} network - Сеть криптовалюты (TRC-20, BEP-20 и т.д.)
    * @returns {Promise<Object>} Данные счета
    */
-  async createInvoice(amount, userId, withBonus = false, fiatCurrency = 'USD') {
+  async createInvoice(amount, userId, withBonus = false, fiatCurrency = 'USD', cryptoCurrency = 'USDT', network = 'TRC-20') {
     try {
       const amountNum = parseFloat(amount);
       if (isNaN(amountNum) || amountNum <= 0) {
@@ -52,20 +96,35 @@ class CryptoCloudService {
       // Создаем уникальный ID заказа
       const orderId = `DEPOSIT-${userIdNum}-${Date.now()}`;
 
-      // Формируем данные для создания счета (API v2)
-      // ВАЖНО: currency - это ФИАТНАЯ валюта (USD, EUR, RUB и т.д.)
-      // Пользователь сам выбирает крипту на странице оплаты
+      // ✅ Конвертируем сумму криптовалюты в USD с АКТУАЛЬНЫМ курсом
+      // CryptoCloud API требует фиатную валюту!
+      const currencySyncService = require('./currencySyncService');
+      const currentRate = await currencySyncService.getCurrencyRateAsync(cryptoCurrency);
+      const amountInUSD = amountNum * currentRate;
+      
+      logger.info('CRYPTOCLOUD', 'Converting to USD with LIVE rate', {
+        originalAmount: amountNum,
+        cryptoCurrency,
+        network,
+        liveRate: currentRate,
+        amountInUSD: amountInUSD.toFixed(2)
+      });
+
+      // ✅ Формируем данные для CryptoCloud
+      // currency ДОЛЖНА быть фиатной (USD, EUR, etc.)
       const invoiceData = {
         shop_id: CRYPTO_CLOUD_SHOP_ID,
-        amount: amountNum,  // Сумма как число, не строка
-        currency: fiatCurrency.toUpperCase(),  // USD, EUR, RUB и т.д.
+        amount: amountInUSD.toFixed(2),  // Сумма в USD
+        currency: 'USD',  // Фиатная валюта
         order_id: orderId
       };
 
       logger.info('CRYPTOCLOUD', 'Creating invoice', { 
         userId: userIdNum, 
-        amount: amountNum, 
-        currency: fiatCurrency,
+        originalAmount: amountNum,
+        cryptoCurrency,
+        network,
+        amountInUSD: amountInUSD.toFixed(2),
         withBonus,
         orderId
       });
@@ -97,14 +156,33 @@ class CryptoCloudService {
         throw new Error('Invalid response from CryptoCloud: missing uuid');
       }
 
+      // Определяем tokenId для сохранения
+      let token = null;
+      if (cryptoCurrency && cryptoCurrency.includes('_')) {
+        // Если передан формат "USDT_TRC20"
+        const [symbol, network] = cryptoCurrency.split('_');
+        token = await prisma.cryptoToken.findFirst({
+          where: {
+            symbol: symbol.toUpperCase(),
+            network: network || 'ERC-20'
+          }
+        });
+      } else {
+        // Ищем по символу
+        token = await prisma.cryptoToken.findFirst({
+          where: { symbol: cryptoCurrency?.toUpperCase() || 'USDT' }
+        });
+      }
+
       // Сохраняем информацию о депозите в БД
-      // Сохраняем как USDT т.к. это наш внутренний токен
+      // Используем переданную криптовалюту и сеть
       await prisma.pendingDeposit.create({
         data: {
           userId: userIdNum,
           invoiceId: invoice.uuid,  // CryptoCloud v2 использует uuid
           amount: amountNum,
-          asset: 'USDT',  // Внутренняя валюта казино
+          asset: cryptoCurrency,  // Сохраняем выбранную криптовалюту
+          network: network || token?.network || 'TRC-20',  // Сохраняем переданную сеть
           status: 'pending',
           withBonus: withBonus
         }
@@ -113,17 +191,24 @@ class CryptoCloudService {
       logger.info('CRYPTOCLOUD', 'Invoice created', { 
         invoiceId: invoice.uuid, 
         userId: userIdNum,
-        amount: amountNum,
+        originalAmount: amountNum,
+        amountInUSD: amountInUSD.toFixed(2),
+        cryptoCurrency,
+        network,
         payUrl: invoice.link
       });
 
+      // ✅ Возвращаем данные
+      // Пользователь выберет криптовалюту на странице CryptoCloud
       return {
         invoiceId: invoice.uuid,
         status: invoice.status || 'created',
-        payUrl: invoice.link,  // v2 использует link, не pay_url
+        payUrl: invoice.link,  // Ссылка на страницу оплаты CryptoCloud
         orderId: orderId,
-        amount: amountNum,
-        currency: 'USDT'  // Для клиента показываем как USDT
+        amount: amountNum,  // Оригинальная сумма в крипте
+        amountUSD: parseFloat(amountInUSD.toFixed(2)),  // Сумма в USD
+        currency: cryptoCurrency,  // Выбранная криптовалюта
+        network: network,
       };
 
     } catch (error) {
@@ -148,6 +233,220 @@ class CryptoCloudService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Создать статический кошелёк для конкретной криптовалюты
+   * Пользователь сможет оплатить ТОЛЬКО этой криптовалютой!
+   * 
+   * @param {number} userId - ID пользователя
+   * @param {string} cryptoCurrency - Криптовалюта (BTC, ETH, USDT и т.д.)
+   * @param {string} network - Сеть (TRC-20, ERC-20, BTC и т.д.)
+   * @returns {Promise<Object>} Данные кошелька с адресом
+   */
+  async createStaticWallet(userId, cryptoCurrency, network) {
+    try {
+      const userIdNum = parseInt(userId);
+      if (isNaN(userIdNum)) {
+        throw new Error('Invalid userId');
+      }
+
+      // Получаем код валюты для CryptoCloud
+      const cryptoCloudCurrency = this.getCryptoCloudCurrency(cryptoCurrency, network);
+      
+      // Уникальный идентификатор для этого пользователя и валюты
+      const identify = `user_${userIdNum}_${cryptoCurrency}_${network}`.replace(/[^a-zA-Z0-9_]/g, '_');
+
+      logger.info('CRYPTOCLOUD', 'Creating static wallet', {
+        userId: userIdNum,
+        cryptoCurrency,
+        network,
+        cryptoCloudCurrency,
+        identify
+      });
+
+      const response = await this.api.post('/invoice/static/create', {
+        shop_id: CRYPTO_CLOUD_SHOP_ID,
+        currency: cryptoCloudCurrency,  // Криптовалюта напрямую!
+        identify: identify
+      });
+
+      if (!response.data || response.data.status === 'error') {
+        const errorMsg = response.data?.result?.message || 
+                        response.data?.result?.currency ||
+                        JSON.stringify(response.data?.result) || 
+                        'Error from CryptoCloud';
+        throw new Error(errorMsg);
+      }
+
+      const wallet = response.data.result;
+
+      logger.info('CRYPTOCLOUD', 'Static wallet created', {
+        userId: userIdNum,
+        currency: cryptoCurrency,
+        address: wallet.address,
+        uuid: wallet.uuid
+      });
+
+      return {
+        uuid: wallet.uuid,
+        address: wallet.address,
+        currency: cryptoCurrency,
+        network: network,
+        cryptoCloudCurrency: cryptoCloudCurrency,
+        identify: identify
+      };
+
+    } catch (error) {
+      if (error.response) {
+        logger.error('CRYPTOCLOUD', 'Static wallet error', {
+          status: error.response.status,
+          data: error.response.data,
+          userId,
+          cryptoCurrency
+        });
+        console.error('❌ CryptoCloud Static Wallet Error:', JSON.stringify(error.response.data, null, 2));
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Создать депозит через СТАТИЧЕСКИЙ КОШЕЛЁК (с fallback на обычный инвойс)
+   * Статический кошелёк гарантирует оплату только выбранной криптой.
+   * В тестовом режиме CryptoCloud - используется обычный инвойс.
+   */
+  async createStaticWalletInvoice(amount, userId, withBonus = false, cryptoCurrency = 'USDT', network = 'TRC-20') {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      throw new Error('Invalid amount');
+    }
+
+    const userIdNum = parseInt(userId);
+    if (isNaN(userIdNum)) {
+      throw new Error('Invalid userId');
+    }
+
+    const cryptoCloudCurrency = this.getCryptoCloudCurrency(cryptoCurrency, network);
+    const identify = `user_${userIdNum}_${cryptoCloudCurrency}`;
+
+    // Конвертируем в USD
+    const currencySyncService = require('./currencySyncService');
+    const currentRate = await currencySyncService.getCurrencyRateAsync(cryptoCurrency);
+    const amountInUSD = amountNum * currentRate;
+
+    logger.info('CRYPTOCLOUD', 'Creating deposit', {
+      userId: userIdNum,
+      amount: amountNum,
+      cryptoCurrency,
+      network,
+      amountInUSD: amountInUSD.toFixed(2)
+    });
+
+    // ===== ПОПЫТКА 1: Статический кошелёк (только для боевого режима) =====
+    try {
+      const response = await this.api.post('/invoice/static/create', {
+        shop_id: CRYPTO_CLOUD_SHOP_ID,
+        currency: cryptoCloudCurrency,
+        identify: identify
+      });
+
+      if (response.data && response.data.status !== 'error') {
+        const wallet = response.data.result;
+
+        logger.info('CRYPTOCLOUD', 'Static wallet created', {
+          uuid: wallet.uuid,
+          address: wallet.address
+        });
+
+        // Сохраняем pending deposit
+        await prisma.pendingDeposit.create({
+          data: {
+            userId: userIdNum,
+            invoiceId: wallet.uuid,
+            amount: amountNum,
+            asset: cryptoCurrency,
+            network: network,
+            status: 'pending',
+            withBonus: withBonus
+          }
+        });
+
+        // ✅ Статический кошелёк - встроенный виджет
+        return {
+          invoiceId: wallet.uuid,
+          status: 'awaiting_payment',
+          payUrl: null,
+          orderId: `STATIC-${userIdNum}-${Date.now()}`,
+          amount: amountNum,
+          amountUSD: parseFloat(amountInUSD.toFixed(2)),
+          currency: cryptoCurrency,
+          network: network,
+          address: wallet.address,
+          staticWallet: true,
+          warning: `Отправляйте ТОЛЬКО ${cryptoCurrency} (${network}) на этот адрес!`
+        };
+      }
+    } catch (staticError) {
+      // Статические кошельки не работают (тестовый режим)
+      logger.warn('CRYPTOCLOUD', 'Static wallet not available, using regular invoice', {
+        error: staticError.response?.data?.result || staticError.message
+      });
+    }
+
+    // ===== FALLBACK: Обычный инвойс (для тестового режима) =====
+    logger.info('CRYPTOCLOUD', 'Using regular invoice (test mode fallback)');
+
+    const orderId = `DEPOSIT-${userIdNum}-${Date.now()}`;
+    
+    const invoiceData = {
+      shop_id: CRYPTO_CLOUD_SHOP_ID,
+      amount: amountInUSD.toFixed(2),
+      currency: 'USD',
+      order_id: orderId
+    };
+
+    const response = await this.api.post('/invoice/create', invoiceData);
+
+    if (!response.data || response.data.status === 'error') {
+      throw new Error(response.data?.result?.message || 'Invoice creation failed');
+    }
+
+    const invoice = response.data.result;
+
+    // Сохраняем pending deposit
+    await prisma.pendingDeposit.create({
+      data: {
+        userId: userIdNum,
+        invoiceId: invoice.uuid,
+        amount: amountNum,
+        asset: cryptoCurrency,
+        network: network,
+        status: 'pending',
+        withBonus: withBonus
+      }
+    });
+
+    logger.info('CRYPTOCLOUD', 'Regular invoice created', {
+      invoiceId: invoice.uuid,
+      payUrl: invoice.link
+    });
+
+    // ⚠️ Обычный инвойс - редирект на CryptoCloud
+    return {
+      invoiceId: invoice.uuid,
+      status: invoice.status || 'created',
+      payUrl: invoice.link,
+      orderId: orderId,
+      amount: amountNum,
+      amountUSD: parseFloat(amountInUSD.toFixed(2)),
+      currency: cryptoCurrency,
+      network: network,
+      address: null,
+      staticWallet: false,
+      warning: null,
+      testMode: true  // Флаг тестового режима
+    };
   }
 
   /**
@@ -380,16 +679,49 @@ class CryptoCloudService {
         withBonus 
       });
 
-      // Получаем или создаем токен
-      let token = await prisma.cryptoToken.findUnique({ 
-        where: { symbol: assetStr } 
+      // Получаем pendingDeposit для информации о валюте и сети
+      const pendingDeposit = await prisma.pendingDeposit.findUnique({
+        where: { invoiceId }
       });
 
+      // Получаем или создаем токен
+      let token = null;
+      
+      // Используем network из pendingDeposit, если есть
+      if (pendingDeposit && pendingDeposit.network) {
+        token = await prisma.cryptoToken.findFirst({
+          where: {
+            symbol: assetStr,
+            network: pendingDeposit.network
+          }
+        });
+      }
+      
+      // Если не нашли, пробуем найти USDT TRC-20 как наиболее популярный вариант
+      if (!token && assetStr === 'USDT') {
+        token = await prisma.cryptoToken.findFirst({ 
+          where: { 
+            symbol: assetStr,
+            network: 'TRC-20'
+          } 
+        });
+      }
+      
+      // Если не нашли, ищем любой токен с таким symbol
       if (!token) {
+        token = await prisma.cryptoToken.findFirst({ 
+          where: { symbol: assetStr } 
+        });
+      }
+
+      // Если все еще не нашли, создаем новый токен
+      if (!token) {
+        const defaultNetwork = pendingDeposit?.network || (assetStr === 'USDT' ? 'TRC-20' : 'ERC-20');
         token = await prisma.cryptoToken.create({
           data: { 
             symbol: assetStr, 
             name: assetStr, 
+            network: defaultNetwork,
             decimals: 8 
           }
         });

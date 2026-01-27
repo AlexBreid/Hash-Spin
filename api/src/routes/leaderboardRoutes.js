@@ -3,6 +3,25 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 
+// Курсы валют для конвертации в USD
+const CRYPTO_TO_USD = {
+  'USDT': 1.0,
+  'USDC': 1.0,
+  'BTC': 100000,
+  'ETH': 3300,
+  'BNB': 700,
+  'SOL': 200,
+  'TRX': 0.25,
+  'LTC': 130,
+  'TON': 5.5,
+};
+
+// Конвертация крипты в USD
+function cryptoToUsd(amount, symbol) {
+  const rate = CRYPTO_TO_USD[symbol] || 1;
+  return amount * rate;
+}
+
 function getStartDate(period) {
   const now = new Date();
   switch (period) {
@@ -87,55 +106,73 @@ router.get('/api/v1/leaderboard', async (req, res) => {
 
       // Объединяем все игры
       const allWins = [
-        ...crashWins.map(bet => ({
-          id: `crash-${bet.id}`,
-          username: bet.user?.username || bet.user?.firstName || 'Anonymous',
-          avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-          score: parseFloat(bet.winnings.toString()),
-          tokenSymbol: bet.token?.symbol || '???',
-          gameType: 'crash',
-          createdAt: bet.createdAt,
-        })),
-        ...minesweeperWins.map(game => ({
-          id: `minesweeper-${game.id}`,
-          username: game.user?.username || game.user?.firstName || 'Anonymous',
-          avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-          score: parseFloat(game.winAmount.toString()),
-          tokenSymbol: game.token?.symbol || '???',
-          gameType: 'minesweeper',
-          createdAt: game.createdAt,
-        })),
-        ...plinkoGames
-          .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
-          .map(game => ({
-            id: `plinko-${game.id}`,
+        ...crashWins.map(bet => {
+          const score = parseFloat(bet.winnings.toString());
+          const tokenSymbol = bet.token?.symbol || 'USDT';
+          return {
+            id: `crash-${bet.id}`,
+            username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+            avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: bet.tokenId,
+            gameType: 'crash',
+            createdAt: bet.createdAt,
+          };
+        }),
+        ...minesweeperWins.map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: `minesweeper-${game.id}`,
             username: game.user?.username || game.user?.firstName || 'Anonymous',
             avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-            score: parseFloat(game.winAmount.toString()),
-            tokenSymbol: game.token?.symbol || '???',
-            gameType: 'plinko',
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'minesweeper',
             createdAt: game.createdAt,
-          })),
+          };
+        }),
+        ...plinkoGames
+          .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
+          .map(game => {
+            const score = parseFloat(game.winAmount.toString());
+            const tokenSymbol = game.token?.symbol || 'USDT';
+            return {
+              id: `plinko-${game.id}`,
+              username: game.user?.username || game.user?.firstName || 'Anonymous',
+              avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+              score,
+              scoreUsd: cryptoToUsd(score, tokenSymbol),
+              tokenSymbol,
+              tokenId: game.tokenId,
+              gameType: 'plinko',
+              createdAt: game.createdAt,
+            };
+          }),
       ];
 
-      // Сортируем по score и берём top N
+      // Сортируем по USD эквиваленту и берём top N
       leaderboard = allWins
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
         .slice(0, limitNum)
         .map((entry, index) => ({
           ...entry,
           rank: index + 1,
         }));
     } else if (game === 'crash') {
-      // CRASH GAME
-      const bigWins = await prisma.crashBet.findMany({
+      // CRASH GAME - получаем больше записей, сортируем по USD
+      const allWins = await prisma.crashBet.findMany({
         where: {
           createdAt: { gte: startDate },
           result: 'won',
           winnings: { gt: '0' },
         },
-        orderBy: { winnings: 'desc' },
-        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+        take: limitNum * 5, // Берём больше для правильной сортировки по USD
         include: {
           user: {
             select: {
@@ -153,26 +190,36 @@ router.get('/api/v1/leaderboard', async (req, res) => {
         },
       });
 
-      leaderboard = bigWins.map((bet, index) => ({
-        id: bet.id.toString(),
-        username: bet.user?.username || bet.user?.firstName || 'Anonymous',
-        avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(bet.winnings.toString()),
-        tokenSymbol: bet.token?.symbol || '???',
-        gameType: 'crash',
-        createdAt: bet.createdAt,
-        rank: index + 1,
-      }));
+      // Конвертируем и сортируем по USD
+      leaderboard = allWins
+        .map(bet => {
+          const score = parseFloat(bet.winnings.toString());
+          const tokenSymbol = bet.token?.symbol || 'USDT';
+          return {
+            id: bet.id.toString(),
+            username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+            avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: bet.tokenId,
+            gameType: 'crash',
+            createdAt: bet.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, limitNum)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     } else if (game === 'minesweeper') {
-      // MINESWEEPER GAME
-      const bigWins = await prisma.minesweeperGame.findMany({
+      // MINESWEEPER GAME - получаем больше записей, сортируем по USD
+      const allWins = await prisma.minesweeperGame.findMany({
         where: {
           createdAt: { gte: startDate },
           status: { in: ['WON', 'CASHED_OUT'] },
           winAmount: { not: null },
         },
-        orderBy: { winAmount: 'desc' },
-        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+        take: limitNum * 5,
         include: {
           user: {
             select: {
@@ -190,31 +237,34 @@ router.get('/api/v1/leaderboard', async (req, res) => {
         },
       });
 
-      leaderboard = bigWins.map((game, index) => ({
-        id: game.id.toString(),
-        username: game.user?.username || game.user?.firstName || 'Anonymous',
-        avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(game.winAmount.toString()),
-        tokenSymbol: game.token?.symbol || '???',
-        gameType: 'minesweeper',
-        createdAt: game.createdAt,
-        rank: index + 1,
-      }));
+      leaderboard = allWins
+        .map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: game.id.toString(),
+            username: game.user?.username || game.user?.firstName || 'Anonymous',
+            avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'minesweeper',
+            createdAt: game.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, limitNum)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     } else if (game === 'plinko') {
-      // PLINKO GAME - используем PlinkoGame с фильтрацией (крупные ставки >= $50 ИЛИ выигрыши >= 5x)
-      // Получаем все игры с условиями и фильтруем выигрыши на уровне приложения
+      // PLINKO GAME - получаем больше записей, сортируем по USD
       const allGames = await prisma.plinkoGame.findMany({
         where: {
           createdAt: { gte: startDate },
           status: 'COMPLETED',
-          // Фильтруем: либо ставка >= 50, либо множитель >= 5 (крупные ставки или выигрыши)
-          OR: [
-            { betAmount: { gte: '50' } },
-            { multiplier: { gte: 5 } }
-          ]
         },
-        orderBy: { winAmount: 'desc' },
-        take: limitNum * 2, // Берём больше, чтобы после фильтрации осталось достаточно
+        orderBy: { createdAt: 'desc' },
+        take: limitNum * 5,
         include: {
           user: {
             select: {
@@ -232,21 +282,27 @@ router.get('/api/v1/leaderboard', async (req, res) => {
         },
       });
 
-      // Фильтруем только выигрыши (winAmount > betAmount) и берём top N
-      const bigWins = allGames
+      // Фильтруем выигрыши, конвертируем и сортируем по USD
+      leaderboard = allGames
         .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
-        .slice(0, limitNum);
-
-      leaderboard = bigWins.map((game, index) => ({
-        id: game.id.toString(),
-        username: game.user?.username || game.user?.firstName || 'Anonymous',
-        avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(game.winAmount.toString()),
-        tokenSymbol: game.token?.symbol || '???',
-        gameType: 'plinko',
-        createdAt: game.createdAt,
-        rank: index + 1,
-      }));
+        .map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: game.id.toString(),
+            username: game.user?.username || game.user?.firstName || 'Anonymous',
+            avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'plinko',
+            createdAt: game.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, limitNum)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     } else {
       // Неподдерживаемая игра - возвращаем пустой массив
       return res.json({
@@ -333,54 +389,72 @@ router.get('/api/v1/leaderboard/top3', async (req, res) => {
       ]);
 
       const allWins = [
-        ...crashWins.map(bet => ({
-          id: `crash-${bet.id}`,
-          username: bet.user?.username || bet.user?.firstName || 'Anonymous',
-          avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-          score: parseFloat(bet.winnings.toString()),
-          tokenSymbol: bet.token?.symbol || '???',
-          gameType: 'crash',
-          createdAt: bet.createdAt,
-        })),
-        ...minesweeperWins.map(game => ({
-          id: `minesweeper-${game.id}`,
-          username: game.user?.username || game.user?.firstName || 'Anonymous',
-          avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-          score: parseFloat(game.winAmount.toString()),
-          tokenSymbol: game.token?.symbol || '???',
-          gameType: 'minesweeper',
-          createdAt: game.createdAt,
-        })),
-        ...plinkoGames
-          .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
-          .map(game => ({
-            id: `plinko-${game.id}`,
+        ...crashWins.map(bet => {
+          const score = parseFloat(bet.winnings.toString());
+          const tokenSymbol = bet.token?.symbol || 'USDT';
+          return {
+            id: `crash-${bet.id}`,
+            username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+            avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: bet.tokenId,
+            gameType: 'crash',
+            createdAt: bet.createdAt,
+          };
+        }),
+        ...minesweeperWins.map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: `minesweeper-${game.id}`,
             username: game.user?.username || game.user?.firstName || 'Anonymous',
             avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-            score: parseFloat(game.winAmount.toString()),
-            tokenSymbol: game.token?.symbol || '???',
-            gameType: 'plinko',
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'minesweeper',
             createdAt: game.createdAt,
-          })),
+          };
+        }),
+        ...plinkoGames
+          .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
+          .map(game => {
+            const score = parseFloat(game.winAmount.toString());
+            const tokenSymbol = game.token?.symbol || 'USDT';
+            return {
+              id: `plinko-${game.id}`,
+              username: game.user?.username || game.user?.firstName || 'Anonymous',
+              avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+              score,
+              scoreUsd: cryptoToUsd(score, tokenSymbol),
+              tokenSymbol,
+              tokenId: game.tokenId,
+              gameType: 'plinko',
+              createdAt: game.createdAt,
+            };
+          }),
       ];
 
       topThree = allWins
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
         .slice(0, 3)
         .map((entry, index) => ({
           ...entry,
           rank: index + 1,
         }));
     } else if (game === 'crash') {
-      // CRASH GAME
-      const topWins = await prisma.crashBet.findMany({
+      // CRASH GAME - получаем больше, сортируем по USD, берём top 3
+      const allWins = await prisma.crashBet.findMany({
         where: {
           createdAt: { gte: startDate },
           result: 'won',
           winnings: { gt: '0' },
         },
-        orderBy: { winnings: 'desc' },
-        take: 3,
+        orderBy: { createdAt: 'desc' },
+        take: 100, // Берём больше для правильной сортировки по USD
         include: {
           user: {
             select: {
@@ -398,25 +472,35 @@ router.get('/api/v1/leaderboard/top3', async (req, res) => {
         },
       });
 
-      topThree = topWins.map((bet, index) => ({
-        id: bet.id.toString(),
-        username: bet.user?.username || bet.user?.firstName || 'Anonymous',
-        avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(bet.winnings.toString()),
-        tokenSymbol: bet.token?.symbol || '???',
-        createdAt: bet.createdAt,
-        rank: index + 1,
-      }));
+      topThree = allWins
+        .map(bet => {
+          const score = parseFloat(bet.winnings.toString());
+          const tokenSymbol = bet.token?.symbol || 'USDT';
+          return {
+            id: bet.id.toString(),
+            username: bet.user?.username || bet.user?.firstName || 'Anonymous',
+            avatar: (bet.user?.username || bet.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: bet.tokenId,
+            gameType: 'crash',
+            createdAt: bet.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, 3)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     } else if (game === 'minesweeper') {
-      // MINESWEEPER GAME
-      const topWins = await prisma.minesweeperGame.findMany({
+      // MINESWEEPER GAME - получаем больше, сортируем по USD
+      const allWins = await prisma.minesweeperGame.findMany({
         where: {
           createdAt: { gte: startDate },
           status: { in: ['WON', 'CASHED_OUT'] },
           winAmount: { not: null },
         },
-        orderBy: { winAmount: 'desc' },
-        take: 3,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
         include: {
           user: {
             select: {
@@ -434,29 +518,34 @@ router.get('/api/v1/leaderboard/top3', async (req, res) => {
         },
       });
 
-      topThree = topWins.map((game, index) => ({
-        id: game.id.toString(),
-        username: game.user?.username || game.user?.firstName || 'Anonymous',
-        avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(game.winAmount.toString()),
-        tokenSymbol: game.token?.symbol || '???',
-        createdAt: game.createdAt,
-        rank: index + 1,
-      }));
+      topThree = allWins
+        .map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: game.id.toString(),
+            username: game.user?.username || game.user?.firstName || 'Anonymous',
+            avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'minesweeper',
+            createdAt: game.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, 3)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     } else if (game === 'plinko') {
-      // PLINKO GAME - используем PlinkoGame с фильтрацией (крупные ставки >= $50 ИЛИ выигрыши >= 5x)
+      // PLINKO GAME - получаем больше, сортируем по USD
       const allGames = await prisma.plinkoGame.findMany({
         where: {
           createdAt: { gte: startDate },
           status: 'COMPLETED',
-          // Фильтруем: либо ставка >= 50, либо множитель >= 5 (крупные ставки или выигрыши)
-          OR: [
-            { betAmount: { gte: '50' } },
-            { multiplier: { gte: 5 } }
-          ]
         },
-        orderBy: { winAmount: 'desc' },
-        take: 10, // Берём больше, чтобы после фильтрации осталось top 3
+        orderBy: { createdAt: 'desc' },
+        take: 100,
         include: {
           user: {
             select: {
@@ -474,20 +563,26 @@ router.get('/api/v1/leaderboard/top3', async (req, res) => {
         },
       });
 
-      // Фильтруем только выигрыши (winAmount > betAmount) и берём top 3
-      const topWins = allGames
+      topThree = allGames
         .filter(game => parseFloat(game.winAmount.toString()) > parseFloat(game.betAmount.toString()))
-        .slice(0, 3);
-
-      topThree = topWins.map((game, index) => ({
-        id: game.id.toString(),
-        username: game.user?.username || game.user?.firstName || 'Anonymous',
-        avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
-        score: parseFloat(game.winAmount.toString()),
-        tokenSymbol: game.token?.symbol || '???',
-        createdAt: game.createdAt,
-        rank: index + 1,
-      }));
+        .map(game => {
+          const score = parseFloat(game.winAmount.toString());
+          const tokenSymbol = game.token?.symbol || 'USDT';
+          return {
+            id: game.id.toString(),
+            username: game.user?.username || game.user?.firstName || 'Anonymous',
+            avatar: (game.user?.username || game.user?.firstName || 'A').substring(0, 2).toUpperCase(),
+            score,
+            scoreUsd: cryptoToUsd(score, tokenSymbol),
+            tokenSymbol,
+            tokenId: game.tokenId,
+            gameType: 'plinko',
+            createdAt: game.createdAt,
+          };
+        })
+        .sort((a, b) => b.scoreUsd - a.scoreUsd)
+        .slice(0, 3)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     }
 
     res.json({

@@ -11,18 +11,19 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const currencySyncService = require('../services/currencySyncService');
 const plinkoService = require('../services/PlinkoService');
 const logger = require('../utils/logger');
 const { deductBetFromBalance, creditWinnings } = require('./helpers/gameReferralHelper');
 
 /**
  * 💰 GET /api/v1/plinko/balance
- * Получить баланс игрока
+ * Получить баланс игрока для выбранной валюты
  */
 router.get('/api/v1/plinko/balance', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const tokenId = 2; // USDT
+    const tokenId = parseInt(req.query.tokenId) || 2; // По умолчанию USDT, но можно выбрать любую валюту
 
     const mainBalance = await prisma.balance.findUnique({
       where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } },
@@ -30,18 +31,22 @@ router.get('/api/v1/plinko/balance', authenticateToken, async (req, res) => {
     });
 
     const bonusBalance = await prisma.balance.findUnique({
-      where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } }
+      where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } },
+      include: { token: true }
     });
 
     const main = parseFloat(mainBalance?.amount?.toString() || '0');
     const bonus = parseFloat(bonusBalance?.amount?.toString() || '0');
+    const token = mainBalance?.token || bonusBalance?.token;
 
     res.json({
       success: true,
       balance: main + bonus,
       mainBalance: main,
       bonusBalance: bonus,
-      currency: mainBalance?.token?.symbol || 'USDT'
+      tokenId: tokenId,
+      currency: token?.symbol || 'USDT',
+      network: token?.network || 'TRC-20'
     });
 
   } catch (error) {
@@ -57,19 +62,37 @@ router.get('/api/v1/plinko/balance', authenticateToken, async (req, res) => {
 router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { betAmount } = req.body;
-    const tokenId = 2; // USDT
+    const { betAmount, tokenId: requestTokenId } = req.body;
+    const tokenId = requestTokenId || 2; // По умолчанию USDT
 
     if (!betAmount || betAmount <= 0) {
       return res.status(400).json({ success: false, error: 'Укажите ставку' });
     }
 
-    if (betAmount < 0.1) {
-      return res.status(400).json({ success: false, error: 'Минимальная ставка 0.1 USDT' });
+    // Получаем токен для проверки лимитов
+    const token = await prisma.cryptoToken.findUnique({
+      where: { id: tokenId }
+    });
+
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Валюта не найдена' });
     }
 
-    if (betAmount > 1000) {
-      return res.status(400).json({ success: false, error: 'Максимальная ставка 1000 USDT' });
+    const minBet = currencySyncService.getMinBetForCurrency(token.symbol);
+    const maxBet = currencySyncService.getMaxBetForCurrency(token.symbol);
+
+    if (betAmount < minBet) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Минимальная ставка ${minBet} ${token.symbol}` 
+      });
+    }
+
+    if (betAmount > maxBet) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Максимальная ставка ${maxBet} ${token.symbol}` 
+      });
     }
 
     // Списываем ставку
@@ -127,8 +150,8 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
 router.post('/api/v1/plinko/play', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { betAmount } = req.body;
-    const tokenId = 2;
+    const { betAmount, tokenId: requestTokenId } = req.body;
+    const tokenId = requestTokenId || 2; // По умолчанию USDT, но можно выбрать любую валюту
 
     if (!betAmount || betAmount <= 0) {
       return res.status(400).json({ success: false, error: 'Укажите ставку' });
@@ -218,7 +241,8 @@ router.get('/api/v1/plinko/history', authenticateToken, async (req, res) => {
 router.get('/api/v1/plinko/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const stats = await plinkoService.getPlayerStats(userId, 2);
+    const tokenId = parseInt(req.query.tokenId) || 2; // По умолчанию USDT
+    const stats = await plinkoService.getPlayerStats(userId, tokenId);
 
     res.json({
       success: true,
@@ -241,9 +265,25 @@ router.get('/api/v1/plinko/stats', authenticateToken, async (req, res) => {
  * ⚙️ GET /api/v1/plinko/config
  * Настройки игры (множители, вероятности)
  */
-router.get('/api/v1/plinko/config', (req, res) => {
+router.get('/api/v1/plinko/config', async (req, res) => {
   try {
     const PlinkoService = require('../services/PlinkoService');
+    const currencySyncService = require('../services/currencySyncService');
+    const { tokenId } = req.query;
+    
+    // Если передан tokenId, возвращаем максимальную ставку для этой валюты
+    let maxBet = 1000; // По умолчанию для USDT
+    let minBet = 0.1;
+    
+    if (tokenId) {
+      maxBet = await currencySyncService.getMaxBetForToken(parseInt(tokenId));
+      const token = await prisma.cryptoToken.findUnique({
+        where: { id: parseInt(tokenId) }
+      });
+      if (token) {
+        minBet = currencySyncService.getMinBetForCurrency(token.symbol);
+      }
+    }
     
     res.json({
       success: true,
@@ -251,8 +291,8 @@ router.get('/api/v1/plinko/config', (req, res) => {
         rows: PlinkoService.ROWS,
         slots: PlinkoService.MULTIPLIERS.length,
         multipliers: PlinkoService.MULTIPLIERS, // Используем мультипликаторы из сервиса
-        minBet: 0.1,
-        maxBet: 1000
+        minBet: minBet,
+        maxBet: maxBet
       }
     });
 

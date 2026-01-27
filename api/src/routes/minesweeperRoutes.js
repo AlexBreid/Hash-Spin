@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const minesweeperService = require('../services/MinesweeperService');
+const currencySyncService = require('../services/currencySyncService');
 const logger = require('../utils/logger');
 
 const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./helpers/gameReferralHelper');
@@ -72,6 +73,35 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
       return res.status(400).json({
         success: false,
         message: 'Некорректные параметры (minesCount должен быть >= 1)',
+      });
+    }
+
+    // Получаем токен для проверки лимитов
+    const token = await prisma.cryptoToken.findUnique({
+      where: { id: DEFAULT_TOKEN_ID }
+    });
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Валюта не найдена',
+      });
+    }
+
+    const minBet = currencySyncService.getMinBetForCurrency(token.symbol);
+    const maxBet = currencySyncService.getMaxBetForCurrency(token.symbol);
+
+    if (betAmount < minBet) {
+      return res.status(400).json({
+        success: false,
+        message: `Минимальная ставка ${minBet} ${token.symbol}`,
+      });
+    }
+
+    if (betAmount > maxBet) {
+      return res.status(400).json({
+        success: false,
+        message: `Максимальная ставка ${maxBet} ${token.symbol}`,
       });
     }
 
