@@ -2571,17 +2571,27 @@ html {
   /* Плавный переход при смене темы */
   transition: background-color 300ms ease, color 300ms ease;
   scroll-behavior: smooth;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   line-height: 1.5;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
-* {
-  transition: all .2s ease-in-out;
+#root {
+  height: 100%;
+  overflow: hidden;
 }
+
+/* Убираем глобальный transition - он вызывает дёрганье при смене данных */
+/* Transition применяем только к нужным элементам через классы */
 
 /* Selection styles */
 ::selection {

@@ -390,7 +390,7 @@ function AppContent() {
     // Показываем страницу ошибки сервера
     if (serverCheckDone && serverError) {
         return (
-            <div className="min-h-screen w-full max-w-[390px] mx-auto" style={{ height: '850px' }}>
+            <div className="w-full max-w-[390px] mx-auto overflow-hidden" style={{ height: '100dvh' }}>
                 <ServerErrorPage 
                     onRetry={checkServerHealth}
                     errorMessage={serverErrorMessage}
@@ -401,7 +401,7 @@ function AppContent() {
 
     if (loading || !serverCheckDone) {
         return (
-            <div className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto flex items-center justify-center">
+            <div className="bg-background text-foreground w-full max-w-[390px] mx-auto flex items-center justify-center" style={{ height: '100dvh' }}>
                 <p className="text-muted-foreground">Загружение...</p>
             </div>
         );
@@ -410,7 +410,7 @@ function AppContent() {
     // Показываем Welcome страницу для новых пользователей
     if (showWelcome) {
         return (
-            <div className="min-h-screen w-full max-w-[390px] mx-auto" style={{ height: '850px' }}>
+            <div className="w-full max-w-[390px] mx-auto overflow-hidden" style={{ height: '100dvh' }}>
                 <WelcomePage onEnter={handleWelcomeEnter} />
             </div>
         );
@@ -418,17 +418,24 @@ function AppContent() {
 
     return (
         <div
-            className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
-            style={{ height: '850px' }}
+            className="bg-background text-foreground w-full max-w-[390px] mx-auto relative overflow-hidden"
+            style={{ height: '100dvh', maxHeight: '100dvh' }}
         >
             {!isAuthPage && !isFullscreenPage && !isFinancePage && <TopNavigation onProfileClick={handleProfileClick} />}
 
-            <main className={
-                isFullscreenPage ? 'h-full overflow-hidden' :
-                isFinancePage ? 'h-[calc(850px-70px)] overflow-y-auto' :
-                isAuthPage ? 'h-full' : 
-                'h-[calc(850px-140px)] overflow-y-auto'
-            }>
+            <main 
+                className={
+                    isFullscreenPage ? 'overflow-hidden' :
+                    isAuthPage ? '' : 
+                    'overflow-y-auto overflow-x-hidden'
+                }
+                style={{
+                    height: isFullscreenPage ? '100%' :
+                            isFinancePage ? 'calc(100dvh - 70px)' :
+                            isAuthPage ? '100%' :
+                            'calc(100dvh - 140px)'
+                }}
+            >
                 {renderCurrentPage()}
             </main>
 

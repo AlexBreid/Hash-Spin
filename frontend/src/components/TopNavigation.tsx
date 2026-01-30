@@ -326,37 +326,45 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
       style={{
         backgroundColor: `${bgColor}dd`,
         borderBottomColor: borderColor,
+        height: '70px', // Фиксированная высота навигации
+        flexShrink: 0,
       }}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between h-full">
         
-        {/* Logo */}
-        <div className="flex items-center space-x-3">
+        {/* Logo - фиксированная ширина */}
+        <div 
+          className="flex items-center"
+          style={{ 
+            width: '80px', // Фиксированная ширина для логотипа
+            flexShrink: 0,
+          }}
+        >
           <div 
-            className="flex items-center justify-center rounded-xl p-2 transition-all duration-300"
+            className="flex items-center justify-center rounded-xl p-1"
             style={{
               background: theme === 'dark' 
                 ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.1))'
                 : 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.05))',
               border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`,
-              boxShadow: theme === 'dark' 
-                ? '0 2px 8px rgba(59, 130, 246, 0.1)'
-                : '0 2px 8px rgba(59, 130, 246, 0.05)'
             }}
           >
             <img 
               src={logoSU} 
               alt="Logo"
-              className="h-14 w-auto max-w-[180px] object-contain"
-              style={{ maxHeight: '88px' }}
+              className="h-10 w-auto object-contain"
+              style={{ maxWidth: '70px' }}
             />
           </div>
         </div>
 
-        {/* Balance and Actions */}
-        <div className="flex items-center space-x-2">
+        {/* Balance and Actions - фиксированная ширина */}
+        <div 
+          className="flex items-center gap-2"
+          style={{ flexShrink: 0 }}
+        >
           
-          {/* Объединённый блок: Селект валюты + Баланс */}
+          {/* Объединённый блок: Селект валюты + Баланс - фиксированная ширина */}
           {!loading ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -367,17 +375,13 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                     gap: '0',
                     backgroundColor: balanceBg,
                     border: `1px solid ${balanceBorder}`,
-                    borderRadius: '14px',
+                    borderRadius: '12px',
                     padding: '0',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
                     overflow: 'hidden',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#10b981';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = balanceBorder;
+                    width: '160px', // Фиксированная ширина блока баланса
+                    height: '46px',
+                    flexShrink: 0,
                   }}
                 >
                   {/* Левая часть - селект валюты */}
@@ -385,23 +389,26 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '10px 12px',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      padding: '0 8px',
                       backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
                       borderRight: `1px solid ${balanceBorder}`,
+                      height: '100%',
+                      width: '60px', // Фиксированная ширина селекта
+                      flexShrink: 0,
                     }}
                   >
-                    <Coins className="w-4 h-4" style={{ color: '#10b981' }} />
                     <span
                       style={{
-                        fontSize: '13px',
+                        fontSize: '12px',
                         fontWeight: '600',
                         color: textColor,
                       }}
                     >
                       {selectedWallet?.symbol || selectedToken?.symbol || 'USD'}
                     </span>
-                    <ChevronDown className="w-3 h-3" style={{ color: mutedColor }} />
+                    <ChevronDown className="w-3 h-3" style={{ color: mutedColor, flexShrink: 0 }} />
                   </div>
                   
                   {/* Правая часть - баланс */}
@@ -411,17 +418,17 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                       flexDirection: 'column',
                       alignItems: 'flex-end',
                       justifyContent: 'center',
-                      padding: '8px 14px',
-                      minWidth: '90px',
-                      maxWidth: '160px',
+                      padding: '4px 10px',
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
                     <span
                       style={{
-                        fontSize: '9px',
+                        fontSize: '8px',
                         color: mutedColor,
                         textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
+                        letterSpacing: '0.3px',
                         lineHeight: '1',
                       }}
                     >
@@ -429,17 +436,17 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                     </span>
                     <span
                       style={{
-                        fontSize: getBalanceFontSize(walletData?.balance || 0),
+                        fontSize: '13px',
                         fontWeight: '700',
                         color: (walletData?.balance || 0) > 0 ? '#10b981' : textColor,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        maxWidth: '140px',
+                        maxWidth: '80px',
                         lineHeight: '1.2',
                       }}
                     >
-                      {formatBalance(walletData?.balance || 0)}
+                      {formatBalance(walletData?.balance || 0, true)}
                     </span>
                   </div>
                 </button>
@@ -654,12 +661,17 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           ) : (
             <div
               style={{
-                padding: '8px 12px',
+                width: '160px',
+                height: '46px',
                 backgroundColor: balanceBg,
                 border: `1px solid ${balanceBorder}`,
                 borderRadius: '12px',
-                fontSize: '12px',
+                fontSize: '11px',
                 color: mutedColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               Загрузка...
@@ -667,40 +679,32 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           )}
 
           
-          {/* Deposit Button */}
+          {/* Deposit Button - фиксированный размер */}
           <button
             onClick={handleDepositClick}
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '40px',
-              height: '40px',
+              width: '36px',
+              height: '36px',
               backgroundColor: '#10b981',
               border: 'none',
-              borderRadius: '12px',
+              borderRadius: '10px',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#059669';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#10b981';
-              e.currentTarget.style.transform = 'scale(1)';
+              flexShrink: 0,
             }}
             title="Пополнить баланс"
           >
-            <Plus className="w-5 h-5" style={{ color: '#ffffff' }} />
+            <Plus className="w-4 h-4" style={{ color: '#ffffff' }} />
           </button>
 
-          {/* Profile Button */}
+          {/* Profile Button - фиксированный размер */}
           <button
             onClick={onProfileClick}
             style={{
-              width: '40px',
-              height: '40px',
+              width: '36px',
+              height: '36px',
               backgroundColor: theme === 'dark' 
                 ? 'rgba(148, 163, 184, 0.2)' 
                 : 'rgba(148, 163, 184, 0.15)',
@@ -710,20 +714,10 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme === 'dark' 
-                ? 'rgba(148, 163, 184, 0.3)' 
-                : 'rgba(148, 163, 184, 0.25)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = theme === 'dark' 
-                ? 'rgba(148, 163, 184, 0.2)' 
-                : 'rgba(148, 163, 184, 0.15)';
+              flexShrink: 0,
             }}
           >
-            <User className="w-5 h-5" style={{ color: '#3b82f6' }} />
+            <User className="w-4 h-4" style={{ color: '#3b82f6' }} />
           </button>
         </div>
       </div>
