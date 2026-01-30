@@ -42,7 +42,7 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      fetchBalance().catch(err => console.error('❌ Ошибка баланса:', err));
+      fetchBalance().catch(() => {});
       loadAvailableTokens();
     }
   }, []);
@@ -72,7 +72,7 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки валют:', err);
+      
     } finally {
       setTokensLoading(false);
     }
@@ -176,9 +176,9 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
 
       setStep('SUCCESS');
       // Перезагружаем баланс
-      fetchBalance().catch(err => console.error('❌ Ошибка баланса:', err));
+      fetchBalance().catch(() => {});
     } catch (err) {
-      console.error('❌ Ошибка вывода:', err);
+      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     } finally {

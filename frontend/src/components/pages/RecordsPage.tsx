@@ -35,7 +35,7 @@ export function RecordsPage() {
   const fetchLeaderboardData = async (newPeriod: string, newGame: string) => {
     try {
       setLoading(true);
-      console.log(`🔄 Загружаю рекорды: период=${newPeriod}, игра=${newGame}`);
+      
       
       let allRecords: LeaderboardEntry[] = [];
       
@@ -69,12 +69,12 @@ export function RecordsPage() {
                 isFake: false
               }));
               allRecords.push(...apiRecords);
-              console.log(`✅ Загружено ${apiRecords.length} записей из API`);
+              
             }
           }
         }
       } catch (apiError) {
-        console.warn('⚠️ Не удалось загрузить данные из API:', apiError);
+        
       }
       
       // 2. JSON файл больше не нужен - данные берём из API
@@ -117,9 +117,9 @@ export function RecordsPage() {
       // Top 3 - первые 3 записи
       setTopThree(rankedRecords.slice(0, 3));
       
-      console.log(`✅ Итого уникальных записей: ${rankedRecords.length} (из ${finalRecords.length} всего)`);
+      
     } catch (err) {
-      console.error('Ошибка загрузки:', err);
+      
       setLeaderboard([]);
       setTopThree([]);
     } finally {

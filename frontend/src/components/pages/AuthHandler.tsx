@@ -26,7 +26,7 @@ const AuthHandler: React.FC = () => {
         const existingUser = localStorage.getItem(USER_KEY);
 
         if (existingToken && existingUser) {
-            console.log('✅ [AuthHandler] Пользователь уже авторизован, пропускаем автологин');
+            
             // Уже авторизован - просто редиректим на главную
             navigate('/', { replace: true });
             return;
@@ -56,7 +56,7 @@ const AuthHandler: React.FC = () => {
 
             } catch (error) {
                 setStatus('Ошибка авторизации. Проблема с токеном или API. Пожалуйста, попробуйте снова.'); 
-                console.error("Auth Error:", error);
+                
 
                 navigate('/login', { replace: true }); 
             }

@@ -42,6 +42,11 @@ const getUrlParameter = (name: string): string => {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
 
+// Проверка находимся ли мы в Telegram WebApp
+const isTelegramWebApp = (): boolean => {
+    return typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData;
+};
+
 // --- ОСНОВНОЙ КОМПОНЕНТ ---
 type LoginPageProps = {
     onLoginSuccess?: () => void; 
@@ -49,16 +54,17 @@ type LoginPageProps = {
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) { 
     const navigate = useNavigate();
-    const { login, isAuthenticated, loading: authLoading } = useAuth();
+    const { login, isAuthenticated, loading: authLoading, loginWithTelegram, restoreSession } = useAuth();
 
     const [username, setUsername] = useState<string>('');
     const [password, setPassword] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
     const [message, setMessage] = useState<string>('');
-    const [authMethod, setAuthMethod] = useState<'form' | 'token'>('form'); 
+    const [authMethod, setAuthMethod] = useState<'form' | 'token' | 'telegram'>('form'); 
     
-    // 🆕 Флаг что мы уже пытались авторизоваться по токену
+    // Флаги для предотвращения повторных попыток
     const [tokenAttempted, setTokenAttempted] = useState<boolean>(false);
+    const [telegramAttempted, setTelegramAttempted] = useState<boolean>(false);
 
     const handleNavigation = useCallback(() => {
         // Очищаем URL от токена перед редиректом
@@ -73,12 +79,11 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         }
     }, [onLoginSuccess, navigate]);
 
-    // 🆕 FIX: Если пользователь УЖЕ авторизован - сразу редиректим без показа ошибки
+    // Если пользователь УЖЕ авторизован - сразу редиректим
     useEffect(() => {
         if (!authLoading && isAuthenticated) {
-            console.log('✅ [LoginPage] Пользователь уже авторизован, редирект на главную');
             
-            // Очищаем токен из URL если он есть
+            
             if (window.location.search.includes('token=')) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -87,12 +92,42 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         }
     }, [authLoading, isAuthenticated, handleNavigation]);
 
-    // Авторизация по токену (из Telegram)
+    // Автоматическая авторизация через Telegram WebApp
     useEffect(() => {
-        // 🆕 FIX: НЕ пытаемся авторизоваться если:
-        // 1. Ещё загружается состояние авторизации
-        // 2. Пользователь уже авторизован  
-        // 3. Мы уже пытались авторизоваться по токену
+        if (authLoading || isAuthenticated || telegramAttempted) {
+            return;
+        }
+
+        // Если мы в Telegram WebApp и нет URL токена - пробуем авторизоваться
+        const urlToken = getUrlParameter('token');
+        
+        if (isTelegramWebApp() && !urlToken) {
+            setTelegramAttempted(true);
+            setAuthMethod('telegram');
+            setMessage('📱 Обнаружен Telegram WebApp. Выполняю автоматический вход...');
+            setLoading(true);
+
+            loginWithTelegram()
+                .then((success: boolean) => {
+                    if (success) {
+                        setMessage('✅ Успешный вход через Telegram! Перенаправление...');
+                        setTimeout(handleNavigation, 500);
+                    } else {
+                        setMessage('⚠️ Не удалось войти автоматически. Попробуйте получить новую ссылку в боте.');
+                        setLoading(false);
+                        setAuthMethod('form');
+                    }
+                })
+                .catch(() => {
+                    setMessage('❌ Ошибка при авторизации через Telegram');
+                    setLoading(false);
+                    setAuthMethod('form');
+                });
+        }
+    }, [authLoading, isAuthenticated, telegramAttempted, loginWithTelegram, handleNavigation]);
+
+    // Авторизация по токену из URL (из Telegram бота)
+    useEffect(() => {
         if (authLoading || isAuthenticated || tokenAttempted) {
             return;
         }
@@ -100,9 +135,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         const token = getUrlParameter('token');
 
         if (token) {
-            setTokenAttempted(true); // Помечаем что попытка была
+            setTokenAttempted(true);
             setAuthMethod('token');
-            setMessage('🔗 Обнаружен токен Telegram. Выполняю автоматический вход...');
+            setMessage('🔗 Обнаружен токен. Выполняю автоматический вход...');
             setLoading(true);
             
             fetch(LOGIN_ENDPOINT_TOKEN, {
@@ -115,24 +150,40 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 if (data.success && data.token && data.user) {
                     login(data.token, data.user); 
                     setMessage('✅ Успешный вход! Перенаправление...');
-                    setTimeout(handleNavigation, 1000); 
+                    setTimeout(handleNavigation, 500); 
                 } else {
-                    setMessage(`❌ Ошибка токена: ${data.error || 'Invalid, expired, or used token'}`);
+                    setMessage(`❌ Ошибка токена: ${data.error || 'Токен недействителен или истёк'}`);
                     setLoading(false);
                     
                     // Очищаем URL от невалидного токена
                     window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Пробуем восстановить сессию другим способом
+                    if (isTelegramWebApp()) {
+                        setMessage('📱 Пробую войти через Telegram...');
+                        loginWithTelegram()
+                            .then((success: boolean) => {
+                                if (success) {
+                                    setMessage('✅ Успешный вход через Telegram!');
+                                    setTimeout(handleNavigation, 500);
+                                } else {
+                                    setMessage('❌ Токен истёк. Запросите новую ссылку в боте.');
+                                    setAuthMethod('form');
+                                }
+                            });
+                    } else {
+                        setAuthMethod('form');
+                    }
                 }
             })
             .catch((error: Error) => {
-                setMessage(`💥 Ошибка сети/сервера: ${error.message}. Пожалуйста, попробуйте войти вручную.`);
+                setMessage(`💥 Ошибка сети: ${error.message}. Попробуйте войти вручную.`);
                 setLoading(false);
-                
-                // Очищаем URL
                 window.history.replaceState({}, document.title, window.location.pathname);
+                setAuthMethod('form');
             });
         }
-    }, [authLoading, isAuthenticated, tokenAttempted, handleNavigation, login]);
+    }, [authLoading, isAuthenticated, tokenAttempted, handleNavigation, login, loginWithTelegram]);
 
     // Авторизация по логину/паролю
     const handleFormSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
@@ -158,18 +209,34 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             if (response.ok && data.success && data.token && data.user) {
                 login(data.token, data.user);
                 setMessage('✅ Успешный вход! Перенаправление...');
-                setTimeout(handleNavigation, 1000); 
+                setTimeout(handleNavigation, 500); 
             } else {
                 setMessage(`❌ Ошибка входа: ${data.error || 'Неверный логин или пароль.'}`);
             }
         } catch (error: any) {
-            setMessage(`💥 Ошибка сети: Не удалось связаться с сервером (${API_BASE_URL}).`);
+            setMessage(`💥 Ошибка сети: Не удалось связаться с сервером.`);
         } finally {
             setLoading(false);
         }
     }, [username, password, handleNavigation, login]);
 
-    // 🆕 Показываем лоадер пока проверяем авторизацию
+    // Попытка восстановить сессию
+    const handleRestoreSession = useCallback(async () => {
+        setLoading(true);
+        setMessage('🔄 Пробую восстановить сессию...');
+        
+        const success = await restoreSession();
+        
+        if (success) {
+            setMessage('✅ Сессия восстановлена! Перенаправление...');
+            setTimeout(handleNavigation, 500);
+        } else {
+            setMessage('❌ Не удалось восстановить сессию. Войдите заново.');
+            setLoading(false);
+        }
+    }, [restoreSession, handleNavigation]);
+
+    // Показываем лоадер пока проверяем авторизацию
     if (authLoading) {
         return (
             <div className="min-h-screen bg-[#101423] text-white flex items-center justify-center p-4">
@@ -181,7 +248,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         );
     }
 
-    // 🆕 Если уже авторизован - показываем сообщение (на случай медленного редиректа)
+    // Если уже авторизован - показываем сообщение
     if (isAuthenticated) {
         return (
             <div className="min-h-screen bg-[#101423] text-white flex items-center justify-center p-4">
@@ -207,49 +274,66 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                             loading ? 'text-blue-300' : 
                             message.includes('❌') ? 'text-red-400' :
                             message.includes('✅') ? 'text-green-400' :
+                            message.includes('⚠️') ? 'text-yellow-400' :
                             'text-gray-400'
                         }`}>
                             {message || 
-                            (authMethod === 'token' ? 'Ожидаем ответа сервера...' : 'Введите ваши данные для входа.')}
+                            (authMethod === 'token' ? 'Ожидаем ответа сервера...' : 
+                             authMethod === 'telegram' ? 'Авторизация через Telegram...' :
+                             'Введите ваши данные для входа.')}
                         </p>
                     </div>
 
                     {authMethod === 'form' ? (
-                        <form onSubmit={handleFormSubmit} className="space-y-6">
-                            <Input
-                                type="text"
-                                placeholder="Логин (Username или ID)"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                disabled={loading}
-                            />
-                            <Input
-                                type="password"
-                                placeholder="Пароль"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                disabled={loading}
-                            />
-                            <Button type="submit" disabled={loading} className="mt-4">
-                                {loading ? (
-                                    <span className="flex items-center justify-center">
-                                        <Loader2 className="w-5 h-5 mr-2" /> 
-                                        Вход...
-                                    </span>
-                                ) : (
-                                    'Войти в аккаунт'
-                                )}
-                            </Button>
-                        </form>
+                        <>
+                            <form onSubmit={handleFormSubmit} className="space-y-6">
+                                <Input
+                                    type="text"
+                                    placeholder="Логин (Username или ID)"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    disabled={loading}
+                                />
+                                <Input
+                                    type="password"
+                                    placeholder="Пароль"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    disabled={loading}
+                                />
+                                <Button type="submit" disabled={loading} className="mt-4">
+                                    {loading ? (
+                                        <span className="flex items-center justify-center">
+                                            <Loader2 className="w-5 h-5 mr-2" /> 
+                                            Вход...
+                                        </span>
+                                    ) : (
+                                        'Войти в аккаунт'
+                                    )}
+                                </Button>
+                            </form>
+                            
+                            {/* Кнопка восстановления сессии */}
+                            {isTelegramWebApp() && (
+                                <button
+                                    onClick={handleRestoreSession}
+                                    disabled={loading}
+                                    className="w-full mt-4 py-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                >
+                                    📱 Войти через Telegram
+                                </button>
+                            )}
+                        </>
                     ) : (
                         <div className="flex flex-col items-center space-y-4">
                             {loading && <Loader2 className="w-8 h-8 text-blue-400" />}
                             <p className="text-sm text-gray-400 text-center">
-                                Если автоматический вход не сработает, попробуйте обновить страницу или 
-                                запросите новую ссылку у Telegram-бота.
+                                {authMethod === 'telegram' 
+                                    ? 'Авторизация через Telegram WebApp...'
+                                    : 'Если автоматический вход не сработает, запросите новую ссылку у бота.'}
                             </p>
-                            {/* 🆕 Кнопка для ручного входа если токен не сработал */}
-                            {!loading && message.includes('❌') && (
+                            {/* Кнопка для ручного входа если автоматический не сработал */}
+                            {!loading && (message.includes('❌') || message.includes('⚠️')) && (
                                 <Button 
                                     onClick={() => {
                                         setAuthMethod('form');

@@ -141,7 +141,7 @@ export function CurrencySelector({
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки валют:', err);
+      
     } finally {
       setLoading(false);
     }

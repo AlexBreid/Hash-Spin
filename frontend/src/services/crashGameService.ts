@@ -49,7 +49,7 @@ class CrashGameService {
         });
 
         this.socket.on('connect', () => {
-          console.log('✅ Подключились к Crash Server');
+          
           
           this.socket!.emit('joinGame', {
             userId,
@@ -62,12 +62,12 @@ class CrashGameService {
         });
 
         this.socket.on('connect_error', (error) => {
-          console.error('❌ Ошибка подключения:', error);
+          
           reject(error);
         });
 
         this.socket.on('disconnect', () => {
-          console.log('⚠️ Отключились от Crash Server');
+          
         });
       } catch (error) {
         reject(error);

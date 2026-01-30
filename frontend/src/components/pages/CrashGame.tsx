@@ -102,7 +102,7 @@ export function CrashGame() {
       const toSave = history.slice(0, MAX_HISTORY_ITEMS);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch (error) {
-      console.error('❌ Ошибка сохранения истории:', error);
+      
     }
   }, []);
 
@@ -219,12 +219,12 @@ export function CrashGame() {
             }
           }
         } catch (error: any) {
-          console.error('❌ Ошибка загрузки истории:', error.message);
+          
         } finally {
           setIsHistoryLoaded(true);
         }
       } catch (error) {
-        console.error('❌ Ошибка подключения:', error);
+        
         toast.error('❌ Ошибка подключения');
         setIsHistoryLoaded(true);
       }
@@ -479,7 +479,7 @@ export function CrashGame() {
       setIsLoading(true);
       await crashGameService.placeBet(amount, selectedTokenId);
     } catch (e) {
-      console.error('Bet error:', e);
+      
       toast.error('❌ Ошибка ставки');
     } finally {
       setIsLoading(false);

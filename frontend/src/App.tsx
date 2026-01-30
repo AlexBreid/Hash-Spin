@@ -16,8 +16,10 @@ import { SupportPage } from './components/pages/SupportPage';
 import { LoginPage } from './components/pages/LoginPage';
 import { CrashGame } from './components/pages/CrashGame';
 import { WithdrawPage } from './components/pages/WithdrawPage';
+import DepositPage from './components/pages/DepositPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import PlinkoGame from './components/pages/games/Plinkogame';
+import { HistoryPage } from './components/pages/HistoryPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
@@ -30,9 +32,10 @@ import { CryptoCloudCallback } from './components/pages/CryptoCloudCallback';
 import { WelcomePage } from './components/pages/WelcomePage';
 import { AuthModal } from './components/modals/AuthModal';
 import { NotAuthenticated } from './components/pages/NotAuthenticated';
+import { ServerErrorPage } from './components/pages/ServerErrorPage';
 
 // Страницы, требующие авторизации (home и support доступны всем)
-const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'minesweeper', 'plinko'];
+const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'history'];
 
 // Ключ для localStorage - показывалась ли welcome страница
 const WELCOME_SHOWN_KEY = 'safarix_welcome_shown';
@@ -50,6 +53,59 @@ function AppContent() {
     // Новые состояния для welcome и auth
     const [showWelcome, setShowWelcome] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
+    
+    // Состояние доступности сервера
+    const [serverError, setServerError] = useState(false);
+    const [serverErrorMessage, setServerErrorMessage] = useState<string | undefined>();
+    const [serverCheckDone, setServerCheckDone] = useState(false);
+
+    // Проверка доступности сервера
+    const checkServerHealth = async () => {
+        try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(`${API_BASE_URL}/health`, {
+                signal: controller.signal,
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                setServerError(false);
+                setServerErrorMessage(undefined);
+            } else {
+                setServerError(true);
+                setServerErrorMessage(`Сервер вернул ошибку: ${response.status}`);
+            }
+        } catch (error) {
+            setServerError(true);
+            if (error instanceof Error) {
+                if (error.name === 'AbortError') {
+                    setServerErrorMessage('Превышено время ожидания ответа');
+                } else {
+                    setServerErrorMessage(error.message);
+                }
+            }
+        } finally {
+            setServerCheckDone(true);
+        }
+    };
+
+    // Проверяем сервер при загрузке
+    useEffect(() => {
+        checkServerHealth();
+        
+        // Периодическая проверка каждые 30 сек если есть ошибка
+        const interval = setInterval(() => {
+            if (serverError) {
+                checkServerHealth();
+            }
+        }, 30000);
+        
+        return () => clearInterval(interval);
+    }, [serverError]);
 
     // Проверяем, показывать ли welcome страницу при первом входе
     useEffect(() => {
@@ -66,6 +122,8 @@ function AppContent() {
         if (path === '/minesweeper') return 'minesweeper';
         if (path === '/plinko') return 'plinko';
         if (path === '/withdraw') return 'withdraw';
+        if (path === '/deposit') return 'deposit';
+        if (path === '/history') return 'history';
         if (path === '/records') return 'records';
         if (path === '/referrals') return 'referrals';
         if (path === '/account') return 'account';
@@ -237,6 +295,10 @@ function AppContent() {
                 return <PlinkoGame />;
             case 'withdraw':
                 return <WithdrawPage />;
+            case 'deposit':
+                return <DepositPage onBack={() => handlePageChange('account')} />;
+            case 'history':
+                return <HistoryPage />;
             case 'records':
                 return <RecordsPage />;
             case 'referrals':
@@ -269,11 +331,26 @@ function AppContent() {
     const isMinesweeperPage = currentPage === 'minesweeper';
     const isPlinkoPage = currentPage === 'plinko';
     const isWithdrawPage = currentPage === 'withdraw';
+    const isDepositPage = currentPage === 'deposit';
+    const isHistoryPage = currentPage === 'history';
     const isCallbackPage = currentPage === 'callback' || currentPage === 'successful-payment' || currentPage === 'failed-payment';
     const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
     const isFullscreenPage = isGamePage || isCallbackPage;
+    const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage;
 
-    if (loading) {
+    // Показываем страницу ошибки сервера
+    if (serverCheckDone && serverError) {
+        return (
+            <div className="min-h-screen w-full max-w-[390px] mx-auto" style={{ height: '850px' }}>
+                <ServerErrorPage 
+                    onRetry={checkServerHealth}
+                    errorMessage={serverErrorMessage}
+                />
+            </div>
+        );
+    }
+
+    if (loading || !serverCheckDone) {
         return (
             <div className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto flex items-center justify-center">
                 <p className="text-muted-foreground">Загружение...</p>
@@ -295,18 +372,18 @@ function AppContent() {
             className="min-h-screen bg-background text-foreground w-full max-w-[390px] mx-auto relative"
             style={{ height: '850px' }}
         >
-            {!isAuthPage && !isFullscreenPage && !isWithdrawPage && <TopNavigation onProfileClick={handleProfileClick} />}
+            {!isAuthPage && !isFullscreenPage && !isFinancePage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main className={
                 isFullscreenPage ? 'h-full overflow-hidden' :
-                isWithdrawPage ? 'h-[calc(850px-70px)] overflow-y-auto' :
+                isFinancePage ? 'h-[calc(850px-70px)] overflow-y-auto' :
                 isAuthPage ? 'h-full' : 
                 'h-[calc(850px-140px)] overflow-y-auto'
             }>
                 {renderCurrentPage()}
             </main>
 
-            {!isAuthPage && !isFullscreenPage && !isWithdrawPage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
+            {!isAuthPage && !isFullscreenPage && !isFinancePage && <BottomNavigation currentPage={currentPage} onPageChange={handlePageChange} />}
 
             {/* Плавающая кнопка с подарком */}
             {showFloatingButton && hasBonusAvailable && (

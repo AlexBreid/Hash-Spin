@@ -7,8 +7,10 @@
 import React from 'react';
 
 export interface User {
-  id?: string;
+  id?: string | number;
   username?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   avatar?: string;
   balance?: number;
@@ -22,6 +24,9 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   login: (newToken: string, newUser: User) => void;
   logout: () => void;
+  refreshToken: (currentToken: string) => Promise<string | null>;
+  restoreSession: () => Promise<boolean>;
+  loginWithTelegram: () => Promise<boolean>;
 }
 
 declare const AuthContext: React.Context<AuthContextType | undefined>;

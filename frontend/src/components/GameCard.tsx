@@ -26,7 +26,7 @@ const getCategoryIcon = (category: string, title?: string) => {
 };
 
 export function GameCard({ title, image, category, onClick, playersCount }: GameCardProps) {
-  console.log(`[GameCard] ${title}: playersCount =`, playersCount, typeof playersCount);
+  
   
   return (
     <div 

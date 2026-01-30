@@ -155,11 +155,11 @@ export function HomePage() {
           bonusCounts[gameId] = realCounts[gameId as keyof typeof realCounts] + randomBonus;
         });
 
-        console.log('✅ [HomePage] Игроки инициализированы:', bonusCounts);
+        
         setPlayersCount(bonusCounts);
         hasInitializedPlayers.current = true;
       } catch (error) {
-        console.error('Ошибка загрузки количества игроков:', error);
+        
       }
     };
 
@@ -223,10 +223,10 @@ export function HomePage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('🔄 Загружаю профиль для проверки реферала...');
+      
       
       fetchProfile().catch((err: Error) => {
-        console.warn('⚠️ Ошибка загрузки профиля:', err.message);
+        
         setHasReferrer(false);
       });
     }
@@ -234,28 +234,28 @@ export function HomePage() {
 
   useEffect(() => {
     if (profileData) {
-      console.log('✅ Profile data:', profileData);
+      
       
       try {
         const profile = profileData.data || profileData;
         
         if (profile.referredById) {
-          console.log('✅ У пользователя уже есть реферер:', profile.referredById);
+          
           setHasReferrer(true);
         } 
         else {
-          console.log('⚠️ У пользователя НЕТ реферера');
+          
           setHasReferrer(false);
         }
       } catch (err) {
-        console.warn('⚠️ Ошибка парсинга профиля:', err);
+        
         setHasReferrer(false);
       }
     }
   }, [profileData]);
 
   const handleGameClick = (gameId: string) => {
-    console.log('🎮 Запуск игры:', gameId);
+    
     
     if (gameId === 'minesweeper') {
       navigate('/minesweeper');
@@ -267,7 +267,7 @@ export function HomePage() {
       navigate('/plinko');
     } 
     else {
-      console.log('❓ Неизвестная игра:', gameId);
+      
     }
   };
 
@@ -364,7 +364,7 @@ export function HomePage() {
                           </div>
                           <p className="mb-4 text-sm" style={{ color: colors.mutedForeground }}>Получите +50% к первому депозиту автоматически</p>
                           <Button 
-                            onClick={() => navigate('/account')}
+                            onClick={() => navigate('/deposit')}
                             className="font-semibold shadow-lg transition-all active:scale-95"
                             style={{
                               background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
@@ -450,7 +450,7 @@ export function HomePage() {
             backgroundColor: 'transparent',
             border: `2px solid ${colors.primary}4D`
           }}
-          onClick={() => console.log('Просмотр всех игр')}
+          onClick={() => {}}
         >
           Все игры
           <ChevronRight className="w-5 h-5 ml-2" />

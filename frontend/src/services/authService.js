@@ -27,7 +27,7 @@ function verifySessionToken(token) {
     try {
         return jwt.verify(token, JWT_SECRET);
     } catch (error) {
-        console.error('❌ JWT verification failed:', error.message);
+        
         return null;
     }
 }
@@ -58,7 +58,7 @@ async function registerNewUser(telegramUser) {
         },
     });
 
-    console.log(`✅ New user registered: ID=${user.id}, Telegram ID=${telegramId}`);
+    
 
     return { user, rawPassword }; // Возвращаем и пользователя, и сырой пароль
 }
@@ -79,7 +79,7 @@ async function generateOneTimeToken(userId) {
         },
     });
 
-    console.log(`🔑 One-time token generated for User ID: ${userId}`);
+    
     return token;
 }
 
@@ -94,17 +94,17 @@ async function useOneTimeToken(token) {
 
     // Проверки валидности токена
     if (!tokenRecord) {
-        console.warn(`⚠️ Token not found: ${token}`);
+        
         return null;
     }
 
     if (tokenRecord.used) {
-        console.warn(`⚠️ Token already used: ${token}`);
+        
         return null;
     }
 
     if (new Date() > tokenRecord.expiresAt) {
-        console.warn(`⚠️ Token expired: ${token}`);
+        
         return null;
     }
 
@@ -114,7 +114,7 @@ async function useOneTimeToken(token) {
         data: { used: true },
     });
 
-    console.log(`✅ One-time token used successfully for User ID: ${tokenRecord.userId}`);
+    
     return tokenRecord.user;
 }
 

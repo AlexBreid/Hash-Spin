@@ -78,7 +78,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   const colors = getThemeColors();
 
   const [step, setStep] = useState<'SELECT' | 'PLAYING' | 'REVEAL_BOARD' | 'RESULT'>('SELECT');
-  const [minesCount, setMinesCount] = useState<number>(1);
+  const [minesCount, setMinesCount] = useState<number | ''>(1);
   const [betAmount, setBetAmount] = useState('10');
   const [loading, setLoading] = useState(false);
   const [gameId, setGameId] = useState<number | null>(null);
@@ -131,14 +131,14 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     
     const checkActiveGame = async () => {
       try {
-        console.log('🔍 [MINESWEEPER] Проверяю активную игру...');
+        
         const response = await getActiveGame() as any;
         const data = response?.data || response;
 
         if (!isMounted) return;
 
         if (data && data.gameId) {
-          console.log('✅ [MINESWEEPER] Найдена активная игра:', data.gameId);
+          
           toast.info('Восстанавливаю активную игру...');
           
           // Восстанавливаем состояние игры
@@ -175,13 +175,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           setOpenedCells(opened);
           
           setStep('PLAYING');
-          console.log('✅ [MINESWEEPER] Игра восстановлена');
+          
           toast.success('Игра восстановлена!');
         } else {
-          console.log('ℹ️ [MINESWEEPER] Активная игра не найдена');
+          
         }
       } catch (err: any) {
-        console.error('❌ [MINESWEEPER] Ошибка проверки активной игры:', err);
         // Не показываем ошибку пользователю, это нормально если игры нет
       }
     };
@@ -270,8 +269,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         setTotalBalance(total);
       }
     } catch (err) {
-      console.error('❌ [MINESWEEPER] Ошибка обновления баланса:', err);
-    }
+      }
   };
   
   // 🆕 Обработчик смены валюты
@@ -293,7 +291,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
   }, []);
 
   const handleStartGame = async () => {
-    if (minesCount < 1 || minesCount > 24) {
+    if (minesCount === '' || minesCount < 1 || minesCount > 24) {
       toast.error('Количество мин должно быть от 1 до 24');
       return;
     }
@@ -311,50 +309,46 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
     setLoading(true);
     try {
-      console.log(`🎮 [MINESWEEPER] Начинаю игру с ставкой ${amount}, мин: ${minesCount}, tokenId: ${tokenId}`);
+      
       const response = await startGame({
         minesCount: minesCount,
         betAmount: amount,
         tokenId: tokenId || undefined,
       });
 
-      console.log('📦 [MINESWEEPER] Ответ от сервера:', response);
+      
 
       // Проверяем структуру ответа (может быть response.data или response)
       const gameData = response?.data || response;
 
-      console.log('📦 [MINESWEEPER] Обработанные данные:', gameData);
+      
 
       if (!gameData) {
         throw new Error('Сервер не вернул данные');
       }
 
       if (typeof gameData.gameId !== 'number') {
-        console.error('❌ [MINESWEEPER] Некорректный gameId:', gameData.gameId);
         throw new Error('Сервер вернул некорректный ID игры');
       }
 
       if (!Array.isArray(gameData.grid)) {
-        console.error('❌ [MINESWEEPER] Некорректный grid:', gameData.grid);
         throw new Error('Сервер вернул некорректное поле');
       }
 
       // Временно создаем правильное поле 5x5 если сервер вернул 6x6 (для совместимости)
       let finalGrid = gameData.grid;
       if (gameData.grid.length === 6) {
-        console.warn('⚠️ [MINESWEEPER] Сервер вернул поле 6x6, создаю 5x5');
         finalGrid = Array(5).fill(null).map(() =>
           Array(5).fill(null).map(() => ({
             revealed: false,
           }))
         );
       } else if (gameData.grid.length !== 5) {
-        console.error('❌ [MINESWEEPER] Неправильный размер grid:', gameData.grid.length);
         throw new Error(`Ожидалось поле 5x5, получено ${gameData.grid.length}x${gameData.grid[0]?.length || '?'}`);
       }
 
       // 🆕 СОХРАНЯЕМ balanceType и userBonusId!
-      console.log(`🆕 [START] Сохраняю balanceType=${gameData.balanceType}, userBonusId=${gameData.userBonusId}`);
+      
       setBalanceType(gameData.balanceType);
       setUserBonusId(gameData.userBonusId);
       
@@ -375,23 +369,20 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       setPotentialWin(gameData.potentialWin?.toString() || '0');
       setGameStatus('PLAYING');
       
-      console.log('✅ [MINESWEEPER] Все данные установлены:');
-      console.log('   gameId:', gameData.gameId);
-      console.log('   grid размер:', gameData.grid.length, 'x', gameData.grid[0]?.length);
-      console.log('   currentMultiplier:', gameData.currentMultiplier);
-      console.log('   maxMultiplier:', gameData.maxMultiplier);
+      
+      
+      
+      
+      
       
       // Устанавливаем step в последнюю очередь
       setStep('PLAYING');
-      console.log('✅ [MINESWEEPER] step установлен в PLAYING');
       
-      toast.success('Игра начата!');
 
       setTimeout(() => {
         refreshBalance();
       }, 500);
     } catch (err: any) {
-      console.error('❌ [MINESWEEPER] Ошибка начала игры:', err);
       toast.error(err.message || 'Не удалось начать игру');
     } finally {
       setLoading(false);
@@ -406,7 +397,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     
     try {
       // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId!
-      console.log(`🎮 [REVEAL] Отправляю: gameId=${gameId}, x=${x}, y=${y}, balanceType=${balanceType}, userBonusId=${userBonusId}`);
+      
       
       const response = await revealCell({ 
         gameId, 
@@ -460,8 +451,6 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           setBigWinData({ winAmount: winAmountNum, multiplier: multiplierNum });
           setIsBigWinModalOpen(true);
         }
-        
-        toast.success(`🎉 Вы открыли всё поле! Выигрыш: ${result.winAmount} USDT`);
 
         setTimeout(() => {
           refreshBalance();
@@ -478,15 +467,12 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
           sessionStorage.removeItem(`minesweeper_balanceType_${gameId}`);
           sessionStorage.removeItem(`minesweeper_userBonusId_${gameId}`);
         }
-        
-        toast.error('💣 Вы попали в мину!');
 
         setTimeout(() => {
           refreshBalance();
         }, 1000);
       }
     } catch (err: any) {
-      console.error('❌ [MINESWEEPER] Ошибка открытия клетки:', err);
       toast.error(err.message || 'Ошибка открытия клетки');
     } finally {
       setCellLoading(false);
@@ -497,7 +483,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     if (!gameId) return;
     try {
       // 🆕 ОТПРАВЛЯЕМ balanceType и userBonusId!
-      console.log(`💸 [CASHOUT] Кэшаут игры ${gameId}, balanceType=${balanceType}, userBonusId=${userBonusId}`);
+      
       
       const response = await cashOut({ 
         gameId,
@@ -527,19 +513,16 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
       const winAmountNum = parseFloat(result.winAmount || '0');
       const multiplierNum = currentMultiplier; // Используем текущий множитель
       
-      // Проверяем условия для Big Win Modal: множитель >= 5x ИЛИ выигрыш >= $1000
+        // Проверяем условия для Big Win Modal: множитель >= 5x ИЛИ выигрыш >= $1000
       if (multiplierNum >= 5 || winAmountNum >= 1000) {
         setBigWinData({ winAmount: winAmountNum, multiplier: multiplierNum });
         setIsBigWinModalOpen(true);
       }
-      
-      toast.success(`💸 Вы забрали ${result.winAmount} USDT`);
 
       setTimeout(() => {
         refreshBalance();
       }, 500);
     } catch (err: any) {
-      console.error('❌ [MINESWEEPER] Ошибка кэшаута:', err);
       toast.error(err.message || 'Ошибка кэшаута');
     }
   };
@@ -766,13 +749,27 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                   </label>
                   <Input
                     type="number"
+                    min="1"
                     max="24"
                     step="1"
                     value={minesCount}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      if (val >= 1 && val <= 24) {
-                        setMinesCount(val);
+                      const val = e.target.value;
+                      // Разрешаем пустое значение для редактирования
+                      if (val === '') {
+                        setMinesCount('');
+                        return;
+                      }
+                      const numVal = parseInt(val);
+                      if (!isNaN(numVal)) {
+                        // Ограничиваем 1-24
+                        setMinesCount(Math.min(24, Math.max(1, numVal)));
+                      }
+                    }}
+                    onBlur={() => {
+                      // При потере фокуса - если пусто, ставим 1
+                      if (minesCount === '' || minesCount < 1) {
+                        setMinesCount(1);
                       }
                     }}
                     className="bet-input w-full text-center font-bold"
@@ -803,11 +800,11 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span style={{ color: colors.mutedForeground }}>Первая клетка:</span>
-                    <span className="font-bold ml-1" style={{ color: colors.primary }}>×{calculateBaseMultiplier(minesCount).toFixed(2)}</span>
+                    <span className="font-bold ml-1" style={{ color: colors.primary }}>×{calculateBaseMultiplier(minesCount || 1).toFixed(2)}</span>
                   </div>
                   <div>
                     <span style={{ color: colors.mutedForeground }}>Максимум:</span>
-                    <span className="font-bold ml-1" style={{ color: '#F59E0B' }}>×{calculateMaxMultiplier(minesCount).toFixed(2)}</span>
+                    <span className="font-bold ml-1" style={{ color: '#F59E0B' }}>×{calculateMaxMultiplier(minesCount || 1).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -833,7 +830,7 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
 
               <Button
                 onClick={handleStartGame}
-                disabled={minesCount < 1 || minesCount > 24 || loading || balanceLoading}
+                disabled={minesCount === '' || minesCount < 1 || minesCount > 24 || loading || balanceLoading}
                 className="w-full font-black py-3 rounded-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 text-lg"
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
@@ -921,11 +918,24 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
               {/* Кнопка забрать выигрыш */}
               <Button
                 onClick={handleCashOut}
-                disabled={cellLoading}
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl flex items-center justify-center gap-2 border-0 font-bold py-3 transition-all transform hover:scale-105 active:scale-95"
+                disabled={cellLoading || currentMultiplier <= 1}
+                className="w-full rounded-xl flex items-center justify-center gap-2 border-0 font-black py-4 text-lg transition-all transform hover:scale-105 active:scale-95"
+                style={{
+                  background: currentMultiplier > 1 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)' 
+                    : 'rgba(100, 116, 139, 0.3)',
+                  color: currentMultiplier > 1 ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                  boxShadow: currentMultiplier > 1 
+                    ? '0 0 20px rgba(16, 185, 129, 0.5), 0 4px 15px rgba(16, 185, 129, 0.4)' 
+                    : 'none',
+                  border: currentMultiplier > 1 ? '2px solid #34d399' : '1px solid rgba(100, 116, 139, 0.3)',
+                  animation: currentMultiplier > 1.5 ? 'pulse-scale 1.5s ease-in-out infinite' : 'none'
+                }}
               >
-                <Zap size={18} />
-                Забрать выигрыш
+                <Zap size={20} />
+                {currentMultiplier > 1 
+                  ? `💰 ЗАБРАТЬ ${potentialWin} USDT` 
+                  : 'Откройте клетку'}
               </Button>
             </Card>
           )}
@@ -1005,19 +1015,44 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
               </div>
 
               {step === 'RESULT' && (
-                <div className="mt-6 flex gap-3 animate-slideUp">
+                <div className="mt-6 flex flex-col gap-3 animate-slideUp">
+                  {/* Кнопка забрать выигрыш - только если выиграли */}
+                  {(gameStatus === 'WON' || gameStatus === 'CASHED_OUT') && winAmount && (
+                    <Button
+                      onClick={resetGame}
+                      className="w-full py-4 text-lg font-black rounded-xl transition-all transform hover:scale-105 active:scale-95 animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
+                        color: '#ffffff',
+                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.5), 0 4px 15px rgba(16, 185, 129, 0.4)',
+                        border: '2px solid #34d399'
+                      }}
+                    >
+                      💰 ЗАБРАТЬ {winAmount} USDT
+                    </Button>
+                  )}
+                  
+                  {/* Кнопка попробовать снова */}
                   <Button
                     onClick={resetGame}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transition-all transform hover:scale-105 active:scale-95"
+                    className="w-full py-3 font-bold rounded-xl transition-all transform hover:scale-105 active:scale-95"
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                      border: '2px solid #60a5fa'
+                    }}
                   >
-                    Попробовать снова
+                    🔄 Попробовать снова
                   </Button>
+                  
                   <Button
                     onClick={onBack}
-                    className="flex-1 text-white transition-all transform hover:scale-105 active:scale-95"
+                    className="w-full py-2 text-sm transition-all transform hover:scale-105 active:scale-95"
                     style={{
-                      backgroundColor: `color-mix(in srgb, ${colors.primary} 50%, transparent)`,
-                      borderColor: colors.primary
+                      backgroundColor: 'rgba(100, 116, 139, 0.3)',
+                      color: colors.mutedForeground,
+                      border: '1px solid rgba(100, 116, 139, 0.5)'
                     }}
                   >
                     Выйти
@@ -1045,3 +1080,4 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+

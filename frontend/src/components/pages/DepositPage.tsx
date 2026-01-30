@@ -107,7 +107,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки валют:', err);
+      
     } finally {
       setTokensLoading(false);
     }
@@ -134,7 +134,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки информации о бонусе:', err);
+      
     }
   };
 
@@ -169,7 +169,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         await createDeposit(amount, false, token);
       }
     } catch (err) {
-      console.error('❌ Ошибка:', err);
+      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     } finally {
@@ -222,7 +222,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
       setStep('PAYMENT');
       startPaymentMonitoring(data.data.invoiceId);
     } catch (err) {
-      console.error('❌ Ошибка создания депозита:', err);
+      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     }
@@ -234,7 +234,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
     try {
       await createDeposit(depositAmount, withBonus);
     } catch (err) {
-      console.error('❌ Ошибка:', err);
+      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     } finally {
@@ -264,7 +264,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         );
 
         if (!response.ok) {
-          console.error('Ошибка проверки статуса:', response.statusText);
+          
           return;
         }
 
@@ -283,7 +283,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
           }
         }
       } catch (err) {
-        console.error('Ошибка проверки статуса:', err);
+        
       }
     }, 3000);
 

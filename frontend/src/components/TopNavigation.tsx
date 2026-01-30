@@ -1,12 +1,9 @@
 import { User, Plus, ChevronDown, Coins } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useFetch } from '../hooks/useDynamicApi'; 
-import { Button } from './ui/button';
-import DepositPage from './pages/DepositPage';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import logoSU from '../assets/SU.png';
-import { CurrencySelector, CurrencyInfo, setGlobalCurrency, getGlobalCurrency } from './CurrencySelector';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,12 +62,11 @@ interface UserWallet {
 const STORAGE_KEY_SELECTED_TOKEN = 'selectedTokenId';
 
 export function TopNavigation({ onProfileClick }: TopNavigationProps) {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const { isAuthenticated, token } = useAuth();
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showDepositModal, setShowDepositModal] = useState(false);
-  const [depositCurrency, setDepositCurrency] = useState<string | null>(null); // Валюта для депозита
   const [userWallets, setUserWallets] = useState<UserWallet[]>([]); // Кошельки пользователя
   const [availableTokens, setAvailableTokens] = useState<CryptoToken[]>([]); // Все доступные токены
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
@@ -96,7 +92,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 Загружены балансы:', data);
+        
         
         if (data.success && Array.isArray(data.data)) {
           // ✅ Группируем балансы по СИМВОЛУ (все USDT вместе, все USDC вместе)
@@ -126,7 +122,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
           });
           
           const wallets = Array.from(walletsMap.values());
-          console.log('💰 Кошельки пользователя:', wallets);
+          
           setUserWallets(wallets);
           
           // Устанавливаем выбранную валюту
@@ -167,7 +163,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
         }
       }
     } catch (error) {
-      console.error('❌ Ошибка загрузки балансов:', error);
+      
     }
   }, [token]);
 
@@ -196,7 +192,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
         }
       }
     } catch (error) {
-      console.error('❌ Ошибка загрузки токенов:', error);
+      
     }
   }, [token]);
 
@@ -228,7 +224,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     }
     
     const symbol = selectedWallet?.symbol || '';
-    console.log(`🔄 Смена валюты на ${symbol} (tokenId=${tokenId})`);
+    
     
     if (selectedWallet) {
       setSelectedTokenId(selectedWallet.tokenId);
@@ -306,34 +302,14 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
     return '14px';
   };
 
-  // Обработчик для открытия модального окна пополнения
+  // Обработчик для перехода на страницу пополнения
   const handleDepositClick = () => {
-    // Запоминаем текущую выбранную валюту для депозита
-    const globalCurrency = getGlobalCurrency();
-    if (globalCurrency) {
-      setDepositCurrency(globalCurrency.symbol);
-    }
-    setShowDepositModal(true);
-  };
-
-  // Обработчик для закрытия модального окна и перезагрузки баланса
-  const handleDepositClose = () => {
-    setShowDepositModal(false);
-    setDepositCurrency(null);
-    // Перезагружаем все балансы после пополнения
-    loadUserBalances();
+    navigate('/deposit');
   };
 
   // Получаем информацию о выбранной валюте
   const selectedWallet = userWallets.find(w => w.tokenId === selectedTokenId);
   const selectedToken = availableTokens.find((t: CryptoToken) => t.id === selectedTokenId);
-
-  // --- Если модал открыт, показываем DepositPage ---
-  if (showDepositModal) {
-    return (
-      <DepositPage onBack={handleDepositClose} defaultCurrency={depositCurrency} />
-    );
-  }
 
   // Цвета в зависимости от темы
   const bgColor = theme === 'dark' ? '#0f1d3a' : '#f5f5f7';

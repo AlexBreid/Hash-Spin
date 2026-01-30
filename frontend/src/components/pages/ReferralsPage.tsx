@@ -91,8 +91,8 @@ const isTelegramWebApp = (): boolean => {
 
 // ✅ Универсальная функция копирования
 const copyToClipboard = async (text: string): Promise<boolean> => {
-  console.log('[COPY] Starting copy, text:', text)
-  console.log('[COPY] Is Telegram WebApp:', isTelegramWebApp())
+  
+  
   
   // Вибрация для тактильного отклика
   try {
@@ -103,10 +103,10 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text)
-      console.log('[COPY] Clipboard API success')
+      
       return true
     } catch (err) {
-      console.log('[COPY] Clipboard API failed:', err)
+      
     }
   }
 
@@ -129,10 +129,10 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
     const successful = document.execCommand('copy')
     document.body.removeChild(textArea)
     
-    console.log('[COPY] execCommand result:', successful)
+    
     if (successful) return true
   } catch (err) {
-    console.log('[COPY] execCommand failed:', err)
+    
   }
 
   // Метод 3: showAlert в Telegram
@@ -198,7 +198,7 @@ export function ReferralsPage() {
       setLoadingReferrals(true)
       const result = await loadReferrals()
       if (result?.data?.referrals) setReferrals(result.data.referrals)
-    } catch (err) { console.error('Ошибка загрузки рефералов:', err) }
+    } catch (err) { }
     finally { setLoadingReferrals(false) }
   }
 

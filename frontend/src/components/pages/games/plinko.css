@@ -265,34 +265,4 @@
   color: var(--muted-foreground);
 }
 
-/* ✅ Когда клавиатура открыта */
-.plinko-page.keyboard-open {
-  height: 100vh;
-  height: 100dvh;
-  overflow-y: auto; /* Разрешаем скролл для контролов */
-  -webkit-overflow-scrolling: touch;
-  transition: height 0.3s ease; /* Плавный переход */
-}
-
-.plinko-page.keyboard-open .plinko-board {
-  flex: 0 0 auto; /* Не растягивается, но не скрывается полностью */
-  height: auto;
-  min-height: 200px; /* Минимальная высота чтобы было видно поле */
-  max-height: 40vh; /* Максимальная высота при открытой клавиатуре */
-  padding: 8px;
-  overflow: visible;
-  transition: flex 0.3s ease, min-height 0.3s ease, max-height 0.3s ease, padding 0.3s ease; /* Плавный переход */
-}
-
-.plinko-page.keyboard-open .plinko-history {
-  display: flex; /* Оставляем историю видимой */
-  transition: display 0.3s ease;
-}
-
-.plinko-page.keyboard-open .plinko-controls {
-  flex: 0 0 auto; /* Не растягивается автоматически */
-  min-height: fit-content;
-  padding-top: 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  transition: padding 0.3s ease;
-}
+/* ✅ Убрали keyboard-open стили - они вызывали проблемы с версткой */

@@ -41,7 +41,7 @@ export function useBalance() {
    */
   const fetchBalances = useCallback(async () => {
     if (!isAuthenticated || !token) {
-      console.warn('⚠️ useBalance: Пользователь не авторизован');
+      
       return;
     }
 
@@ -49,7 +49,7 @@ export function useBalance() {
       setLoading(true);
       setError(null);
 
-      console.log(`🔄 Загружаю балансы пользователя ${user?.id}...`);
+      
 
       const response = await fetch(
         `${API_BASE_URL}/api/v1/wallet/balance`,
@@ -72,14 +72,14 @@ export function useBalance() {
       const data = await response.json();
 
       if (data.success && Array.isArray(data.data)) {
-        console.log(`✅ Загружено ${data.data.length} балансов:`, data.data);
+        
         setBalances(data.data);
       } else {
         throw new Error(data.error || 'Ошибка загрузки балансов');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('❌ Ошибка загрузки балансов:', errorMessage);
+      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -108,10 +108,6 @@ export function useBalance() {
         setLoading(true);
         setError(null);
 
-        console.log(
-          `🔄 Обновляю баланс: ${operation} ${amount} на токене ${tokenId} (${type})...`
-        );
-
         const response = await fetch(
           `${API_BASE_URL}/api/v1/balance/update-balance`,
           {
@@ -136,7 +132,7 @@ export function useBalance() {
         const data = await response.json();
 
         if (data.success && data.data) {
-          console.log(`✅ Баланс обновлён:`, data.data);
+          
           
           // Обновляем локальное состояние
           setBalances(prev =>
@@ -151,7 +147,7 @@ export function useBalance() {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error('❌ Ошибка обновления баланса:', errorMessage);
+        
         setError(errorMessage);
         throw err;
       } finally {
@@ -200,3 +196,4 @@ export function useBalance() {
     getTotalBalance,
   };
 }
+

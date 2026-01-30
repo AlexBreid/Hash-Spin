@@ -11,11 +11,10 @@ import {
   TrendingUp,
   CreditCard,
   ArrowUpCircle,
+  History,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import DepositPage from './DepositPage';
-import { WithdrawPage } from './WithdrawPage';
 
 interface UserProfile {
   id: string;
@@ -168,8 +167,6 @@ const MetricCard = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
-  console.log('🎁 BonusCard rendering with:', bonus);
-  
   const wagered = toNumber(bonus.wageredAmount);
   const required = toNumber(bonus.requiredWager);
   const granted = toNumber(bonus.grantedAmount);
@@ -179,8 +176,6 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
   const expiresAt = new Date(bonus.expiresAt);
   const now = new Date();
   const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-  
-  console.log('🎁 BonusCard computed:', { wagered, required, granted, remaining, progress, daysLeft });
   
   return (
     <motion.div
@@ -314,8 +309,6 @@ export function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [avatarFallback, setAvatarFallback] = useState(false);
-  const [showDeposit, setShowDeposit] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
 
   const hasLoadedRef = useRef(false);
 
@@ -329,25 +322,18 @@ export function AccountPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      console.log('🔄 Загружаю профиль...');
       
-      fetchProfile().catch((err: Error) => {
-        console.error('❌ Profile error:', err.message);
+      fetchProfile().catch(() => {
         setError('Failed to load profile');
         setLoading(false);
       });
       
-      fetchActiveBonus()
-        .then(() => console.log('✅ Бонус загружен'))
-        .catch((err: Error) => {
-          console.warn('⚠️ Бонус не загружен (это нормально):', err.message);
-        });
+      fetchActiveBonus().catch(() => {});
     }
   }, [fetchProfile, fetchActiveBonus]);
 
   useEffect(() => {
     if (data) {
-      console.log('✅ Profile data:', data);
       if (data.success && data.data) {
         setProfileData(data.data as UserProfile);
       } else if (data.id && data.username) {
@@ -362,29 +348,23 @@ export function AccountPage() {
 
   useEffect(() => {
     if (bonusData) {
-      console.log('🎁 Raw bonusData:', bonusData);
       try {
         if (bonusData.id && bonusData.grantedAmount !== undefined && bonusData.requiredWager !== undefined) {
-          console.log('✅ [DIRECT BONUS] Setting active bonus:', bonusData);
           setActiveBonus(bonusData as ActiveBonus);
           return;
         }
         
         if (bonusData.success && bonusData.data) {
-          console.log('✅ [WRAPPED BONUS] Setting from success.data:', bonusData.data);
           setActiveBonus(bonusData.data as ActiveBonus);
           return;
         }
         
         if (bonusData.data) {
-          console.log('✅ [DATA FIELD BONUS] Setting from data field:', bonusData.data);
           setActiveBonus(bonusData.data as ActiveBonus);
           return;
         }
-        
-        console.warn('⚠️ Bonus data структура не поддерживается:', bonusData);
-      } catch (err) {
-        console.error('❌ Error parsing bonus:', err);
+      } catch {
+        // Silent fail
       }
     }
   }, [bonusData]);
@@ -431,17 +411,6 @@ export function AccountPage() {
 
     const initials = getInitials(firstName || "", lastName);
     const dateJoined = new Date(createdAt).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-
-    console.log('🎯 Rendering AccountPage with activeBonus:', activeBonus);
-
-    // Если показываем страницу депозита или вывода
-    if (showDeposit) {
-      return <DepositPage onBack={() => setShowDeposit(false)} />;
-    }
-
-    if (showWithdraw) {
-      return <WithdrawPage onBack={() => setShowWithdraw(false)} />;
-    }
 
     return (
       <div 
@@ -528,9 +497,9 @@ export function AccountPage() {
             </div>
 
             {/* КНОПКИ ПОПОЛНЕНИЯ И ВЫВОДА - КОМПАКТНЫЙ ДИЗАЙН */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <motion.button
-                onClick={() => setShowDeposit(true)}
+                onClick={() => navigate('/deposit')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm min-w-0"
@@ -546,7 +515,7 @@ export function AccountPage() {
               </motion.button>
 
               <motion.button
-                onClick={() => setShowWithdraw(true)}
+                onClick={() => navigate('/withdraw')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm min-w-0"
@@ -561,6 +530,25 @@ export function AccountPage() {
                 <span className="truncate">Вывести</span>
               </motion.button>
             </div>
+
+            {/* КНОПКА ИСТОРИЯ */}
+            <motion.button
+              onClick={() => navigate('/history')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
+              style={{
+                background: `linear-gradient(135deg, 
+                  color-mix(in srgb, ${COLORS.accent} 15%, transparent), 
+                  color-mix(in srgb, ${COLORS.primary} 10%, transparent)
+                )`,
+                borderColor: `color-mix(in srgb, ${COLORS.accent} 40%, ${COLORS.primary})`,
+                color: COLORS.foreground,
+              }}
+            >
+              <History size={18} style={{ color: COLORS.accent }} />
+              <span>История операций</span>
+            </motion.button>
           </motion.div>
 
           {/* 🎁 АКТИВНЫЙ БОНУС */}

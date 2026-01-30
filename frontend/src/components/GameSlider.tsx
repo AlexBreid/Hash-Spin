@@ -58,7 +58,7 @@ export function GameSlider({ games, onGameClick, playersCount }: GameSliderProps
   };
 
   const handleCardClick = (gameId: string) => {
-    console.log('🎮 GameCard clicked:', gameId);
+    
     if (onGameClick) {
       onGameClick(gameId);
     }

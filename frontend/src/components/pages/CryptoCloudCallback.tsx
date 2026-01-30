@@ -20,13 +20,6 @@ export default function CryptoCloudCallback() {
         const paymentStatus = searchParams.get('status');
         const orderId = searchParams.get('order_id');
 
-        console.log('🪝 [CALLBACK] Processing CryptoCloud callback:', {
-          invoiceId,
-          status: paymentStatus,
-          orderId,
-          allParams: Object.fromEntries(searchParams.entries())
-        });
-
         // Если есть параметры от CryptoCloud - отправляем на бек
         if (invoiceId || orderId) {
           // Формируем данные для бека
@@ -39,7 +32,7 @@ export default function CryptoCloudCallback() {
             ...Object.fromEntries(searchParams.entries())
           };
 
-          console.log('🪝 [CALLBACK] Sending to backend:', webhookData);
+          
 
           // Отправляем на бек webhook endpoint
           const response = await fetch(`${API_BASE_URL}/api/v1/deposit/cryptocloud/webhook`, {
@@ -51,7 +44,7 @@ export default function CryptoCloudCallback() {
           });
 
           const result = await response.json();
-          console.log('🪝 [CALLBACK] Backend response:', result);
+          
 
           if (result.success && result.processed) {
             setStatus('success');
@@ -71,7 +64,7 @@ export default function CryptoCloudCallback() {
         }
 
       } catch (error) {
-        console.error('❌ [CALLBACK] Error:', error);
+        
         setStatus('error');
         setMessage('Ошибка обработки платежа');
         
@@ -104,7 +97,7 @@ export default function CryptoCloudCallback() {
       });
 
       const data = await response.json();
-      console.log('🪝 [CALLBACK] Deposit status:', data);
+      
 
       if (data.success) {
         const depositStatus = data.data.status;
@@ -124,7 +117,7 @@ export default function CryptoCloudCallback() {
         }
       }
     } catch (error) {
-      console.error('❌ [CALLBACK] Error checking status:', error);
+      
     }
   };
 
@@ -159,7 +152,7 @@ export default function CryptoCloudCallback() {
         setTimeout(() => navigate('/'), 2000);
       }
     } catch (error) {
-      console.error('❌ [CALLBACK] Error:', error);
+      
       setStatus('error');
       setMessage('Ошибка проверки платежа');
     }
@@ -212,3 +205,4 @@ export default function CryptoCloudCallback() {
 }
 
 export { CryptoCloudCallback };
+

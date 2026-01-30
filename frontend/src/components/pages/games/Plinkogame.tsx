@@ -10,6 +10,7 @@ import './games.css';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const ROWS = 16;
 const MULTS = [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110];
+const MAX_BALLS = 15; // Ограничение для оптимизации FPS
 
 interface Pin { x: number; y: number; }
 
@@ -41,7 +42,6 @@ export default function PlinkoGame() {
   const pinsRef = useRef<Pin[]>([]);
   const frameRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
 
   const [balance, setBalance] = useState(0);
@@ -49,7 +49,6 @@ export default function PlinkoGame() {
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState<{ m: number }[]>([]);
   const [profit, setProfit] = useState(0);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null);
   const [tokenId, setTokenId] = useState<number | null>(null);
   
@@ -73,28 +72,6 @@ export default function PlinkoGame() {
   };
 
   const rowHeight = (BOT_Y - TOP_Y) / ROWS;
-
-  // ✅ Обработка фокуса на input
-  const handleInputFocus = useCallback(() => {
-    setKeyboardOpen(true);
-    
-    // Скроллим к контролам после появления клавиатуры
-    setTimeout(() => {
-      if (controlsRef.current) {
-        controlsRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'end' 
-        });
-      }
-    }, 150);
-  }, []);
-
-  const handleInputBlur = useCallback(() => {
-    // Задержка для плавного закрытия клавиатуры
-    setTimeout(() => {
-      setKeyboardOpen(false);
-    }, 300); // Даём время клавиатуре закрыться перед изменением классов
-  }, []);
 
   // ✅ Обработка Enter - закрываем клавиатуру
   const handleInputKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -227,7 +204,7 @@ export default function PlinkoGame() {
         setBalance(parseFloat(d.balance));
       }
     } catch (err) {
-      console.error('[PLINKO] Ошибка загрузки баланса:', err);
+      
     }
   }, [token, tokenId]);
 
@@ -252,6 +229,7 @@ export default function PlinkoGame() {
   const drop = async () => {
     if (bet > balance) return toast.error('Недостаточно средств');
     if (bet < 0.1) return toast.error('Мин. ставка 0.1');
+    if (ballsRef.current.length >= MAX_BALLS) return; // Лимит шариков для FPS
 
     try {
       const r = await fetch(`${API}/api/v1/plinko/drop`, {
@@ -444,13 +422,7 @@ export default function PlinkoGame() {
           setCount(c => Math.max(0, c - 1));
           setHistory(h => [{ m: ball.multiplier }, ...h].slice(0, 20));
 
-          if (p > 0) {
-            const mt = ball.multiplier >= 100 ? String(ball.multiplier) : ball.multiplier + 'x';
-            toast.success(`${mt} → +${p.toFixed(2)}`);
-          } else if (p < -0.01) {
-            const mt = ball.multiplier >= 100 ? String(ball.multiplier) : ball.multiplier + 'x';
-            toast.error(`${mt} → ${p.toFixed(2)}`);
-          }
+          // Убраны toast уведомления - результат виден в истории
           return;
         }
 
@@ -575,7 +547,7 @@ export default function PlinkoGame() {
   return (
     <div 
       ref={pageRef}
-      className={`plinko-page game-page ${keyboardOpen ? 'keyboard-open' : ''}`}
+      className="plinko-page game-page"
     >
       <GameHeader 
         title="PLINKO" 
@@ -603,7 +575,7 @@ export default function PlinkoGame() {
         })}
       </div>
 
-      <div ref={controlsRef} className="plinko-controls">
+      <div className="plinko-controls">
         <div className="plinko-input-row">
           <button onClick={() => setBet(b => Math.max(0.1, +(b / 2).toFixed(2)))}>½</button>
           <input
@@ -612,8 +584,6 @@ export default function PlinkoGame() {
             inputMode="decimal"
             value={bet}
             onChange={e => setBet(Math.max(0, +e.target.value))}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
             step="0.1"
             className="game-input"
@@ -632,7 +602,7 @@ export default function PlinkoGame() {
         <button
           className="plinko-play-btn game-button"
           onClick={drop}
-          disabled={bet > balance || bet < 0.1}
+          disabled={bet > balance || bet < 0.1 || ballsRef.current.length >= MAX_BALLS}
         >
           БРОСИТЬ ({bet.toFixed(2)})
         </button>
