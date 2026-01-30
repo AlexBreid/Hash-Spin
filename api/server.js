@@ -21,6 +21,14 @@ const RouteLoader = require('./src/utils/routeLoader');
 // ✅ ИСПРАВЛЕНИЕ #1: Импортируем webhook handler
 const { handleCryptoPayWebhook } = require('./src/bots/telegramBot');
 
+// 🛡️ SECURITY: Импортируем middleware безопасности
+const { 
+  rateLimiter, 
+  apiProtection, 
+  requestValidation,
+  getSecurityStats 
+} = require('./src/middleware/security');
+
 // ====================================
 // ✅ ИСПРАВЛЕНИЕ #10: ВАЛИДАЦИЯ ENV ПЕРЕМЕННЫХ
 // ====================================
@@ -90,6 +98,15 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // ====================================
+// 🛡️ SECURITY MIDDLEWARE
+// ====================================
+app.use(requestValidation);  // Валидация запросов
+app.use(rateLimiter);        // Rate limiting (анти-DDoS)
+app.use(apiProtection);      // Защита API (требует авторизации)
+
+console.log('✅ Security middleware enabled (Rate Limiting + API Protection)');
+
+// ====================================
 // MIDDLEWARE - ОТКЛЮЧЕНИЕ КЭШИРОВАНИЯ
 // ====================================
 app.use((req, res, next) => {
@@ -112,6 +129,24 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
+  });
+});
+
+/**
+ * 🛡️ Security Stats (только для админов с GAME_SERVER_SECRET)
+ */
+app.get('/security-stats', (req, res) => {
+  const serverKey = req.headers['x-game-server-key'];
+  
+  if (serverKey !== process.env.GAME_SERVER_SECRET) {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+  
+  const stats = getSecurityStats();
+  res.json({
+    success: true,
+    data: stats,
+    timestamp: new Date().toISOString()
   });
 });
 

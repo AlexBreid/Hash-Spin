@@ -40,7 +40,7 @@ const requireAdminAuth = async (req, res, next) => {
 // 📊 СТАТИСТИКА
 // ====================================
 
-router.get('/stats', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/stats', requireAdminAuth, async (req, res) => {
     try {
         const totalUsers = await prisma.user.count();
         const blockedUsers = await prisma.user.count({ where: { isBlocked: true } });
@@ -87,7 +87,7 @@ router.get('/stats', requireAdminAuth, async (req, res) => {
 // ====================================
 
 // Получить список пользователей
-router.get('/users', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/users', requireAdminAuth, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
@@ -120,7 +120,7 @@ router.get('/users', requireAdminAuth, async (req, res) => {
 });
 
 // Получить юзера по ID
-router.get('/users/:id', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/users/:id', requireAdminAuth, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: parseInt(req.params.id) },
@@ -143,7 +143,7 @@ router.get('/users/:id', requireAdminAuth, async (req, res) => {
 });
 
 // Заблокировать пользователя
-router.post('/users/:id/block', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/users/:id/block', requireAdminAuth, async (req, res) => {
     try {
         const user = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -157,7 +157,7 @@ router.post('/users/:id/block', requireAdminAuth, async (req, res) => {
 });
 
 // Разблокировать пользователя
-router.post('/users/:id/unblock', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/users/:id/unblock', requireAdminAuth, async (req, res) => {
     try {
         const user = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -171,7 +171,7 @@ router.post('/users/:id/unblock', requireAdminAuth, async (req, res) => {
 });
 
 // Выдать админ-статус
-router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/users/:id/make-admin', requireAdminAuth, async (req, res) => {
     try {
         const user = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -185,7 +185,7 @@ router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
 });
 
 // Снять админ-статус
-router.post('/users/:id/remove-admin', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/users/:id/remove-admin', requireAdminAuth, async (req, res) => {
     try {
         const user = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -203,19 +203,70 @@ router.post('/users/:id/remove-admin', requireAdminAuth, async (req, res) => {
 // ====================================
 
 // Получить все транзакции
-router.get('/transactions', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/transactions', requireAdminAuth, async (req, res) => {
     try {
         const type = req.query.type; // DEPOSIT, WITHDRAW
         const status = req.query.status; // PENDING, COMPLETED, FAILED
         const limit = parseInt(req.query.limit) || 50;
+        const search = req.query.search; // Поиск по нику/имени/telegramId
+        const tokenId = req.query.tokenId; // Фильтр по токену
+        const dateFrom = req.query.dateFrom; // Дата от
+        const dateTo = req.query.dateTo; // Дата до
+        const minAmount = req.query.minAmount; // Мин. сумма
+        const maxAmount = req.query.maxAmount; // Макс. сумма
 
         const where = {};
         if (type) where.type = type;
         if (status) where.status = status;
+        if (tokenId) where.tokenId = parseInt(tokenId);
+        
+        // Фильтр по сумме
+        if (minAmount || maxAmount) {
+            where.amount = {};
+            if (minAmount) where.amount.gte = parseFloat(minAmount);
+            if (maxAmount) where.amount.lte = parseFloat(maxAmount);
+        }
+        
+        // Фильтр по дате
+        if (dateFrom || dateTo) {
+            where.createdAt = {};
+            if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+            if (dateTo) where.createdAt.lte = new Date(dateTo);
+        }
+        
+        // Поиск по пользователю
+        if (search) {
+            where.user = {
+                OR: [
+                    { username: { contains: search, mode: 'insensitive' } },
+                    { firstName: { contains: search, mode: 'insensitive' } },
+                    { lastName: { contains: search, mode: 'insensitive' } },
+                    { telegramId: { contains: search } }
+                ]
+            };
+        }
 
         const transactions = await prisma.transaction.findMany({
             where,
-            include: { user: true, token: true },
+            include: { 
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        firstName: true,
+                        lastName: true,
+                        telegramId: true
+                    }
+                }, 
+                token: true,
+                approvedBy: {
+                    select: {
+                        id: true,
+                        username: true,
+                        firstName: true
+                    }
+                }
+            },
             orderBy: { createdAt: 'desc' },
             take: limit
         });
@@ -227,11 +278,24 @@ router.get('/transactions', requireAdminAuth, async (req, res) => {
 });
 
 // Одобрить вывод
-router.post('/transactions/:id/approve', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/transactions/:id/approve', requireAdminAuth, async (req, res) => {
     try {
         const transaction = await prisma.transaction.update({
             where: { id: parseInt(req.params.id) },
-            data: { status: 'COMPLETED' }
+            data: { 
+                status: 'COMPLETED',
+                approvedById: req.user.id,
+                approvedAt: new Date()
+            },
+            include: {
+                approvedBy: {
+                    select: {
+                        id: true,
+                        username: true,
+                        firstName: true
+                    }
+                }
+            }
         });
 
         res.json({ ok: true, message: 'Withdrawal approved', transaction });
@@ -241,8 +305,10 @@ router.post('/transactions/:id/approve', requireAdminAuth, async (req, res) => {
 });
 
 // Отклонить вывод (вернуть деньги)
-router.post('/transactions/:id/reject', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/transactions/:id/reject', requireAdminAuth, async (req, res) => {
     try {
+        const { reason } = req.body; // Опциональная причина отклонения
+        
         const transaction = await prisma.transaction.findUnique({
             where: { id: parseInt(req.params.id) }
         });
@@ -251,28 +317,55 @@ router.post('/transactions/:id/reject', requireAdminAuth, async (req, res) => {
             return res.status(404).json({ error: 'Transaction not found' });
         }
 
-        // Возвращаем деньги на баланс
-        const balance = await prisma.balance.findFirst({
+        // Возвращаем деньги на MAIN баланс (не на BONUS!)
+        const balance = await prisma.balance.findUnique({
             where: {
-                userId: transaction.userId,
-                tokenId: transaction.tokenId
+                userId_tokenId_type: {
+                    userId: transaction.userId,
+                    tokenId: transaction.tokenId,
+                    type: 'MAIN'
+                }
             }
         });
 
         if (balance) {
             await prisma.balance.update({
                 where: { id: balance.id },
-                data: { amount: balance.amount + transaction.amount }
+                data: { amount: { increment: parseFloat(transaction.amount.toString()) } }
+            });
+        } else {
+            // Если MAIN баланса нет - создаём
+            await prisma.balance.create({
+                data: {
+                    userId: transaction.userId,
+                    tokenId: transaction.tokenId,
+                    type: 'MAIN',
+                    amount: parseFloat(transaction.amount.toString())
+                }
             });
         }
 
-        // Помечаем транзакцию как FAILED
-        await prisma.transaction.update({
+        // Помечаем транзакцию как FAILED с информацией об админе
+        const updatedTransaction = await prisma.transaction.update({
             where: { id: parseInt(req.params.id) },
-            data: { status: 'FAILED' }
+            data: { 
+                status: 'FAILED',
+                approvedById: req.user.id,
+                approvedAt: new Date(),
+                rejectReason: reason || null
+            },
+            include: {
+                approvedBy: {
+                    select: {
+                        id: true,
+                        username: true,
+                        firstName: true
+                    }
+                }
+            }
         });
 
-        res.json({ ok: true, message: 'Withdrawal rejected and funds returned' });
+        res.json({ ok: true, message: 'Withdrawal rejected and funds returned', transaction: updatedTransaction });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -282,7 +375,7 @@ router.post('/transactions/:id/reject', requireAdminAuth, async (req, res) => {
 // 🔔 ЛОГИ ВЕБ-ХУКОВ
 // ====================================
 
-router.get('/webhook-logs', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/webhook-logs', requireAdminAuth, async (req, res) => {
     try {
         const logs = await prisma.transaction.findMany({
             where: { type: 'DEPOSIT' },
@@ -301,7 +394,7 @@ router.get('/webhook-logs', requireAdminAuth, async (req, res) => {
 // ⚙️ СИСТЕМНЫЕ НАСТРОЙКИ
 // ====================================
 
-router.get('/settings', requireAdminAuth, async (req, res) => {
+router.get('/api/admin/settings', requireAdminAuth, async (req, res) => {
     try {
         res.json({
             minDeposit: 10,
@@ -322,7 +415,7 @@ router.get('/settings', requireAdminAuth, async (req, res) => {
 // 📤 РУЧНОЕ ПОПОЛНЕНИЕ (Только суперадмин)
 // ====================================
 
-router.post('/manual-deposit', requireAdminAuth, async (req, res) => {
+router.post('/api/admin/manual-deposit', requireAdminAuth, async (req, res) => {
     try {
         // Проверяем что это суперадмин (например, ID 1)
         if (req.user.id !== 1) {

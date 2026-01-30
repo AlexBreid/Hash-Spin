@@ -15,6 +15,7 @@
 const prisma = require('../../prismaClient');
 const logger = require('../utils/logger');
 const Decimal = require('decimal.js');
+const { getCurrencyRateAsync } = require('./currencySyncService');
 
 class ReferralService {
   static CONFIG = {
@@ -45,6 +46,7 @@ class ReferralService {
 
   /**
    * 🎁 ВЫДАТЬ ДЕПОЗИТНЫЙ БОНУС
+   * Поддерживает все криптовалюты с пересчётом в USD эквивалент
    */
   async grantDepositBonus(userId, depositAmount, tokenId, referrerId) {
     try {
@@ -58,7 +60,36 @@ class ReferralService {
         return null;
       }
 
-      if (depositNum < ReferralService.CONFIG.MIN_DEPOSIT_AMOUNT) {
+      // Получаем информацию о токене
+      const token = await prisma.cryptoToken.findUnique({
+        where: { id: tokenId }
+      });
+
+      if (!token) {
+        logger.error('REFERRAL', 'Token not found', { tokenId });
+        return null;
+      }
+
+      // Получаем курс валюты к USD
+      const rate = await getCurrencyRateAsync(token.symbol);
+      
+      // Конвертируем сумму депозита в USD для проверки лимитов
+      const depositInUSD = depositNum * rate;
+      
+      logger.info('REFERRAL', 'Checking bonus eligibility', { 
+        userId: userIdNum, 
+        depositNum, 
+        depositInUSD, 
+        token: token.symbol, 
+        rate 
+      });
+
+      // Проверяем минимальный депозит в USD эквиваленте
+      if (depositInUSD < ReferralService.CONFIG.MIN_DEPOSIT_AMOUNT) {
+        logger.info('REFERRAL', 'Deposit below minimum', { 
+          depositInUSD, 
+          minRequired: ReferralService.CONFIG.MIN_DEPOSIT_AMOUNT 
+        });
         return null;
       }
 
@@ -76,16 +107,22 @@ class ReferralService {
         return null;
       }
 
+      // Рассчитываем бонус в единицах криптовалюты
       let bonusAmount = depositNum * (ReferralService.CONFIG.DEPOSIT_BONUS_PERCENT / 100);
-      const maxBonus = ReferralService.CONFIG.MAX_BONUS_AMOUNT;
+      
+      // Максимальный бонус в USD эквиваленте -> конвертируем в единицы криптовалюты
+      const maxBonusInCrypto = ReferralService.CONFIG.MAX_BONUS_AMOUNT / rate;
 
-      if (bonusAmount > maxBonus) {
-        bonusAmount = maxBonus;
+      if (bonusAmount > maxBonusInCrypto) {
+        bonusAmount = maxBonusInCrypto;
       }
 
       const totalAmount = depositNum + bonusAmount;
       const requiredWager = totalAmount * ReferralService.CONFIG.WAGERING_MULTIPLIER;
       const maxPayoutAmount = totalAmount * ReferralService.CONFIG.MAX_PAYOUT_MULTIPLIER;
+      
+      // Максимальная ставка в единицах криптовалюты
+      const maxBetInCrypto = ReferralService.CONFIG.MAX_BET_AMOUNT / rate;
       
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + ReferralService.CONFIG.BONUS_EXPIRY_DAYS);
@@ -125,12 +162,21 @@ class ReferralService {
           totalAmount: totalAmount,
           requiredWager: requiredWager,
           expiresAt: expiresAt,
-          maxBetAmount: ReferralService.CONFIG.MAX_BET_AMOUNT,
-          maxPayoutAmount: maxPayoutAmount
+          maxBetAmount: maxBetInCrypto,
+          maxPayoutAmount: maxPayoutAmount,
+          // Добавляем USD эквиваленты для информации
+          bonusAmountUSD: bonusAmount * rate,
+          totalAmountUSD: totalAmount * rate,
+          currency: token.symbol
         };
       });
 
-      logger.info('REFERRAL', 'Deposit bonus granted', { userId: userIdNum });
+      logger.info('REFERRAL', 'Deposit bonus granted', { 
+        userId: userIdNum, 
+        bonusAmount: bonusAmount, 
+        currency: token.symbol,
+        bonusAmountUSD: bonusAmount * rate
+      });
       return result;
     } catch (error) {
       logger.error('REFERRAL', 'Error granting bonus', { error: error.message });

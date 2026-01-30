@@ -163,6 +163,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         photoUrl: true,
         createdAt: true,
         referredById: true,
+        isAdmin: true,
       },
     });
 
@@ -282,6 +283,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       photoUrl: user.photoUrl,
+      isAdmin: user.isAdmin || false,
       level,
       vipLevel,
       vipRank,

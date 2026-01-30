@@ -209,6 +209,83 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
 });
 
 /**
+ * ⭐ НОВЫЙ ENDPOINT: Получить балансы с детализацией по сетям для вывода
+ * GET /api/v1/wallet/withdraw-options
+ * 
+ * Возвращает все балансы пользователя с информацией о токенах и сетях
+ */
+router.get('/api/v1/wallet/withdraw-options', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем все балансы пользователя с токенами
+    const balances = await prisma.balance.findMany({
+      where: { 
+        userId: userId,
+        type: 'MAIN',
+        amount: { gt: 0 }
+      },
+      include: {
+        token: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            network: true,
+            decimals: true
+          }
+        }
+      }
+    });
+    
+    // Группируем по символу валюты
+    const grouped = {};
+    
+    for (const bal of balances) {
+      if (!bal.token) continue;
+      // Пропускаем XTR (Stars)
+      if (bal.token.symbol === 'XTR') continue;
+      
+      const symbol = bal.token.symbol;
+      const amount = parseFloat(bal.amount.toString()) || 0;
+      
+      if (!grouped[symbol]) {
+        grouped[symbol] = {
+          symbol: symbol,
+          name: bal.token.name,
+          totalBalance: 0,
+          networks: []
+        };
+      }
+      
+      grouped[symbol].totalBalance += amount;
+      grouped[symbol].networks.push({
+        tokenId: bal.token.id,
+        network: bal.token.network,
+        balance: amount,
+        decimals: bal.token.decimals
+      });
+    }
+    
+    // Преобразуем в массив и сортируем по балансу
+    const result = Object.values(grouped)
+      .filter(t => t.totalBalance > 0)
+      .sort((a, b) => b.totalBalance - a.totalBalance);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения опций вывода',
+      error: error.message
+    });
+  }
+});
+
+/**
  * ⭐ НОВЫЙ ENDPOINT: Получить сети для пополнения конкретной валюты
  * GET /api/v1/wallet/deposit-networks/:symbol
  * 
@@ -726,6 +803,7 @@ router.get('/api/v1/wallet/history', authenticateToken, async (req, res) => {
           token: {
             select: {
               symbol: true,
+              network: true,
             },
           },
         },
@@ -746,21 +824,169 @@ router.get('/api/v1/wallet/history', authenticateToken, async (req, res) => {
           type: t.type,
           status: t.status,
           amount: parseFloat(t.amount.toString()),
-          token: t.token.symbol,
-          date: t.createdAt.toISOString(),
+          currency: t.token.symbol,
+          network: t.token.network,
+          txHash: t.txHash,
+          walletAddress: t.walletAddress,
+          createdAt: t.createdAt ? t.createdAt.toISOString() : null,
+          rejectReason: t.rejectReason,
+          approvedAt: t.approvedAt ? t.approvedAt.toISOString() : null,
         })),
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch history',
+    });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// ⭐ TELEGRAM STARS WITHDRAWAL ENDPOINTS
+// ═══════════════════════════════════════════════════════════════════
+
+const starsWithdrawalService = require('../services/starsWithdrawalService');
+
+/**
+ * ⭐ GET /api/v1/wallet/withdraw/stars/limits
+ * Получить лимиты вывода Stars
+ */
+router.get('/api/v1/wallet/withdraw/stars/limits', authenticateToken, async (req, res) => {
+  try {
+    const limits = starsWithdrawalService.getStarsWithdrawalLimits();
+    
+    res.json({
+      success: true,
+      data: limits
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Ошибка получения лимитов'
+    });
+  }
+});
+
+/**
+ * ⭐ POST /api/v1/wallet/withdraw/stars
+ * Создать заявку на вывод Stars
+ */
+router.post('/api/v1/wallet/withdraw/stars', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { starsAmount, method = 'convert' } = req.body;
+    
+    if (!starsAmount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Укажите количество Stars'
+      });
+    }
+    
+    const result = await starsWithdrawalService.createStarsWithdrawal(
+      userId,
+      starsAmount,
+      method
+    );
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Ошибка создания заявки'
+    });
+  }
+});
+
+/**
+ * ⭐ GET /api/v1/wallet/withdraw/methods
+ * Получить доступные методы вывода
+ */
+router.get('/api/v1/wallet/withdraw/methods', authenticateToken, async (req, res) => {
+  try {
+    const starsLimits = starsWithdrawalService.getStarsWithdrawalLimits();
+    
+    res.json({
+      success: true,
+      data: {
+        methods: [
+          {
+            id: 'crypto',
+            name: 'Криптовалюта',
+            description: 'Вывод на внешний кошелёк',
+            minAmount: 10,
+            fee: '2.5%',
+            processingTime: '1-24 часа',
+            currencies: ['USDT', 'BTC', 'ETH', 'TRX', 'TON']
+          },
+          {
+            id: 'stars',
+            name: 'Telegram Stars',
+            description: 'Конвертация Stars в USDT',
+            minAmount: starsLimits.minWithdrawal,
+            minAmountUSD: starsLimits.minWithdrawalUSD,
+            fee: `${starsLimits.feePercent}%`,
+            processingTime: '1-24 часа',
+            rate: starsLimits.rate
+          }
+        ]
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 📋 GET /api/v1/wallet/withdrawals
+ * Получить список заявок на вывод пользователя
+ */
+router.get('/api/v1/wallet/withdrawals', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    const withdrawals = await prisma.transaction.findMany({
+      where: {
+        userId,
+        type: 'WITHDRAW'
+      },
+      include: {
+        token: { select: { symbol: true, name: true, network: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+    
+    res.json({
+      success: true,
+      data: withdrawals.map(w => ({
+        id: w.id,
+        amount: parseFloat(w.amount.toString()),
+        currency: w.token.symbol,
+        network: w.token.network,
+        status: w.status,
+        txHash: w.txHash,
+        walletAddress: w.walletAddress,
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка получения списка выводов'
     });
   }
 });

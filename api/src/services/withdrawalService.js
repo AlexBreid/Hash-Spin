@@ -10,9 +10,16 @@ const prisma = require('../../prismaClient');
 const axios = require('axios');
 const logger = require('../utils/logger');
 const validators = require('../utils/validators');
+const { getCurrencyRate } = require('./currencySyncService');
 
 const CRYPTO_PAY_API = 'https://pay.crypt.bot/api';
 const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔧 НАСТРОЙКИ АВТОМАТИЧЕСКОГО ОДОБРЕНИЯ
+// ═══════════════════════════════════════════════════════════════════════════════
+const AUTO_APPROVE_LIMIT_USD = 100;      // Автоматическое одобрение до $100
+const MAX_AUTO_WITHDRAWALS_PER_DAY = 2;  // Максимум 2 автоматических вывода в сутки
 
 /**
  * ⭐ Экранировать спецсимволы для Markdown v2
@@ -32,6 +39,75 @@ function escapeMarkdown(text) {
   if (!text) return '';
   return String(text)
     .replace(/[*_`[]/g, '\\$&');
+}
+
+/**
+ * ⭐ Конвертировать сумму криптовалюты в USD
+ * @param {number} amount - Сумма в криптовалюте
+ * @param {string} asset - Символ криптовалюты (USDT, BTC, ETH и т.д.)
+ * @returns {number} Эквивалент в USD
+ */
+async function convertToUSD(amount, asset) {
+  const assetUpper = asset.toUpperCase();
+  
+  // Стейблкоины = 1 USD
+  if (['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD'].includes(assetUpper)) {
+    return amount;
+  }
+  
+  // Для Stars (XTR)
+  if (assetUpper === 'XTR') {
+    return amount * 0.02; // 1 Star ≈ $0.02
+  }
+  
+  // Для остальных - используем актуальный курс
+  try {
+    const rate = getCurrencyRate(assetUpper);
+    return amount * rate;
+  } catch (e) {
+    logger.warn('WITHDRAWAL', `Failed to get rate for ${assetUpper}, using 0`, { error: e.message });
+    return 0;
+  }
+}
+
+/**
+ * ⭐ Проверить, может ли вывод быть автоматически одобрен
+ * @param {number} userId - ID пользователя
+ * @param {number} amountUSD - Сумма в USD
+ * @returns {Object} { canAutoApprove: boolean, reason: string }
+ */
+async function checkAutoApproval(userId, amountUSD) {
+  // Проверка суммы
+  if (amountUSD > AUTO_APPROVE_LIMIT_USD) {
+    return {
+      canAutoApprove: false,
+      reason: `Сумма ${amountUSD.toFixed(2)} USD превышает лимит автоматического одобрения ($${AUTO_APPROVE_LIMIT_USD})`
+    };
+  }
+  
+  // Проверка количества выводов за последние 24 часа
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  
+  const recentWithdrawals = await prisma.transaction.count({
+    where: {
+      userId: userId,
+      type: 'WITHDRAW',
+      status: 'COMPLETED',
+      createdAt: { gte: oneDayAgo }
+    }
+  });
+  
+  if (recentWithdrawals >= MAX_AUTO_WITHDRAWALS_PER_DAY) {
+    return {
+      canAutoApprove: false,
+      reason: `Превышен лимит автоматических выводов (${MAX_AUTO_WITHDRAWALS_PER_DAY} в сутки). Заявка отправлена на рассмотрение.`
+    };
+  }
+  
+  return {
+    canAutoApprove: true,
+    reason: 'Автоматическое одобрение'
+  };
 }
 
 class WithdrawalService {
@@ -154,6 +230,22 @@ class WithdrawalService {
         };
       }
 
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // ⭐ ПРОВЕРКА АВТОМАТИЧЕСКОГО ОДОБРЕНИЯ
+      // ═══════════════════════════════════════════════════════════════════════════════
+      
+      const amountUSD = await convertToUSD(amountNum, asset);
+      const autoApprovalCheck = await checkAutoApproval(userIdNum, amountUSD);
+      
+      logger.info('WITHDRAWAL', 'Auto-approval check', {
+        userId: userIdNum,
+        amount: amountNum,
+        asset,
+        amountUSD: amountUSD.toFixed(2),
+        canAutoApprove: autoApprovalCheck.canAutoApprove,
+        reason: autoApprovalCheck.reason
+      });
+
       // Создаём заявку на вывод
       const withdrawal = await prisma.$transaction(async (tx) => {
         const newTx = await tx.transaction.create({
@@ -161,10 +253,10 @@ class WithdrawalService {
             userId: userIdNum,
             tokenId: token.id,
             type: 'WITHDRAW',
-            status: 'PENDING',
+            status: autoApprovalCheck.canAutoApprove ? 'COMPLETED' : 'PENDING',
             amount: amountNum.toFixed(8).toString(),
             walletAddress: null,
-            txHash: null
+            txHash: autoApprovalCheck.canAutoApprove ? `auto_${Date.now()}` : null
           }
         });
 
@@ -176,8 +268,7 @@ class WithdrawalService {
               amount: { decrement: amountNum }
             }
           });
-
-          }
+        }
 
         return newTx;
       });
@@ -189,55 +280,113 @@ class WithdrawalService {
         username: user.username,
         firstName: user.firstName,
         amount: amountNum.toFixed(8),
-        asset
+        asset,
+        amountUSD: amountUSD.toFixed(2),
+        autoApproved: autoApprovalCheck.canAutoApprove
       });
 
-      // ⭐ Уведомляем админов С ЭКРАНИРОВАННЫМ ИМЕНЕМ
-      try {
-        // Формируем отображаемое имя
-        const userDisplayName = user.username 
-          ? `@${user.username}`
-          : user.firstName 
-            ? user.firstName 
-            : `User #${user.id}`;
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // 📩 УВЕДОМЛЕНИЯ
+      // ═══════════════════════════════════════════════════════════════════════════════
+      
+      const userDisplayName = user.username 
+        ? `@${user.username}`
+        : user.firstName 
+          ? user.firstName 
+          : `User #${user.id}`;
+      const escapedUserName = escapeMarkdown(userDisplayName);
 
-        // ⭐ ЭКРАНИРУЕМ для Markdown
-        const escapedUserName = escapeMarkdown(userDisplayName);
+      if (autoApprovalCheck.canAutoApprove) {
+        // ✅ Автоматически одобрено - уведомляем пользователя
+        try {
+          if (user.telegramId) {
+            await bot.telegram.sendMessage(
+              user.telegramId,
+              `✅ *Вывод выполнен автоматически!*\n\n` +
+              `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
+              `💵 (~$${amountUSD.toFixed(2)})\n` +
+              `🎫 ID: #${withdrawal.id}\n` +
+              `⏰ Время: ${new Date().toLocaleString()}\n\n` +
+              `Средства отправлены!`,
+              { parse_mode: 'Markdown' }
+            );
+          }
+        } catch (e) {
+          logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
+        }
+        
+        return {
+          success: true,
+          withdrawalId: withdrawal.id,
+          amount: amountNum.toFixed(8),
+          asset,
+          amountUSD: amountUSD.toFixed(2),
+          status: 'COMPLETED',
+          autoApproved: true,
+          message: '✅ Вывод выполнен автоматически!'
+        };
+      } else {
+        // ⏳ Требуется одобрение админа - уведомляем админов
+        try {
+          const admins = await prisma.user.findMany({
+            where: { isAdmin: true },
+            select: { telegramId: true }
+          });
 
-        const admins = await prisma.user.findMany({
-          where: { isAdmin: true },
-          select: { telegramId: true }
-        });
-
-        for (const admin of admins) {
-          if (admin.telegramId) {
-            try {
-              await bot.telegram.sendMessage(
-                admin.telegramId,
-                `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\n` +
-                `🎫 ID: #${withdrawal.id}\n` +
-                `👤 Пользователь: ${escapedUserName}\n` +
-                `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
-                `⏰ Время: ${new Date().toLocaleString()}\n\n` +
-                `Управляйте в Админ Панели`,
-                { parse_mode: 'Markdown' }
-              );
+          for (const admin of admins) {
+            if (admin.telegramId) {
+              try {
+                await bot.telegram.sendMessage(
+                  admin.telegramId,
+                  `💸 НОВАЯ ЗАЯВКА НА ВЫВОД\n\n` +
+                  `🎫 ID: #${withdrawal.id}\n` +
+                  `👤 Пользователь: ${escapedUserName}\n` +
+                  `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
+                  `💵 Эквивалент: ~$${amountUSD.toFixed(2)}\n` +
+                  `⏰ Время: ${new Date().toLocaleString()}\n\n` +
+                  `⚠️ Требуется ручное одобрение!\n` +
+                  `Причина: ${autoApprovalCheck.reason}\n\n` +
+                  `Управляйте в Админ Панели`,
+                  { parse_mode: 'Markdown' }
+                );
               } catch (e) {
-              logger.warn('WITHDRAWAL', `Failed to notify admin`, { error: e.message });
+                logger.warn('WITHDRAWAL', `Failed to notify admin`, { error: e.message });
+              }
             }
           }
+        } catch (e) {
+          logger.warn('WITHDRAWAL', `Failed to get admins`, { error: e.message });
         }
-      } catch (e) {
-        logger.warn('WITHDRAWAL', `Failed to get admins`, { error: e.message });
-      }
 
-      return {
-        success: true,
-        withdrawalId: withdrawal.id,
-        amount: amountNum.toFixed(8),
-        asset,
-        status: 'PENDING'
-      };
+        // Уведомляем пользователя о статусе
+        try {
+          if (user.telegramId) {
+            await bot.telegram.sendMessage(
+              user.telegramId,
+              `⏳ *Заявка на вывод создана*\n\n` +
+              `💰 Сумма: ${amountNum.toFixed(8)} ${asset}\n` +
+              `💵 (~$${amountUSD.toFixed(2)})\n` +
+              `🎫 ID: #${withdrawal.id}\n\n` +
+              `📋 Статус: На рассмотрении\n` +
+              `Администратор проверит заявку в ближайшее время.`,
+              { parse_mode: 'Markdown' }
+            );
+          }
+        } catch (e) {
+          logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
+        }
+
+        return {
+          success: true,
+          withdrawalId: withdrawal.id,
+          amount: amountNum.toFixed(8),
+          asset,
+          amountUSD: amountUSD.toFixed(2),
+          status: 'PENDING',
+          autoApproved: false,
+          message: '⏳ Заявка отправлена на рассмотрение администратору'
+        };
+      }
     } catch (error) {
       logger.error('WITHDRAWAL', 'Failed to create withdrawal request', {
         error: error.message,

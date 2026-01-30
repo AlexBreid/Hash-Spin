@@ -13,12 +13,13 @@ const { convertCryptoToUSD, getCurrencyRate } = require('./currencySyncService')
 // Конфигурация CryptoCloud
 const CRYPTO_CLOUD_API_URL = 'https://api.cryptocloud.plus/v2';
 const CRYPTO_CLOUD_API_KEY = process.env.CRYPTO_CLOUD_API_KEY;
+const CRYPTO_CLOUD_WITHDRAW_API_KEY = process.env.CRYPTO_CLOUD_WITHDRAW_API_KEY;
 const CRYPTO_CLOUD_SHOP_ID = process.env.CRYPTO_CLOUD_SHOP_ID;
 const CRYPTO_CLOUD_SECRET = process.env.CRYPTO_CLOUD_SECRET;
 
 class CryptoCloudService {
   constructor() {
-    // Создаем axios instance с базовыми настройками
+    // Создаем axios instance для депозитов
     this.api = axios.create({
       baseURL: CRYPTO_CLOUD_API_URL,
       timeout: 30000,
@@ -28,6 +29,21 @@ class CryptoCloudService {
         'Accept': 'application/json'
       }
     });
+
+    // Создаем отдельный axios instance для выводов (с другим API ключом)
+    this.withdrawApi = axios.create({
+      baseURL: CRYPTO_CLOUD_API_URL,
+      timeout: 30000,
+      headers: {
+        'Authorization': `Token ${CRYPTO_CLOUD_WITHDRAW_API_KEY || CRYPTO_CLOUD_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    if (CRYPTO_CLOUD_WITHDRAW_API_KEY) {
+      logger.info('CRYPTOCLOUD', 'Withdraw API key configured separately');
+    }
   }
 
   /**
@@ -778,8 +794,8 @@ class CryptoCloudService {
         return transaction;
       });
 
-      // Если выбран бонус, начисляем его
-      if (withBonus && assetStr === 'USDT') {
+      // Если выбран бонус, начисляем его для любой криптовалюты
+      if (withBonus) {
         try {
           const user = await prisma.user.findUnique({
             where: { id: userIdNum },
@@ -787,7 +803,7 @@ class CryptoCloudService {
           });
 
           if (user?.referredById) {
-            logger.info('CRYPTOCLOUD', 'Granting bonus', { userId: userIdNum });
+            logger.info('CRYPTOCLOUD', 'Granting bonus', { userId: userIdNum, asset: assetStr });
             
             const bonusInfo = await referralService.grantDepositBonus(
               userIdNum,
@@ -799,7 +815,8 @@ class CryptoCloudService {
             if (bonusInfo) {
               logger.info('CRYPTOCLOUD', 'Bonus granted', { 
                 userId: userIdNum, 
-                bonusAmount: bonusInfo.bonusAmount 
+                bonusAmount: bonusInfo.bonusAmount,
+                asset: assetStr
               });
             }
           }
@@ -899,7 +916,9 @@ class CryptoCloudService {
   }
 
   /**
-   * Вывод средств
+   * Вывод средств через CryptoCloud API
+   * Документация: https://docs.cryptocloud.plus/ru/api-reference-v2/withdrawals
+   * 
    * @param {string} currencyCode - Код валюты (BTC, USDT_TRC20 и т.д.)
    * @param {string} toAddress - Адрес получателя
    * @param {number} amount - Сумма
@@ -907,23 +926,95 @@ class CryptoCloudService {
    */
   async withdraw(currencyCode, toAddress, amount) {
     try {
-      const response = await this.api.post('/invoice/api/out/create', {
-        currency_code: currencyCode,
-        to_address: toAddress,
-        amount: amount
+      logger.info('CRYPTOCLOUD', 'Creating withdrawal', {
+        currencyCode,
+        toAddress: toAddress.substring(0, 10) + '...',
+        amount
       });
 
-      if (response.data?.status === 'success') {
-        return response.data.data;
+      // Используем отдельный API для выводов
+      const response = await this.withdrawApi.post('/invoice/api/out/create', {
+        currency_code: currencyCode,
+        to_address: toAddress,
+        amount: parseFloat(amount).toString()
+      });
+
+      logger.info('CRYPTOCLOUD', 'Withdrawal response', {
+        status: response.data?.status,
+        result: response.data?.result
+      });
+
+      if (response.data?.status === 'success' || response.data?.result === 'success') {
+        return {
+          success: true,
+          data: response.data.data || response.data,
+          txId: response.data.data?.id || response.data.id
+        };
       }
 
-      throw new Error(response.data?.message || 'Withdrawal failed');
+      throw new Error(response.data?.message || response.data?.error || 'Withdrawal failed');
     } catch (error) {
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
       logger.error('CRYPTOCLOUD', 'Error withdrawing', { 
-        error: error.message,
+        error: errorMessage,
+        status: error.response?.status,
         currencyCode,
-        toAddress,
+        toAddress: toAddress.substring(0, 10) + '...',
         amount 
+      });
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Получить статус вывода
+   * @param {string} withdrawalId - ID вывода
+   * @returns {Promise<Object>} Статус вывода
+   */
+  async getWithdrawalStatus(withdrawalId) {
+    try {
+      const response = await this.withdrawApi.get(`/invoice/api/out/info/${withdrawalId}`);
+      return response.data;
+    } catch (error) {
+      logger.error('CRYPTOCLOUD', 'Error getting withdrawal status', {
+        error: error.message,
+        withdrawalId
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Получить историю выводов
+   * @param {number} limit - Лимит записей
+   * @param {number} offset - Смещение
+   * @returns {Promise<Object>} История выводов
+   */
+  async getWithdrawalHistory(limit = 100, offset = 0) {
+    try {
+      const response = await this.withdrawApi.get('/invoice/api/out/list', {
+        params: { limit, offset }
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('CRYPTOCLOUD', 'Error getting withdrawal history', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Получить баланс для выводов
+   * @returns {Promise<Object>} Балансы
+   */
+  async getWithdrawBalance() {
+    try {
+      const response = await this.withdrawApi.get('/invoice/api/out/balance');
+      return response.data;
+    } catch (error) {
+      logger.error('CRYPTOCLOUD', 'Error getting withdraw balance', {
+        error: error.message
       });
       throw error;
     }

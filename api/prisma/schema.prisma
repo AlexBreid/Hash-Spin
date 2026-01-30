@@ -117,7 +117,8 @@ model User {
   plinkoBets         PlinkoBet[]           @relation("PlinkoBets")
   balances           Balance[]
   wallets            UserWallet[]
-  transactions       Transaction[]
+  transactions       Transaction[] @relation("UserTransactions")
+  approvedTransactions Transaction[] @relation("ApprovedTransactions")
   bets               Bet[]
   leaderboardEntries LeaderboardEntry[]
   bonuses            UserBonus[]
@@ -193,7 +194,7 @@ model Transaction {
   id Int @id @default(autoincrement())
 
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
 
   tokenId Int
   token   CryptoToken @relation(fields: [tokenId], references: [id])
@@ -205,6 +206,14 @@ model Transaction {
 
   txHash        String?
   walletAddress String?
+  
+  // Кто одобрил/отклонил заявку (для выводов)
+  approvedById Int?
+  approvedBy   User? @relation("ApprovedTransactions", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  
+  // Причина отклонения (опционально)
+  rejectReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
