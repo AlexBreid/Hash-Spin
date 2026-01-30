@@ -94,31 +94,42 @@ function StarsDepositBlock() {
       });
       
       const data = await response.json();
+      console.log('🔵 Stars invoice response:', data);
       
       if (!data.success) {
-        throw new Error(data.message || 'Ошибка создания инвойса');
+        console.error('🔴 Invoice creation failed:', data);
+        throw new Error(data.message || data.error || 'Ошибка создания инвойса');
       }
       
+      const invoiceLink = data.data?.invoiceLink;
+      console.log('🔵 Invoice link:', invoiceLink);
+      console.log('🔵 isAvailable:', isAvailable);
+      
       // Если Telegram WebApp доступен - открываем инвойс
-      if (isAvailable && data.data.invoiceLink) {
+      if (isAvailable && invoiceLink) {
         hapticFeedback('success');
+        console.log('🟢 Opening invoice...');
         
-        const status = await openInvoice(data.data.invoiceLink);
+        const status = await openInvoice(invoiceLink);
+        console.log('🟢 Invoice status:', status);
         
         if (status === 'paid') {
           toast.success(`✅ Оплачено ${starsAmount} Stars!`);
           hapticFeedback('success');
-          // Обновляем страницу через 1 секунду
           setTimeout(() => window.location.reload(), 1000);
         } else if (status === 'cancelled') {
           toast.info('Оплата отменена');
+        } else if (status === 'pending') {
+          toast.info('Ожидание оплаты...');
         } else {
-          toast.error('Ошибка оплаты');
+          toast.error(`Статус оплаты: ${status}`);
         }
-      } else {
-        // Fallback: показываем инструкцию
-        toast.info('Откройте бота для оплаты Stars');
-        window.open('https://t.me/SafariUpBot', '_blank');
+      } else if (!isAvailable) {
+        toast.error('Оплата Stars доступна только в Telegram');
+        console.error('🔴 Telegram WebApp not available');
+      } else if (!invoiceLink) {
+        toast.error('Не получена ссылка на оплату');
+        console.error('🔴 Invoice link is empty');
       }
       
     } catch (error) {
