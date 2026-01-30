@@ -9,10 +9,7 @@ class TatumService {
 
     this.gatewayUrl = process.env.TATUM_GATEWAY_URL || this.getGatewayUrl();
 
-    console.log(`🔗 Используется TRON сеть: ${this.tronNetwork}`);
-    console.log(`📍 Gateway URL: ${this.gatewayUrl}`);
-    console.log(`🔑 API Key: ${this.apiKey ? this.apiKey.substring(0, 20) + '...' : 'НЕ УСТАНОВЛЕН'}`);
-  }
+    }
 
   getGatewayUrl() {
     const networkUrls = {
@@ -34,8 +31,6 @@ class TatumService {
         id: Math.floor(Math.random() * 1000000),
       };
 
-      console.log(`📡 JSON-RPC запрос: ${method} к ${this.gatewayUrl}`);
-
       const response = await axios.post(this.gatewayUrl, payload, {
         headers: {
           'accept': 'application/json',
@@ -46,21 +41,16 @@ class TatumService {
       });
 
       if (response.data.error) {
-        console.error(`❌ JSON-RPC Error: ${JSON.stringify(response.data.error)}`);
         throw new Error(`JSON-RPC Error: ${response.data.error.message}`);
       }
       
       return response.data.result !== undefined ? response.data.result : response.data;
     } catch (error) {
       if (error.response) {
-        console.error(`❌ JSON-RPC ошибка: Status ${error.response.status}`);
-        console.error('Response:', error.response.data);
         throw new Error(`Request failed with status code ${error.response.status}: ${JSON.stringify(error.response.data)}`);
       } else if (error.code === 'ECONNABORTED') {
-        console.error('❌ Timeout: Connection to Tatum gateway timed out');
         throw new Error('Connection timeout. Tatum service is not responding.');
       } else {
-        console.error('❌ JSON-RPC ошибка:', error.message);
         throw error;
       }
     }
@@ -68,8 +58,6 @@ class TatumService {
 
   async createDepositAddress(userId) {
     try {
-      console.log(`📍 Создаю TRON адрес пополнения для пользователя ${userId}...`);
-
       // ✅ Генерируем случайный приватный ключ (32 байта)
       const privateKey = crypto.randomBytes(32).toString('hex');
       
@@ -86,8 +74,6 @@ class TatumService {
       // Берем первые 34 символа и добавляем префикс TRON адреса
       const base58Address = 'T' + addressHash.substring(0, 33);
 
-      console.log(`✅ TRON адрес создан: ${base58Address}`);
-
       return {
         accountId: base58Address,
         address: base58Address,
@@ -97,21 +83,16 @@ class TatumService {
         contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', // USDT контракт
       };
     } catch (error) {
-      console.error('❌ Ошибка создания TRON адреса:', error.message);
       throw new Error(`Не удалось создать TRON адрес: ${error.message}`);
     }
   }
 
   async getAddressBalance(address) {
     try {
-      console.log(`🔍 Проверяю баланс адреса: ${address}`);
-
       // Try to get balance from Tatum
       const balance = await this.jsonRpcCall('eth_getBalance', [address, 'latest']);
 
       const balanceInTron = parseInt(balance, 16) / 1e18;
-
-      console.log(`✅ Баланс: ${balanceInTron} TRX`);
 
       return {
         balance: balanceInTron.toString(),
@@ -119,7 +100,6 @@ class TatumService {
         address: address,
       };
     } catch (error) {
-      console.error('❌ Ошибка получения баланса TRON:', error.message);
       // Don't throw - return zero balance instead
       return {
         balance: '0',
@@ -131,8 +111,6 @@ class TatumService {
 
   async getTransactionStatus(txHash) {
     try {
-      console.log(`📊 Проверяю статус транзакции TRON: ${txHash}`);
-
       const receipt = await this.jsonRpcCall('eth_getTransactionReceipt', [txHash]);
 
       if (!receipt) {
@@ -145,8 +123,6 @@ class TatumService {
 
       const status = receipt.status === '0x1' ? 'SUCCESS' : 'FAILED';
 
-      console.log(`✅ Статус транзакции: ${status}`);
-
       return {
         hash: txHash,
         status: status,
@@ -155,7 +131,6 @@ class TatumService {
         to: receipt.to,
       };
     } catch (error) {
-      console.error('❌ Ошибка получения статуса TRON:', error.message);
       // Return pending if we can't check
       return {
         hash: txHash,
@@ -167,13 +142,10 @@ class TatumService {
 
   async getBlockNumber() {
     try {
-      console.log('🔗 Проверяю текущий блок...');
       const blockNumber = await this.jsonRpcCall('eth_blockNumber', []);
       const blockNum = parseInt(blockNumber, 16);
-      console.log(`✅ Текущий блок: ${blockNum}`);
       return blockNum;
     } catch (error) {
-      console.error('❌ Ошибка получения номера блока:', error.message);
       throw error;
     }
   }
@@ -206,15 +178,13 @@ class TatumService {
 
   async testConnection() {
     try {
-      console.log('🧪 Тестирую подключение к TRON...');
       const blockNumber = await this.getBlockNumber();
-      console.log(`✅ Подключение успешно! Текущий блок: ${blockNumber}`);
       return true;
     } catch (error) {
-      console.error('❌ Ошибка подключения:', error.message);
       return false;
     }
   }
 }
 
 module.exports = new TatumService();
+

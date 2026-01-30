@@ -48,7 +48,6 @@ router.get('/api/v1/wallet/wallet/:tokenId', authenticateToken, async (req, res)
       }
     });
   } catch (error) {
-    console.error('❌ Ошибка получения кошелька:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения кошелька',
@@ -84,7 +83,6 @@ router.get('/api/v1/wallet/wallets', authenticateToken, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Ошибка получения кошельков:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения кошельков',
@@ -121,7 +119,6 @@ router.get('/api/v1/wallet/bet-limits', async (req, res) => {
       data: limits
     });
   } catch (error) {
-    console.error('❌ Ошибка получения лимитов ставок:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения лимитов ставок',
@@ -157,8 +154,6 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
       });
     }
     
-    console.log('📋 Запрос базовых токенов');
-
     // Получаем базовые токены для балансов
     const baseTokens = await currencySyncService.getBaseTokens();
 
@@ -195,8 +190,6 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
       });
     }
 
-    console.log(`✅ Найдено ${baseTokens.length} базовых токенов`);
-
     // Обновляем кэш
     tokensCache.data = baseTokens;
     tokensCache.timestamp = Date.now();
@@ -207,7 +200,6 @@ router.get('/api/v1/wallet/tokens', async (req, res) => {
       cached: false
     });
   } catch (error) {
-    console.error('❌ Ошибка получения токенов:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения списка токенов',
@@ -243,7 +235,6 @@ router.get('/api/v1/wallet/deposit-networks/:symbol', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Ошибка получения сетей:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения списка сетей',
@@ -261,8 +252,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
     const userId = req.user.userId;
     const { amount, currency } = req.body;
 
-    console.log('📍 Получены данные:', { amount, currency, userId });
-
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
@@ -279,11 +268,7 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
       });
     }
 
-    console.log(`📍 Создание TRON адреса пополнения для пользователя ${userId}...`);
-
     const addressData = await tatumService.createDepositAddress(userId);
-    console.log(`✅ TRON адрес создан: ${addressData.address}`);
-
     const token = await prisma.cryptoToken.findFirst({
       where: {
         symbol: 'USDT',
@@ -292,7 +277,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
     });
 
     if (!token) {
-      console.error('❌ USDT TRC20 токен не найден в БД');
       return res.status(404).json({
         success: false,
         message: 'USDT токен TRC20 не найден в системе',
@@ -310,8 +294,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
         txHash: null,
       },
     });
-
-    console.log(`✅ Платеж создан: ID ${transaction.id}`);
 
     const networkInfo = tatumService.getNetworkInfo();
 
@@ -338,7 +320,6 @@ router.post('/api/v1/wallet/deposit/create-address', authenticateToken, async (r
       },
     });
   } catch (error) {
-    console.error('❌ Ошибка создания адреса:', error.message);
     res.status(500).json({
       success: false,
       message: error.message || 'Не удалось создать адрес пополнения',
@@ -406,7 +387,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
         },
       });
     } catch (tatumError) {
-      console.error('❌ Ошибка Tatum:', tatumError.message);
       res.json({
         success: true,
         data: {
@@ -417,7 +397,6 @@ router.get('/api/v1/wallet/deposit/status/:transactionId', authenticateToken, as
       });
     }
   } catch (error) {
-    console.error('❌ Ошибка проверки статуса:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка проверки статуса платежа',
@@ -433,8 +412,6 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
   try {
     const { address, value, txId, type } = req.body;
 
-    console.log(`🔔 Вебхук получен: ${value} на ${address}`);
-
     // 1️⃣ Находим транзакцию по адресу
     const transaction = await prisma.transaction.findFirst({
       where: {
@@ -445,7 +422,6 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
     });
 
     if (!transaction) {
-      console.log('⚠️ Транзакция не найдена');
       return res.status(404).json({ success: false });
     }
 
@@ -454,12 +430,10 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
       const txStatus = await tatumService.getTransactionStatus(txId);
 
       if (txStatus.status !== 'SUCCESS') {
-        console.log('⏳ Платеж еще в обработке');
         return res.json({ success: true, message: 'Pending' });
       }
     } catch (tatumError) {
-      console.error('⚠️ Не удалось проверить статус в Tatum:', tatumError.message);
-    }
+      }
 
     // 3️⃣ Обновляем статус платежа
     await prisma.transaction.update({
@@ -469,8 +443,6 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
         txHash: txId,
       },
     });
-
-    console.log(`✅ Платеж подтвержден: ${txId}`);
 
     // 4️⃣ Пополняем баланс пользователя
     let balance = await prisma.balance.findUnique({
@@ -507,8 +479,6 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
       where: { id: transaction.tokenId },
     });
 
-    console.log(`💰 Баланс пополнен: ${value} ${token?.symbol} для пользователя ${transaction.userId}`);
-
     // 5️⃣ 🎁 НОВОЕ: Начисляем бонус рефереру если он есть
     try {
       const user = await prisma.user.findUnique({
@@ -524,8 +494,6 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
       if (user?.referrer) {
         const bonusPercentage = 10;
         const bonusAmount = (parseFloat(value) * bonusPercentage) / 100;
-
-        console.log(`🎁 Начисляю бонус рефереру: ${bonusAmount} ${token?.symbol}`);
 
         // Получаем или создаем баланс реферера
         let referrerBalance = await prisma.balance.findUnique({
@@ -571,20 +539,16 @@ router.post('/api/v1/wallet/webhook/deposit', async (req, res) => {
           },
         });
 
-        console.log(`✅ Бонус ${bonusAmount} ${token?.symbol} начислен рефереру ${user.referrer.username}`);
-      } else {
-        console.log(`ℹ️ Пользователь ${transaction.userId} не имеет реферера`);
-      }
+        } else {
+        }
     } catch (referralError) {
-      console.error('⚠️ Ошибка при начислении реферального бонуса:', referralError.message);
-    }
+      }
 
     res.json({
       success: true,
       message: 'Balance topped up',
     });
   } catch (error) {
-    console.error('❌ Ошибка вебхука:', error.message);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -660,8 +624,6 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
       },
     });
 
-    console.log(`✅ User ${userId} deposited ${amount} ${token.symbol}`);
-
     res.json({
       success: true,
       data: {
@@ -670,7 +632,6 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Error processing deposit:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to process deposit',
@@ -731,8 +692,6 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       },
     });
 
-    console.log(`✅ User ${userId} requested withdrawal of ${amount}`);
-
     res.json({
       success: true,
       data: {
@@ -742,7 +701,6 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Error processing withdrawal:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to process withdrawal',
@@ -800,7 +758,6 @@ router.get('/api/v1/wallet/history', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Error fetching history:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch history',
@@ -809,3 +766,4 @@ router.get('/api/v1/wallet/history', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+

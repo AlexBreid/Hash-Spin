@@ -46,11 +46,6 @@ async function getToken(symbol) {
  * Симулирует реальных игроков - позиции постоянно меняются
  */
 async function dailyLeaderboardUpdate() {
-  console.log('\n' + '='.repeat(60));
-  console.log('🎮 [LEADERBOARD CRON] Daily shuffle started');
-  console.log('📅 Time:', new Date().toISOString());
-  console.log('='.repeat(60));
-
   try {
     // Получаем фейковых пользователей
     const fakeUsers = await prisma.user.findMany({
@@ -60,7 +55,6 @@ async function dailyLeaderboardUpdate() {
     });
 
     if (fakeUsers.length === 0) {
-      console.log('⚠️ No fake users found. Run generateFakeLeaderboard.js first.');
       return { success: false, message: 'No fake users' };
     }
 
@@ -109,7 +103,6 @@ async function dailyLeaderboardUpdate() {
         }
       });
       
-      console.log(`🏆 New #${i + 1}: ${user.username} - ${amountInCrypto.toFixed(4)} ${currency}`);
       created++;
     }
 
@@ -146,13 +139,9 @@ async function dailyLeaderboardUpdate() {
       created++;
     }
 
-    console.log(`✅ Created ${created} new entries (positions shuffled)`);
-    console.log('='.repeat(60) + '\n');
-
     return { success: true, created };
 
   } catch (error) {
-    console.error('❌ [LEADERBOARD CRON] Error:', error.message);
     logger.error('LEADERBOARD_CRON', 'Daily update failed', { error: error.message });
     return { success: false, error: error.message };
   }
@@ -163,12 +152,8 @@ async function dailyLeaderboardUpdate() {
  */
 function startLeaderboardCron(intervalMs = 24 * 60 * 60 * 1000) {
   if (cronInterval) {
-    console.log('⚠️ [LEADERBOARD CRON] Already running');
     return;
   }
-
-  console.log('🚀 [LEADERBOARD CRON] Starting (interval: 24 hours)');
-  console.log('   First run: in 1 hour\n');
 
   // Первый запуск через час
   setTimeout(() => {
@@ -181,8 +166,7 @@ function startLeaderboardCron(intervalMs = 24 * 60 * 60 * 1000) {
   }, intervalMs);
 
   logger.info('LEADERBOARD_CRON', 'Leaderboard cron started');
-  console.log('✅ [LEADERBOARD CRON] Initialized\n');
-}
+  }
 
 /**
  * Остановить cron
@@ -191,8 +175,7 @@ function stopLeaderboardCron() {
   if (cronInterval) {
     clearInterval(cronInterval);
     cronInterval = null;
-    console.log('🛑 [LEADERBOARD CRON] Stopped');
-  }
+    }
 }
 
 module.exports = {
@@ -200,4 +183,6 @@ module.exports = {
   startLeaderboardCron,
   stopLeaderboardCron
 };
+
+
 

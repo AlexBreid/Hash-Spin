@@ -223,8 +223,7 @@ class CryptoCloudService {
         });
         
         // Выводим детали ошибки
-        console.error('❌ CryptoCloud API Error:', JSON.stringify(error.response.data, null, 2));
-      } else {
+        } else {
         logger.error('CRYPTOCLOUD', 'Error creating invoice', { 
           error: error.message,
           userId,
@@ -305,8 +304,7 @@ class CryptoCloudService {
           userId,
           cryptoCurrency
         });
-        console.error('❌ CryptoCloud Static Wallet Error:', JSON.stringify(error.response.data, null, 2));
-      }
+        }
       throw error;
     }
   }
@@ -933,3 +931,4 @@ class CryptoCloudService {
 }
 
 module.exports = new CryptoCloudService();
+

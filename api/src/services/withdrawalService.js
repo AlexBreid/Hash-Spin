@@ -42,16 +42,11 @@ class WithdrawalService {
    * ⭐ ИСПРАВЛЕНИЕ: Экранируем username для Markdown
    */
   async createWithdrawalRequest(bot, userId, amount, asset = 'USDT') {
-    console.log(`\n💸 [WITHDRAWAL] Creating withdrawal request`);
-    console.log(`   userId: ${userId}`);
-    console.log(`   amount: ${amount} ${asset}`);
-
     try {
       const userIdNum = parseInt(userId);
       const amountNum = parseFloat(amount);
 
       if (!validators.validateUserId(userIdNum)) {
-        console.error(`❌ Invalid userId: ${userId}`);
         return { 
           success: false, 
           userMessage: '❌ Некорректный пользователь', 
@@ -60,7 +55,6 @@ class WithdrawalService {
       }
 
       if (!validators.validateWithdrawAmount(amountNum)) {
-        console.error(`❌ Invalid amount: ${amount}`);
         return { 
           success: false, 
           userMessage: '❌ Некорректная сумма', 
@@ -69,7 +63,6 @@ class WithdrawalService {
       }
 
       if (!validators.validateAsset(asset)) {
-        console.error(`❌ Invalid asset: ${asset}`);
         return { 
           success: false, 
           userMessage: '❌ Некорректный актив', 
@@ -78,8 +71,6 @@ class WithdrawalService {
       }
 
       // ⭐ Загружаем пользователя с именем
-      console.log(`   🔍 Loading user data...`);
-      
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
         select: { 
@@ -91,7 +82,6 @@ class WithdrawalService {
       });
 
       if (!user) {
-        console.error(`❌ User not found: ${userIdNum}`);
         return { 
           success: false, 
           userMessage: '❌ Пользователь не найден', 
@@ -99,14 +89,11 @@ class WithdrawalService {
         };
       }
 
-      console.log(`   ✅ User found: ${user.username || user.firstName || `#${user.id}`}`);
-
       const token = await prisma.cryptoToken.findUnique({
         where: { symbol: asset }
       });
 
       if (!token) {
-        console.error(`❌ Token not found: ${asset}`);
         return { 
           success: false, 
           userMessage: `❌ Токен ${asset} не найден`, 
@@ -115,8 +102,6 @@ class WithdrawalService {
       }
 
       // ✅ Проверяем есть ли активный бонус
-      console.log(`\n🎁 [WITHDRAWAL] Checking for active bonus...`);
-      
       const activeBonus = await prisma.userBonus.findFirst({
         where: {
           userId: userIdNum,
@@ -131,10 +116,6 @@ class WithdrawalService {
         const wagered = parseFloat(activeBonus.wageredAmount.toString());
         const required = parseFloat(activeBonus.requiredWager.toString());
         const remaining = Math.max(required - wagered, 0);
-
-        console.error(`❌ [WITHDRAWAL] User has active bonus!`);
-        console.error(`   Wagered: ${wagered.toFixed(8)} / ${required.toFixed(8)}`);
-        console.error(`   Remaining: ${remaining.toFixed(8)}`);
 
         return {
           success: false,
@@ -152,8 +133,6 @@ class WithdrawalService {
         };
       }
 
-      console.log(`✅ [WITHDRAWAL] No active bonus found, proceeding...`);
-
       // Получаем MAIN баланс (не BONUS!)
       const balance = await prisma.balance.findUnique({
         where: {
@@ -167,18 +146,13 @@ class WithdrawalService {
 
       const currentBalance = balance ? parseFloat(balance.amount.toString()) : 0;
 
-      console.log(`   💰 MAIN Balance: ${currentBalance.toFixed(8)}`);
-
       if (currentBalance < amountNum) {
-        console.error(`❌ Insufficient MAIN balance: ${currentBalance} < ${amountNum}`);
         return {
           success: false,
           userMessage: `❌ Недостаточно средств на счёте. Доступно: ${currentBalance.toFixed(8)} ${asset}`,
           error: 'Insufficient balance'
         };
       }
-
-      console.log(`   ✅ Validation passed`);
 
       // Создаём заявку на вывод
       const withdrawal = await prisma.$transaction(async (tx) => {
@@ -194,8 +168,6 @@ class WithdrawalService {
           }
         });
 
-        console.log(`   ✅ Transaction created: ID=${newTx.id}`);
-
         // ✅ Списываем с MAIN баланса!
         if (balance) {
           await tx.balance.update({
@@ -205,13 +177,10 @@ class WithdrawalService {
             }
           });
 
-          console.log(`   ✅ MAIN balance reduced by ${amountNum.toFixed(8)}`);
-        }
+          }
 
         return newTx;
       });
-
-      console.log(`✅ Withdrawal request created: #${withdrawal.id}\n`);
 
       logger.info('WITHDRAWAL', 'Withdrawal request created', {
         withdrawalId: withdrawal.id,
@@ -240,9 +209,6 @@ class WithdrawalService {
           select: { telegramId: true }
         });
 
-        console.log(`\n📤 Notifying ${admins.length} admin(s)...`);
-        console.log(`   User: ${userDisplayName} (escaped: ${escapedUserName})`);
-
         for (const admin of admins) {
           if (admin.telegramId) {
             try {
@@ -256,8 +222,7 @@ class WithdrawalService {
                 `Управляйте в Админ Панели`,
                 { parse_mode: 'Markdown' }
               );
-              console.log(`   ✅ Notified admin ${admin.telegramId}`);
-            } catch (e) {
+              } catch (e) {
               logger.warn('WITHDRAWAL', `Failed to notify admin`, { error: e.message });
             }
           }
@@ -274,7 +239,6 @@ class WithdrawalService {
         status: 'PENDING'
       };
     } catch (error) {
-      console.error(`❌ Critical error in createWithdrawalRequest:`, error.message);
       logger.error('WITHDRAWAL', 'Failed to create withdrawal request', {
         error: error.message,
         stack: error.stack
@@ -292,14 +256,10 @@ class WithdrawalService {
    * ✅ Обработать заявку на вывод
    */
   async processWithdrawal(bot, withdrawalId, approve = true) {
-    console.log(`\n💸 [WITHDRAWAL] Processing withdrawal #${withdrawalId}`);
-    console.log(`   Action: ${approve ? 'APPROVE' : 'REJECT'}`);
-
     try {
       const withdrawalIdNum = parseInt(withdrawalId);
 
       if (isNaN(withdrawalIdNum) || withdrawalIdNum <= 0) {
-        console.error(`❌ Invalid withdrawalId: ${withdrawalId}`);
         throw new Error('Invalid withdrawal ID');
       }
 
@@ -312,17 +272,14 @@ class WithdrawalService {
       });
 
       if (!withdrawal) {
-        console.error(`❌ Withdrawal not found: ${withdrawalIdNum}`);
         throw new Error('Withdrawal not found');
       }
 
       if (withdrawal.type !== 'WITHDRAW') {
-        console.error(`❌ Transaction is not a withdrawal: ${withdrawal.type}`);
         throw new Error('Transaction is not a withdrawal');
       }
 
       if (withdrawal.status !== 'PENDING') {
-        console.error(`❌ Withdrawal status is not PENDING: ${withdrawal.status}`);
         throw new Error(`Withdrawal status is ${withdrawal.status}, cannot process`);
       }
 
@@ -332,19 +289,12 @@ class WithdrawalService {
       const tokenId = withdrawal.tokenId;
       const asset = withdrawal.token.symbol;
 
-      console.log(`   ✅ Withdrawal found: #${withdrawalIdNum}`);
-      console.log(`   Amount: ${amount.toFixed(8)} ${asset}`);
-      console.log(`   User Telegram ID: ${telegramId}`);
-
       if (approve) {
-        console.log(`\n✅ APPROVING withdrawal...`);
         return await this._approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       } else {
-        console.log(`\n❌ REJECTING withdrawal...`);
         return await this._rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset);
       }
     } catch (error) {
-      console.error(`❌ Critical error in processWithdrawal:`, error.message);
       logger.error('WITHDRAWAL', 'Failed to process withdrawal', {
         withdrawalId,
         error: error.message,
@@ -360,14 +310,8 @@ class WithdrawalService {
    */
   async _approveWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
-      console.log(`📤 Sending to Crypto Pay API transfer endpoint...`);
-      console.log(`   📍 Target: Telegram User #${telegramId}`);
-      console.log(`   💰 Amount: ${amount.toFixed(8)} ${asset}`);
-
       const randomSuffix = Math.random().toString(36).substring(2, 8);
       const spendId = `w${withdrawal.id}t${Date.now()}${randomSuffix}`;
-
-      console.log(`   📝 spend_id: ${spendId}`);
 
       const payload = {
         user_id: telegramId,
@@ -375,10 +319,6 @@ class WithdrawalService {
         amount: amount.toFixed(8),
         spend_id: spendId
       };
-
-      console.log(`   📤 Payload:`, JSON.stringify(payload, null, 2));
-
-      console.log(`\n📡 Отправляем запрос на ${CRYPTO_PAY_API}/transfer`);
 
       let transferResponse;
       try {
@@ -394,16 +334,7 @@ class WithdrawalService {
           }
         );
 
-        console.log(`\n✅ API Response Status: ${transferResponse.status}`);
-        console.log(`📋 Full Response:`, JSON.stringify(transferResponse.data, null, 2));
-
-      } catch (axiosError) {
-        console.error(`\n❌ AXIOS ERROR:`);
-        console.error(`   Status: ${axiosError.response?.status}`);
-        console.error(`   Status Text: ${axiosError.response?.statusText}`);
-        console.error(`   Response Data:`, JSON.stringify(axiosError.response?.data, null, 2));
-        console.error(`   Error Message: ${axiosError.message}`);
-
+        } catch (axiosError) {
         logger.error('WITHDRAWAL', 'Crypto Pay API Error', {
           status: axiosError.response?.status,
           statusText: axiosError.response?.statusText,
@@ -416,22 +347,15 @@ class WithdrawalService {
 
       if (!transferResponse.data.ok) {
         const errorMsg = transferResponse.data.error?.message || 'Unknown error';
-        console.error(`❌ API Error: ${errorMsg}`);
         throw new Error(`Transfer failed: ${errorMsg}`);
       }
 
       if (!transferResponse.data.result) {
-        console.error(`❌ No result in API response`);
         throw new Error('No transfer result returned');
       }
 
       const transferResult = transferResponse.data.result;
       const transferId = transferResult.transfer_id || transferResult.id;
-
-      console.log(`\n✅ Transfer successful!`);
-      console.log(`   🔗 Transfer ID: ${transferId}`);
-
-      console.log(`\n💾 Updating database...`);
 
       await prisma.$transaction(async (tx) => {
         await tx.transaction.update({
@@ -443,12 +367,7 @@ class WithdrawalService {
           }
         });
 
-        console.log(`   ✅ Transaction updated`);
-        console.log(`      Status: COMPLETED`);
-        console.log(`      TxHash: ${transferId}`);
-      });
-
-      console.log(`\n✅ Withdrawal approved: #${withdrawal.id}\n`);
+        });
 
       logger.info('WITHDRAWAL', 'Withdrawal approved and transferred', {
         withdrawalId: withdrawal.id,
@@ -474,8 +393,7 @@ class WithdrawalService {
             `Средства отправлены на ваш кошелёк\\.`,
             { parse_mode: 'MarkdownV2' }
           );
-          console.log(`   ✅ User notified`);
-        }
+          }
       } catch (e) {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
@@ -489,7 +407,6 @@ class WithdrawalService {
       };
 
     } catch (error) {
-      console.error(`\n❌ Error in _approveWithdrawal: ${error.message}`);
       logger.error('WITHDRAWAL', 'Failed to approve withdrawal', {
         withdrawalId: withdrawal.id,
         telegramId: telegramId,
@@ -505,8 +422,6 @@ class WithdrawalService {
    */
   async _rejectWithdrawal(bot, withdrawal, amount, userId, telegramId, tokenId, asset) {
     try {
-      console.log(`🚫 Rejecting withdrawal...`);
-
       await prisma.$transaction(async (tx) => {
         // Обновляем статус заявки
         await tx.transaction.update({
@@ -516,8 +431,6 @@ class WithdrawalService {
             updatedAt: new Date()
           }
         });
-
-        console.log(`   ✅ Transaction updated: status=FAILED`);
 
         // Возвращаем деньги на MAIN баланс
         await tx.balance.upsert({
@@ -539,10 +452,7 @@ class WithdrawalService {
           }
         });
 
-        console.log(`   ✅ Funds returned: +${amount.toFixed(8)} ${asset}`);
-      });
-
-      console.log(`✅ Withdrawal rejected: #${withdrawal.id}\n`);
+        });
 
       logger.info('WITHDRAWAL', 'Withdrawal rejected', {
         withdrawalId: withdrawal.id,
@@ -566,8 +476,7 @@ class WithdrawalService {
             `Средства вернулись на ваш счёт\\.`,
             { parse_mode: 'Markdown' }
           );
-          console.log(`   ✅ User notified`);
-        }
+          }
       } catch (e) {
         logger.warn('WITHDRAWAL', `Failed to notify user`, { error: e.message });
       }
@@ -581,7 +490,6 @@ class WithdrawalService {
       };
 
     } catch (error) {
-      console.error(`❌ Error in _rejectWithdrawal:`, error.message);
       logger.error('WITHDRAWAL', 'Failed to reject withdrawal', {
         withdrawalId: withdrawal.id,
         error: error.message
@@ -667,3 +575,4 @@ class WithdrawalService {
 }
 
 module.exports = new WithdrawalService();
+

@@ -22,10 +22,7 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
   try {
     const userId = req.user.userId;
 
-    console.log(`\n📊 [GET-BALANCES] userId=${userId}`);
-
     if (!userId) {
-      console.error('❌ userId не найден в req.user');
       return res.status(401).json({
         success: false,
         error: 'Неверная аутентификация',
@@ -38,8 +35,6 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
       include: { token: true },
       orderBy: { createdAt: 'asc' },
     });
-
-    console.log(`   ✅ Найдено ${balances.length} балансов`);
 
     // ✅ Возвращаем в формате с type
     const formatted = balances.map(bal => ({
@@ -86,7 +81,6 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
       bonus: bonusInfo
     });
   } catch (error) {
-    console.error('❌ Ошибка получения балансов:', error);
     logger.error('BALANCE', 'Failed to get balances', { error: error.message });
     
     res.status(500).json({
@@ -106,10 +100,7 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`\n💳 [WALLET-BALANCE] userId=${userId}`);
-
     if (!userId) {
-      console.error('❌ userId не найден в req.user');
       return res.status(401).json({
         success: false,
         error: 'Неверная аутентификация',
@@ -131,8 +122,6 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
         }
       },
     });
-
-    console.log(`   ✅ Найдено ${balances.length} балансов`);
 
     // ✅ ГРУППИРУЕМ балансы по СИМВОЛУ валюты
     // Все USDT (TRC-20, ERC-20, BEP-20 etc.) → один USDT баланс
@@ -232,8 +221,6 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
       if (b.type === 'MAIN') totalMain += b.amount;
       if (b.type === 'BONUS') totalBonus += b.amount;
     }
-    console.log(`   💰 Объединённые балансы: ${balancesBySymbol.size} валют, MAIN: ${totalMain.toFixed(2)}, BONUS: ${totalBonus.toFixed(2)}`);
-
     res.json({
       success: true,
       data: formatted,
@@ -241,8 +228,6 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
       canWithdraw: !activeBonus  // ✅ Нельзя выводить если есть активный бонус
     });
   } catch (error) {
-    console.error('❌ Ошибка получения баланса:', error);
-    console.error('❌ Stack trace:', error.stack);
     logger.error('BALANCE', 'Failed to get wallet balance', { 
       error: error.message,
       stack: error.stack,
@@ -266,10 +251,7 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
     const userId = req.user.userId;
     const tokenId = parseInt(req.params.tokenId);
 
-    console.log(`\n💵 [BALANCE-QUERY] tokenId=${tokenId}, userId=${userId}`);
-
     if (!userId) {
-      console.error('❌ userId не найден в req.user');
       return res.status(401).json({
         success: false,
         error: 'Неверная аутентификация',
@@ -301,8 +283,6 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
     const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
     const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
     const totalAmount = mainAmount + bonusAmount;
-
-    console.log(`   💰 Main: ${mainAmount.toFixed(8)}, Bonus: ${bonusAmount.toFixed(8)}, Total: ${totalAmount.toFixed(8)}`);
 
     // Получаем информацию о бонусе
     const activeBonus = await prisma.userBonus.findFirst({
@@ -340,7 +320,6 @@ router.get('/api/v1/balance/balance/:tokenId', authenticateToken, async (req, re
       bonus: bonusInfo
     });
   } catch (error) {
-    console.error('❌ Ошибка получения баланса:', error);
     logger.error('BALANCE', 'Failed to get balance', { error: error.message });
     
     res.status(500).json({
@@ -359,10 +338,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     const userId = req.user.userId;
     const { tokenId, amount, type = 'MAIN', operation = 'add' } = req.body;
 
-    console.log(`\n💰 [UPDATE-BALANCE] ${operation} ${amount} на ${type}`);
-
     if (!userId) {
-      console.error('❌ userId не найден в req.user');
       return res.status(401).json({
         success: false,
         error: 'Неверная аутентификация',
@@ -403,7 +379,6 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
     });
 
     if (!balance) {
-      console.log(`   📝 ${type} баланс не найден, создаю новый...`);
       balance = await prisma.balance.create({
         data: {
           userId: userId,
@@ -412,8 +387,7 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
           amount: operation === 'add' ? amount.toString() : '0',
         },
       });
-      console.log(`   ✅ ${type} баланс создан: ${balance.amount}`);
-    } else {
+      } else {
       // Вычисляем новую сумму
       const currentAmount = parseFloat(balance.amount.toString());
       let newAmount;
@@ -424,15 +398,12 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
         newAmount = currentAmount - amount;
         
         if (newAmount < 0) {
-          console.warn(`   ⚠️ Недостаточно ${type} для вычитания (${currentAmount} < ${amount})`);
           return res.status(400).json({
             success: false,
             error: `Недостаточно ${type} баланса`,
           });
         }
       }
-
-      console.log(`   🔄 ${type}: ${currentAmount.toFixed(8)} → ${newAmount.toFixed(8)}`);
 
       balance = await prisma.balance.update({
         where: { id: balance.id },
@@ -441,8 +412,6 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
         },
       });
     }
-
-    console.log(`   ✅ Баланс обновлён: ${balance.amount}\n`);
 
     res.json({
       success: true,
@@ -457,7 +426,6 @@ router.post('/api/v1/balance/update-balance', authenticateToken, async (req, res
       },
     });
   } catch (error) {
-    console.error('❌ Ошибка обновления баланса:', error);
     logger.error('BALANCE', 'Failed to update balance', { error: error.message });
     
     res.status(500).json({
@@ -475,8 +443,6 @@ router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { tokenId, amount, from, to } = req.body;
-
-    console.log(`\n🔄 [TRANSFER] ${amount} c ${from} на ${to}`);
 
     if (!userId) {
       return res.status(401).json({
@@ -521,8 +487,6 @@ router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
         update: { amount: { increment: amount } },
       });
 
-      console.log(`   ✅ Передача успешна: ${from} → ${to}`);
-
       return { from: updated1, to: toBalance };
     });
 
@@ -531,7 +495,6 @@ router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('❌ Ошибка передачи:', error);
     logger.error('BALANCE', 'Failed to transfer balance', { error: error.message });
     
     res.status(400).json({
@@ -542,3 +505,4 @@ router.post('/api/v1/balance/transfer', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+

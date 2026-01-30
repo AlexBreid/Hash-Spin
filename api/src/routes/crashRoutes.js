@@ -26,7 +26,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
   const { userId, tokenId, betId, winnings, exitMultiplier, gameId, result, balanceType, userBonusId } = req.body;
 
   if (!betId || !userId || !tokenId) {
-    console.log('❌ [CASHOUT-RESULT] Отсутствуют обязательные поля');
     return res.status(400).json({ 
       success: false, 
       error: 'Missing required fields: betId, userId, tokenId' 
@@ -39,7 +38,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
       const winningsAmount = parseFloat(winnings) || 0;
 
       if (isNaN(betIdInt)) {
-        console.log(`❌ [CASHOUT-RESULT] Неправильный betId: ${betId}`);
         return res.status(400).json({ success: false, error: 'Invalid betId format' });
       }
 
@@ -48,23 +46,15 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
       });
 
       if (!bet) {
-        console.log(`❌ [CASHOUT-RESULT] Ставка не найдена: ${betIdInt}`);
         return res.status(404).json({ success: false, error: 'Bet not found' });
       }
 
       if (bet.result !== 'PENDING') {
-        console.log(`⚠️ [CASHOUT-RESULT] Ставка уже обработана (${bet.result}), пропускаем: ${betIdInt}`);
         return res.json({ 
           success: true, 
           data: { status: 'already_processed', previousResult: bet.result } 
         });
       }
-
-      console.log(`\n📝 [CASHOUT-RESULT] Обновляю ставку ${betIdInt}`);
-      console.log(`   result: ${result}`);
-      console.log(`   winnings: ${winningsAmount.toFixed(8)}`);
-      console.log(`   balanceType: ${balanceType}`);
-      console.log(`   userBonusId: ${userBonusId}`);
 
       const finalResult = await prisma.$transaction(async (tx) => {
         const updatedBet = await tx.crashBet.update({
@@ -76,12 +66,8 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
           }
         });
 
-        console.log(`   ✅ Ставка обновлена в БД`);
-
         // 🆕 ДЕНЬГИ ЗАЧИСЛЯЮТСЯ СРАЗУ!
         if (winningsAmount > 0 && (result === 'won' || result === 'WON')) {
-          console.log(`\n🏆 [CASHOUT-RESULT] Зачисляю выигрыш СРАЗУ: ${winningsAmount.toFixed(8)} на ${balanceType || 'MAIN'}`);
-          
           // ✅ Зачисляем выигрыш СРАЗУ
           const creditResult = await tx.balance.upsert({
             where: {
@@ -98,8 +84,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
             }
           });
 
-          console.log(`   ✅ Выигрыш зачислен`);
-
           await tx.crashTransaction.create({
             data: {
               userId,
@@ -112,8 +96,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
           // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР СРАЗУ (если была ставка с BONUS)
           if (balanceType === 'BONUS' && userBonusId) {
-            console.log(`\n💛 [CASHOUT-RESULT] Проверяю вейджер для бонуса`);
-            
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
             });
@@ -124,8 +106,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
               const newWagered = parseFloat((currentWagered + winningsAmount).toFixed(8));
               const requiredNum = parseFloat(bonus.requiredWager.toString());
 
-              console.log(`   💛 Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
-
               await tx.userBonus.update({
                 where: { id: userBonusId },
                 data: { wageredAmount: newWagered.toFixed(8).toString() }
@@ -133,8 +113,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
               // 🎊 КОНВЕРСИЯ СРАЗУ если вейджер выполнен!
               if (newWagered >= requiredNum) {
-                console.log(`\n🎊 [CASHOUT-RESULT] ВЕЙДЖЕР ВЫПОЛНЕН! Конвертирую BONUS → MAIN`);
-                
                 // Получаем текущий BONUS баланс для конверсии
                 const currentBonus = await tx.balance.findUnique({
                   where: {
@@ -144,16 +122,12 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
 
                 const bonusBalanceForConversion = parseFloat(currentBonus?.amount?.toString() || '0');
 
-                console.log(`   💳 Конвертирую ВСЮ сумму: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
-                
                 if (bonusBalanceForConversion > 0) {
                   // 1. Обнуляем BONUS баланс
                   await tx.balance.update({
                     where: { id: currentBonus.id },
                     data: { amount: '0' }
                   });
-                  
-                  console.log(`      ✅ BONUS баланс обнулен`);
                   
                   // 2. Добавляем в MAIN
                   await tx.balance.upsert({
@@ -170,8 +144,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
                       amount: bonusBalanceForConversion.toFixed(8).toString()
                     }
                   });
-
-                  console.log(`      ✅ MAIN +${bonusBalanceForConversion.toFixed(8)}`);
 
                   // 3. Логируем конверсию
                   await tx.crashTransaction.create({
@@ -193,10 +165,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
                     }
                   });
                   
-                  console.log(`      ✅ Бонус завершён\n`);
-                } else {
-                  console.log(`      ℹ️ BONUS баланс пуст, просто помечаем завершённым\n`);
-                  
+                  } else {
                   await tx.userBonus.update({
                     where: { id: userBonusId },
                     data: { 
@@ -209,8 +178,7 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
             }
           }
         } else {
-          console.log(`\n❌ [CASHOUT-RESULT] Ставка потеряна (result=${result}, winnings=${winningsAmount})`);
-        }
+          }
 
         // Обновляем раунд
         const round = await tx.crashRound.findUnique({
@@ -218,8 +186,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
         });
 
         if (round) {
-          console.log(`\n🔄 [CASHOUT-RESULT] Обновляю раунд`);
-          
           await tx.crashRound.update({
             where: { id: round.id },
             data: {
@@ -234,7 +200,6 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
       
       res.json({ success: true, data: { status: 'finalized', result: finalResult.result } });
     } catch (error) {
-      console.error('❌ [CASHOUT-RESULT] Ошибка:', error.message);
       logger.error('CRASH', 'Failed to process cashout', { error: error.message });
 
       if (error.code === 'P2025') {
@@ -251,12 +216,10 @@ const verifyGameServerSecret = (req, res) => {
   const expectedSecret = process.env.GAME_SERVER_SECRET;
   
   if (!expectedSecret) {
-    console.error('⚠️ GAME_SERVER_SECRET не установлен в .env');
     return res.status(500).json({ success: false, error: 'Server misconfigured' });
   }
 
   if (!serverSecret || serverSecret !== expectedSecret) {
-    console.log(`❌ Invalid server secret`);
     return res.status(403).json({ success: false, error: 'Unauthorized: Invalid Server Secret' });
   }
 
@@ -268,7 +231,6 @@ router.post('/api/v1/crash/start-round', (req, res) => {
   if (verified !== true) return;
 
   if (!req.body.gameId || req.body.crashPoint === undefined) {
-    console.log('❌ [START-ROUND] Отсутствуют обязательные поля');
     return res.status(400).json({ 
       success: false, 
       error: 'Missing required fields: gameId, crashPoint' 
@@ -284,7 +246,6 @@ router.post('/api/v1/crash/start-round', (req, res) => {
       });
 
       if (existingRound) {
-        console.log(`⚠️ [START-ROUND] Раунд уже существует: ${gameId}`);
         return res.status(409).json({ 
           success: false, 
           error: 'Round with this gameId already exists' 
@@ -303,7 +264,6 @@ router.post('/api/v1/crash/start-round', (req, res) => {
       });
       res.json({ success: true, data: { roundId: newRound.id } });
     } catch (error) {
-      console.error('❌ [START-ROUND] Ошибка:', error.message);
       logger.error('CRASH', 'Failed to create round', { error: error.message });
       
       res.status(500).json({ success: false, error: 'Failed to create round', details: error.message });
@@ -318,7 +278,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
   const { userId, gameId, amount, tokenId } = req.body;
 
   if (!userId || !gameId || amount === undefined || !tokenId) {
-    console.log(`❌ [CREATE-BET] Отсутствуют обязательные поля`);
     return res.status(400).json({ 
       success: false, 
       error: 'Missing fields'
@@ -327,20 +286,16 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
 
   const betAmount = parseFloat(amount);
   if (isNaN(betAmount) || betAmount <= 0) {
-    console.log(`❌ [CREATE-BET] Неправильная сумма: ${amount}`);
     return res.status(400).json({ success: false, error: 'Invalid bet amount' });
   }
 
   (async () => {
     try {
-      console.log(`\n🎮 [CREATE-BET] userId=${userId}, amount=${betAmount.toFixed(8)}`);
-
       const round = await prisma.crashRound.findUnique({
         where: { gameId }
       });
 
       if (!round) {
-        console.log(`❌ [CREATE-BET] Раунд не найден: ${gameId}`);
         return res.status(404).json({ success: false, error: 'Round not found' });
       }
 
@@ -349,7 +304,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       });
 
       if (!token) {
-        console.log(`❌ [CREATE-BET] Токен не найден: ${tokenId}`);
         return res.status(404).json({ success: false, error: 'Token not found' });
       }
 
@@ -358,7 +312,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       const maxBet = currencySyncService.getMaxBetForCurrency(token.symbol);
 
       if (betAmount < minBet) {
-        console.log(`❌ [CREATE-BET] Ставка меньше минимума: ${betAmount} < ${minBet}`);
         return res.status(400).json({ 
           success: false, 
           error: `Минимальная ставка ${minBet} ${token.symbol}` 
@@ -366,7 +319,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       }
 
       if (betAmount > maxBet) {
-        console.log(`❌ [CREATE-BET] Ставка больше максимума: ${betAmount} > ${maxBet}`);
         return res.status(400).json({ 
           success: false, 
           error: `Максимальная ставка ${maxBet} ${token.symbol}` 
@@ -374,7 +326,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       }
 
       if (!token) {
-        console.log(`❌ [CREATE-BET] Токен не найден: ID=${tokenId}`);
         return res.status(400).json({ success: false, error: 'Token not found' });
       }
 
@@ -383,7 +334,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
       });
 
       if (!user) {
-        console.log(`❌ [CREATE-BET] Пользователь не найден: ID=${userId}`);
         return res.status(400).json({ success: false, error: 'User not found' });
       }
 
@@ -392,11 +342,8 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         const deductResult = await deductBetFromBalance(userId, betAmount, tokenId);
         
         if (!deductResult.success) {
-          console.log(`❌ [CREATE-BET] ${deductResult.error}`);
           throw new Error(deductResult.error || 'Insufficient balance');
         }
-
-        console.log(`   ✅ Ставка списана`);
 
         // Создаём ставку
         const newBet = await tx.crashBet.create({
@@ -410,8 +357,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
             result: 'PENDING'
           }
         });
-
-        console.log(`   ✅ Ставка создана: ID=${newBet.id}`);
 
         // Логируем ставку
         await tx.crashTransaction.create({
@@ -448,7 +393,6 @@ router.post('/api/v1/crash/create-bet', (req, res) => {
         } 
       });
     } catch (error) {
-      console.error('❌ [CREATE-BET] Ошибка:', error.message);
       logger.error('CRASH', 'Failed to create bet', { error: error.message });
       
       res.status(500).json({ success: false, error: 'Failed to create bet', details: error.message });
@@ -470,7 +414,6 @@ router.get('/api/v1/crash/history', authenticateToken, async (req, res) => {
 
     res.json({ success: true, data: bets, count: bets.length });
   } catch (error) {
-    console.error('❌ Error fetching history:', error);
     logger.error('CRASH', 'Failed to fetch history', { error: error.message });
     
     res.status(500).json({ success: false, error: 'Failed to fetch history' });
@@ -502,7 +445,6 @@ router.get('/api/v1/crash/stats', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching stats:', error);
     logger.error('CRASH', 'Failed to fetch stats', { error: error.message });
     
     res.status(500).json({ success: false, error: 'Failed to fetch stats' });
@@ -521,7 +463,6 @@ router.get('/api/v1/crash/leaderboard', async (req, res) => {
 
     res.json({ success: true, data: topPlayers });
   } catch (error) {
-    console.error('❌ Error fetching leaderboard:', error);
     logger.error('CRASH', 'Failed to fetch leaderboard', { error: error.message });
     
     res.status(500).json({ success: false, error: 'Failed to fetch leaderboard' });
@@ -558,7 +499,6 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [VERIFY-BET] ОШИБКА:', error.message);
     logger.error('CRASH', 'Failed to verify bet', { error: error.message });
     
     res.status(500).json({ success: false, error: 'Failed to verify bet' });
@@ -574,10 +514,6 @@ router.post('/api/v1/crash/verify-bet', authenticateToken, async (req, res) => {
 // ===================================
 router.get('/api/v1/crash/last-crashes', async (req, res) => {
   try {
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📊 [ROUTE] GET /crash/last-crashes (с смещением skip: 2)`);
-    console.log(`${'='.repeat(80)}`);
-
     // ✅ БЕРЁМ 12, ПРОПУСКАЕМ 2 (будущие), ВОЗВРАЩАЕМ 10
     const crashes = await prisma.crashRound.findMany({
       select: {
@@ -621,7 +557,6 @@ router.get('/api/v1/crash/last-crashes', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [ROUTE] Ошибка получения крашей:', error.message);
     logger.error('CRASH', 'Failed to fetch crashes', { error: error.message });
     
     res.status(500).json({
@@ -692,7 +627,6 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ [ROUTE] Ошибка получения статистики:', error.message);
     logger.error('CRASH', 'Failed to fetch statistics', { error: error.message });
     
     res.status(500).json({
@@ -703,3 +637,4 @@ router.get('/api/v1/crash/statistics', async (req, res) => {
 });
 
 module.exports = router;
+

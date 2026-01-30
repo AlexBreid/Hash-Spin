@@ -37,16 +37,12 @@ class PlinkoService {
     const slot = Math.max(0, Math.min(16, position));
     const multiplier = PlinkoService.MULTIPLIERS[slot];
     
-    console.log(`🎲 [PLINKO GENERATE] slot=${slot}, multiplier=${multiplier}x, position=${position}, multipliers=[${PlinkoService.MULTIPLIERS.join(', ')}]`);
-    
     return { directions, slot, multiplier };
   }
 
   async createGame(userId, tokenId, betAmount) {
     const result = this.generatePath();
     const winAmount = new Decimal(betAmount).mul(result.multiplier);
-    
-    console.log(`💰 [PLINKO CREATE] betAmount=${betAmount}, multiplier=${result.multiplier}x, winAmount=${winAmount.toString()}`);
     
     const game = await prisma.plinkoGame.create({
       data: {
@@ -99,3 +95,5 @@ class PlinkoService {
 }
 
 module.exports = new PlinkoService();
+
+

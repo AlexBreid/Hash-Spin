@@ -150,8 +150,6 @@ router.post('/users/:id/block', requireAdminAuth, async (req, res) => {
             data: { isBlocked: true }
         });
 
-        console.log(`👮 Admin ${req.user.id} blocked user ${user.id}`);
-
         res.json({ ok: true, message: `User ${user.id} blocked`, user });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -165,8 +163,6 @@ router.post('/users/:id/unblock', requireAdminAuth, async (req, res) => {
             where: { id: parseInt(req.params.id) },
             data: { isBlocked: false }
         });
-
-        console.log(`👮 Admin ${req.user.id} unblocked user ${user.id}`);
 
         res.json({ ok: true, message: `User ${user.id} unblocked`, user });
     } catch (error) {
@@ -182,8 +178,6 @@ router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
             data: { isAdmin: true }
         });
 
-        console.log(`👑 Admin ${req.user.id} promoted user ${user.id} to admin`);
-
         res.json({ ok: true, message: `User ${user.id} is now admin`, user });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -197,8 +191,6 @@ router.post('/users/:id/remove-admin', requireAdminAuth, async (req, res) => {
             where: { id: parseInt(req.params.id) },
             data: { isAdmin: false }
         });
-
-        console.log(`👑 Admin ${req.user.id} demoted user ${user.id}`);
 
         res.json({ ok: true, message: `User ${user.id} is no longer admin`, user });
     } catch (error) {
@@ -242,8 +234,6 @@ router.post('/transactions/:id/approve', requireAdminAuth, async (req, res) => {
             data: { status: 'COMPLETED' }
         });
 
-        console.log(`✅ Admin ${req.user.id} approved withdrawal ${transaction.id}`);
-
         res.json({ ok: true, message: 'Withdrawal approved', transaction });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -281,8 +271,6 @@ router.post('/transactions/:id/reject', requireAdminAuth, async (req, res) => {
             where: { id: parseInt(req.params.id) },
             data: { status: 'FAILED' }
         });
-
-        console.log(`❌ Admin ${req.user.id} rejected withdrawal ${transaction.id}`);
 
         res.json({ ok: true, message: 'Withdrawal rejected and funds returned' });
     } catch (error) {
@@ -390,8 +378,6 @@ router.post('/manual-deposit', requireAdminAuth, async (req, res) => {
                 walletAddress: 'ADMIN_MANUAL'
             }
         });
-
-        console.log(`💳 Admin ${req.user.id} manually deposited $${amount} to user ${userId}`);
 
         res.json({ ok: true, message: `$${amount} added to user ${userId}` });
     } catch (error) {

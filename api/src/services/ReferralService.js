@@ -47,23 +47,18 @@ class ReferralService {
    * 🎁 ВЫДАТЬ ДЕПОЗИТНЫЙ БОНУС
    */
   async grantDepositBonus(userId, depositAmount, tokenId, referrerId) {
-    console.log(`\n🎁 [GRANT BONUS] userId=${userId}, deposit=${depositAmount.toFixed(8)}`);
-
     try {
       const userIdNum = parseInt(userId);
       if (isNaN(userIdNum)) {
-        console.error(`❌ Invalid userId`);
         return null;
       }
 
       const depositNum = parseFloat(depositAmount);
       if (isNaN(depositNum) || depositNum <= 0) {
-        console.error(`❌ Invalid deposit amount`);
         return null;
       }
 
       if (depositNum < ReferralService.CONFIG.MIN_DEPOSIT_AMOUNT) {
-        console.log(`❌ [GRANT BONUS] Deposit below minimum`);
         return null;
       }
 
@@ -78,7 +73,6 @@ class ReferralService {
       });
 
       if (activeBonus) {
-        console.log(`⚠️ [GRANT BONUS] User already has active bonus`);
         return null;
       }
 
@@ -139,7 +133,6 @@ class ReferralService {
       logger.info('REFERRAL', 'Deposit bonus granted', { userId: userIdNum });
       return result;
     } catch (error) {
-      console.error(`❌ [GRANT BONUS] Error:`, error.message);
       logger.error('REFERRAL', 'Error granting bonus', { error: error.message });
       return null;
     }
@@ -262,8 +255,6 @@ class ReferralService {
    * ⚡ АННУЛИРОВАТЬ БОНУС если баланс < 0.20 USDT
    */
   async checkAndAnnulateBonusIfLow(userId, tokenId, userBonusId) {
-    console.log(`\n⚡ [CHECK ANNULATE] userId=${userId}, userBonusId=${userBonusId}`);
-
     try {
       const bonus = await prisma.userBonus.findUnique({
         where: { id: userBonusId }
@@ -312,7 +303,6 @@ class ReferralService {
       return { annulated: false };
 
     } catch (error) {
-      console.error(`❌ [CHECK ANNULATE] Error:`, error.message);
       logger.error('REFERRAL', 'Error checking bonus annulation', { error: error.message });
       return { annulated: false, error: error.message };
     }
@@ -391,8 +381,6 @@ class ReferralService {
         where: { referredById: userIdNum }
       });
 
-      console.log(`📊 [getReferrerStats] userId=${userIdNum}, referralsCount=${referralsCount}`);
-
       // Получаем статистику из ReferralStats
       const stats = await prisma.referralStats.findMany({
         where: { referrerId: userIdNum }
@@ -449,8 +437,6 @@ class ReferralService {
           : ReferralService.CONFIG.WORKER_PROFIT_SHARE,
         referrerType: user.referrerType
       };
-
-      console.log(`📊 [getReferrerStats] Result:`, JSON.stringify(result, null, 2));
 
       return result;
 
@@ -525,9 +511,6 @@ class ReferralService {
    *   - Комиссия = 100 × 0.05 = 5 USDT
    */
   async processAllPendingCommissions(tokenId = 2) {
-    console.log(`\n💰 [PROCESS COMMISSIONS] Starting...`);
-    console.log(`📅 Time: ${new Date().toISOString()}`);
-    
     try {
       const allStats = await prisma.referralStats.findMany({
         where: { tokenId },
@@ -536,8 +519,6 @@ class ReferralService {
           referee: { select: { id: true, username: true } }
         }
       });
-
-      console.log(`📊 [PROCESS] Found ${allStats.length} referral pairs`);
 
       let processed = 0;
       let success = 0;
@@ -563,8 +544,7 @@ class ReferralService {
               commission = fairShare.times(commissionRate).dividedBy(100);
 
               calculationDetails = `Turnover=${turnover.toFixed(2)}, HouseProfit=${houseProfit.toFixed(4)}, FairShare=${fairShare.toFixed(4)}, Commission=${commission.toFixed(8)}`;
-              console.log(`   🟢 REGULAR ${stat.referrer.username || stat.referrer.id}: ${calculationDetails}`);
-            }
+              }
 
           } else if (referrerType === 'WORKER') {
             // 🔴 WORKER: 5% от newLosses
@@ -575,8 +555,7 @@ class ReferralService {
               commission = losses.times(workerShare).dividedBy(100);
 
               calculationDetails = `Losses=${losses.toFixed(2)}, Commission=${commission.toFixed(8)} (${workerShare}%)`;
-              console.log(`   🔴 WORKER ${stat.referrer.username || stat.referrer.id}: ${calculationDetails}`);
-            }
+              }
           }
 
           // Только если комиссия выше порога
@@ -630,8 +609,6 @@ class ReferralService {
             });
 
             success++;
-            console.log(`   ✅ Paid ${result.toFixed(8)} USDT to ${stat.referrer.username || stat.referrer.id}`);
-
             if (referrerType === 'REGULAR') {
               breakdown.regular++;
               breakdown.regularAmount += parseFloat(result.toString());
@@ -640,22 +617,14 @@ class ReferralService {
               breakdown.workersAmount += parseFloat(result.toString());
             }
           } else if (commission.greaterThan(0)) {
-            console.log(`   ⏭️ Commission ${commission.toFixed(8)} < threshold ${ReferralService.CONFIG.COMMISSION_PAYOUT_THRESHOLD}, skipped`);
-          }
+            }
 
           processed++;
 
         } catch (error) {
-          console.error(`   ❌ Error processing referrer ${stat.referrer.id}:`, error.message);
           processed++;
         }
       }
-
-      console.log(`\n✅ [PROCESS COMMISSIONS] Completed:`);
-      console.log(`   📊 Processed: ${processed}`);
-      console.log(`   ✅ Paid: ${success}`);
-      console.log(`   🟢 Regular: ${breakdown.regular} (${breakdown.regularAmount.toFixed(8)} USDT)`);
-      console.log(`   🔴 Workers: ${breakdown.workers} (${breakdown.workersAmount.toFixed(8)} USDT)\n`);
 
       return {
         processed,
@@ -665,7 +634,6 @@ class ReferralService {
       };
 
     } catch (error) {
-      console.error(`❌ [PROCESS COMMISSIONS] Error:`, error.message);
       logger.error('REFERRAL', 'Error processing all commissions', { error: error.message });
       throw error;
     }
@@ -701,3 +669,4 @@ class ReferralService {
 // Экспортируем и класс, и экземпляр
 module.exports = new ReferralService();
 module.exports.ReferralService = ReferralService;
+

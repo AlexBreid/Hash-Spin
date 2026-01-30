@@ -16,8 +16,6 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log(`📊 [REFERRAL API] Загружаю статистику для пользователя ${userId}`);
-
     // Получаем полную статистику через сервис
     const stats = await referralService.getReferrerStats(userId);
 
@@ -65,7 +63,6 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка получения статистики:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения статистики'
@@ -80,8 +77,6 @@ router.get('/api/v1/referral/stats', authenticateToken, async (req, res) => {
 router.get('/api/v1/referral/bonus-stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-
-    console.log(`📊 [REFERRAL API] Загружаю статистику бонуса для ${userId}`);
 
     const bonusStats = await referralService.getBonusStats(userId);
 
@@ -98,7 +93,6 @@ router.get('/api/v1/referral/bonus-stats', authenticateToken, async (req, res) =
       data: bonusStats.bonus
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка получения статистики бонуса:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения статистики бонуса'
@@ -115,8 +109,6 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
   try {
     const userId = req.user.userId;
     const { referralCode } = req.body;
-
-    console.log(`🔗 [REFERRAL API] Попытка привязать код ${referralCode} для пользователя ${userId}`);
 
     // Валидация
     if (!referralCode || referralCode.trim().length === 0) {
@@ -141,7 +133,6 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
 
     // 🔴 КРИТИЧЕСКАЯ ПРОВЕРКА: пользователь уже привязан к рефереру
     if (currentUser.referredById !== null) {
-      console.warn(`⚠️ [REFERRAL API] Пользователь ${userId} уже привязан к рефереру с ID ${currentUser.referredById}`);
       return res.status(400).json({
         success: false,
         message: 'Вы уже использовали реферальный код. Один код можно ввести только один раз!'
@@ -155,7 +146,6 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
     });
 
     if (!referrer) {
-      console.warn(`⚠️ [REFERRAL API] Реферер с кодом "${referralCode}" не найден`);
       return res.status(404).json({
         success: false,
         message: 'Реферальный код не найден. Проверьте правильность кода.'
@@ -176,8 +166,6 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
       data: { referredById: referrer.id }
     });
 
-    console.log(`✅ [REFERRAL API] Пользователь ${userId} привязан к рефереру ${referrer.id} (${referrer.username})`);
-
     res.json({
       success: true,
       message: 'Реферальный код успешно привязан! При первом депозите вы получите +100% бонус!',
@@ -191,7 +179,6 @@ router.post('/api/v1/referral/link-referrer', authenticateToken, async (req, res
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка привязки реферального кода:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка привязки реферального кода'
@@ -208,8 +195,6 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
     const userId = req.user.userId;
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
-
-    console.log(`📋 [REFERRAL API] Загружаю рефералов для ${userId}`);
 
     // Получаем рефералов
     const referrals = await prisma.user.findMany({
@@ -272,7 +257,6 @@ router.get('/api/v1/referral/my-referrals', authenticateToken, async (req, res) 
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка получения рефералов:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения списка рефералов'
@@ -328,7 +312,6 @@ router.post('/api/v1/admin/referral/set-worker', authenticateToken, async (req, 
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка установки воркера:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка установки воркера'
@@ -379,7 +362,6 @@ router.post('/api/v1/admin/referral/remove-worker', authenticateToken, async (re
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка удаления воркера:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка удаления воркера'
@@ -448,7 +430,6 @@ router.get('/api/v1/admin/referral/global-stats', authenticateToken, async (req,
       }
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка получения глобальной статистики:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка получения статистики'
@@ -482,7 +463,6 @@ router.post('/api/v1/admin/referral/payout-all', authenticateToken, async (req, 
       data: result
     });
   } catch (error) {
-    console.error('❌ [REFERRAL API] Ошибка массовой выплаты:', error.message);
     res.status(500).json({
       success: false,
       message: 'Ошибка массовой выплаты'
@@ -491,3 +471,4 @@ router.post('/api/v1/admin/referral/payout-all', authenticateToken, async (req, 
 });
 
 module.exports = router;
+

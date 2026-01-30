@@ -61,14 +61,11 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
   try {
-    console.log(`[ACTIVE_BONUS] 🔍 Загружаю активный бонус для userId: ${userId}`);
     logger.info('USER', 'Fetching active bonus', { userId });
 
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 1: Поиск активного бонуса в таблице UserBonus
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[ACTIVE_BONUS] 📋 Ищу активный бонус в таблице UserBonus...');
 
     const activeBonus = await prisma.userBonus.findFirst({
       where: {
@@ -89,7 +86,6 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
 
     // Если бонуса нет
     if (!activeBonus) {
-      console.log(`[ACTIVE_BONUS] ⚠️ Активный бонус не найден для userId: ${userId}`);
       logger.info('USER', 'No active bonus found', { userId });
       
       return res.json({
@@ -99,13 +95,9 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`[ACTIVE_BONUS] ✅ Активный бонус найден: ${activeBonus.id}`);
-
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 2: ФОРМИРОВАНИЕ ОТВЕТА
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[ACTIVE_BONUS] 📋 Формирую ответ...');
 
     const bonusData = {
       id: activeBonus.id.toString(),
@@ -120,8 +112,6 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
       createdAt: activeBonus.createdAt.toISOString(),
     };
 
-    console.log('[ACTIVE_BONUS] ✅ Ответ сформирован:', bonusData);
-
     logger.info('USER', 'Active bonus fetched successfully', {
       userId,
       bonusId: activeBonus.id,
@@ -134,10 +124,6 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
       data: bonusData,
     });
   } catch (error) {
-    console.error('[ACTIVE_BONUS] ❌ КРИТИЧЕСКАЯ ОШИБКА:', error);
-    console.error('[ACTIVE_BONUS] Сообщение:', error.message);
-    console.error('[ACTIVE_BONUS] Stack:', error.stack);
-
     logger.error('USER', 'Error fetching active bonus', {
       userId,
       error: error.message,
@@ -161,14 +147,12 @@ router.get('/profile', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
   try {
-    console.log(`[PROFILE] 🔍 Начинаю загрузку профиля для userId: ${userId}`);
     logger.info('USER', 'Starting profile fetch', { userId });
 
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 1: Загрузка пользователя
     // ════════════════════════════════════════════════════════════════════════════
     
-    console.log('[PROFILE] 📋 Этап 1: Загружаю пользователя...');
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -183,20 +167,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
     });
 
     if (!user) {
-      console.log(`[PROFILE] ❌ Пользователь не найден: ${userId}`);
       logger.warn('USER', 'User not found', { userId });
       return res.status(404).json({
         success: false,
         error: 'User not found',
       });
     }
-    console.log(`[PROFILE] ✅ Пользователь найден: ${user.username}`);
-
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 2: ПОЛУЧИТЬ ВСЕ ИГРЫ ЧЕРЕЗ UNION ЗАПРОС
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 2: Загружаю ВСЕ ИГРЫ из всех таблиц (Crash + Minesweeper + обычные)...');
 
     let allGames = [];
     try {
@@ -242,18 +221,13 @@ router.get('/profile', authenticateToken, async (req, res) => {
         ORDER BY "createdAt" DESC
       `;
 
-      console.log(`[PROFILE] ✅ Всего игр найдено: ${allGames.length}`);
-    } catch (err) {
-      console.warn('[PROFILE] ⚠️ Ошибка UNION запроса:', err.message);
-      console.error(err);
+      } catch (err) {
       allGames = [];
     }
 
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 3: ПОДСЧЁТ СТАТИСТИКИ
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 3: Подсчитываю статистику...');
 
     const totalGames = allGames.length;
     let totalWagered = 0;
@@ -282,17 +256,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
       }
     }
 
-    console.log('[PROFILE] ✅ Статистика подсчитана:');
-    console.log(`  - Всего игр: ${totalGames}`);
-    console.log(`  - Всего ставок: ${totalWagered.toFixed(2)} USDT`);
-    console.log(`  - Выигрышей: ${winningBets}`);
-    console.log(`  - Общий счёт: ${totalScore.toFixed(2)} USDT`);
-
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 4: РАСЧЁТЫ МЕТРИК
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 4: Рассчитываю метрики...');
 
     const level = Math.max(1, Math.floor(totalGames / 10) + 1);
     const vipRank = calculateVipRank(totalGames);
@@ -306,17 +272,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
     const gamesPerDay = totalGames > 0 ? Math.round(totalGames / daysActive) : 0;
     const roi = totalWagered > 0 ? ((totalScore / totalWagered) * 100) : 0;
 
-    console.log('[PROFILE] ✅ Метрики рассчитаны:');
-    console.log(`  - Win Rate: ${winRate}%`);
-    console.log(`  - ROI: ${roi.toFixed(2)}%`);
-    console.log(`  - Уровень: ${level}`);
-    console.log(`  - VIP: ${vipLevel}`);
-
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 5: ФОРМИРОВАНИЕ ОТВЕТА
     // ════════════════════════════════════════════════════════════════════════════
-
-    console.log('[PROFILE] 📋 Этап 5: Формирую ответ...');
 
     const userData = {
       id: user.id.toString(),
@@ -346,8 +304,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
       referrerId: user.referredById,
     };
 
-    console.log('[PROFILE] ✅ Ответ сформирован');
-
     logger.info('USER', 'Profile fetched successfully', {
       userId,
       level,
@@ -361,10 +317,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
       data: userData,
     });
   } catch (error) {
-    console.error('[PROFILE] ❌ КРИТИЧЕСКАЯ ОШИБКА:', error);
-    console.error('[PROFILE] Сообщение:', error.message);
-    console.error('[PROFILE] Stack:', error.stack);
-
     logger.error('USER', 'Error fetching user profile', {
       userId,
       error: error.message,
@@ -388,8 +340,6 @@ router.get('/stats', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
   try {
-    console.log(`[STATS] 🔍 Загружаю статистику для userId: ${userId}`);
-
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, username: true },
@@ -435,7 +385,6 @@ router.get('/stats', authenticateToken, async (req, res) => {
         WHERE "userId" = ${userId}
       `;
     } catch (err) {
-      console.warn('[STATS] ⚠️ Ошибка UNION:', err.message);
       allGames = [];
     }
 
@@ -476,7 +425,6 @@ router.get('/stats', authenticateToken, async (req, res) => {
 
     res.json({ success: true, data: stats });
   } catch (error) {
-    console.error(`[STATS] ❌ Ошибка:`, error.message);
     logger.error('USER', 'Error fetching stats', { userId, error: error.message });
 
     res.status(500).json({
@@ -488,3 +436,4 @@ router.get('/stats', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+

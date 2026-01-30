@@ -13,13 +13,9 @@ const { deductBetFromBalance, creditWinnings, getUserBalances } = require('./hel
  */
 router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
   try {
-    console.log('📊 Загружаю сложности сапёра');
-
     let difficulties = await prisma.minesweeperDifficulty.findMany();
 
     if (difficulties.length === 0) {
-      console.log('🔧 Инициализирую сложности...');
-      
       const defaultDifficulties = [
         { name: 'EASY', minesCount: 6, gridSize: 6, multiplier: 1.5 },
         { name: 'MEDIUM', minesCount: 12, gridSize: 6, multiplier: 2.5 },
@@ -31,8 +27,7 @@ router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
       }
 
       difficulties = await prisma.minesweeperDifficulty.findMany();
-      console.log(`✅ Сложности инициализированы: ${difficulties.length} шт.`);
-    }
+      }
 
     res.json({
       success: true,
@@ -45,7 +40,6 @@ router.get('/api/v1/minesweeper/difficulties', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('❌ Ошибка получения сложностей:', error.message);
     logger.error('MINESWEEPER', 'Failed to get difficulties', { error: error.message });
     
     res.status(500).json({
@@ -64,11 +58,6 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     const { minesCount, betAmount, tokenId } = req.body;
     const DEFAULT_TOKEN_ID = tokenId || 2;
     
-    console.log('🎮 [MINESWEEPER START] Начинаю игру');
-    console.log('   userId:', userId);
-    console.log('   minesCount:', minesCount);
-    console.log('   betAmount:', betAmount);
-
     if (!minesCount || minesCount < 1 || !betAmount || betAmount <= 0) {
       return res.status(400).json({
         success: false,
@@ -106,18 +95,14 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     }
 
     // 💳 Списываем ставку
-    console.log('💳 [START] Списываю ставку...');
     const deductResult = await deductBetFromBalance(userId, parseFloat(betAmount), DEFAULT_TOKEN_ID);
     
     if (!deductResult.success) {
-      console.log(`❌ [START] ${deductResult.error}`);
       return res.status(400).json({
         success: false,
         message: deductResult.error || 'Недостаточно средств',
       });
     }
-    console.log(`✅ [START] Списано ${betAmount} с ${deductResult.balanceType}`);
-
     // 🎮 Создаём игру (теперь передаём minesCount вместо difficultyId)
     const gameData = await minesweeperService.createGame(
       userId,
@@ -136,7 +121,6 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     });
     
   } catch (error) {
-    console.error('❌ [START] ОШИБКА:', error.message);
     logger.error('MINESWEEPER', 'Failed to start game', { error: error.message });
     
     res.status(500).json({
@@ -158,11 +142,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
     const userId = req.user.userId;
     const { gameId, x, y, balanceType, userBonusId } = req.body;
 
-    console.log(`\n🎮 [REVEAL] Открываю клетку [${x}, ${y}]`);
-    console.log(`   gameId: ${gameId}`);
-    console.log(`   balanceType: ${balanceType}`);
-    console.log(`   userBonusId: ${userBonusId}`);
-
     if (gameId === undefined || x === undefined || y === undefined) {
       return res.status(400).json({
         success: false,
@@ -172,15 +151,9 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
 
     const result = await minesweeperService.revealGameCell(gameId, x, y, userId);
 
-    console.log(`\n🎮 [REVEAL] Результат: ${result.status}`);
-    console.log(`   win: ${result.status === 'WON'}`);
-    console.log(`   winAmount: ${result.winAmount || 0}`);
-
     // 🎉 ПОЛНАЯ ПОБЕДА - ЗАЧИСЛИТЬ ВЫИГРЫШ И ОБНОВИТЬ ВЕЙДЖЕР
     if (result.status === 'WON' && result.winAmount) {
       const winAmountNum = parseFloat(result.winAmount);
-      console.log(`\n🎉 [REVEAL] ПОЛНАЯ ПОБЕДА! Выигрыш: ${winAmountNum.toFixed(8)}`);
-      
       const game = await prisma.minesweeperGame.findUnique({
         where: { id: gameId },
         select: { tokenId: true },
@@ -190,8 +163,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
         // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS для атомарности
         await prisma.$transaction(async (tx) => {
           // 1️⃣ ЗАЧИСЛЯЕМ ВЫИГРЫШ СРАЗУ
-          console.log(`\n💰 [REVEAL] Зачисляю выигрыш ${winAmountNum.toFixed(8)} на ${balanceType || 'MAIN'}`);
-          
           await tx.balance.upsert({
             where: {
               userId_tokenId_type: { userId, tokenId: game.tokenId, type: balanceType || 'MAIN' }
@@ -207,12 +178,8 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
             }
           });
 
-          console.log(`   ✅ Выигрыш зачислен на ${balanceType || 'MAIN'}`);
-
           // 2️⃣ ЕСЛИ БЫЛА СТАВКА С BONUS - обновляем вейджер
           if (balanceType === 'BONUS' && userBonusId) {
-            console.log(`\n💛 [REVEAL] Обновляю вейджер бонуса...`);
-            
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
             });
@@ -226,21 +193,14 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
             const newWagered = parseFloat((currentWagered + winAmountNum).toFixed(8));
             const requiredNum = parseFloat(bonus.requiredWager.toString());
 
-            console.log(`   💛 Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
-            console.log(`   💛 Прогресс: ${((newWagered / requiredNum) * 100).toFixed(1)}%`);
-
             // Обновляем wageredAmount в БД
             await tx.userBonus.update({
               where: { id: userBonusId },
               data: { wageredAmount: newWagered.toFixed(8).toString() }
             });
 
-            console.log(`   ✅ Вейджер обновлён`);
-
             // 3️⃣ ПРОВЕРЯЕМ: вейджер выполнен?
             if (newWagered >= requiredNum) {
-              console.log(`\n🎊 [REVEAL] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
-              
               // Получаем текущий BONUS баланс для конверсии
               const currentBonus = await tx.balance.findUnique({
                 where: {
@@ -250,16 +210,12 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
 
               const bonusBalanceForConversion = parseFloat(currentBonus?.amount?.toString() || '0');
 
-              console.log(`\n💳 [REVEAL] Конвертирую ВСЮ сумму: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
-              
               if (bonusBalanceForConversion > 0) {
                 // 1. Обнуляем BONUS баланс
                 await tx.balance.update({
                   where: { id: currentBonus.id },
                   data: { amount: '0' }
                 });
-                
-                console.log(`   ✅ BONUS баланс обнулен`);
                 
                 // 2. Добавляем ВСЮ сумму в MAIN
                 await tx.balance.upsert({
@@ -277,10 +233,8 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
                   }
                 });
 
-                console.log(`   ✅ MAIN +${bonusBalanceForConversion.toFixed(8)}`);
-              } else {
-                console.log(`   ℹ️ BONUS баланс пуст`);
-              }
+                } else {
+                }
               
               // 3. Отмечаем бонус завершённым
               await tx.userBonus.update({
@@ -291,8 +245,7 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
                 }
               });
               
-              console.log(`   ✅ Бонус завершён\n`);
-            }
+              }
           }
         });
 
@@ -304,8 +257,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
         });
       }
     } else if (result.status === 'LOST') {
-      console.log(`\n💔 [REVEAL] Проиграли. Game over.`);
-      
       logger.info('MINESWEEPER', 'Game lost', {
         gameId,
         userId
@@ -317,7 +268,6 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
       data: result,
     });
   } catch (error) {
-    console.error('❌ [REVEAL] ОШИБКА:', error.message);
     logger.error('MINESWEEPER', 'Failed to reveal cell', { error: error.message });
     
     res.status(400).json({
@@ -334,12 +284,9 @@ router.get('/api/v1/minesweeper/active', authenticateToken, async (req, res) => 
   try {
     const userId = req.user.userId;
 
-    console.log(`🔍 [ACTIVE] Проверяю активную игру для пользователя ${userId}`);
-
     const activeGame = await minesweeperService.getActiveGame(userId);
 
     if (!activeGame) {
-      console.log(`   ℹ️ Активная игра не найдена`);
       return res.json({
         success: true,
         data: null,
@@ -347,14 +294,11 @@ router.get('/api/v1/minesweeper/active', authenticateToken, async (req, res) => 
       });
     }
 
-    console.log(`   ✅ Активная игра найдена: ID ${activeGame.gameId}`);
-
     res.json({
       success: true,
       data: activeGame,
     });
   } catch (error) {
-    console.error('❌ [ACTIVE] Ошибка:', error.message);
     logger.error('MINESWEEPER', 'Failed to get active game', { error: error.message });
     
     res.status(500).json({
@@ -372,8 +316,6 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
     const userId = req.user.userId;
     const limit = parseInt(req.query.limit) || 20;
 
-    console.log(`📚 [HISTORY] Загружаю историю игр пользователя ${userId}`);
-
     const games = await prisma.minesweeperGame.findMany({
       where: { userId },
       include: {
@@ -383,8 +325,6 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
-
-    console.log(`   ✅ Загружено ${games.length} игр`);
 
     res.json({
       success: true,
@@ -401,7 +341,6 @@ router.get('/api/v1/minesweeper/history', authenticateToken, async (req, res) =>
       })),
     });
   } catch (error) {
-    console.error('❌ Ошибка истории:', error.message);
     logger.error('MINESWEEPER', 'Failed to get history', { error: error.message });
     
     res.status(500).json({
@@ -422,10 +361,6 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
   try {
     const userId = req.user.userId;
     const { gameId, balanceType, userBonusId } = req.body;
-
-    console.log(`\n💸 [CASHOUT] Кэшаут игры ${gameId}`);
-    console.log(`   balanceType: ${balanceType}`);
-    console.log(`   userBonusId: ${userBonusId}`);
 
     if (!gameId) {
       return res.status(400).json({
@@ -448,21 +383,14 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 
     const result = await minesweeperService.cashOutGame(gameId, userId);
 
-    console.log(`\n💰 [CASHOUT] Результат кэшаута: ${result.status}`);
-    console.log(`   winAmount: ${result.winAmount || 0}`);
-
     // ✅ Зачисляем выигрыш и обновляем вейджер
     if (result.winAmount) {
       const winAmountNum = parseFloat(result.winAmount);
       
       if (winAmountNum > 0) {
-        console.log(`\n💰 [CASHOUT] Зачисляю выигрыш: ${winAmountNum.toFixed(8)}`);
-
         // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS для атомарности
         await prisma.$transaction(async (tx) => {
           // 1️⃣ ЗАЧИСЛЯЕМ ВЫИГРЫШ СРАЗУ
-          console.log(`   💰 [CASHOUT] На ${balanceType || 'MAIN'} баланс`);
-          
           await tx.balance.upsert({
             where: {
               userId_tokenId_type: { userId, tokenId: game.tokenId, type: balanceType || 'MAIN' }
@@ -478,12 +406,8 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
             }
           });
 
-          console.log(`   ✅ Выигрыш зачислен`);
-
           // 2️⃣ ЕСЛИ БЫЛА СТАВКА С BONUS - обновляем вейджер
           if (balanceType === 'BONUS' && userBonusId) {
-            console.log(`\n💛 [CASHOUT] Обновляю вейджер бонуса...`);
-            
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
             });
@@ -497,21 +421,14 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
             const newWagered = parseFloat((currentWagered + winAmountNum).toFixed(8));
             const requiredNum = parseFloat(bonus.requiredWager.toString());
 
-            console.log(`   💛 Вейджер: ${newWagered.toFixed(8)} / ${requiredNum.toFixed(8)}`);
-            console.log(`   💛 Прогресс: ${((newWagered / requiredNum) * 100).toFixed(1)}%`);
-
             // Обновляем wageredAmount в БД
             await tx.userBonus.update({
               where: { id: userBonusId },
               data: { wageredAmount: newWagered.toFixed(8).toString() }
             });
 
-            console.log(`   ✅ Вейджер обновлён`);
-
             // 3️⃣ ПРОВЕРЯЕМ: вейджер выполнен?
             if (newWagered >= requiredNum) {
-              console.log(`\n🎊 [CASHOUT] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
-              
               // Получаем текущий BONUS баланс для конверсии
               const currentBonus = await tx.balance.findUnique({
                 where: {
@@ -521,16 +438,12 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 
               const bonusBalanceForConversion = parseFloat(currentBonus?.amount?.toString() || '0');
 
-              console.log(`\n💳 [CASHOUT] Конвертирую ВСЮ сумму: ${bonusBalanceForConversion.toFixed(8)} BONUS → MAIN`);
-              
               if (bonusBalanceForConversion > 0) {
                 // 1. Обнуляем BONUS баланс
                 await tx.balance.update({
                   where: { id: currentBonus.id },
                   data: { amount: '0' }
                 });
-                
-                console.log(`   ✅ BONUS баланс обнулен`);
                 
                 // 2. Добавляем ВСЮ сумму в MAIN
                 await tx.balance.upsert({
@@ -548,10 +461,8 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
                   }
                 });
 
-                console.log(`   ✅ MAIN +${bonusBalanceForConversion.toFixed(8)}`);
-              } else {
-                console.log(`   ℹ️ BONUS баланс пуст`);
-              }
+                } else {
+                }
               
               // 3. Отмечаем бонус завершённым
               await tx.userBonus.update({
@@ -562,8 +473,7 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
                 }
               });
               
-              console.log(`   ✅ Бонус завершён\n`);
-            }
+              }
           }
         });
 
@@ -581,7 +491,6 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
       data: result,
     });
   } catch (error) {
-    console.error('❌ [CASHOUT] ОШИБКА:', error.message);
     logger.error('MINESWEEPER', 'Failed to cashout', { error: error.message });
     
     res.status(400).json({
@@ -599,8 +508,6 @@ router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) =>
     const userId = req.user.userId;
     const tokenId = parseInt(req.query.tokenId) || 2;
 
-    console.log(`💰 [BALANCE] Получаю баланс для игры (tokenId=${tokenId})`);
-
     const balances = await getUserBalances(userId, tokenId);
 
     res.json({
@@ -608,7 +515,6 @@ router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) =>
       data: balances
     });
   } catch (error) {
-    console.error('❌ Ошибка баланса:', error.message);
     logger.error('MINESWEEPER', 'Failed to get balance', { error: error.message });
     
     res.status(500).json({
@@ -619,3 +525,4 @@ router.get('/api/v1/minesweeper/balance', authenticateToken, async (req, res) =>
 });
 
 module.exports = router;
+

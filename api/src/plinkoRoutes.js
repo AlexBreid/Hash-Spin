@@ -45,7 +45,6 @@ router.get('/api/v1/plinko/balance', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Balance]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -79,12 +78,8 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
     }
 
     // Генерируем результат
-    console.log(`\n🎮 [PLINKO DROP] userId=${userId}, betAmount=${betAmount}`);
-    console.log(`📊 [PLINKO DROP] PlinkoService.MULTIPLIERS = [${plinkoService.constructor.MULTIPLIERS?.join(', ') || 'NOT FOUND'}]`);
     const gameData = await plinkoService.createGame(userId, tokenId, betAmount);
     const winAmount = parseFloat(gameData.winAmount);
-    console.log(`💰 [PLINKO DROP] gameData.slot=${gameData.slot}, gameData.multiplier=${gameData.multiplier}, winAmount=${winAmount}`);
-
     // Зачисляем выигрыш
     if (winAmount > 0) {
       await creditWinnings(userId, winAmount, tokenId, deductResult.balanceType);
@@ -115,7 +110,6 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Drop]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -177,7 +171,6 @@ router.post('/api/v1/plinko/play', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Play]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -206,7 +199,6 @@ router.get('/api/v1/plinko/history', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko History]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -232,7 +224,6 @@ router.get('/api/v1/plinko/stats', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Stats]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -262,3 +253,5 @@ router.get('/api/v1/plinko/config', (req, res) => {
 });
 
 module.exports = router;
+
+

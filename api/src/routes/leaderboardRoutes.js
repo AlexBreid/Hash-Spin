@@ -14,6 +14,7 @@ const CRYPTO_TO_USD = {
   'TRX': 0.25,
   'LTC': 130,
   'TON': 5.5,
+  'XTR': 0.02, // Telegram Stars (~50 звёзд = $1)
 };
 
 // Конвертация крипты в USD
@@ -326,7 +327,6 @@ router.get('/api/v1/leaderboard', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching leaderboard:', error);
     res.status(500).json({ success: false, error: 'Failed to load leaderboard' });
   }
 });
@@ -590,9 +590,9 @@ router.get('/api/v1/leaderboard/top3', async (req, res) => {
       data: topThree
     });
   } catch (error) {
-    console.error('❌ Error fetching top 3 wins:', error);
     res.status(500).json({ success: false, error: 'Failed to load top wins' });
   }
 });
 
 module.exports = router;
+

@@ -12,7 +12,7 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    console.log('❌ No token provided');
+    
     return res.status(401).json({ 
       success: false, 
       error: 'Access token required. Format: Bearer <token>' 
@@ -22,10 +22,10 @@ const authenticateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     req.user = decoded; // { userId, telegramId, ... }
-    console.log(`✅ Token verified for user: ${decoded.userId}`);
+    
     next();
   } catch (error) {
-    console.log(`❌ Token verification failed: ${error.message}`);
+    
     
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ 
@@ -58,14 +58,14 @@ const checkServerSecret = (req, res, next) => {
   }
 
   if (!serverSecret || serverSecret !== expectedSecret) {
-    console.log(`❌ Invalid server secret: ${serverSecret}`);
+    
     return res.status(403).json({ 
       success: false, 
       error: 'Unauthorized: Invalid Server Secret' 
     });
   }
 
-  console.log('✅ Server secret verified');
+  
   next();
 };
 

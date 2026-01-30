@@ -33,6 +33,8 @@ const BASE_TOKENS = [
   { symbol: 'BNB', name: 'Binance Coin', network: 'BEP-20', decimals: 18, isBase: true },
   { symbol: 'SOL', name: 'Solana', network: 'SOL', decimals: 9, isBase: true },
   { symbol: 'SHIB', name: 'Shiba Inu', network: 'ERC-20', decimals: 18, isBase: true },
+  // ⭐ Telegram Stars
+  { symbol: 'XTR', name: 'Telegram Stars', network: 'TELEGRAM', decimals: 0, isBase: true },
 ];
 
 // ============================================
@@ -91,6 +93,10 @@ const DEPOSIT_NETWORKS = {
   'SHIB': [
     { network: 'ERC-20', name: 'Ethereum (ERC-20)', fee: 'Высокая', speed: 'Средне' },
   ],
+  // ⭐ Telegram Stars
+  'XTR': [
+    { network: 'TELEGRAM', name: 'Telegram Stars', fee: 'Нет', speed: 'Мгновенно' },
+  ],
 };
 
 // Устаревшие списки — оставляем для совместимости при синхронизации сетей
@@ -120,6 +126,8 @@ const CRYPTO_BOT_CURRENCIES = [
   { symbol: 'USDD', name: 'Decentralized USD', network: 'TRC-20', decimals: 6 },
   { symbol: 'TUSD', name: 'TrueUSD', network: 'ERC-20', decimals: 18 },
   { symbol: 'TUSD', name: 'TrueUSD', network: 'BEP-20', decimals: 18 },
+  // ⭐ Telegram Stars
+  { symbol: 'XTR', name: 'Telegram Stars', network: 'TELEGRAM', decimals: 0 },
 ];
 
 const CRYPTO_CLOUD_CURRENCIES = CRYPTO_BOT_CURRENCIES; // Одинаковый список
@@ -382,6 +390,8 @@ const FALLBACK_RATES = {
   'LTC': 130,
   'TON': 5.5,
   'SHIB': 0.00002,
+  // ⭐ Telegram Stars (~$0.02 за 1 звезду, 50 звёзд = $1)
+  'XTR': 0.02,
 };
 
 /**

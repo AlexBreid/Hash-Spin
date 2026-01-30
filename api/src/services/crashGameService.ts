@@ -49,8 +49,6 @@ class CrashGameService {
         });
 
         this.socket.on('connect', () => {
-          console.log('✅ Подключились к Crash Server');
-          
           this.socket!.emit('joinGame', {
             userId,
             userName,
@@ -62,13 +60,11 @@ class CrashGameService {
         });
 
         this.socket.on('connect_error', (error) => {
-          console.error('❌ Ошибка подключения:', error);
           reject(error);
         });
 
         this.socket.on('disconnect', () => {
-          console.log('⚠️ Отключились от Crash Server');
-        });
+          });
       } catch (error) {
         reject(error);
       }
@@ -87,13 +83,11 @@ class CrashGameService {
     });
 
     this.socket.on('gameCrashed', (data: any) => {
-      console.log('💣 gameCrashed событие получено от сервера');
       this.emit('gameCrashed', data);
     });
 
     // 🆕 FIX: Обработчик старта нового раунда
     this.socket.on('roundStarted', (data: any) => {
-      console.log('🚀 roundStarted событие получено от сервера:', data.gameId);
       this.emit('roundStarted', data);
     });
 
@@ -168,3 +162,4 @@ class CrashGameService {
 }
 
 export const crashGameService = new CrashGameService();
+

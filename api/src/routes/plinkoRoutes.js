@@ -5,6 +5,8 @@
  * - Покупка одного шарика
  * - Покупка нескольких шариков сразу
  * - Баланс, история, статистика
+ * 
+ * Защита от race condition: атомарная транзакция в deductBetFromBalance
  */
 
 const express = require('express');
@@ -50,7 +52,6 @@ router.get('/api/v1/plinko/balance', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Balance]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -63,7 +64,7 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { betAmount, tokenId: requestTokenId } = req.body;
-    const tokenId = requestTokenId || 2; // По умолчанию USDT
+    const tokenId = requestTokenId || 2;
 
     if (!betAmount || betAmount <= 0) {
       return res.status(400).json({ success: false, error: 'Укажите ставку' });
@@ -95,18 +96,15 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
       });
     }
 
-    // Списываем ставку
+    // Списываем ставку (АТОМАРНАЯ ОПЕРАЦИЯ - защита от race condition)
     const deductResult = await deductBetFromBalance(userId, parseFloat(betAmount), tokenId);
     if (!deductResult.success) {
       return res.status(400).json({ success: false, error: deductResult.error || 'Недостаточно средств' });
     }
 
     // Генерируем результат
-    console.log(`\n🎮 [PLINKO DROP] userId=${userId}, betAmount=${betAmount}`);
-    console.log(`📊 [PLINKO DROP] PlinkoService.MULTIPLIERS = [${plinkoService.constructor.MULTIPLIERS?.join(', ') || 'NOT FOUND'}]`);
     const gameData = await plinkoService.createGame(userId, tokenId, betAmount);
     const winAmount = parseFloat(gameData.winAmount);
-    console.log(`💰 [PLINKO DROP] gameData.slot=${gameData.slot}, gameData.multiplier=${gameData.multiplier}, winAmount=${winAmount}`);
 
     // Зачисляем выигрыш
     if (winAmount > 0) {
@@ -138,7 +136,6 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Drop]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -151,13 +148,13 @@ router.post('/api/v1/plinko/play', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { betAmount, tokenId: requestTokenId } = req.body;
-    const tokenId = requestTokenId || 2; // По умолчанию USDT, но можно выбрать любую валюту
+    const tokenId = requestTokenId || 2;
 
     if (!betAmount || betAmount <= 0) {
       return res.status(400).json({ success: false, error: 'Укажите ставку' });
     }
 
-    // Списываем ставку
+    // Списываем ставку (АТОМАРНАЯ ОПЕРАЦИЯ - защита от race condition)
     const deductResult = await deductBetFromBalance(userId, parseFloat(betAmount), tokenId);
     if (!deductResult.success) {
       return res.status(400).json({ success: false, error: deductResult.error });
@@ -200,7 +197,6 @@ router.post('/api/v1/plinko/play', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Play]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -229,7 +225,6 @@ router.get('/api/v1/plinko/history', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko History]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -256,7 +251,6 @@ router.get('/api/v1/plinko/stats', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Plinko Stats]', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -302,3 +296,5 @@ router.get('/api/v1/plinko/config', async (req, res) => {
 });
 
 module.exports = router;
+
+

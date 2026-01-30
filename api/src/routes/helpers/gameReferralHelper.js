@@ -16,8 +16,6 @@ const logger = require('../../utils/logger');
  */
 async function getUserBalances(userId, tokenId) {
   try {
-    console.log(`\n💰 [GET BALANCES] userId=${userId}, tokenId=${tokenId}`);
-    
     const [main, bonus] = await Promise.all([
       prisma.balance.findUnique({
         where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } }
@@ -30,17 +28,12 @@ async function getUserBalances(userId, tokenId) {
     const mainAmount = parseFloat(main?.amount?.toString() || '0');
     const bonusAmount = parseFloat(bonus?.amount?.toString() || '0');
 
-    console.log(`   💙 MAIN: ${mainAmount.toFixed(8)}`);
-    console.log(`   💛 BONUS: ${bonusAmount.toFixed(8)}`);
-    console.log(`   📊 TOTAL: ${(mainAmount + bonusAmount).toFixed(8)}\n`);
-
     return {
       main: mainAmount,
       bonus: bonusAmount,
       total: mainAmount + bonusAmount,
     };
   } catch (error) {
-    console.error(`❌ [GET BALANCES] Error:`, error.message);
     logger.error('BALANCE', 'Failed to get user balances', { error: error.message });
     return { main: 0, bonus: 0, total: 0 };
   }
@@ -51,8 +44,6 @@ async function getUserBalances(userId, tokenId) {
  * ПРИОРИТЕТ: BONUS (если активен) → MAIN
  */
 async function determineBalanceForBet(userId, betAmount, tokenId) {
-  console.log(`\n🎯 [DETERMINE BALANCE] userId=${userId}, betAmount=${betAmount.toFixed(8)}`);
-
   try {
     // 1️⃣ Проверяем есть ли активный BONUS
     const activeBonus = await prisma.userBonus.findFirst({
@@ -66,8 +57,6 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
     });
 
     if (activeBonus) {
-      console.log(`   💛 Активный бонус найден (ID=${activeBonus.id})`);
-
       // Проверяем BONUS баланс
       const bonusBalance = await prisma.balance.findUnique({
         where: {
@@ -76,11 +65,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
       });
 
       const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
-      console.log(`   💛 BONUS баланс: ${bonusAmount.toFixed(8)}`);
-
       if (bonusAmount >= betAmount) {
-        console.log(`   ✅ BONUS >= ставке, используем BONUS\n`);
-        
         return { 
           balanceType: 'BONUS', 
           balance: bonusBalance, 
@@ -88,11 +73,9 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
           userBonusId: activeBonus.id
         };
       } else {
-        console.log(`   ❌ BONUS < ставке (${bonusAmount.toFixed(8)} < ${betAmount.toFixed(8)})`);
-      }
+        }
     } else {
-      console.log(`   ℹ️ Нет активного бонуса`);
-    }
+      }
 
     // 2️⃣ Проверяем MAIN баланс
     const mainBalance = await prisma.balance.findUnique({
@@ -102,11 +85,7 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
     });
 
     const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
-    console.log(`   💙 MAIN баланс: ${mainAmount.toFixed(8)}`);
-
     if (mainAmount >= betAmount) {
-      console.log(`   ✅ MAIN >= ставке, используем MAIN\n`);
-      
       return { 
         balanceType: 'MAIN', 
         balance: mainBalance, 
@@ -115,8 +94,6 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
       };
     }
 
-    console.log(`   ❌ Недостаточно средств (MAIN: ${mainAmount.toFixed(8)}, нужно: ${betAmount.toFixed(8)})\n`);
-    
     return { 
       balanceType: 'NONE', 
       balance: null, 
@@ -125,7 +102,6 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
     };
 
   } catch (error) {
-    console.error(`❌ [DETERMINE BALANCE] Error:`, error.message);
     logger.error('BALANCE', 'Failed to determine balance', { error: error.message });
     
     return { 
@@ -139,11 +115,10 @@ async function determineBalanceForBet(userId, betAmount, tokenId) {
 
 /**
  * 💳 Списать ставку с правильного баланса
- * АТОМАРНАЯ ОПЕРАЦИЯ - защита от race condition
+ * АТОМАРНАЯ ОПЕРАЦИЯ с retry логикой для защиты от race condition
  */
-async function deductBetFromBalance(userId, betAmount, tokenId) {
-  console.log(`\n💳 [DEDUCT BET] Списание ставки ${betAmount.toFixed(8)}...`);
-
+async function deductBetFromBalance(userId, betAmount, tokenId, retryCount = 0) {
+  const MAX_RETRIES = 3;
   try {
     // Используем транзакцию для атомарной проверки и списания
     const result = await prisma.$transaction(async (tx) => {
@@ -158,9 +133,6 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
         }
       });
 
-      let balanceType = 'MAIN';
-      let userBonusId = null;
-
       // 2️⃣ Пробуем списать с BONUS (если есть активный бонус)
       if (activeBonus) {
         const bonusBalance = await tx.balance.findUnique({
@@ -169,29 +141,32 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
 
         const bonusAmount = bonusBalance ? parseFloat(bonusBalance.amount.toString()) : 0;
 
-        if (bonusAmount >= betAmount) {
-          // Атомарно списываем с BONUS
-          const updated = await tx.balance.update({
-            where: { id: bonusBalance.id },
+        if (bonusAmount >= betAmount && bonusBalance) {
+          // Условный update - списываем только если баланс >= ставки
+          const updated = await tx.balance.updateMany({
+            where: { 
+              id: bonusBalance.id,
+              amount: { gte: betAmount } // Защита от race condition
+            },
             data: { amount: { decrement: betAmount } }
           });
 
-          const newBalance = parseFloat(updated.amount.toString());
-          
-          // Проверка на отрицательный баланс (защита)
-          if (newBalance < 0) {
-            throw new Error('INSUFFICIENT_BALANCE');
+          if (updated.count > 0) {
+            // Получаем новый баланс
+            const newBalanceRecord = await tx.balance.findUnique({
+              where: { id: bonusBalance.id }
+            });
+            const newBalance = newBalanceRecord ? parseFloat(newBalanceRecord.amount.toString()) : 0;
+            
+            return {
+              success: true,
+              balanceType: 'BONUS',
+              newBalance,
+              fromBonus: true,
+              userBonusId: activeBonus.id
+            };
           }
-
-          console.log(`   ✅ Списано ${betAmount.toFixed(8)} с BONUS. Остаток: ${newBalance.toFixed(8)}`);
-          
-          return {
-            success: true,
-            balanceType: 'BONUS',
-            newBalance,
-            fromBonus: true,
-            userBonusId: activeBonus.id
-          };
+          // Если update.count === 0, баланс изменился между проверкой и обновлением
         }
       }
 
@@ -200,26 +175,35 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
         where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } }
       });
 
-      const mainAmount = mainBalance ? parseFloat(mainBalance.amount.toString()) : 0;
+      if (!mainBalance) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+
+      const mainAmount = parseFloat(mainBalance.amount.toString());
 
       if (mainAmount < betAmount) {
         throw new Error('INSUFFICIENT_BALANCE');
       }
 
-      // Атомарно списываем с MAIN
-      const updated = await tx.balance.update({
-        where: { id: mainBalance.id },
+      // Условный update - списываем только если баланс >= ставки
+      const updated = await tx.balance.updateMany({
+        where: { 
+          id: mainBalance.id,
+          amount: { gte: betAmount } // Защита от race condition
+        },
         data: { amount: { decrement: betAmount } }
       });
 
-      const newBalance = parseFloat(updated.amount.toString());
-      
-      // Проверка на отрицательный баланс (защита)
-      if (newBalance < 0) {
-        throw new Error('INSUFFICIENT_BALANCE');
+      if (updated.count === 0) {
+        // Баланс изменился между проверкой и обновлением - retry
+        throw new Error('BALANCE_CHANGED');
       }
 
-      console.log(`   ✅ Списано ${betAmount.toFixed(8)} с MAIN. Остаток: ${newBalance.toFixed(8)}`);
+      // Получаем новый баланс
+      const newBalanceRecord = await tx.balance.findUnique({
+        where: { id: mainBalance.id }
+      });
+      const newBalance = newBalanceRecord ? parseFloat(newBalanceRecord.amount.toString()) : 0;
 
       return {
         success: true,
@@ -228,20 +212,26 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
         fromBonus: false,
         userBonusId: null
       };
-    }, {
-      isolationLevel: 'Serializable' // Максимальная изоляция для предотвращения race condition
-    });
+    }); // Используем стандартную изоляцию (ReadCommitted)
 
     // Отслеживаем для реферальной системы (вне транзакции, т.к. не критично)
     await trackBet(userId, betAmount, tokenId, result.balanceType);
 
-    console.log(`✅ [DEDUCT BET] УСПЕХ: ${result.balanceType}\n`);
-
     return result;
 
   } catch (error) {
-    if (error.message === 'INSUFFICIENT_BALANCE') {
-      console.log(`❌ [DEDUCT BET] Недостаточно средств`);
+    // Retry при конфликтах записи или изменении баланса
+    const isRetryable = error.message === 'BALANCE_CHANGED' || 
+                        error.code === 'P2034' || // Write conflict
+                        (error.message && error.message.includes('deadlock'));
+    
+    if (isRetryable && retryCount < MAX_RETRIES) {
+      // Небольшая задержка перед retry
+      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+      return deductBetFromBalance(userId, betAmount, tokenId, retryCount + 1);
+    }
+
+    if (error.message === 'INSUFFICIENT_BALANCE' || error.message === 'BALANCE_CHANGED') {
       return { 
         success: false, 
         error: 'Недостаточно средств',
@@ -250,7 +240,6 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
       };
     }
 
-    console.error(`❌ [DEDUCT BET] ОШИБКА:`, error.message);
     logger.error('BALANCE', 'Failed to deduct bet', { error: error.message });
     
     return { 
@@ -267,13 +256,9 @@ async function deductBetFromBalance(userId, betAmount, tokenId) {
  */
 async function trackBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
   try {
-    console.log(`   📊 [TRACK BET] Отслеживаю ставку ${betAmount.toFixed(8)} (${balanceType})`);
-    
     await referralService.processBet(userId, betAmount, tokenId, balanceType);
     
-    console.log(`   ✅ [TRACK BET] Отслежено`);
-  } catch (error) {
-    console.warn(`⚠️ [TRACK BET] Error:`, error.message);
+    } catch (error) {
     logger.warn('BALANCE', 'Failed to track bet', { error: error.message });
   }
 }
@@ -284,8 +269,6 @@ async function trackBet(userId, betAmount, tokenId, balanceType = 'MAIN') {
  */
 async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') {
   try {
-    console.log(`\n🏆 [CREDIT WINNINGS] userId=${userId}, amount=${winAmount.toFixed(8)}, type=${balanceType}`);
-
     const updated = await prisma.balance.upsert({
       where: {
         userId_tokenId_type: { userId, tokenId, type: balanceType }
@@ -302,12 +285,9 @@ async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') 
     });
 
     const newBalance = parseFloat(updated.amount.toString());
-    console.log(`✅ [CREDIT WINNINGS] Выигрыш ${winAmount.toFixed(8)} на ${balanceType}: новый баланс ${newBalance.toFixed(8)}\n`);
-
     return { success: true, newBalance };
 
   } catch (error) {
-    console.error(`❌ [CREDIT WINNINGS] ОШИБКА:`, error.message);
     logger.error('BALANCE', 'Failed to credit winnings', { error: error.message });
     
     return { success: false, error: error.message };
@@ -325,10 +305,7 @@ async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') 
  */
 async function updateWagerAndCheckConversion(userId, wagerAmount, tokenId, userBonusId) {
   try {
-    console.log(`\n💛 [UPDATE WAGER] userId=${userId}, wager=${wagerAmount.toFixed(8)}`);
-
     if (!userBonusId) {
-      console.log(`   ℹ️ Нет bonusId, пропускаем\n`);
       return { converted: false };
     }
 
@@ -337,18 +314,12 @@ async function updateWagerAndCheckConversion(userId, wagerAmount, tokenId, userB
     });
 
     if (!bonus) {
-      console.warn(`   ⚠️ Бонус не найден (ID=${userBonusId})\n`);
       return { converted: false };
     }
-
-    console.log(`   💛 Текущий вейджер: ${bonus.wageredAmount.toString()}`);
-    console.log(`   💛 Требуется: ${bonus.requiredWager.toString()}`);
 
     const currentWagered = parseFloat(bonus.wageredAmount.toString());
     const newWagered = parseFloat((currentWagered + wagerAmount).toFixed(8));
     const requiredNum = parseFloat(bonus.requiredWager.toString());
-
-    console.log(`   💛 Новый вейджер: ${newWagered.toFixed(8)}`);
 
     // Обновляем wageredAmount
     await prisma.userBonus.update({
@@ -356,21 +327,14 @@ async function updateWagerAndCheckConversion(userId, wagerAmount, tokenId, userB
       data: { wageredAmount: newWagered.toString() }
     });
 
-    console.log(`   ✅ Вейджер обновлён`);
-
     // Проверяем выполнен ли вейджер
     if (newWagered >= requiredNum) {
-      console.log(`\n🎊 [UPDATE WAGER] ВЕЙДЖЕР ВЫПОЛНЕН! ${newWagered.toFixed(8)} >= ${requiredNum.toFixed(8)}`);
-      
       return await convertBonusToMain(userId, tokenId, userBonusId);
     }
-
-    console.log(`   📊 Осталось: ${(requiredNum - newWagered).toFixed(8)}\n`);
 
     return { converted: false };
 
   } catch (error) {
-    console.error(`❌ [UPDATE WAGER] ОШИБКА:`, error.message);
     logger.error('BALANCE', 'Failed to update wager', { error: error.message });
     
     return { converted: false, error: error.message };
@@ -385,8 +349,6 @@ async function updateWagerAndCheckConversion(userId, wagerAmount, tokenId, userB
  */
 async function convertBonusToMain(userId, tokenId, userBonusId) {
   try {
-    console.log(`\n💳 [CONVERT] Конвертирую BONUS → MAIN для userId=${userId}`);
-
     // Получаем текущий BONUS баланс
     const bonusBalance = await prisma.balance.findUnique({
       where: {
@@ -395,8 +357,6 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
     });
 
     if (!bonusBalance) {
-      console.warn(`   ⚠️ BONUS баланс не найден`);
-      
       // Всё равно помечаем бонус завершённым
       await prisma.userBonus.update({
         where: { id: userBonusId },
@@ -407,11 +367,7 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
     }
 
     const remainingBonus = parseFloat(bonusBalance.amount.toString());
-    console.log(`   💛 BONUS баланс: ${remainingBonus.toFixed(8)}`);
-
     if (remainingBonus <= 0) {
-      console.log(`   ℹ️ BONUS баланс пуст`);
-      
       // Помечаем бонус завершённым
       await prisma.userBonus.update({
         where: { id: userBonusId },
@@ -429,8 +385,6 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
         data: { amount: '0' }
       });
       
-      console.log(`   ✅ BONUS баланс обнулен`);
-
       // 2. Добавляем в MAIN
       await tx.balance.upsert({
         where: {
@@ -447,8 +401,6 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
         }
       });
       
-      console.log(`   ✅ MAIN баланс +${remainingBonus.toFixed(8)}`);
-
       // 3. Помечаем бонус завершённым
       await tx.userBonus.update({
         where: { id: userBonusId },
@@ -458,10 +410,7 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
         }
       });
       
-      console.log(`   ✅ Бонус помечен завершённым`);
-    });
-
-    console.log(`✅ [CONVERT] Конверсия завершена! ${remainingBonus.toFixed(8)} BONUS → MAIN\n`);
+      });
 
     logger.info('BALANCE', 'Bonus converted to main', {
       userId,
@@ -475,7 +424,6 @@ async function convertBonusToMain(userId, tokenId, userBonusId) {
     };
 
   } catch (error) {
-    console.error(`❌ [CONVERT] ОШИБКА:`, error.message);
     logger.error('BALANCE', 'Failed to convert bonus', { error: error.message });
     
     return { converted: false, error: error.message };
@@ -518,7 +466,6 @@ async function getBalanceForFront(userId, tokenId, tokenSymbol = 'USDT') {
       }
     ];
   } catch (error) {
-    console.error(`❌ [GET BALANCE FOR FRONT] Error:`, error.message);
     logger.error('BALANCE', 'Failed to get balance for front', { error: error.message });
     
     return [
@@ -533,7 +480,6 @@ async function getBalanceForFront(userId, tokenId, tokenSymbol = 'USDT') {
  */
 async function logBalanceState(userId, tokenId, prefix = '') {
   const balances = await getUserBalances(userId, tokenId);
-  console.log(`${prefix}[BALANCE STATE] MAIN=${balances.main.toFixed(8)}, BONUS=${balances.bonus.toFixed(8)}, TOTAL=${balances.total.toFixed(8)}`);
   return balances;
 }
 
@@ -549,3 +495,4 @@ module.exports = {
   convertBonusToMain,
   logBalanceState
 };
+

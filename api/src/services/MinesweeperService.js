@@ -200,12 +200,6 @@ class MinesweeperService {
      */
     async createGame(userId, tokenId, minesCount, betAmount) {
         try {
-            console.log('   ⚙️ [Service.createGame] Параметры:');
-            console.log('      userId:', userId);
-            console.log('      tokenId:', tokenId);
-            console.log('      minesCount:', minesCount);
-            console.log('      betAmount:', betAmount);
-
             // Валидация количества мин
             const gridSize = 5;
             const maxMines = gridSize * gridSize - 1; // Максимум 24 мины на поле 5x5
@@ -216,8 +210,6 @@ class MinesweeperService {
 
             const { grid, minesPositions } = this.generateField(minesCount);
             const initialMultiplier = 1.0;
-
-            console.log('   ✅ Поле сгенерировано');
 
             // Сохраняем minesCount в gameState как метаданные
             const gameStateWithMeta = {
@@ -244,8 +236,6 @@ class MinesweeperService {
                 },
             });
 
-            console.log(`   ✅ Игра создана в БД: ID ${game.id}`);
-
             // Принудительно создаем пустое поле 5x5 для фронтенда
             const emptyGrid = Array(5).fill(null).map(() =>
                 Array(5).fill(null).map(() => ({
@@ -265,12 +255,9 @@ class MinesweeperService {
                 potentialWin: new Decimal(betAmount).mul(initialMultiplier).toString(),
             };
 
-            console.log('   ✅ Ответ подготовлен');
             return response;
 
         } catch (error) {
-            console.error('❌ [Service.createGame] ОШИБКА:', error.message);
-            console.error('   Stack:', error.stack);
             throw error;
         }
     }
@@ -341,8 +328,6 @@ class MinesweeperService {
                     },
                 });
 
-                console.log(`❌ Игра ${gameId}: попадание в мину в позиции [${x}, ${y}]`);
-                
                 const fullRevealedGrid = this.prepareFullRevealedGrid(grid);
                 
                 return {
@@ -362,8 +347,6 @@ class MinesweeperService {
 
             // ✅ БЕЗОПАСНАЯ КЛЕТКА
             const revealedCount = this.countRevealedCells(grid);
-            
-            console.log(`   📊 Расчет множителя: revealedCount=${revealedCount}, minesCount=${minesCount}`);
             
             const currentMultiplier = this.getMultiplier(revealedCount, minesCount);
             const nextMultiplier = this.getNextMultiplier(revealedCount, minesCount);
@@ -395,8 +378,6 @@ class MinesweeperService {
                     where: { id: gameId },
                     data: updateData,
                 });
-
-                console.log(`🎉 Игра ${gameId}: ПОЛНАЯ ПОБЕДА! Выигрыш ${finalWinAmount}`);
 
                 const fullRevealedGrid = this.prepareFullRevealedGrid(grid);
                 
@@ -437,7 +418,6 @@ class MinesweeperService {
             };
             
         } catch (error) {
-            console.error('❌ Ошибка открытия клетки:', error.message);
             throw error;
         }
     }
@@ -471,7 +451,6 @@ class MinesweeperService {
                     gameStateData = JSON.parse(game.gameState);
                 }
             } catch (parseError) {
-                console.error('❌ Ошибка парсинга gameState:', parseError);
                 throw new Error('Некорректный формат gameState');
             }
 
@@ -481,7 +460,6 @@ class MinesweeperService {
 
             // Проверяем, что grid - это массив массивов
             if (!Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0])) {
-                console.error('❌ Некорректный формат grid:', grid);
                 throw new Error('Некорректный формат игрового поля');
             }
 
@@ -525,8 +503,6 @@ class MinesweeperService {
             };
 
         } catch (error) {
-            console.error('❌ Ошибка получения активной игры:', error.message);
-            console.error('   Stack:', error.stack);
             throw error;
         }
     }
@@ -567,8 +543,6 @@ class MinesweeperService {
             const grid = Array.isArray(gameStateData) ? gameStateData : gameStateData.grid;
             const fullRevealedGrid = this.prepareFullRevealedGrid(grid);
 
-            console.log(`💸 Игра ${gameId}: Кэшаут на ${game.multiplier}X. Выигрыш: ${winAmount}`);
-            
             return {
                 status: 'CASHED_OUT',
                 winAmount: winAmount.toString(),
@@ -578,11 +552,12 @@ class MinesweeperService {
             };
 
         } catch (error) {
-            console.error('❌ Ошибка кэшаута:', error.message);
             throw error;
         }
     }
 }
 
 module.exports = new MinesweeperService();
+
+
 

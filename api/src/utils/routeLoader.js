@@ -20,13 +20,10 @@ class RouteLoader {
   loadRoutes() {
     try {
       if (!fs.existsSync(this.routesDir)) {
-        console.warn(`⚠️ Routes directory not found: ${this.routesDir}`);
         return;
       }
 
       const files = fs.readdirSync(this.routesDir);
-
-      console.log('\n🔍 Scanning routes directory...');
 
       for (const file of files) {
         // Пропускаем не-js файлы и специальные файлы
@@ -47,16 +44,12 @@ class RouteLoader {
           // Извлекаем endpoints из router'а
           this.extractEndpoints(file, router);
 
-          console.log(`✅ Loaded: ${file}`);
-        } catch (err) {
-          console.error(`❌ Error loading ${file}:`, err.message);
-        }
+          } catch (err) {
+          }
       }
 
-      console.log(`\n📊 Total routes loaded: ${this.routes.size}\n`);
-    } catch (err) {
-      console.error('❌ Error loading routes:', err);
-    }
+      } catch (err) {
+      }
   }
 
   /**
@@ -64,7 +57,6 @@ class RouteLoader {
    */
   extractEndpoints(fileName, router) {
     if (!router.stack) {
-      console.warn(`⚠️ ${fileName} doesn't have stack property`);
       return;
     }
 
@@ -140,17 +132,13 @@ class RouteLoader {
    * Вывести все загруженные routes в консоль
    */
   printRoutes() {
-    console.log('\n📋 Loaded API Routes:');
-    console.log('=====================\n');
-
     const sortedRoutes = Array.from(this.routes.entries()).sort();
 
     for (const [key, route] of sortedRoutes) {
-      console.log(`${route.method.padEnd(6)} ${route.path.padEnd(40)} → ${key}`);
-    }
+      }
 
-    console.log(`\n📊 Total: ${this.routes.size} routes\n`);
-  }
+    }
 }
 
 module.exports = RouteLoader;
+
