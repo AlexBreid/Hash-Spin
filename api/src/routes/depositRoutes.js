@@ -721,7 +721,10 @@ router.post('/api/v1/deposit/stars/invoice', authenticateToken, async (req, res)
     // Создаём инвойс через бота
     const { botInstance } = require('../bots/telegramBot');
     
+    logger.info('STARS', 'Creating invoice', { userId, amount, botAvailable: !!botInstance });
+    
     if (!botInstance) {
+      logger.error('STARS', 'Bot instance not available');
       return res.status(500).json({
         success: false,
         message: 'Telegram бот недоступен'
@@ -735,6 +738,12 @@ router.post('/api/v1/deposit/stars/invoice', authenticateToken, async (req, res)
       withBonus || false
     );
     
+    logger.info('STARS', 'Invoice params created', { 
+      title: invoiceParams.title,
+      currency: 'XTR',
+      amount: invoiceParams.prices[0].amount
+    });
+    
     // Создаём инвойс и получаем ссылку
     const invoiceLink = await botInstance.telegram.createInvoiceLink({
       title: invoiceParams.title,
@@ -745,11 +754,14 @@ router.post('/api/v1/deposit/stars/invoice', authenticateToken, async (req, res)
       prices: invoiceParams.prices
     });
     
-    logger.info('DEPOSIT', 'Stars invoice created', {
+    logger.info('STARS', 'Invoice link created successfully', {
       userId,
       amount,
-      invoiceId: pendingDeposit.invoiceId
+      invoiceId: pendingDeposit.invoiceId,
+      invoiceLinkLength: invoiceLink?.length || 0
     });
+    
+    console.log('⭐ STARS Invoice Link:', invoiceLink);
     
     res.json({
       success: true,
@@ -763,9 +775,17 @@ router.post('/api/v1/deposit/stars/invoice', authenticateToken, async (req, res)
     });
     
   } catch (error) {
+    logger.error('STARS', 'Failed to create invoice', { 
+      error: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    console.error('⭐ STARS Error:', error);
+    
     res.status(500).json({
       success: false,
-      message: error.message || 'Ошибка создания инвойса Stars'
+      message: error.message || 'Ошибка создания инвойса Stars',
+      error: error.code || 'UNKNOWN'
     });
   }
 });
@@ -835,6 +855,54 @@ router.get('/api/v1/deposit/stars/balance', authenticateToken, async (req, res) 
     res.status(500).json({
       success: false,
       message: error.message || 'Ошибка получения баланса Stars'
+    });
+  }
+});
+
+/**
+ * ⭐ GET /api/v1/deposit/stars/test
+ * Тестовый эндпоинт для проверки создания Stars инвойса
+ */
+router.get('/api/v1/deposit/stars/test', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Получаем инстанс бота
+    const { botInstance } = require('../bots/telegramBot');
+    
+    if (!botInstance) {
+      return res.status(500).json({
+        success: false,
+        message: 'Telegram бот недоступен',
+        error: 'BOT_NOT_AVAILABLE'
+      });
+    }
+    
+    // Пробуем создать тестовый инвойс
+    const testInvoice = await botInstance.telegram.createInvoiceLink({
+      title: '⭐ Тест Stars',
+      description: 'Тестовый инвойс для проверки Stars',
+      payload: JSON.stringify({ type: 'test', userId, timestamp: Date.now() }),
+      provider_token: '', // Пустой для Stars!
+      currency: 'XTR',
+      prices: [{ label: '50 Stars', amount: 50 }]
+    });
+    
+    res.json({
+      success: true,
+      message: 'Stars инвойс создан успешно!',
+      data: {
+        invoiceLink: testInvoice,
+        note: 'Откройте эту ссылку в Telegram для оплаты'
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка создания Stars инвойса',
+      error: error.message,
+      code: error.code || 'UNKNOWN'
     });
   }
 });
