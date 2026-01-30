@@ -12,6 +12,7 @@ import {
   CreditCard,
   ArrowUpCircle,
   History,
+  Shield,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -33,6 +34,7 @@ interface UserProfile {
     gameType: string;
   };
   createdAt: string;
+  isAdmin?: boolean;
 }
 
 interface ActiveBonus {
@@ -549,6 +551,27 @@ export function AccountPage() {
               <History size={18} style={{ color: COLORS.accent }} />
               <span>История операций</span>
             </motion.button>
+
+            {/* КНОПКА АДМИН-ПАНЕЛИ (только для админов) */}
+            {profileData?.isAdmin && (
+              <motion.button
+                onClick={() => navigate('/admin-withdrawals')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    color-mix(in srgb, #8B5CF6 20%, transparent), 
+                    color-mix(in srgb, #6D28D9 15%, transparent)
+                  )`,
+                  borderColor: '#8B5CF6',
+                  color: COLORS.foreground,
+                }}
+              >
+                <Shield size={18} style={{ color: '#8B5CF6' }} />
+                <span>Заявки на вывод</span>
+              </motion.button>
+            )}
           </motion.div>
 
           {/* 🎁 АКТИВНЫЙ БОНУС */}

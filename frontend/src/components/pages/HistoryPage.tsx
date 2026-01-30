@@ -46,6 +46,8 @@ interface Transaction {
   txHash?: string;
   walletAddress?: string;
   createdAt: string;
+  rejectReason?: string | null;
+  approvedAt?: string | null;
 }
 
 interface ApiResponse {
@@ -64,18 +66,47 @@ type FilterType = 'all' | 'deposit' | 'withdraw';
 // 🔧 УТИЛИТЫ
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const getStatusInfo = (status: Transaction['status']) => {
+const getStatusInfo = (status: Transaction['status'], type?: Transaction['type']) => {
   switch (status) {
     case 'COMPLETED':
-      return { icon: CheckCircle2, color: COLORS.success, text: 'Выполнено' };
+      return { 
+        icon: CheckCircle2, 
+        color: COLORS.success, 
+        text: type === 'WITHDRAW' ? 'Выплачено' : 'Выполнено',
+        description: type === 'WITHDRAW' ? 'Средства отправлены' : 'Зачислено на счёт'
+      };
     case 'PENDING':
-      return { icon: Clock, color: COLORS.warning, text: 'В обработке' };
+      return { 
+        icon: Clock, 
+        color: COLORS.warning, 
+        text: type === 'WITHDRAW' ? 'На рассмотрении' : 'В обработке',
+        description: type === 'WITHDRAW' 
+          ? 'Заявка проверяется администратором' 
+          : 'Ожидаем подтверждения платежа'
+      };
     case 'FAILED':
-      return { icon: XCircle, color: COLORS.error, text: 'Ошибка' };
+      return { 
+        icon: XCircle, 
+        color: COLORS.error, 
+        text: type === 'WITHDRAW' ? 'Отклонено' : 'Ошибка',
+        description: type === 'WITHDRAW' 
+          ? 'Средства возвращены на баланс' 
+          : 'Не удалось обработать'
+      };
     case 'CANCELLED':
-      return { icon: XCircle, color: COLORS.mutedForeground, text: 'Отменено' };
+      return { 
+        icon: XCircle, 
+        color: COLORS.mutedForeground, 
+        text: 'Отменено',
+        description: 'Операция отменена'
+      };
     default:
-      return { icon: Clock, color: COLORS.mutedForeground, text: status };
+      return { 
+        icon: Clock, 
+        color: COLORS.mutedForeground, 
+        text: status,
+        description: ''
+      };
   }
 };
 
@@ -99,7 +130,9 @@ const getTypeInfo = (type: Transaction['type']) => {
 };
 
 const formatDate = (dateString: string) => {
+  if (!dateString) return '—';
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
@@ -121,7 +154,7 @@ const formatAmount = (amount: string | number): string => {
 
 const TransactionCard = ({ tx, index }: { tx: Transaction; index: number }) => {
   const typeInfo = getTypeInfo(tx.type);
-  const statusInfo = getStatusInfo(tx.status);
+  const statusInfo = getStatusInfo(tx.status, tx.type);
   const TypeIcon = typeInfo.icon;
   const StatusIcon = statusInfo.icon;
 
@@ -180,16 +213,41 @@ const TransactionCard = ({ tx, index }: { tx: Transaction; index: number }) => {
           </span>
         </div>
         
-        <div className="flex items-center gap-1.5">
-          <StatusIcon size={14} style={{ color: statusInfo.color }} />
-          <span style={{ color: statusInfo.color }} className="text-xs font-medium">
-            {statusInfo.text}
-          </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <StatusIcon size={14} style={{ color: statusInfo.color }} />
+            <span style={{ color: statusInfo.color }} className="text-xs font-medium">
+              {statusInfo.text}
+            </span>
+          </div>
+          {statusInfo.description && tx.status === 'PENDING' && (
+            <span style={{ color: COLORS.mutedForeground }} className="text-[10px]">
+              {statusInfo.description}
+            </span>
+          )}
         </div>
       </div>
+      
+      {/* Причина отклонения */}
+      {tx.status === 'FAILED' && tx.rejectReason && (
+        <div 
+          className="mt-3 p-3 rounded-lg"
+          style={{ 
+            background: `color-mix(in srgb, ${COLORS.error} 10%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${COLORS.error} 30%, transparent)`
+          }}
+        >
+          <p style={{ color: COLORS.error }} className="text-xs font-medium mb-1">
+            Причина отклонения:
+          </p>
+          <p style={{ color: COLORS.mutedForeground }} className="text-xs">
+            {tx.rejectReason}
+          </p>
+        </div>
+      )}
 
       {/* TxHash если есть */}
-      {tx.txHash && (
+      {tx.txHash && !tx.txHash.startsWith('auto_') && (
         <div className="mt-2 pt-2 border-t" style={{ borderColor: `color-mix(in srgb, ${COLORS.border} 30%, transparent)` }}>
           <p style={{ color: COLORS.mutedForeground }} className="text-xs truncate">
             TX: {tx.txHash.slice(0, 16)}...{tx.txHash.slice(-8)}

@@ -20,6 +20,8 @@ import DepositPage from './components/pages/DepositPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import PlinkoGame from './components/pages/games/Plinkogame';
 import { HistoryPage } from './components/pages/HistoryPage';
+import { AdminWithdrawalsPage } from './components/pages/AdminWithdrawalsPage';
+import { AccessDeniedPage } from './components/pages/AccessDeniedPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
@@ -35,7 +37,7 @@ import { NotAuthenticated } from './components/pages/NotAuthenticated';
 import { ServerErrorPage } from './components/pages/ServerErrorPage';
 
 // Страницы, требующие авторизации (home и support доступны всем)
-const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'history'];
+const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'history', 'admin-withdrawals'];
 
 // Ключ для localStorage - показывалась ли welcome страница
 const WELCOME_SHOWN_KEY = 'safarix_welcome_shown';
@@ -53,6 +55,9 @@ function AppContent() {
     // Новые состояния для welcome и auth
     const [showWelcome, setShowWelcome] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
+    
+    // Состояние для проверки админа
+    const [isAdmin, setIsAdmin] = useState(false);
     
     // Состояние доступности сервера
     const [serverError, setServerError] = useState(false);
@@ -124,6 +129,7 @@ function AppContent() {
         if (path === '/withdraw') return 'withdraw';
         if (path === '/deposit') return 'deposit';
         if (path === '/history') return 'history';
+        if (path === '/admin-withdrawals' || path === '/admin/withdrawals') return 'admin-withdrawals';
         if (path === '/records') return 'records';
         if (path === '/referrals') return 'referrals';
         if (path === '/account') return 'account';
@@ -138,6 +144,42 @@ function AppContent() {
 
     const [currentPage, setCurrentPage] = useState(getCurrentPageFromURL());
     const [isDarkMode, setIsDarkMode] = useState(true);
+
+    // Проверяем права админа
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            if (!isAuthenticated) {
+                setIsAdmin(false);
+                return;
+            }
+            
+            try {
+                const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+                const token = localStorage.getItem('casino_jwt_token') || localStorage.getItem('authToken') || localStorage.getItem('token');
+                
+                if (!token) {
+                    setIsAdmin(false);
+                    return;
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const profile = data.data || data;
+                    setIsAdmin(profile.isAdmin === true);
+                } else {
+                    setIsAdmin(false);
+                }
+            } catch {
+                setIsAdmin(false);
+            }
+        };
+        
+        checkAdminStatus();
+    }, [isAuthenticated, user?.id]);
 
     // Проверяем доступность бонуса
     useEffect(() => {
@@ -299,6 +341,12 @@ function AppContent() {
                 return <DepositPage onBack={() => handlePageChange('account')} />;
             case 'history':
                 return <HistoryPage />;
+            case 'admin-withdrawals':
+                // Проверяем права админа
+                if (!isAdmin) {
+                    return <AccessDeniedPage />;
+                }
+                return <AdminWithdrawalsPage />;
             case 'records':
                 return <RecordsPage />;
             case 'referrals':
@@ -333,10 +381,11 @@ function AppContent() {
     const isWithdrawPage = currentPage === 'withdraw';
     const isDepositPage = currentPage === 'deposit';
     const isHistoryPage = currentPage === 'history';
+    const isAdminWithdrawalsPage = currentPage === 'admin-withdrawals';
     const isCallbackPage = currentPage === 'callback' || currentPage === 'successful-payment' || currentPage === 'failed-payment';
     const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
     const isFullscreenPage = isGamePage || isCallbackPage;
-    const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage;
+    const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage || isAdminWithdrawalsPage;
 
     // Показываем страницу ошибки сервера
     if (serverCheckDone && serverError) {

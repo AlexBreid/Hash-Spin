@@ -255,3 +255,13 @@ html {
   width: 100% !important;
   height: auto !important;
 }
+
+/* Скрытие скроллбара */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

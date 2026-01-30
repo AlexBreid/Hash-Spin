@@ -161,8 +161,8 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
       setDepositAmount(amount);
       setSelectedToken(token);
 
-      // Если доступен бонус и валюта USDT, показываем выбор бонуса
-      if (bonusInfo?.canUseBonus && token.symbol === 'USDT') {
+      // Если доступен бонус, показываем выбор бонуса для любой криптовалюты
+      if (bonusInfo?.canUseBonus) {
         setStep('BONUS_CHOICE');
       } else {
         // Сразу создаем депозит без бонуса
@@ -381,7 +381,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
                 fontSize: '14px',
                 lineHeight: '1.8'
               }}>
-                <li>+100% к пополнению (до {bonusInfo.limits.maxBonus} USDT)</li>
+                <li>+100% к пополнению (до ${bonusInfo.limits.maxBonus} эквивалент)</li>
                 <li>Отыграй {bonusInfo.limits.wageringMultiplier}x от суммы</li>
                 <li>Выигрыш до {bonusInfo.limits.maxPayoutMultiplier}x</li>
                 <li>Действителен {bonusInfo.limits.bonusExpiryDays} дней</li>
