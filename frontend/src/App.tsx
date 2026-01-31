@@ -35,6 +35,7 @@ import { WelcomePage } from './components/pages/WelcomePage';
 import { AuthModal } from './components/modals/AuthModal';
 import { NotAuthenticated } from './components/pages/NotAuthenticated';
 import { ServerErrorPage } from './components/pages/ServerErrorPage';
+import { BlockedPage } from './components/pages/BlockedPage';
 
 // Страницы, требующие авторизации (home и support доступны всем)
 const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'history', 'admin-withdrawals'];
@@ -63,8 +64,12 @@ function AppContent() {
     const [serverError, setServerError] = useState(false);
     const [serverErrorMessage, setServerErrorMessage] = useState<string | undefined>();
     const [serverCheckDone, setServerCheckDone] = useState(false);
+    
+    // Состояние блокировки IP
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [blockInfo, setBlockInfo] = useState<{ remainingHours?: number; reason?: string }>({});
 
-    // Проверка доступности сервера
+    // Проверка доступности сервера и блокировки
     const checkServerHealth = async () => {
         try {
             const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -77,9 +82,23 @@ function AppContent() {
             
             clearTimeout(timeoutId);
             
+            // Проверяем блокировку IP
+            if (response.status === 429) {
+                const data = await response.json();
+                if (data.blocked) {
+                    setIsBlocked(true);
+                    setBlockInfo({
+                        remainingHours: data.remainingHours || 24,
+                        reason: data.reason
+                    });
+                    return;
+                }
+            }
+            
             if (response.ok) {
                 setServerError(false);
                 setServerErrorMessage(undefined);
+                setIsBlocked(false);
             } else {
                 setServerError(true);
                 setServerErrorMessage(`Сервер вернул ошибку: ${response.status}`);
@@ -97,6 +116,37 @@ function AppContent() {
             setServerCheckDone(true);
         }
     };
+    
+    // Глобальный обработчик для перехвата блокировки при любом запросе
+    useEffect(() => {
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            
+            // Проверяем блокировку
+            if (response.status === 429) {
+                try {
+                    const clonedResponse = response.clone();
+                    const data = await clonedResponse.json();
+                    if (data.blocked && data.error === 'IP_BLOCKED') {
+                        setIsBlocked(true);
+                        setBlockInfo({
+                            remainingHours: data.remainingHours || 24,
+                            reason: data.reason
+                        });
+                    }
+                } catch {
+                    // Игнорируем ошибки парсинга
+                }
+            }
+            
+            return response;
+        };
+        
+        return () => {
+            window.fetch = originalFetch;
+        };
+    }, []);
 
     // Проверяем сервер при загрузке
     useEffect(() => {
@@ -386,6 +436,22 @@ function AppContent() {
     const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
     const isFullscreenPage = isGamePage || isCallbackPage;
     const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage || isAdminWithdrawalsPage;
+
+    // Показываем страницу блокировки IP
+    if (isBlocked) {
+        return (
+            <div className="w-full max-w-[390px] mx-auto overflow-hidden" style={{ height: '100dvh' }}>
+                <BlockedPage 
+                    remainingHours={blockInfo.remainingHours}
+                    reason={blockInfo.reason}
+                    onRetry={() => {
+                        setIsBlocked(false);
+                        checkServerHealth();
+                    }}
+                />
+            </div>
+        );
+    }
 
     // Показываем страницу ошибки сервера
     if (serverCheckDone && serverError) {
