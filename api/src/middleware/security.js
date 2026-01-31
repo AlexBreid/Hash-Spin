@@ -14,18 +14,21 @@ const logger = require('../utils/logger');
 
 // Rate Limiting настройки
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // 1 минута
-const RATE_LIMIT_MAX_REQUESTS = 100;      // Максимум запросов в минуту
+const RATE_LIMIT_MAX_REQUESTS = 200;      // Максимум запросов в минуту (увеличено)
 const RATE_LIMIT_MAX_AUTH_ATTEMPTS = 10;  // Максимум попыток авторизации
-const BLOCK_DURATION_MS = 15 * 60 * 1000; // Блокировка на 15 минут
+const BLOCK_DURATION_MS = 24 * 60 * 60 * 1000; // Блокировка на 24 часа
 
 // Особые лимиты для разных эндпоинтов
 const ENDPOINT_LIMITS = {
-  '/api/v1/auth/': 20,           // Авторизация - строже
-  '/api/v1/wallet/withdraw': 10, // Вывод - очень строго
-  '/api/v1/deposit/': 30,        // Пополнение
-  '/api/v1/crash/bet': 60,       // Ставки в играх
-  '/api/v1/minesweeper/': 60,
-  '/api/v1/plinko/': 60,
+  '/api/v1/auth/': 30,           // Авторизация
+  '/api/v1/wallet/withdraw': 15, // Вывод
+  '/api/v1/deposit/': 50,        // Пополнение
+  '/api/v1/crash/bet': 300,      // Ставки в играх - высокий лимит
+  '/api/v1/crash/': 300,
+  '/api/v1/minesweeper/': 300,   // Игры не должны банить
+  '/api/v1/plinko/': 500,        // Plinko - очень высокий (много быстрых ставок)
+  '/api/v1/wallet/balance': 200, // Баланс часто запрашивается
+  '/api/v1/user/': 150,          // Профиль пользователя
 };
 
 // Белый список IP (не ограничены)
@@ -170,14 +173,19 @@ function rateLimiter(req, res, next) {
   if (isBlocked(ip)) {
     const blockInfo = blockedIPs.get(ip);
     const remainingSeconds = Math.ceil((blockInfo.until - now) / 1000);
+    const remainingHours = Math.ceil(remainingSeconds / 3600);
     
     logger.warn('SECURITY', `Blocked IP attempted access: ${ip}`, { path });
     
     return res.status(429).json({
       success: false,
-      error: 'Too Many Requests',
-      message: `IP заблокирован. Попробуйте через ${remainingSeconds} секунд.`,
-      retryAfter: remainingSeconds
+      error: 'IP_BLOCKED',
+      blocked: true,
+      message: `Ваш IP заблокирован на 24 часа за подозрительную активность.`,
+      reason: blockInfo.reason,
+      blockedAt: blockInfo.blockedAt,
+      retryAfter: remainingSeconds,
+      remainingHours: remainingHours
     });
   }
   
@@ -208,10 +216,20 @@ function rateLimiter(req, res, next) {
     suspicious.lastActivity = now;
     suspiciousActivity.set(ip, suspicious);
     
-    // Если слишком много нарушений - блокируем
-    if (suspicious.violations >= 5) {
+    // Если слишком много нарушений - блокируем (увеличено до 15)
+    if (suspicious.violations >= 15) {
       blockIP(ip, 'Repeated rate limit violations');
       suspicious.violations = 0;
+      
+      return res.status(429).json({
+        success: false,
+        error: 'IP_BLOCKED',
+        blocked: true,
+        message: 'Ваш IP заблокирован на 24 часа за подозрительную активность.',
+        reason: 'Repeated rate limit violations',
+        retryAfter: BLOCK_DURATION_MS / 1000,
+        remainingHours: 24
+      });
     }
     
     const remainingMs = RATE_LIMIT_WINDOW_MS - (now - ipData.windowStart);
@@ -226,9 +244,10 @@ function rateLimiter(req, res, next) {
     
     return res.status(429).json({
       success: false,
-      error: 'Too Many Requests',
+      error: 'RATE_LIMITED',
       message: `Слишком много запросов. Попробуйте через ${remainingSeconds} секунд.`,
-      retryAfter: remainingSeconds
+      retryAfter: remainingSeconds,
+      warningsLeft: 15 - suspicious.violations
     });
   }
   
@@ -373,5 +392,6 @@ module.exports = {
   isBlocked,
   getClientIP,
 };
+
 
 
