@@ -29,6 +29,9 @@ const {
   getSecurityStats 
 } = require('./src/middleware/security');
 
+// 📊 RECORDS: Импортируем сервис рекордов
+const { startRecordsUpdater, stopRecordsUpdater } = require('./src/services/recordsService');
+
 // ====================================
 // ✅ ИСПРАВЛЕНИЕ #10: ВАЛИДАЦИЯ ENV ПЕРЕМЕННЫХ
 // ====================================
@@ -390,6 +393,15 @@ async function startServer() {
       console.log(`   - Webhook: POST ${API_BASE_URL}/webhook/crypto-pay\n`);
     });
 
+    // === ШАГ 6: Запуск сервиса рекордов (обновление каждые 24 часа) ===
+    console.log('📊 Starting Records Updater...');
+    try {
+      startRecordsUpdater();
+      console.log('✅ Records Updater: Started (updates every 24 hours)');
+    } catch (error) {
+      console.warn('⚠️ Records Updater: Failed to start -', error.message);
+    }
+
   } catch (error) {
     console.error('\n❌ CRITICAL: Startup Error:', error);
     process.exit(1);
@@ -416,6 +428,14 @@ async function startServer() {
       } catch (error) {
         console.warn('⚠️ Failed to stop bot:', error.message);
       }
+    }
+
+    // Остановка Records Updater
+    try {
+      stopRecordsUpdater();
+      console.log('✅ Records Updater stopped');
+    } catch (error) {
+      console.warn('⚠️ Failed to stop Records Updater:', error.message);
     }
 
     // Отключение БД

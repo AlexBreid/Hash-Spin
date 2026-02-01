@@ -172,6 +172,51 @@ class CryptoCloudService {
         throw new Error('Invalid response from CryptoCloud: missing uuid');
       }
 
+      // ✅ Проверяем наличие ссылки на оплату
+      if (!invoice.link && !invoice.url && !invoice.pay_url) {
+        logger.error('CRYPTOCLOUD', 'No payment link in invoice', { 
+          invoice: invoice,
+          availableFields: Object.keys(invoice)
+        });
+        // Пробуем получить ссылку через /invoice/info
+      }
+
+      // ✅ Получаем детальную информацию об инвойсе, включая точную сумму к оплате и ссылку
+      let invoiceDetails = null;
+      let paymentLink = invoice.link || invoice.url || invoice.pay_url;
+      
+      try {
+        const detailsResponse = await this.api.post('/invoice/info', {
+          uuids: [invoice.uuid]
+        });
+        if (detailsResponse.data?.result?.length > 0) {
+          invoiceDetails = detailsResponse.data.result[0];
+          
+          // ✅ Пробуем получить ссылку из деталей, если её нет в основном ответе
+          if (!paymentLink) {
+            paymentLink = invoiceDetails.link || invoiceDetails.url || invoiceDetails.pay_url || invoiceDetails.payment_url;
+          }
+          
+          logger.info('CRYPTOCLOUD', 'Invoice details received', {
+            uuid: invoice.uuid,
+            amountCrypto: invoiceDetails.amount_crypto,
+            amountUSD: invoiceDetails.amount_usd,
+            currency: invoiceDetails.currency,
+            paymentLink: paymentLink ? 'found' : 'not found',
+            availableFields: Object.keys(invoiceDetails)
+          });
+        }
+      } catch (detailsError) {
+        logger.warn('CRYPTOCLOUD', 'Could not get invoice details', { error: detailsError.message });
+      }
+
+      // ✅ Если ссылки всё ещё нет, формируем её вручную
+      if (!paymentLink) {
+        // Формат ссылки CryptoCloud: https://cryptocloud.plus/invoice/{uuid}
+        paymentLink = `https://cryptocloud.plus/invoice/${invoice.uuid}`;
+        logger.info('CRYPTOCLOUD', 'Generated payment link manually', { link: paymentLink });
+      }
+
       // Определяем tokenId для сохранения
       let token = null;
       if (cryptoCurrency && cryptoCurrency.includes('_')) {
@@ -211,20 +256,30 @@ class CryptoCloudService {
         amountInUSD: amountInUSD.toFixed(2),
         cryptoCurrency,
         network,
-        payUrl: invoice.link
+        payUrl: paymentLink,
+        amountCrypto: invoiceDetails?.amount_crypto
       });
 
-      // ✅ Возвращаем данные
-      // Пользователь выберет криптовалюту на странице CryptoCloud
+      // ✅ Возвращаем данные с точной суммой к оплате от CryptoCloud
       return {
         invoiceId: invoice.uuid,
         status: invoice.status || 'created',
-        payUrl: invoice.link,  // Ссылка на страницу оплаты CryptoCloud
+        payUrl: paymentLink,  // Ссылка на страницу оплаты CryptoCloud
         orderId: orderId,
-        amount: amountNum,  // Оригинальная сумма в крипте
+        amount: amountNum,  // Оригинальная сумма (введённая пользователем)
         amountUSD: parseFloat(amountInUSD.toFixed(2)),  // Сумма в USD
         currency: cryptoCurrency,  // Выбранная криптовалюта
         network: network,
+        // ✅ Точная сумма к оплате от CryptoCloud (с учётом комиссий)
+        amountToPay: invoiceDetails?.amount_crypto || null,  // Точная сумма крипты к оплате
+        paymentCurrency: invoiceDetails?.currency || null,  // Валюта для оплаты
+        invoiceInfo: invoiceDetails ? {
+          amountCrypto: invoiceDetails.amount_crypto,
+          currency: invoiceDetails.currency,
+          address: invoiceDetails.address,
+          network: invoiceDetails.network,
+          expiresAt: invoiceDetails.expired_at,
+        } : null
       };
 
     } catch (error) {
@@ -357,59 +412,9 @@ class CryptoCloudService {
       amountInUSD: amountInUSD.toFixed(2)
     });
 
-    // ===== ПОПЫТКА 1: Статический кошелёк (только для боевого режима) =====
-    try {
-      const response = await this.api.post('/invoice/static/create', {
-        shop_id: CRYPTO_CLOUD_SHOP_ID,
-        currency: cryptoCloudCurrency,
-        identify: identify
-      });
-
-      if (response.data && response.data.status !== 'error') {
-        const wallet = response.data.result;
-
-        logger.info('CRYPTOCLOUD', 'Static wallet created', {
-          uuid: wallet.uuid,
-          address: wallet.address
-        });
-
-        // Сохраняем pending deposit
-        await prisma.pendingDeposit.create({
-          data: {
-            userId: userIdNum,
-            invoiceId: wallet.uuid,
-            amount: amountNum,
-            asset: cryptoCurrency,
-            network: network,
-            status: 'pending',
-            withBonus: withBonus
-          }
-        });
-
-        // ✅ Статический кошелёк - встроенный виджет
-        return {
-          invoiceId: wallet.uuid,
-          status: 'awaiting_payment',
-          payUrl: null,
-          orderId: `STATIC-${userIdNum}-${Date.now()}`,
-          amount: amountNum,
-          amountUSD: parseFloat(amountInUSD.toFixed(2)),
-          currency: cryptoCurrency,
-          network: network,
-          address: wallet.address,
-          staticWallet: true,
-          warning: `Отправляйте ТОЛЬКО ${cryptoCurrency} (${network}) на этот адрес!`
-        };
-      }
-    } catch (staticError) {
-      // Статические кошельки не работают (тестовый режим)
-      logger.warn('CRYPTOCLOUD', 'Static wallet not available, using regular invoice', {
-        error: staticError.response?.data?.result || staticError.message
-      });
-    }
-
-    // ===== FALLBACK: Обычный инвойс (для тестового режима) =====
-    logger.info('CRYPTOCLOUD', 'Using regular invoice (test mode fallback)');
+    // ✅ ВСЕГДА используем обычный инвойс с payUrl для встраивания iframe
+    // Статические кошельки отключены, чтобы всегда показывать страницу CryptoCloud
+    logger.info('CRYPTOCLOUD', 'Using regular invoice with iframe');
 
     const orderId = `DEPOSIT-${userIdNum}-${Date.now()}`;
     
@@ -441,16 +446,26 @@ class CryptoCloudService {
       }
     });
 
+    // ✅ Получаем ссылку на оплату
+    let paymentLink = invoice.link || invoice.url || invoice.pay_url;
+    
+    // Если ссылки нет, формируем её вручную
+    if (!paymentLink) {
+      paymentLink = `https://cryptocloud.plus/invoice/${invoice.uuid}`;
+      logger.info('CRYPTOCLOUD', 'Generated payment link manually', { link: paymentLink });
+    }
+
     logger.info('CRYPTOCLOUD', 'Regular invoice created', {
       invoiceId: invoice.uuid,
-      payUrl: invoice.link
+      payUrl: paymentLink,
+      invoiceFields: Object.keys(invoice)
     });
 
-    // ⚠️ Обычный инвойс - редирект на CryptoCloud
+    // ✅ Обычный инвойс - всегда используем payUrl для iframe
     return {
       invoiceId: invoice.uuid,
       status: invoice.status || 'created',
-      payUrl: invoice.link,
+      payUrl: paymentLink,  // ✅ Всегда есть ссылка на страницу оплаты
       orderId: orderId,
       amount: amountNum,
       amountUSD: parseFloat(amountInUSD.toFixed(2)),
@@ -459,7 +474,7 @@ class CryptoCloudService {
       address: null,
       staticWallet: false,
       warning: null,
-      testMode: true  // Флаг тестового режима
+      testMode: false  // Убираем флаг тестового режима
     };
   }
 
