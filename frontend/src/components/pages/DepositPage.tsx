@@ -10,7 +10,7 @@ type DepositStep = 'FORM' | 'BONUS_CHOICE' | 'PAYMENT' | 'PENDING' | 'SUCCESS' |
 interface CryptoCloudInvoice {
   invoiceId: string;
   payUrl: string | null;  // null для статического кошелька
-  amount: number;  // Сумма в криптовалюте
+  amount: number;  // Сумма введённая пользователем
   amountUSD?: number;  // Сумма в USD
   currency: string;
   network?: string;
@@ -21,6 +21,16 @@ interface CryptoCloudInvoice {
   staticWallet?: boolean;  // Флаг статического кошелька
   warning?: string;  // Предупреждение
   testMode?: boolean;  // Тестовый режим (без статического кошелька)
+  // ✅ Точная сумма к оплате от CryptoCloud (с комиссиями)
+  amountToPay?: string | number;  // Точная сумма крипты к оплате
+  paymentCurrency?: string;  // Валюта для оплаты
+  invoiceInfo?: {
+    amountCrypto?: string;
+    currency?: string;
+    address?: string;
+    network?: string;
+    expiresAt?: string;
+  };
 }
 
 interface BonusInfo {
@@ -59,6 +69,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
   const [bonusInfo, setBonusInfo] = useState<BonusInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [iframeError, setIframeError] = useState(false);
 
   // Загружаем информацию о бонусе и валютах при монтировании
   useEffect(() => {
@@ -220,6 +231,8 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
 
       setInvoice(data.data);
       setStep('PAYMENT');
+      
+      // ✅ Запускаем мониторинг статуса в фоне
       startPaymentMonitoring(data.data.invoiceId);
     } catch (err) {
       
@@ -242,9 +255,9 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
     }
   };
 
-  // Мониторинг статуса платежа
+  // Мониторинг статуса платежа (в фоне, не меняет шаг)
   const startPaymentMonitoring = (invoiceId: string) => {
-    setStep('PENDING');
+    // ✅ НЕ меняем шаг на PENDING - остаёмся на PAYMENT с iframe CryptoCloud
     
     const interval = setInterval(async () => {
       try {
@@ -300,18 +313,12 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
       setError(null);
     } else if (step === 'BONUS_CHOICE') {
       setStep('FORM');
-    } else if (step === 'PAYMENT' || step === 'PENDING') {
+    } else if (step === 'PAYMENT') {
       setStep('FORM');
       setInvoice(null);
     }
   };
 
-  // Открыть ссылку на оплату
-  const handleOpenPayment = () => {
-    if (invoice?.payUrl) {
-      window.open(invoice.payUrl, '_blank');
-    }
-  };
 
   return (
     <div className="deposit-page">
@@ -430,96 +437,147 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
           </div>
         )}
 
-        {/* STEP 3: ОПЛАТА */}
-        {step === 'PAYMENT' && invoice && (
+        {/* STEP 3: ОПЛАТА - ВСТРОЕННАЯ СТРАНИЦА CRYPTOCLOUD */}
+        {step === 'PAYMENT' && invoice && invoice.payUrl && (
           <div className="payment-section" style={{
-            padding: '24px',
-            background: 'var(--background, #0f1d3a)',
-            borderRadius: '16px',
-            border: '1px solid var(--border, #3b82f640)',
+            width: '100%',
+            height: 'calc(100vh - 140px)',
+            minHeight: '700px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '24px', color: 'var(--text, #fafafa)', marginBottom: '8px' }}>
-                Счет создан
+            {/* Заголовок */}
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '12px',
+              padding: '12px 16px',
+              background: 'var(--background, #0f1d3a)',
+              borderRadius: '12px',
+              flexShrink: 0,
+            }}>
+              <h2 style={{ fontSize: '18px', color: 'var(--text, #fafafa)', marginBottom: '6px' }}>
+                💳 Оплата через CryptoCloud
               </h2>
-              <p style={{ fontSize: '18px', color: 'var(--muted, #a0aac0)', marginBottom: '4px' }}>
-                {invoice.amount.toFixed(2)} {invoice.currency}
-              </p>
               {invoice.withBonus && (
                 <div style={{
-                  marginTop: '12px',
-                  padding: '12px',
+                  marginTop: '6px',
+                  padding: '6px 12px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   borderRadius: '8px',
                   color: '#fff',
-                  fontSize: '14px',
+                  fontSize: '11px',
                 }}>
                   🎁 Бонус +100% будет начислен после оплаты
                 </div>
               )}
             </div>
 
-            <button
-              onClick={handleOpenPayment}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                marginBottom: '16px',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
-            >
-              <CreditCard size={20} />
-              Оплатить через CryptoCloud
-              <ExternalLink size={18} />
-            </button>
-
+            {/* Встроенный iframe с страницей CryptoCloud */}
             <div style={{
-              padding: '16px',
-              background: 'var(--card-bg, #1f2937)',
+              flex: 1,
+              width: '100%',
+              minHeight: '600px',
               borderRadius: '12px',
-              fontSize: '14px',
-              color: 'var(--muted, #a0aac0)',
+              overflow: 'hidden',
+              background: '#fff',
+              border: '1px solid var(--border, #3b82f640)',
+              position: 'relative',
             }}>
-              <p style={{ margin: '0 0 8px 0' }}>
-                📋 <strong>Инструкция:</strong>
-              </p>
-              <ol style={{ margin: '0', paddingLeft: '20px', lineHeight: '1.8' }}>
-                <li>Нажмите кнопку "Оплатить через CryptoCloud"</li>
-                <li>Выберите способ оплаты (криптовалюта)</li>
-                <li>Следуйте инструкциям для завершения платежа</li>
-                <li>После оплаты баланс пополнится автоматически</li>
-              </ol>
-            </div>
-
-            <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              background: 'var(--card-bg, #1f2937)',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: 'var(--muted, #a0aac0)',
-              textAlign: 'center',
-            }}>
-              ID счета: {invoice.invoiceId}
+              {!iframeError ? (
+                <iframe
+                  src={invoice.payUrl}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    display: 'block',
+                  }}
+                  title="CryptoCloud Payment"
+                  allow="payment; fullscreen; camera; microphone"
+                  allowFullScreen
+                  frameBorder="0"
+                  scrolling="yes"
+                  loading="eager"
+                  onError={() => {
+                    setIframeError(true);
+                  }}
+                  onLoad={() => {
+                    setIframeError(false);
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '40px',
+                  textAlign: 'center',
+                }}>
+                  <p style={{ color: 'var(--text, #fafafa)', marginBottom: '20px' }}>
+                    Не удалось загрузить страницу оплаты
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (invoice.payUrl) {
+                        window.open(invoice.payUrl, '_blank');
+                      }
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      background: '#3b82f6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Открыть в новой вкладке
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* STEP 4: ОЖИДАНИЕ ПЛАТЕЖА - ВСТРОЕННЫЙ ВИДЖЕТ */}
-        {step === 'PENDING' && invoice && (
+        {/* Если нет payUrl, показываем старую страницу */}
+        {step === 'PAYMENT' && invoice && !invoice.payUrl && (
+          <div className="payment-section" style={{
+            padding: '24px',
+            background: 'var(--background, #0f1d3a)',
+            borderRadius: '16px',
+            border: '1px solid var(--border, #3b82f640)',
+            textAlign: 'center',
+          }}>
+            <h2 style={{ fontSize: '24px', color: 'var(--text, #fafafa)', marginBottom: '16px' }}>
+              Счет создан ✅
+            </h2>
+            <p style={{ color: 'var(--muted, #a0aac0)', marginBottom: '24px' }}>
+              Ссылка на оплату не получена. Обратитесь в поддержку.
+            </p>
+            <button
+              onClick={onBack}
+              style={{
+                padding: '12px 24px',
+                background: '#3b82f6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Назад
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4: ОЖИДАНИЕ ПЛАТЕЖА - УДАЛЕНО, используем только iframe CryptoCloud */}
+        {false && step === 'PENDING' && invoice && (
           <div className="pending-section" style={{
             padding: '24px',
           }}>
@@ -549,7 +607,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
               marginBottom: '20px',
             }}>
               <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '12px', marginBottom: '8px' }}>
-                Отправьте точно:
+                💰 Отправьте точно (с учётом комиссии сети):
               </p>
               <p style={{ 
                 fontSize: '28px', 
@@ -557,16 +615,30 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
                 color: '#10b981',
                 margin: '0 0 4px 0',
               }}>
-                {invoice.amount} {invoice.currency}
+                {/* Показываем точную сумму от CryptoCloud или введённую пользователем */}
+                {invoice.amountToPay || invoice.invoiceInfo?.amountCrypto || invoice.amount} {invoice.paymentCurrency || invoice.invoiceInfo?.currency || invoice.currency}
               </p>
               {invoice.amountUSD && (
                 <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '14px', margin: '8px 0 0 0' }}>
                   ≈ ${invoice.amountUSD.toFixed(2)} USD
                 </p>
               )}
-              {invoice.network && (
+              {(invoice.invoiceInfo?.network || invoice.network) && (
                 <p style={{ color: 'var(--muted, #a0aac0)', fontSize: '12px', marginTop: '4px' }}>
-                  Сеть: <strong>{invoice.network}</strong>
+                  Сеть: <strong>{invoice.invoiceInfo?.network || invoice.network}</strong>
+                </p>
+              )}
+              {/* Предупреждение о комиссии */}
+              {(invoice.amountToPay || invoice.invoiceInfo?.amountCrypto) && (
+                <p style={{ 
+                  color: '#f59e0b', 
+                  fontSize: '11px', 
+                  marginTop: '12px',
+                  padding: '8px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  borderRadius: '8px',
+                }}>
+                  ⚠️ Сумма включает комиссию сети. Отправьте ровно указанную сумму!
                 </p>
               )}
             </div>
@@ -662,7 +734,7 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
                 )}
                 
                 <button
-                  onClick={handleOpenPayment}
+                  onClick={() => invoice.payUrl && window.open(invoice.payUrl, '_blank')}
                   style={{
                     width: '100%',
                     padding: '16px 24px',

@@ -1,2411 +1,2702 @@
 [
   {
-    "id": "fake-crash-1",
-    "username": "Hellstaff",
-    "score": 1249.43,
-    "gameType": "crash",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-1",
-    "username": "Hellstaff",
-    "score": 1882.33,
-    "gameType": "minesweeper",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-1",
-    "username": "Hellstaff",
-    "score": 2560.12,
-    "gameType": "plinko",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-2",
-    "username": "LØV€ YØỮ",
-    "score": 2189.76,
-    "gameType": "crash",
-    "avatar": "LY",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-2",
-    "username": "LØV€ YØỮ",
-    "score": 2131.18,
-    "gameType": "minesweeper",
-    "avatar": "LY",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-2",
-    "username": "LØV€ YØỮ",
-    "score": 1072.25,
-    "gameType": "plinko",
-    "avatar": "LY",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-3",
-    "username": "ᴜɴɪᴄᴏʀɴ",
-    "score": 2425,
-    "gameType": "crash",
-    "avatar": "ᴜɴ",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-3",
-    "username": "ᴜɴɪᴄᴏʀɴ",
-    "score": 1496.95,
-    "gameType": "minesweeper",
-    "avatar": "ᴜɴ",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-3",
-    "username": "ᴜɴɪᴄᴏʀɴ",
-    "score": 1448.24,
-    "gameType": "plinko",
-    "avatar": "ᴜɴ",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-4",
-    "username": "I ℓ٥ﻻ ﻉ√٥υ",
-    "score": 1716.39,
-    "gameType": "crash",
-    "avatar": "I",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-4",
-    "username": "I ℓ٥ﻻ ﻉ√٥υ",
-    "score": 2958.89,
-    "gameType": "minesweeper",
-    "avatar": "I",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-4",
-    "username": "I ℓ٥ﻻ ﻉ√٥υ",
-    "score": 2814.44,
-    "gameType": "plinko",
-    "avatar": "I",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-5",
-    "username": "Mr_KiLLaURa",
-    "score": 2070.82,
-    "gameType": "crash",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-5",
-    "username": "Mr_KiLLaURa",
-    "score": 1566.08,
-    "gameType": "minesweeper",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-5",
-    "username": "Mr_KiLLaURa",
-    "score": 1522.41,
-    "gameType": "plinko",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-6",
-    "username": "Dominator",
-    "score": 2336.04,
-    "gameType": "crash",
-    "avatar": "DO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-6",
-    "username": "Dominator",
-    "score": 1062.6,
-    "gameType": "minesweeper",
-    "avatar": "DO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-6",
-    "username": "Dominator",
-    "score": 2627.07,
-    "gameType": "plinko",
-    "avatar": "DO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-7",
-    "username": "black coffe",
-    "score": 1559.68,
-    "gameType": "crash",
-    "avatar": "BC",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-7",
-    "username": "black coffe",
-    "score": 2971.26,
-    "gameType": "minesweeper",
-    "avatar": "BC",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-7",
-    "username": "black coffe",
-    "score": 2184.54,
-    "gameType": "plinko",
-    "avatar": "BC",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-8",
-    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
-    "score": 1026.8,
-    "gameType": "crash",
-    "avatar": "_",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-8",
-    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
-    "score": 2342.91,
-    "gameType": "minesweeper",
-    "avatar": "_",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-8",
-    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
-    "score": 2218.92,
-    "gameType": "plinko",
-    "avatar": "_",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-9",
-    "username": "JOEN JUNGKOOK",
-    "score": 2638.05,
-    "gameType": "crash",
-    "avatar": "JJ",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-9",
-    "username": "JOEN JUNGKOOK",
-    "score": 2252.77,
-    "gameType": "minesweeper",
-    "avatar": "JJ",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-9",
-    "username": "JOEN JUNGKOOK",
-    "score": 2694.62,
-    "gameType": "plinko",
-    "avatar": "JJ",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-10",
-    "username": "Darkshaper",
-    "score": 1116.28,
-    "gameType": "crash",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-10",
-    "username": "Darkshaper",
-    "score": 2566.33,
-    "gameType": "minesweeper",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-10",
-    "username": "Darkshaper",
-    "score": 1392.67,
-    "gameType": "plinko",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-11",
-    "username": "Āłł_Ÿøūrš",
-    "score": 2281.34,
-    "gameType": "crash",
-    "avatar": "_R",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-11",
-    "username": "Āłł_Ÿøūrš",
-    "score": 2463.22,
-    "gameType": "minesweeper",
-    "avatar": "_R",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-11",
-    "username": "Āłł_Ÿøūrš",
-    "score": 1359.11,
-    "gameType": "plinko",
-    "avatar": "_R",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-12",
-    "username": "რฉςh",
-    "score": 2921.55,
-    "gameType": "crash",
-    "avatar": "H",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-12",
-    "username": "რฉςh",
-    "score": 2644.38,
-    "gameType": "minesweeper",
-    "avatar": "H",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-12",
-    "username": "რฉςh",
-    "score": 1844.08,
-    "gameType": "plinko",
-    "avatar": "H",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-13",
-    "username": "u n i v e r s e",
-    "score": 2398.32,
-    "gameType": "crash",
-    "avatar": "UN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-13",
-    "username": "u n i v e r s e",
-    "score": 1365.11,
-    "gameType": "minesweeper",
-    "avatar": "UN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-13",
-    "username": "u n i v e r s e",
-    "score": 1202.43,
-    "gameType": "plinko",
-    "avatar": "UN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-14",
-    "username": "GAMER",
-    "score": 2599.94,
-    "gameType": "crash",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-14",
-    "username": "GAMER",
-    "score": 2340.51,
-    "gameType": "minesweeper",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-14",
-    "username": "GAMER",
-    "score": 1549.05,
-    "gameType": "plinko",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-15",
-    "username": "Skillet",
-    "score": 1889.24,
-    "gameType": "crash",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-15",
-    "username": "Skillet",
-    "score": 2963.19,
-    "gameType": "minesweeper",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-15",
-    "username": "Skillet",
-    "score": 1557.84,
-    "gameType": "plinko",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-16",
-    "username": "FEISKO",
-    "score": 1074.92,
-    "gameType": "crash",
-    "avatar": "FE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-16",
-    "username": "FEISKO",
-    "score": 1836.63,
-    "gameType": "minesweeper",
-    "avatar": "FE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-16",
-    "username": "FEISKO",
-    "score": 2010.8,
-    "gameType": "plinko",
-    "avatar": "FE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-17",
-    "username": "Bloodray",
-    "score": 1750.09,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-17",
-    "username": "Bloodray",
-    "score": 2874.46,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-17",
-    "username": "Bloodray",
-    "score": 1182.73,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-18",
-    "username": "AnnyMars",
-    "score": 2360.54,
-    "gameType": "crash",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-18",
-    "username": "AnnyMars",
-    "score": 2496.62,
-    "gameType": "minesweeper",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-18",
-    "username": "AnnyMars",
-    "score": 1600.49,
-    "gameType": "plinko",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-19",
-    "username": "Delan",
-    "score": 2211.99,
-    "gameType": "crash",
-    "avatar": "DE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-19",
-    "username": "Delan",
-    "score": 1918.69,
-    "gameType": "minesweeper",
-    "avatar": "DE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-19",
-    "username": "Delan",
-    "score": 1066.17,
-    "gameType": "plinko",
-    "avatar": "DE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-20",
-    "username": "Simple",
-    "score": 1341.16,
-    "gameType": "crash",
-    "avatar": "SI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-20",
-    "username": "Simple",
-    "score": 2011.32,
-    "gameType": "minesweeper",
-    "avatar": "SI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-20",
-    "username": "Simple",
-    "score": 2542.86,
-    "gameType": "plinko",
-    "avatar": "SI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-21",
-    "username": "Alien",
-    "score": 2317.48,
-    "gameType": "crash",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-21",
-    "username": "Alien",
-    "score": 2075.13,
-    "gameType": "minesweeper",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-21",
-    "username": "Alien",
-    "score": 2630.5,
-    "gameType": "plinko",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-22",
-    "username": "Blackseeker",
-    "score": 2382.77,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-22",
-    "username": "Blackseeker",
-    "score": 1702.05,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-22",
-    "username": "Blackseeker",
-    "score": 1164.54,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-23",
-    "username": "Crazy",
-    "score": 2146.75,
-    "gameType": "crash",
-    "avatar": "CR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-23",
-    "username": "Crazy",
-    "score": 2085.48,
-    "gameType": "minesweeper",
-    "avatar": "CR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-23",
-    "username": "Crazy",
-    "score": 2438.75,
-    "gameType": "plinko",
-    "avatar": "CR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-24",
-    "username": "Dark_Sun",
-    "score": 2398.43,
-    "gameType": "crash",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-24",
-    "username": "Dark_Sun",
-    "score": 1924.13,
-    "gameType": "minesweeper",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-24",
-    "username": "Dark_Sun",
-    "score": 1192.27,
-    "gameType": "plinko",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-25",
-    "username": "Kerry",
-    "score": 1050.03,
-    "gameType": "crash",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-25",
-    "username": "Kerry",
-    "score": 1403.59,
-    "gameType": "minesweeper",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-25",
-    "username": "Kerry",
-    "score": 1228.71,
-    "gameType": "plinko",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-26",
-    "username": "mym Ђудęm ęгσ НuK",
-    "score": 2421.82,
-    "gameType": "crash",
-    "avatar": "MM",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-26",
-    "username": "mym Ђудęm ęгσ НuK",
-    "score": 2518.8,
-    "gameType": "minesweeper",
-    "avatar": "MM",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-26",
-    "username": "mym Ђудęm ęгσ НuK",
-    "score": 1458.81,
-    "gameType": "plinko",
-    "avatar": "MM",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-27",
-    "username": "Bloodfire",
-    "score": 1063.62,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-27",
-    "username": "Bloodfire",
-    "score": 1423.16,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-27",
-    "username": "Bloodfire",
-    "score": 2751.18,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-28",
-    "username": "ℓo√ﻉ",
-    "score": 1769.03,
-    "gameType": "crash",
-    "avatar": "O",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-28",
-    "username": "ℓo√ﻉ",
-    "score": 1389.73,
-    "gameType": "minesweeper",
-    "avatar": "O",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-28",
-    "username": "ℓo√ﻉ",
-    "score": 1164.27,
-    "gameType": "plinko",
-    "avatar": "O",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-29",
-    "username": "Black_Hawk_Down",
-    "score": 1253.9,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-29",
-    "username": "Black_Hawk_Down",
-    "score": 1685.66,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-29",
-    "username": "Black_Hawk_Down",
-    "score": 2823.8,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-30",
-    "username": "Cherry The Countess",
-    "score": 1844.31,
-    "gameType": "crash",
-    "avatar": "CT",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-30",
-    "username": "Cherry The Countess",
-    "score": 1017.47,
-    "gameType": "minesweeper",
-    "avatar": "CT",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-30",
-    "username": "Cherry The Countess",
-    "score": 2872.27,
-    "gameType": "plinko",
-    "avatar": "CT",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-31",
-    "username": "Aria",
-    "score": 2227.97,
-    "gameType": "crash",
-    "avatar": "AR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-31",
-    "username": "Aria",
-    "score": 1174.47,
-    "gameType": "minesweeper",
-    "avatar": "AR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-31",
-    "username": "Aria",
-    "score": 1650.29,
-    "gameType": "plinko",
-    "avatar": "AR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-32",
-    "username": "Mr_Mix",
-    "score": 2218.55,
-    "gameType": "crash",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-32",
-    "username": "Mr_Mix",
-    "score": 2161.6,
-    "gameType": "minesweeper",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-32",
-    "username": "Mr_Mix",
-    "score": 1841.04,
-    "gameType": "plinko",
-    "avatar": "MR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-33",
-    "username": "Anen",
-    "score": 1634.92,
-    "gameType": "crash",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-33",
-    "username": "Anen",
-    "score": 1902.74,
-    "gameType": "minesweeper",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-33",
-    "username": "Anen",
-    "score": 2186.49,
-    "gameType": "plinko",
-    "avatar": "AN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-34",
-    "username": "Kirizan",
-    "score": 2819.8,
-    "gameType": "crash",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-34",
-    "username": "Kirizan",
-    "score": 2602.6,
-    "gameType": "minesweeper",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-34",
-    "username": "Kirizan",
-    "score": 1027.31,
-    "gameType": "plinko",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-35",
-    "username": "Lightseeker",
-    "score": 1144.17,
-    "gameType": "crash",
-    "avatar": "LI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-35",
-    "username": "Lightseeker",
-    "score": 1216.93,
-    "gameType": "minesweeper",
-    "avatar": "LI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-35",
-    "username": "Lightseeker",
-    "score": 1262.77,
-    "gameType": "plinko",
-    "avatar": "LI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-36",
-    "username": "WOGY",
-    "score": 1571.54,
-    "gameType": "crash",
-    "avatar": "WO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-36",
-    "username": "WOGY",
-    "score": 1568.46,
-    "gameType": "minesweeper",
-    "avatar": "WO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-36",
-    "username": "WOGY",
-    "score": 1553.03,
-    "gameType": "plinko",
-    "avatar": "WO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-37",
-    "username": "Quemal",
-    "score": 2885.57,
-    "gameType": "crash",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-37",
-    "username": "Quemal",
-    "score": 1677.57,
-    "gameType": "minesweeper",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-37",
-    "username": "Quemal",
-    "score": 2823.04,
-    "gameType": "plinko",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-38",
-    "username": "iSlate",
-    "score": 1695.33,
-    "gameType": "crash",
-    "avatar": "IS",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-38",
-    "username": "iSlate",
-    "score": 1821.18,
-    "gameType": "minesweeper",
-    "avatar": "IS",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-38",
-    "username": "iSlate",
-    "score": 2884.59,
-    "gameType": "plinko",
-    "avatar": "IS",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-39",
-    "username": "Blackstalker",
-    "score": 1469.12,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-39",
-    "username": "Blackstalker",
-    "score": 2201.25,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-39",
-    "username": "Blackstalker",
-    "score": 2766.72,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-40",
-    "username": "Loni",
-    "score": 1291.39,
-    "gameType": "crash",
-    "avatar": "LO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-40",
-    "username": "Loni",
-    "score": 1958.58,
-    "gameType": "minesweeper",
-    "avatar": "LO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-40",
-    "username": "Loni",
-    "score": 2382.05,
-    "gameType": "plinko",
-    "avatar": "LO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-41",
+    "id": "fake-minesweeper-41-1769874973220",
     "username": "Nuliax",
-    "score": 2195.19,
-    "gameType": "crash",
-    "avatar": "NU",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-41",
-    "username": "Nuliax",
-    "score": 1926.78,
+    "score": 2200.74,
     "gameType": "minesweeper",
     "avatar": "NU",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-plinko-41",
+    "id": "fake-crash-56-1769874973220",
+    "username": "DrayLOVE",
+    "score": 2071.07,
+    "gameType": "crash",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-49-1769874973220",
+    "username": "Juce",
+    "score": 1624.29,
+    "gameType": "minesweeper",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-95-1769874973220",
+    "username": "AfinaS",
+    "score": 2048.08,
+    "gameType": "plinko",
+    "avatar": "AF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-34-1769874973220",
+    "username": "Kirizan",
+    "score": 956.3,
+    "gameType": "plinko",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-32-1769874973220",
+    "username": "Mr_Mix",
+    "score": 2086.79,
+    "gameType": "minesweeper",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-33-1769874973220",
+    "username": "Anen",
+    "score": 2290.25,
+    "gameType": "plinko",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-71-1769874973220",
+    "username": "DART-SKRIMER",
+    "score": 2010.28,
+    "gameType": "plinko",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-1-1769874973220",
+    "username": "Hellstaff",
+    "score": 1902.07,
+    "gameType": "minesweeper",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-62-1769874973220",
+    "username": "Halloween",
+    "score": 1899.53,
+    "gameType": "crash",
+    "avatar": "HA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-58-1769874973220",
+    "username": "Xisyaco",
+    "score": 1263.6,
+    "gameType": "minesweeper",
+    "avatar": "XI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-61-1769874973220",
+    "username": "Gralinda",
+    "score": 1868.77,
+    "gameType": "crash",
+    "avatar": "GR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-73-1769874973220",
+    "username": "Dr.What",
+    "score": 3113.32,
+    "gameType": "plinko",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-54-1769874973220",
+    "username": "Topmen",
+    "score": 1664.65,
+    "gameType": "crash",
+    "avatar": "TO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-16-1769874973220",
+    "username": "FEISKO",
+    "score": 1141.85,
+    "gameType": "crash",
+    "avatar": "FE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-20-1769874973220",
+    "username": "Simple",
+    "score": 1199.85,
+    "gameType": "crash",
+    "avatar": "SI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-15-1769874973220",
+    "username": "Skillet",
+    "score": 1937.88,
+    "gameType": "crash",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-99-1769874973220",
+    "username": "Forest Hänter",
+    "score": 1031.12,
+    "gameType": "minesweeper",
+    "avatar": "FH",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-95-1769874973220",
+    "username": "AfinaS",
+    "score": 2262.29,
+    "gameType": "minesweeper",
+    "avatar": "AF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-47-1769874973220",
+    "username": "breakingthesystem",
+    "score": 1938.3,
+    "gameType": "minesweeper",
+    "avatar": "BR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-26-1769874973220",
+    "username": "mym Ђудęm ęгσ НuK",
+    "score": 2097.71,
+    "gameType": "crash",
+    "avatar": "MM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-35-1769874973220",
+    "username": "Lightseeker",
+    "score": 1342.9,
+    "gameType": "minesweeper",
+    "avatar": "LI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-98-1769874973220",
+    "username": "Erennge",
+    "score": 1826.23,
+    "gameType": "plinko",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-10-1769874973220",
+    "username": "Darkshaper",
+    "score": 1389.6,
+    "gameType": "plinko",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-88-1769874973220",
+    "username": "Hellblade",
+    "score": 1942.59,
+    "gameType": "minesweeper",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-81-1769874973220",
+    "username": "someone",
+    "score": 2530.32,
+    "gameType": "crash",
+    "avatar": "SO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-50-1769874973220",
+    "username": "Modar",
+    "score": 1851.41,
+    "gameType": "plinko",
+    "avatar": "MO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-68-1769874973220",
+    "username": "Never mind",
+    "score": 1213.73,
+    "gameType": "plinko",
+    "avatar": "NM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-31-1769874973220",
+    "username": "Aria",
+    "score": 2317.88,
+    "gameType": "crash",
+    "avatar": "AR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-50-1769874973220",
+    "username": "Modar",
+    "score": 1162.57,
+    "gameType": "minesweeper",
+    "avatar": "MO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-36-1769874973220",
+    "username": "WOGY",
+    "score": 1742.91,
+    "gameType": "minesweeper",
+    "avatar": "WO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-80-1769874973220",
+    "username": "Not for you",
+    "score": 2379.01,
+    "gameType": "crash",
+    "avatar": "NF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-64-1769874973220",
+    "username": "Manesenci",
+    "score": 897.12,
+    "gameType": "plinko",
+    "avatar": "MA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-78-1769874973220",
+    "username": "Knights from Bernin",
+    "score": 1821.78,
+    "gameType": "minesweeper",
+    "avatar": "KF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-66-1769874973220",
+    "username": "Blackbrand",
+    "score": 1716.26,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-30-1769874973220",
+    "username": "Cherry The Countess",
+    "score": 974.71,
+    "gameType": "minesweeper",
+    "avatar": "CT",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-9-1769874973220",
+    "username": "JOEN JUNGKOOK",
+    "score": 2997.26,
+    "gameType": "plinko",
+    "avatar": "JJ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-59-1769874973220",
+    "username": "Alsantrius",
+    "score": 2104.56,
+    "gameType": "plinko",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-28-1769874973220",
+    "username": "ℓo√ﻉ",
+    "score": 1192.11,
+    "gameType": "minesweeper",
+    "avatar": "O",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-90-1769874973220",
+    "username": "hotmilk",
+    "score": 1017.26,
+    "gameType": "crash",
+    "avatar": "HO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-5-1769874973220",
+    "username": "Mr_KiLLaURa",
+    "score": 1431.67,
+    "gameType": "minesweeper",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-31-1769874973220",
+    "username": "Aria",
+    "score": 1270.51,
+    "gameType": "minesweeper",
+    "avatar": "AR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-46-1769874973220",
+    "username": "Miromice",
+    "score": 2112.26,
+    "gameType": "minesweeper",
+    "avatar": "MI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-41-1769874973220",
     "username": "Nuliax",
-    "score": 2087.54,
+    "score": 1929.82,
+    "gameType": "crash",
+    "avatar": "NU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-12-1769874973220",
+    "username": "რฉςh",
+    "score": 2492.41,
+    "gameType": "crash",
+    "avatar": "H",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-85-1769874973220",
+    "username": "Error parents",
+    "score": 1150.13,
+    "gameType": "crash",
+    "avatar": "EP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-48-1769874973220",
+    "username": "Jay",
+    "score": 2418.13,
+    "gameType": "plinko",
+    "avatar": "JA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-42-1769874973220",
+    "username": "GawelleN",
+    "score": 2082.72,
+    "gameType": "crash",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-13-1769874973220",
+    "username": "u n i v e r s e",
+    "score": 1025.95,
+    "gameType": "plinko",
+    "avatar": "UN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-7-1769874973220",
+    "username": "black coffe",
+    "score": 1420.5,
+    "gameType": "crash",
+    "avatar": "BC",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-79-1769874973220",
+    "username": "LOVE NEW YORK",
+    "score": 3165.57,
+    "gameType": "crash",
+    "avatar": "LN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-88-1769874973220",
+    "username": "Hellblade",
+    "score": 2646.16,
+    "gameType": "plinko",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-27-1769874973220",
+    "username": "Bloodfire",
+    "score": 1128.43,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-32-1769874973220",
+    "username": "Mr_Mix",
+    "score": 2523.22,
+    "gameType": "crash",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-43-1769874973220",
+    "username": "Ironfire",
+    "score": 2050.9,
+    "gameType": "minesweeper",
+    "avatar": "IR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-60-1769874973220",
+    "username": "Envias",
+    "score": 1518.38,
+    "gameType": "crash",
+    "avatar": "EN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-20-1769874973220",
+    "username": "Simple",
+    "score": 2824.01,
+    "gameType": "plinko",
+    "avatar": "SI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-97-1769874973220",
+    "username": "Elastic Skunk",
+    "score": 2588.51,
+    "gameType": "plinko",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-70-1769874973220",
+    "username": "your problem",
+    "score": 2523.86,
+    "gameType": "plinko",
+    "avatar": "YP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-42-1769874973220",
+    "username": "GawelleN",
+    "score": 1214.44,
+    "gameType": "plinko",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-9-1769874973220",
+    "username": "JOEN JUNGKOOK",
+    "score": 2887.63,
+    "gameType": "crash",
+    "avatar": "JJ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-82-1769874973220",
+    "username": "Zipp↙️",
+    "score": 1291.45,
+    "gameType": "plinko",
+    "avatar": "ZI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-89-1769874973220",
+    "username": "HELLO",
+    "score": 2531.7,
+    "gameType": "minesweeper",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-18-1769874973220",
+    "username": "AnnyMars",
+    "score": 2309.15,
+    "gameType": "crash",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-23-1769874973220",
+    "username": "Crazy",
+    "score": 2060.49,
+    "gameType": "crash",
+    "avatar": "CR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-65-1769874973220",
+    "username": "SkyHorz",
+    "score": 2648.13,
+    "gameType": "minesweeper",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-80-1769874973220",
+    "username": "Not for you",
+    "score": 3100.43,
+    "gameType": "minesweeper",
+    "avatar": "NF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-53-1769874973220",
+    "username": "Bliss",
+    "score": 1553.25,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-78-1769874973220",
+    "username": "Knights from Bernin",
+    "score": 2330.47,
+    "gameType": "plinko",
+    "avatar": "KF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-86-1769874973220",
+    "username": "Eyalanev",
+    "score": 3295.9,
+    "gameType": "plinko",
+    "avatar": "EY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-55-1769874973220",
+    "username": "Dark Devil",
+    "score": 1733.33,
+    "gameType": "minesweeper",
+    "avatar": "DD",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-11-1769874973220",
+    "username": "Āłł_Ÿøūrš",
+    "score": 2272.7,
+    "gameType": "minesweeper",
+    "avatar": "_R",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-14-1769874973220",
+    "username": "GAMER",
+    "score": 2212.51,
+    "gameType": "minesweeper",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-37-1769874973220",
+    "username": "Quemal",
+    "score": 2989.42,
+    "gameType": "plinko",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-27-1769874973220",
+    "username": "Bloodfire",
+    "score": 1373.68,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-25-1769874973220",
+    "username": "Kerry",
+    "score": 1222.85,
+    "gameType": "plinko",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-99-1769874973220",
+    "username": "Forest Hänter",
+    "score": 2213.39,
+    "gameType": "plinko",
+    "avatar": "FH",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-45-1769874973220",
+    "username": "Kitaxe",
+    "score": 2660.63,
+    "gameType": "plinko",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-4-1769874973220",
+    "username": "I ℓ٥ﻻ ﻉ√٥υ",
+    "score": 1958.56,
+    "gameType": "crash",
+    "avatar": "I",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-27-1769874973220",
+    "username": "Bloodfire",
+    "score": 3122.87,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-17-1769874973220",
+    "username": "Bloodray",
+    "score": 1971.99,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-33-1769874973220",
+    "username": "Anen",
+    "score": 1445.9,
+    "gameType": "crash",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-100-1769874973220",
+    "username": "Funny duck",
+    "score": 1435.83,
+    "gameType": "minesweeper",
+    "avatar": "FD",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-55-1769874973220",
+    "username": "Dark Devil",
+    "score": 1179.78,
+    "gameType": "plinko",
+    "avatar": "DD",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-18-1769874973220",
+    "username": "AnnyMars",
+    "score": 2690.4,
+    "gameType": "minesweeper",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-79-1769874973220",
+    "username": "LOVE NEW YORK",
+    "score": 2673.96,
+    "gameType": "minesweeper",
+    "avatar": "LN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-77-1769874973220",
+    "username": "Kakashkaliandiia",
+    "score": 3111.16,
+    "gameType": "plinko",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-60-1769874973220",
+    "username": "Envias",
+    "score": 1708.3,
+    "gameType": "minesweeper",
+    "avatar": "EN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-94-1769874973220",
+    "username": "Tempus",
+    "score": 2681.82,
+    "gameType": "plinko",
+    "avatar": "TE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-63-1769874973220",
+    "username": "krot",
+    "score": 1274.32,
+    "gameType": "crash",
+    "avatar": "KR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-26-1769874973220",
+    "username": "mym Ђудęm ęгσ НuK",
+    "score": 1619.94,
+    "gameType": "plinko",
+    "avatar": "MM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-57-1769874973220",
+    "username": "Kit",
+    "score": 1796.53,
+    "gameType": "minesweeper",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-21-1769874973220",
+    "username": "Alien",
+    "score": 2649.68,
+    "gameType": "plinko",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-83-1769874973220",
+    "username": "do not",
+    "score": 1889.53,
+    "gameType": "minesweeper",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-51-1769874973220",
+    "username": "Kizshura",
+    "score": 1532.6,
+    "gameType": "minesweeper",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-29-1769874973220",
+    "username": "Black_Hawk_Down",
+    "score": 1387.71,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-89-1769874973220",
+    "username": "HELLO",
+    "score": 1506.75,
+    "gameType": "plinko",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-92-1769874973220",
+    "username": "Kamick",
+    "score": 959.61,
+    "gameType": "minesweeper",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-45-1769874973220",
+    "username": "Kitaxe",
+    "score": 1168.98,
+    "gameType": "minesweeper",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-59-1769874973220",
+    "username": "Alsantrius",
+    "score": 3139.62,
+    "gameType": "minesweeper",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-86-1769874973220",
+    "username": "Eyalanev",
+    "score": 1714.69,
+    "gameType": "crash",
+    "avatar": "EY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-43-1769874973220",
+    "username": "Ironfire",
+    "score": 2092.1,
+    "gameType": "crash",
+    "avatar": "IR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-92-1769874973220",
+    "username": "Kamick",
+    "score": 2398.89,
+    "gameType": "crash",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-97-1769874973220",
+    "username": "Elastic Skunk",
+    "score": 2319.72,
+    "gameType": "crash",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-54-1769874973220",
+    "username": "Topmen",
+    "score": 2446.3,
+    "gameType": "minesweeper",
+    "avatar": "TO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-93-1769874973220",
+    "username": "Oveley",
+    "score": 1488.45,
+    "gameType": "plinko",
+    "avatar": "OV",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-68-1769874973220",
+    "username": "Never mind",
+    "score": 1692.52,
+    "gameType": "minesweeper",
+    "avatar": "NM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-19-1769874973220",
+    "username": "Delan",
+    "score": 958.96,
+    "gameType": "plinko",
+    "avatar": "DE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-83-1769874973220",
+    "username": "do not",
+    "score": 1575.41,
+    "gameType": "crash",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-28-1769874973220",
+    "username": "ℓo√ﻉ",
+    "score": 1245.46,
+    "gameType": "plinko",
+    "avatar": "O",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-82-1769874973220",
+    "username": "Zipp↙️",
+    "score": 2575.25,
+    "gameType": "crash",
+    "avatar": "ZI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-24-1769874973220",
+    "username": "Dark_Sun",
+    "score": 2065.02,
+    "gameType": "minesweeper",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-15-1769874973220",
+    "username": "Skillet",
+    "score": 2607.04,
+    "gameType": "minesweeper",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-33-1769874973220",
+    "username": "Anen",
+    "score": 2008.72,
+    "gameType": "minesweeper",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-45-1769874973220",
+    "username": "Kitaxe",
+    "score": 1851.37,
+    "gameType": "crash",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-3-1769874973220",
+    "username": "ᴜɴɪᴄᴏʀɴ",
+    "score": 1427.99,
+    "gameType": "plinko",
+    "avatar": "ᴜɴ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-20-1769874973220",
+    "username": "Simple",
+    "score": 1787.6,
+    "gameType": "minesweeper",
+    "avatar": "SI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-96-1769874973220",
+    "username": "Azago",
+    "score": 1763.9,
+    "gameType": "crash",
+    "avatar": "AZ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-15-1769874973220",
+    "username": "Skillet",
+    "score": 1639.5,
+    "gameType": "plinko",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-89-1769874973220",
+    "username": "HELLO",
+    "score": 2738.67,
+    "gameType": "crash",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-36-1769874973220",
+    "username": "WOGY",
+    "score": 1421.31,
+    "gameType": "crash",
+    "avatar": "WO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-80-1769874973220",
+    "username": "Not for you",
+    "score": 2575.37,
+    "gameType": "plinko",
+    "avatar": "NF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-61-1769874973220",
+    "username": "Gralinda",
+    "score": 1444.16,
+    "gameType": "plinko",
+    "avatar": "GR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-72-1769874973220",
+    "username": "Do not lie",
+    "score": 1495.56,
+    "gameType": "crash",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-67-1769874973220",
+    "username": "Kison",
+    "score": 1627.43,
+    "gameType": "minesweeper",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-75-1769874973220",
+    "username": "Gavirus",
+    "score": 3311.78,
+    "gameType": "crash",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-26-1769874973220",
+    "username": "mym Ђудęm ęгσ НuK",
+    "score": 2492.99,
+    "gameType": "minesweeper",
+    "avatar": "MM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-90-1769874973220",
+    "username": "hotmilk",
+    "score": 2664.18,
+    "gameType": "minesweeper",
+    "avatar": "HO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-13-1769874973220",
+    "username": "u n i v e r s e",
+    "score": 2233.64,
+    "gameType": "crash",
+    "avatar": "UN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-11-1769874973220",
+    "username": "Āłł_Ÿøūrš",
+    "score": 1204.09,
+    "gameType": "plinko",
+    "avatar": "_R",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-70-1769874973220",
+    "username": "your problem",
+    "score": 2406.56,
+    "gameType": "minesweeper",
+    "avatar": "YP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-47-1769874973220",
+    "username": "breakingthesystem",
+    "score": 2024.44,
+    "gameType": "plinko",
+    "avatar": "BR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-8-1769874973220",
+    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+    "score": 2247.96,
+    "gameType": "plinko",
+    "avatar": "_",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-79-1769874973220",
+    "username": "LOVE NEW YORK",
+    "score": 2724.78,
+    "gameType": "plinko",
+    "avatar": "LN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-57-1769874973220",
+    "username": "Kit",
+    "score": 1063.96,
+    "gameType": "plinko",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-23-1769874973220",
+    "username": "Crazy",
+    "score": 2109.32,
+    "gameType": "minesweeper",
+    "avatar": "CR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-44-1769874973220",
+    "username": "Kezan",
+    "score": 2766.87,
+    "gameType": "minesweeper",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-58-1769874973220",
+    "username": "Xisyaco",
+    "score": 2121.56,
+    "gameType": "crash",
+    "avatar": "XI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-2-1769874973220",
+    "username": "LØV€ YØỮ",
+    "score": 2458.32,
+    "gameType": "crash",
+    "avatar": "LY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-72-1769874973220",
+    "username": "Do not lie",
+    "score": 2741.39,
+    "gameType": "minesweeper",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-13-1769874973220",
+    "username": "u n i v e r s e",
+    "score": 1187.07,
+    "gameType": "minesweeper",
+    "avatar": "UN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-43-1769874973220",
+    "username": "Ironfire",
+    "score": 1231.64,
+    "gameType": "plinko",
+    "avatar": "IR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-40-1769874973220",
+    "username": "Loni",
+    "score": 2366.94,
+    "gameType": "plinko",
+    "avatar": "LO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-84-1769874973220",
+    "username": "Erienan",
+    "score": 1384.88,
+    "gameType": "crash",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-39-1769874973220",
+    "username": "Blackstalker",
+    "score": 1336.94,
+    "gameType": "crash",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-8-1769874973220",
+    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+    "score": 1119.86,
+    "gameType": "crash",
+    "avatar": "_",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-29-1769874973220",
+    "username": "Black_Hawk_Down",
+    "score": 1755.48,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-71-1769874973220",
+    "username": "DART-SKRIMER",
+    "score": 2101.72,
+    "gameType": "minesweeper",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-97-1769874973220",
+    "username": "Elastic Skunk",
+    "score": 2188.48,
+    "gameType": "minesweeper",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-19-1769874973220",
+    "username": "Delan",
+    "score": 2075.29,
+    "gameType": "crash",
+    "avatar": "DE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-78-1769874973220",
+    "username": "Knights from Bernin",
+    "score": 1151.51,
+    "gameType": "crash",
+    "avatar": "KF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-6-1769874973220",
+    "username": "Dominator",
+    "score": 2433.03,
+    "gameType": "crash",
+    "avatar": "DO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-42-1769874973220",
+    "username": "GawelleN",
+    "score": 2020.88,
+    "gameType": "minesweeper",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-87-1769874973220",
+    "username": "Fluffy Ratchet",
+    "score": 1152.67,
+    "gameType": "plinko",
+    "avatar": "FR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-39-1769874973220",
+    "username": "Blackstalker",
+    "score": 2421.86,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-49-1769874973220",
+    "username": "Juce",
+    "score": 1534.86,
+    "gameType": "plinko",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-91-1769874973220",
+    "username": "JUST",
+    "score": 1267.2,
+    "gameType": "plinko",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-12-1769874973220",
+    "username": "რฉςh",
+    "score": 2862.36,
+    "gameType": "minesweeper",
+    "avatar": "H",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-62-1769874973220",
+    "username": "Halloween",
+    "score": 1705.69,
+    "gameType": "minesweeper",
+    "avatar": "HA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-51-1769874973220",
+    "username": "Kizshura",
+    "score": 1932.35,
+    "gameType": "plinko",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-46-1769874973220",
+    "username": "Miromice",
+    "score": 1139.13,
+    "gameType": "crash",
+    "avatar": "MI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-65-1769874973220",
+    "username": "SkyHorz",
+    "score": 2597.14,
+    "gameType": "crash",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-14-1769874973220",
+    "username": "GAMER",
+    "score": 1708.98,
+    "gameType": "plinko",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-2-1769874973220",
+    "username": "LØV€ YØỮ",
+    "score": 1166.99,
+    "gameType": "plinko",
+    "avatar": "LY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-36-1769874973220",
+    "username": "WOGY",
+    "score": 1738.35,
+    "gameType": "plinko",
+    "avatar": "WO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-5-1769874973220",
+    "username": "Mr_KiLLaURa",
+    "score": 1618.65,
+    "gameType": "plinko",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-7-1769874973220",
+    "username": "black coffe",
+    "score": 3326.94,
+    "gameType": "minesweeper",
+    "avatar": "BC",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-40-1769874973220",
+    "username": "Loni",
+    "score": 1835.79,
+    "gameType": "minesweeper",
+    "avatar": "LO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-14-1769874973220",
+    "username": "GAMER",
+    "score": 2710.25,
+    "gameType": "crash",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-39-1769874973220",
+    "username": "Blackstalker",
+    "score": 2153.43,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-69-1769874973220",
+    "username": "Quashant",
+    "score": 2518.02,
+    "gameType": "minesweeper",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-52-1769874973220",
+    "username": "Rageseeker",
+    "score": 2949.69,
+    "gameType": "plinko",
+    "avatar": "RA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-3-1769874973220",
+    "username": "ᴜɴɪᴄᴏʀɴ",
+    "score": 1539.17,
+    "gameType": "minesweeper",
+    "avatar": "ᴜɴ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-10-1769874973220",
+    "username": "Darkshaper",
+    "score": 1052.65,
+    "gameType": "crash",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-54-1769874973220",
+    "username": "Topmen",
+    "score": 1536.52,
+    "gameType": "plinko",
+    "avatar": "TO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-6-1769874973220",
+    "username": "Dominator",
+    "score": 1138.72,
+    "gameType": "minesweeper",
+    "avatar": "DO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-86-1769874973220",
+    "username": "Eyalanev",
+    "score": 2021.82,
+    "gameType": "minesweeper",
+    "avatar": "EY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-98-1769874973220",
+    "username": "Erennge",
+    "score": 1597.83,
+    "gameType": "minesweeper",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-17-1769874973220",
+    "username": "Bloodray",
+    "score": 2816.88,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-85-1769874973220",
+    "username": "Error parents",
+    "score": 981.34,
+    "gameType": "minesweeper",
+    "avatar": "EP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-24-1769874973220",
+    "username": "Dark_Sun",
+    "score": 1305.25,
+    "gameType": "plinko",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-74-1769874973220",
+    "username": "Ese",
+    "score": 1286.22,
+    "gameType": "plinko",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-96-1769874973220",
+    "username": "Azago",
+    "score": 2838,
+    "gameType": "plinko",
+    "avatar": "AZ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-64-1769874973220",
+    "username": "Manesenci",
+    "score": 2003.21,
+    "gameType": "crash",
+    "avatar": "MA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-75-1769874973220",
+    "username": "Gavirus",
+    "score": 1289.85,
+    "gameType": "plinko",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-5-1769874973220",
+    "username": "Mr_KiLLaURa",
+    "score": 2375.06,
+    "gameType": "crash",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-22-1769874973220",
+    "username": "Blackseeker",
+    "score": 1101.3,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-67-1769874973220",
+    "username": "Kison",
+    "score": 2262.95,
+    "gameType": "plinko",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-82-1769874973220",
+    "username": "Zipp↙️",
+    "score": 3166.19,
+    "gameType": "minesweeper",
+    "avatar": "ZI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-46-1769874973220",
+    "username": "Miromice",
+    "score": 2238.38,
+    "gameType": "plinko",
+    "avatar": "MI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-34-1769874973220",
+    "username": "Kirizan",
+    "score": 2590.77,
+    "gameType": "crash",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-75-1769874973220",
+    "username": "Gavirus",
+    "score": 2158.37,
+    "gameType": "minesweeper",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-8-1769874973220",
+    "username": "Ť.ħ.ê_Ĉ.õ.о.Ł",
+    "score": 2287.27,
+    "gameType": "minesweeper",
+    "avatar": "_",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-48-1769874973220",
+    "username": "Jay",
+    "score": 2453.15,
+    "gameType": "minesweeper",
+    "avatar": "JA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-62-1769874973220",
+    "username": "Halloween",
+    "score": 2412.21,
+    "gameType": "plinko",
+    "avatar": "HA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-21-1769874973220",
+    "username": "Alien",
+    "score": 2237.19,
+    "gameType": "minesweeper",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-17-1769874973220",
+    "username": "Bloodray",
+    "score": 1142.69,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-59-1769874973220",
+    "username": "Alsantrius",
+    "score": 1530.86,
+    "gameType": "crash",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-37-1769874973220",
+    "username": "Quemal",
+    "score": 2813.93,
+    "gameType": "crash",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-7-1769874973220",
+    "username": "black coffe",
+    "score": 2404.13,
+    "gameType": "plinko",
+    "avatar": "BC",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-73-1769874973220",
+    "username": "Dr.What",
+    "score": 2808.31,
+    "gameType": "minesweeper",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-4-1769874973220",
+    "username": "I ℓ٥ﻻ ﻉ√٥υ",
+    "score": 2854.9,
+    "gameType": "minesweeper",
+    "avatar": "I",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-84-1769874973220",
+    "username": "Erienan",
+    "score": 1894.01,
+    "gameType": "minesweeper",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-65-1769874973220",
+    "username": "SkyHorz",
+    "score": 3346.37,
+    "gameType": "plinko",
+    "avatar": "SK",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-12-1769874973220",
+    "username": "რฉςh",
+    "score": 1635.3,
+    "gameType": "plinko",
+    "avatar": "H",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-66-1769874973220",
+    "username": "Blackbrand",
+    "score": 2190.78,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-92-1769874973220",
+    "username": "Kamick",
+    "score": 1713.43,
+    "gameType": "plinko",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-52-1769874973220",
+    "username": "Rageseeker",
+    "score": 1795.37,
+    "gameType": "crash",
+    "avatar": "RA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-44-1769874973220",
+    "username": "Kezan",
+    "score": 2518.46,
+    "gameType": "plinko",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-30-1769874973220",
+    "username": "Cherry The Countess",
+    "score": 2820.52,
+    "gameType": "plinko",
+    "avatar": "CT",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-11-1769874973220",
+    "username": "Āłł_Ÿøūrš",
+    "score": 2357.62,
+    "gameType": "crash",
+    "avatar": "_R",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-81-1769874973220",
+    "username": "someone",
+    "score": 1985.08,
+    "gameType": "plinko",
+    "avatar": "SO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-10-1769874973220",
+    "username": "Darkshaper",
+    "score": 2384.57,
+    "gameType": "minesweeper",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-83-1769874973220",
+    "username": "do not",
+    "score": 1772.1,
+    "gameType": "plinko",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-47-1769874973220",
+    "username": "breakingthesystem",
+    "score": 1515.33,
+    "gameType": "crash",
+    "avatar": "BR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-64-1769874973220",
+    "username": "Manesenci",
+    "score": 1870.03,
+    "gameType": "minesweeper",
+    "avatar": "MA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-76-1769874973220",
+    "username": "GAZANIK",
+    "score": 1863.53,
+    "gameType": "crash",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-90-1769874973220",
+    "username": "hotmilk",
+    "score": 1499.55,
+    "gameType": "plinko",
+    "avatar": "HO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-40-1769874973220",
+    "username": "Loni",
+    "score": 1404.56,
+    "gameType": "crash",
+    "avatar": "LO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-63-1769874973220",
+    "username": "krot",
+    "score": 2193.71,
+    "gameType": "plinko",
+    "avatar": "KR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-77-1769874973220",
+    "username": "Kakashkaliandiia",
+    "score": 2090.01,
+    "gameType": "crash",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-18-1769874973220",
+    "username": "AnnyMars",
+    "score": 1634.08,
+    "gameType": "plinko",
+    "avatar": "AN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-25-1769874973220",
+    "username": "Kerry",
+    "score": 1147.47,
+    "gameType": "crash",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-100-1769874973220",
+    "username": "Funny duck",
+    "score": 2219.14,
+    "gameType": "plinko",
+    "avatar": "FD",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-66-1769874973220",
+    "username": "Blackbrand",
+    "score": 3015.35,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-24-1769874973220",
+    "username": "Dark_Sun",
+    "score": 2643.33,
+    "gameType": "crash",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-22-1769874973220",
+    "username": "Blackseeker",
+    "score": 1696.76,
+    "gameType": "minesweeper",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-16-1769874973220",
+    "username": "FEISKO",
+    "score": 2243.05,
+    "gameType": "plinko",
+    "avatar": "FE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-76-1769874973220",
+    "username": "GAZANIK",
+    "score": 2267.98,
+    "gameType": "plinko",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-48-1769874973220",
+    "username": "Jay",
+    "score": 2044.67,
+    "gameType": "crash",
+    "avatar": "JA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-91-1769874973220",
+    "username": "JUST",
+    "score": 2627.93,
+    "gameType": "minesweeper",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-87-1769874973220",
+    "username": "Fluffy Ratchet",
+    "score": 2396.56,
+    "gameType": "minesweeper",
+    "avatar": "FR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-58-1769874973220",
+    "username": "Xisyaco",
+    "score": 2289.27,
+    "gameType": "plinko",
+    "avatar": "XI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-69-1769874973220",
+    "username": "Quashant",
+    "score": 1199.78,
+    "gameType": "crash",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-38-1769874973220",
+    "username": "iSlate",
+    "score": 2921.95,
+    "gameType": "plinko",
+    "avatar": "IS",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-25-1769874973220",
+    "username": "Kerry",
+    "score": 1548.53,
+    "gameType": "minesweeper",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-52-1769874973220",
+    "username": "Rageseeker",
+    "score": 3118.52,
+    "gameType": "minesweeper",
+    "avatar": "RA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-53-1769874973220",
+    "username": "Bliss",
+    "score": 1512.62,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-71-1769874973220",
+    "username": "DART-SKRIMER",
+    "score": 2114.44,
+    "gameType": "crash",
+    "avatar": "DA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-37-1769874973220",
+    "username": "Quemal",
+    "score": 1456.52,
+    "gameType": "minesweeper",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-35-1769874973220",
+    "username": "Lightseeker",
+    "score": 1046.64,
+    "gameType": "crash",
+    "avatar": "LI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-1-1769874973220",
+    "username": "Hellstaff",
+    "score": 1251.77,
+    "gameType": "crash",
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-93-1769874973220",
+    "username": "Oveley",
+    "score": 3054.26,
+    "gameType": "crash",
+    "avatar": "OV",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-38-1769874973220",
+    "username": "iSlate",
+    "score": 1843.39,
+    "gameType": "minesweeper",
+    "avatar": "IS",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-34-1769874973220",
+    "username": "Kirizan",
+    "score": 2690.17,
+    "gameType": "minesweeper",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-69-1769874973220",
+    "username": "Quashant",
+    "score": 1829.99,
+    "gameType": "plinko",
+    "avatar": "QU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-73-1769874973220",
+    "username": "Dr.What",
+    "score": 1913.63,
+    "gameType": "crash",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-30-1769874973220",
+    "username": "Cherry The Countess",
+    "score": 1737.73,
+    "gameType": "crash",
+    "avatar": "CT",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-76-1769874973220",
+    "username": "GAZANIK",
+    "score": 1610.38,
+    "gameType": "minesweeper",
+    "avatar": "GA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-23-1769874973220",
+    "username": "Crazy",
+    "score": 2228.83,
+    "gameType": "plinko",
+    "avatar": "CR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-49-1769874973220",
+    "username": "Juce",
+    "score": 1764.46,
+    "gameType": "crash",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-98-1769874973220",
+    "username": "Erennge",
+    "score": 1265.63,
+    "gameType": "crash",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-60-1769874973220",
+    "username": "Envias",
+    "score": 2890.73,
+    "gameType": "plinko",
+    "avatar": "EN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-63-1769874973220",
+    "username": "krot",
+    "score": 2502.47,
+    "gameType": "minesweeper",
+    "avatar": "KR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-44-1769874973220",
+    "username": "Kezan",
+    "score": 3111.5,
+    "gameType": "crash",
+    "avatar": "KE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-74-1769874973220",
+    "username": "Ese",
+    "score": 2339.6,
+    "gameType": "minesweeper",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-72-1769874973220",
+    "username": "Do not lie",
+    "score": 1945.75,
+    "gameType": "plinko",
+    "avatar": "DN",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-61-1769874973220",
+    "username": "Gralinda",
+    "score": 1505.97,
+    "gameType": "minesweeper",
+    "avatar": "GR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-51-1769874973220",
+    "username": "Kizshura",
+    "score": 1996.8,
+    "gameType": "crash",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-100-1769874973220",
+    "username": "Funny duck",
+    "score": 2721.46,
+    "gameType": "crash",
+    "avatar": "FD",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-81-1769874973220",
+    "username": "someone",
+    "score": 2882.69,
+    "gameType": "minesweeper",
+    "avatar": "SO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-56-1769874973220",
+    "username": "DrayLOVE",
+    "score": 2318.45,
+    "gameType": "plinko",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-94-1769874973220",
+    "username": "Tempus",
+    "score": 1594.83,
+    "gameType": "crash",
+    "avatar": "TE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-31-1769874973220",
+    "username": "Aria",
+    "score": 1529.07,
+    "gameType": "plinko",
+    "avatar": "AR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-3-1769874973220",
+    "username": "ᴜɴɪᴄᴏʀɴ",
+    "score": 2554.35,
+    "gameType": "crash",
+    "avatar": "ᴜɴ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-29-1769874973220",
+    "username": "Black_Hawk_Down",
+    "score": 2873.23,
+    "gameType": "plinko",
+    "avatar": "BL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-plinko-41-1769874973220",
+    "username": "Nuliax",
+    "score": 1778.53,
     "gameType": "plinko",
     "avatar": "NU",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-crash-42",
-    "username": "GawelleN",
-    "score": 2196.88,
-    "gameType": "crash",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-42",
-    "username": "GawelleN",
-    "score": 1812.49,
-    "gameType": "minesweeper",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-42",
-    "username": "GawelleN",
-    "score": 1063.55,
-    "gameType": "plinko",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-43",
-    "username": "Ironfire",
-    "score": 2069.48,
-    "gameType": "crash",
-    "avatar": "IR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-43",
-    "username": "Ironfire",
-    "score": 2232.13,
-    "gameType": "minesweeper",
-    "avatar": "IR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-43",
-    "username": "Ironfire",
-    "score": 1334.27,
-    "gameType": "plinko",
-    "avatar": "IR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-44",
-    "username": "Kezan",
-    "score": 2781.82,
-    "gameType": "crash",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-44",
-    "username": "Kezan",
-    "score": 2613.76,
-    "gameType": "minesweeper",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-44",
-    "username": "Kezan",
-    "score": 2301.28,
-    "gameType": "plinko",
-    "avatar": "KE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-45",
-    "username": "Kitaxe",
-    "score": 1766.19,
-    "gameType": "crash",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-45",
-    "username": "Kitaxe",
-    "score": 1150.69,
-    "gameType": "minesweeper",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-45",
-    "username": "Kitaxe",
-    "score": 2586.98,
-    "gameType": "plinko",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-46",
-    "username": "Miromice",
-    "score": 1035.78,
-    "gameType": "crash",
-    "avatar": "MI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-46",
-    "username": "Miromice",
-    "score": 1951.34,
-    "gameType": "minesweeper",
-    "avatar": "MI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-46",
-    "username": "Miromice",
-    "score": 2123.76,
-    "gameType": "plinko",
-    "avatar": "MI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-47",
-    "username": "breakingthesystem",
-    "score": 1672.93,
-    "gameType": "crash",
-    "avatar": "BR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-47",
-    "username": "breakingthesystem",
-    "score": 1768.37,
-    "gameType": "minesweeper",
-    "avatar": "BR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-47",
-    "username": "breakingthesystem",
-    "score": 2320.78,
-    "gameType": "plinko",
-    "avatar": "BR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-48",
-    "username": "Jay",
-    "score": 1968.03,
-    "gameType": "crash",
-    "avatar": "JA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-48",
-    "username": "Jay",
-    "score": 2587.65,
-    "gameType": "minesweeper",
-    "avatar": "JA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-48",
-    "username": "Jay",
-    "score": 2436.82,
-    "gameType": "plinko",
-    "avatar": "JA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-49",
-    "username": "Juce",
-    "score": 1860.08,
-    "gameType": "crash",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-49",
-    "username": "Juce",
-    "score": 1848.58,
-    "gameType": "minesweeper",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-49",
-    "username": "Juce",
-    "score": 1700.46,
-    "gameType": "plinko",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-50",
-    "username": "Modar",
-    "score": 1244.03,
-    "gameType": "crash",
-    "avatar": "MO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-50",
-    "username": "Modar",
-    "score": 1315.81,
-    "gameType": "minesweeper",
-    "avatar": "MO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-50",
-    "username": "Modar",
-    "score": 1821.27,
-    "gameType": "plinko",
-    "avatar": "MO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-51",
-    "username": "Kizshura",
-    "score": 1936.33,
-    "gameType": "crash",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-51",
-    "username": "Kizshura",
-    "score": 1347.42,
-    "gameType": "minesweeper",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-51",
-    "username": "Kizshura",
-    "score": 2074.35,
-    "gameType": "plinko",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-52",
-    "username": "Rageseeker",
-    "score": 1913.56,
-    "gameType": "crash",
-    "avatar": "RA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-52",
-    "username": "Rageseeker",
-    "score": 2793.64,
-    "gameType": "minesweeper",
-    "avatar": "RA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-52",
-    "username": "Rageseeker",
-    "score": 2611.13,
-    "gameType": "plinko",
-    "avatar": "RA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-53",
-    "username": "Bliss",
-    "score": 1369.98,
-    "gameType": "crash",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-53",
-    "username": "Bliss",
-    "score": 1918.12,
-    "gameType": "minesweeper",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-53",
-    "username": "Bliss",
-    "score": 1499.84,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-54",
-    "username": "Topmen",
-    "score": 1612.16,
-    "gameType": "crash",
-    "avatar": "TO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-54",
-    "username": "Topmen",
-    "score": 2729.8,
-    "gameType": "minesweeper",
-    "avatar": "TO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-54",
-    "username": "Topmen",
-    "score": 1378.76,
-    "gameType": "plinko",
-    "avatar": "TO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-55",
+    "id": "fake-crash-55-1769874973220",
     "username": "Dark Devil",
-    "score": 2659.32,
+    "score": 2264.42,
     "gameType": "crash",
     "avatar": "DD",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
   },
   {
-    "id": "fake-minesweeper-55",
-    "username": "Dark Devil",
-    "score": 1517.93,
-    "gameType": "minesweeper",
-    "avatar": "DD",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-55",
-    "username": "Dark Devil",
-    "score": 1250.64,
-    "gameType": "plinko",
-    "avatar": "DD",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-56",
-    "username": "DrayLOVE",
-    "score": 2212.93,
-    "gameType": "crash",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-56",
-    "username": "DrayLOVE",
-    "score": 2506.81,
-    "gameType": "minesweeper",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-56",
-    "username": "DrayLOVE",
-    "score": 2358.58,
-    "gameType": "plinko",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-57",
-    "username": "Kit",
-    "score": 2517.8,
+    "id": "fake-crash-67-1769874973220",
+    "username": "Kison",
+    "score": 1214.09,
     "gameType": "crash",
     "avatar": "KI",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
   },
   {
-    "id": "fake-minesweeper-57",
-    "username": "Kit",
-    "score": 1867.07,
-    "gameType": "minesweeper",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-57",
-    "username": "Kit",
-    "score": 1115.11,
-    "gameType": "plinko",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-58",
-    "username": "Xisyaco",
-    "score": 1958.24,
+    "id": "fake-crash-88-1769874973220",
+    "username": "Hellblade",
+    "score": 2315.65,
     "gameType": "crash",
-    "avatar": "XI",
-    "isFake": true
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
   },
   {
-    "id": "fake-minesweeper-58",
-    "username": "Xisyaco",
-    "score": 1367.69,
+    "id": "fake-minesweeper-16-1769874973220",
+    "username": "FEISKO",
+    "score": 1779.07,
     "gameType": "minesweeper",
-    "avatar": "XI",
-    "isFake": true
+    "avatar": "FE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-plinko-58",
-    "username": "Xisyaco",
-    "score": 2011.83,
-    "gameType": "plinko",
-    "avatar": "XI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-59",
-    "username": "Alsantrius",
-    "score": 1394.89,
-    "gameType": "crash",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-59",
-    "username": "Alsantrius",
-    "score": 2991.57,
-    "gameType": "minesweeper",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-59",
-    "username": "Alsantrius",
-    "score": 2398.48,
-    "gameType": "plinko",
-    "avatar": "AL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-60",
-    "username": "Envias",
-    "score": 1463.43,
-    "gameType": "crash",
-    "avatar": "EN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-60",
-    "username": "Envias",
-    "score": 1592.53,
-    "gameType": "minesweeper",
-    "avatar": "EN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-60",
-    "username": "Envias",
-    "score": 2548.73,
-    "gameType": "plinko",
-    "avatar": "EN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-61",
-    "username": "Gralinda",
-    "score": 2011.25,
-    "gameType": "crash",
-    "avatar": "GR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-61",
-    "username": "Gralinda",
-    "score": 1631.14,
-    "gameType": "minesweeper",
-    "avatar": "GR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-61",
-    "username": "Gralinda",
-    "score": 1290.72,
-    "gameType": "plinko",
-    "avatar": "GR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-62",
-    "username": "Halloween",
-    "score": 1684.05,
-    "gameType": "crash",
-    "avatar": "HA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-62",
-    "username": "Halloween",
-    "score": 1850.89,
-    "gameType": "minesweeper",
-    "avatar": "HA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-62",
-    "username": "Halloween",
-    "score": 2344.26,
-    "gameType": "plinko",
-    "avatar": "HA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-63",
-    "username": "krot",
-    "score": 1341.86,
-    "gameType": "crash",
-    "avatar": "KR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-63",
-    "username": "krot",
-    "score": 2885.59,
-    "gameType": "minesweeper",
-    "avatar": "KR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-63",
-    "username": "krot",
-    "score": 2162.08,
-    "gameType": "plinko",
-    "avatar": "KR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-64",
-    "username": "Manesenci",
-    "score": 1993.34,
-    "gameType": "crash",
-    "avatar": "MA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-64",
-    "username": "Manesenci",
-    "score": 1936.55,
-    "gameType": "minesweeper",
-    "avatar": "MA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-64",
-    "username": "Manesenci",
-    "score": 1001.43,
-    "gameType": "plinko",
-    "avatar": "MA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-65",
-    "username": "SkyHorz",
-    "score": 2761.59,
-    "gameType": "crash",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-65",
-    "username": "SkyHorz",
-    "score": 2687.06,
-    "gameType": "minesweeper",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-65",
-    "username": "SkyHorz",
-    "score": 2927.51,
-    "gameType": "plinko",
-    "avatar": "SK",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-66",
-    "username": "Blackbrand",
-    "score": 1716.16,
+    "id": "fake-crash-22-1769874973220",
+    "username": "Blackseeker",
+    "score": 2143.39,
     "gameType": "crash",
     "avatar": "BL",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-minesweeper-66",
-    "username": "Blackbrand",
-    "score": 2187.98,
+    "id": "fake-plinko-85-1769874973220",
+    "username": "Error parents",
+    "score": 2158.72,
+    "gameType": "plinko",
+    "avatar": "EP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-95-1769874973220",
+    "username": "AfinaS",
+    "score": 1664.93,
+    "gameType": "crash",
+    "avatar": "AF",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-2-1769874973220",
+    "username": "LØV€ YØỮ",
+    "score": 2257.08,
+    "gameType": "minesweeper",
+    "avatar": "LY",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-56-1769874973220",
+    "username": "DrayLOVE",
+    "score": 2676.42,
+    "gameType": "minesweeper",
+    "avatar": "DR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-94-1769874973220",
+    "username": "Tempus",
+    "score": 2112.27,
+    "gameType": "minesweeper",
+    "avatar": "TE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-4-1769874973220",
+    "username": "I ℓ٥ﻻ ﻉ√٥υ",
+    "score": 2471.77,
+    "gameType": "plinko",
+    "avatar": "I",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-9-1769874973220",
+    "username": "JOEN JUNGKOOK",
+    "score": 2270.28,
+    "gameType": "minesweeper",
+    "avatar": "JJ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-53-1769874973220",
+    "username": "Bliss",
+    "score": 1887.69,
     "gameType": "minesweeper",
     "avatar": "BL",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-plinko-66",
-    "username": "Blackbrand",
-    "score": 2945.9,
-    "gameType": "plinko",
-    "avatar": "BL",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-67",
-    "username": "Kison",
-    "score": 1266.24,
-    "gameType": "crash",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-67",
-    "username": "Kison",
-    "score": 1806.74,
-    "gameType": "minesweeper",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-67",
-    "username": "Kison",
-    "score": 2394,
-    "gameType": "plinko",
-    "avatar": "KI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-68",
-    "username": "Never mind",
-    "score": 2407.29,
-    "gameType": "crash",
-    "avatar": "NM",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-68",
-    "username": "Never mind",
-    "score": 1509.28,
-    "gameType": "minesweeper",
-    "avatar": "NM",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-68",
-    "username": "Never mind",
-    "score": 1420.63,
-    "gameType": "plinko",
-    "avatar": "NM",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-69",
-    "username": "Quashant",
-    "score": 1085.82,
-    "gameType": "crash",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-69",
-    "username": "Quashant",
-    "score": 2856.33,
-    "gameType": "minesweeper",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-69",
-    "username": "Quashant",
-    "score": 1659.05,
-    "gameType": "plinko",
-    "avatar": "QU",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-70",
-    "username": "your problem",
-    "score": 2337.98,
-    "gameType": "crash",
-    "avatar": "YP",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-70",
-    "username": "your problem",
-    "score": 2210.92,
-    "gameType": "minesweeper",
-    "avatar": "YP",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-70",
-    "username": "your problem",
-    "score": 2797.78,
-    "gameType": "plinko",
-    "avatar": "YP",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-71",
-    "username": "DART-SKRIMER",
-    "score": 1885.48,
-    "gameType": "crash",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-71",
-    "username": "DART-SKRIMER",
-    "score": 2037.7,
-    "gameType": "minesweeper",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-71",
-    "username": "DART-SKRIMER",
-    "score": 2357.76,
-    "gameType": "plinko",
-    "avatar": "DA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-72",
-    "username": "Do not lie",
-    "score": 1466.7,
-    "gameType": "crash",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-72",
-    "username": "Do not lie",
-    "score": 2480.92,
-    "gameType": "minesweeper",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-72",
-    "username": "Do not lie",
-    "score": 1998.36,
-    "gameType": "plinko",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-73",
-    "username": "Dr.What",
-    "score": 1995.23,
-    "gameType": "crash",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-73",
-    "username": "Dr.What",
-    "score": 2902,
-    "gameType": "minesweeper",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-73",
-    "username": "Dr.What",
-    "score": 2946.13,
-    "gameType": "plinko",
-    "avatar": "DR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-74",
-    "username": "Ese",
-    "score": 2552.29,
-    "gameType": "crash",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-74",
-    "username": "Ese",
-    "score": 2336.87,
-    "gameType": "minesweeper",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-74",
-    "username": "Ese",
-    "score": 1207.28,
-    "gameType": "plinko",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-75",
-    "username": "Gavirus",
-    "score": 2896.99,
-    "gameType": "crash",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-75",
-    "username": "Gavirus",
-    "score": 2328.21,
-    "gameType": "minesweeper",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-75",
-    "username": "Gavirus",
-    "score": 1320.19,
-    "gameType": "plinko",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-76",
-    "username": "GAZANIK",
-    "score": 2159.18,
-    "gameType": "crash",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-76",
-    "username": "GAZANIK",
-    "score": 1531.49,
-    "gameType": "minesweeper",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-76",
-    "username": "GAZANIK",
-    "score": 2322.86,
-    "gameType": "plinko",
-    "avatar": "GA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-77",
-    "username": "Kakashkaliandiia",
-    "score": 1983.82,
-    "gameType": "crash",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-77",
-    "username": "Kakashkaliandiia",
-    "score": 2593.83,
-    "gameType": "minesweeper",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-77",
-    "username": "Kakashkaliandiia",
-    "score": 2767.39,
-    "gameType": "plinko",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-78",
-    "username": "Knights from Bernin",
-    "score": 1303.19,
-    "gameType": "crash",
-    "avatar": "KF",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-78",
-    "username": "Knights from Bernin",
-    "score": 1686.03,
-    "gameType": "minesweeper",
-    "avatar": "KF",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-78",
-    "username": "Knights from Bernin",
-    "score": 2103.84,
-    "gameType": "plinko",
-    "avatar": "KF",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-79",
-    "username": "LOVE NEW YORK",
-    "score": 2916.82,
-    "gameType": "crash",
-    "avatar": "LN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-79",
-    "username": "LOVE NEW YORK",
-    "score": 2725.41,
-    "gameType": "minesweeper",
-    "avatar": "LN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-79",
-    "username": "LOVE NEW YORK",
-    "score": 2697.21,
-    "gameType": "plinko",
-    "avatar": "LN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-80",
-    "username": "Not for you",
-    "score": 2177.98,
-    "gameType": "crash",
-    "avatar": "NF",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-80",
-    "username": "Not for you",
-    "score": 2858.16,
-    "gameType": "minesweeper",
-    "avatar": "NF",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-80",
-    "username": "Not for you",
-    "score": 2353.93,
-    "gameType": "plinko",
-    "avatar": "NF",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-81",
-    "username": "someone",
-    "score": 2891.44,
-    "gameType": "crash",
-    "avatar": "SO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-81",
-    "username": "someone",
-    "score": 2883.76,
-    "gameType": "minesweeper",
-    "avatar": "SO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-81",
-    "username": "someone",
-    "score": 2115.49,
-    "gameType": "plinko",
-    "avatar": "SO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-82",
-    "username": "Zipp↙️",
-    "score": 2554.99,
-    "gameType": "crash",
-    "avatar": "ZI",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-82",
-    "username": "Zipp↙️",
-    "score": 2939.29,
-    "gameType": "minesweeper",
-    "avatar": "ZI",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-82",
-    "username": "Zipp↙️",
-    "score": 1493.93,
-    "gameType": "plinko",
-    "avatar": "ZI",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-83",
-    "username": "do not",
-    "score": 1678.9,
-    "gameType": "crash",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-83",
-    "username": "do not",
-    "score": 1992.38,
-    "gameType": "minesweeper",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-83",
-    "username": "do not",
-    "score": 1646.02,
-    "gameType": "plinko",
-    "avatar": "DN",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-84",
-    "username": "Erienan",
-    "score": 1517.43,
-    "gameType": "crash",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-84",
-    "username": "Erienan",
-    "score": 1806.9,
-    "gameType": "minesweeper",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-84",
-    "username": "Erienan",
-    "score": 2469.17,
-    "gameType": "plinko",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-85",
-    "username": "Error parents",
-    "score": 1088.27,
-    "gameType": "crash",
-    "avatar": "EP",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-85",
-    "username": "Error parents",
-    "score": 1152.76,
-    "gameType": "minesweeper",
-    "avatar": "EP",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-85",
-    "username": "Error parents",
-    "score": 2481.18,
-    "gameType": "plinko",
-    "avatar": "EP",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-86",
-    "username": "Eyalanev",
-    "score": 1850.76,
-    "gameType": "crash",
-    "avatar": "EY",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-86",
-    "username": "Eyalanev",
-    "score": 1915.94,
-    "gameType": "minesweeper",
-    "avatar": "EY",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-86",
-    "username": "Eyalanev",
-    "score": 2999.72,
-    "gameType": "plinko",
-    "avatar": "EY",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-87",
-    "username": "Fluffy Ratchet",
-    "score": 2079.52,
-    "gameType": "crash",
-    "avatar": "FR",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-87",
-    "username": "Fluffy Ratchet",
-    "score": 2292.39,
-    "gameType": "minesweeper",
-    "avatar": "FR",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-87",
-    "username": "Fluffy Ratchet",
-    "score": 1229.25,
-    "gameType": "plinko",
-    "avatar": "FR",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-88",
-    "username": "Hellblade",
-    "score": 2655.07,
-    "gameType": "crash",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-88",
-    "username": "Hellblade",
-    "score": 2256.72,
-    "gameType": "minesweeper",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-88",
-    "username": "Hellblade",
-    "score": 2445.22,
-    "gameType": "plinko",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-89",
-    "username": "HELLO",
-    "score": 2629.12,
-    "gameType": "crash",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-89",
-    "username": "HELLO",
-    "score": 2907.89,
-    "gameType": "minesweeper",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-89",
-    "username": "HELLO",
-    "score": 1772.45,
-    "gameType": "plinko",
-    "avatar": "HE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-90",
-    "username": "hotmilk",
-    "score": 1083.84,
-    "gameType": "crash",
-    "avatar": "HO",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-90",
-    "username": "hotmilk",
-    "score": 2747.12,
-    "gameType": "minesweeper",
-    "avatar": "HO",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-90",
-    "username": "hotmilk",
-    "score": 1469.12,
-    "gameType": "plinko",
-    "avatar": "HO",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-91",
-    "username": "JUST",
-    "score": 1800.21,
-    "gameType": "crash",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-91",
-    "username": "JUST",
-    "score": 2687.14,
-    "gameType": "minesweeper",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-91",
-    "username": "JUST",
-    "score": 1185.1,
-    "gameType": "plinko",
-    "avatar": "JU",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-92",
-    "username": "Kamick",
-    "score": 2668.26,
-    "gameType": "crash",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-92",
-    "username": "Kamick",
-    "score": 1126.39,
-    "gameType": "minesweeper",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-92",
-    "username": "Kamick",
-    "score": 1619.92,
-    "gameType": "plinko",
-    "avatar": "KA",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-93",
-    "username": "Oveley",
-    "score": 2843.45,
-    "gameType": "crash",
-    "avatar": "OV",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-93",
-    "username": "Oveley",
-    "score": 1822.87,
-    "gameType": "minesweeper",
-    "avatar": "OV",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-93",
-    "username": "Oveley",
-    "score": 1475.23,
-    "gameType": "plinko",
-    "avatar": "OV",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-94",
-    "username": "Tempus",
-    "score": 1856.38,
-    "gameType": "crash",
-    "avatar": "TE",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-94",
-    "username": "Tempus",
-    "score": 2477.14,
-    "gameType": "minesweeper",
-    "avatar": "TE",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-94",
-    "username": "Tempus",
-    "score": 2700.82,
-    "gameType": "plinko",
-    "avatar": "TE",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-95",
-    "username": "AfinaS",
-    "score": 1784.46,
-    "gameType": "crash",
-    "avatar": "AF",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-95",
-    "username": "AfinaS",
-    "score": 2081.7,
-    "gameType": "minesweeper",
-    "avatar": "AF",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-95",
-    "username": "AfinaS",
-    "score": 1893.61,
-    "gameType": "plinko",
-    "avatar": "AF",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-96",
-    "username": "Azago",
-    "score": 1809.15,
-    "gameType": "crash",
-    "avatar": "AZ",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-96",
-    "username": "Azago",
-    "score": 2214.72,
-    "gameType": "minesweeper",
-    "avatar": "AZ",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-96",
-    "username": "Azago",
-    "score": 2938.31,
-    "gameType": "plinko",
-    "avatar": "AZ",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-97",
-    "username": "Elastic Skunk",
-    "score": 2103.53,
-    "gameType": "crash",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-97",
-    "username": "Elastic Skunk",
-    "score": 1932.33,
-    "gameType": "minesweeper",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-97",
-    "username": "Elastic Skunk",
-    "score": 2429.14,
-    "gameType": "plinko",
-    "avatar": "ES",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-98",
-    "username": "Erennge",
-    "score": 1433.45,
-    "gameType": "crash",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-minesweeper-98",
-    "username": "Erennge",
-    "score": 1826.72,
-    "gameType": "minesweeper",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-98",
-    "username": "Erennge",
-    "score": 1918.78,
-    "gameType": "plinko",
-    "avatar": "ER",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-99",
+    "id": "fake-crash-99-1769874973220",
     "username": "Forest Hänter",
-    "score": 1580.55,
+    "score": 1437.57,
     "gameType": "crash",
     "avatar": "FH",
-    "isFake": true
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-minesweeper-99",
-    "username": "Forest Hänter",
-    "score": 1032.43,
-    "gameType": "minesweeper",
-    "avatar": "FH",
-    "isFake": true
-  },
-  {
-    "id": "fake-plinko-99",
-    "username": "Forest Hänter",
-    "score": 2534.33,
-    "gameType": "plinko",
-    "avatar": "FH",
-    "isFake": true
-  },
-  {
-    "id": "fake-crash-100",
-    "username": "Funny duck",
-    "score": 2563.55,
+    "id": "fake-crash-28-1769874973220",
+    "username": "ℓo√ﻉ",
+    "score": 1718.11,
     "gameType": "crash",
-    "avatar": "FD",
-    "isFake": true
+    "avatar": "O",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-minesweeper-100",
-    "username": "Funny duck",
-    "score": 1497.68,
-    "gameType": "minesweeper",
-    "avatar": "FD",
-    "isFake": true
+    "id": "fake-crash-21-1769874973220",
+    "username": "Alien",
+    "score": 2655.88,
+    "gameType": "crash",
+    "avatar": "AL",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   },
   {
-    "id": "fake-plinko-100",
-    "username": "Funny duck",
-    "score": 1956.93,
+    "id": "fake-crash-91-1769874973220",
+    "username": "JUST",
+    "score": 1804.21,
+    "gameType": "crash",
+    "avatar": "JU",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-1-1769874973220",
+    "username": "Hellstaff",
+    "score": 2654.54,
     "gameType": "plinko",
-    "avatar": "FD",
-    "isFake": true
+    "avatar": "HE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-50-1769874973220",
+    "username": "Modar",
+    "score": 1345.43,
+    "gameType": "crash",
+    "avatar": "MO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-70-1769874973220",
+    "username": "your problem",
+    "score": 2336.88,
+    "gameType": "crash",
+    "avatar": "YP",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-32-1769874973220",
+    "username": "Mr_Mix",
+    "score": 2107.66,
+    "gameType": "plinko",
+    "avatar": "MR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-74-1769874973220",
+    "username": "Ese",
+    "score": 2916.24,
+    "gameType": "crash",
+    "avatar": "ES",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-84-1769874973220",
+    "username": "Erienan",
+    "score": 2804.41,
+    "gameType": "plinko",
+    "avatar": "ER",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-68-1769874973220",
+    "username": "Never mind",
+    "score": 2416.19,
+    "gameType": "crash",
+    "avatar": "NM",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-38-1769874973220",
+    "username": "iSlate",
+    "score": 1890.91,
+    "gameType": "crash",
+    "avatar": "IS",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-96-1769874973220",
+    "username": "Azago",
+    "score": 2206.18,
+    "gameType": "minesweeper",
+    "avatar": "AZ",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-crash-57-1769874973220",
+    "username": "Kit",
+    "score": 2564.44,
+    "gameType": "crash",
+    "avatar": "KI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-93-1769874973220",
+    "username": "Oveley",
+    "score": 2087.4,
+    "gameType": "minesweeper",
+    "avatar": "OV",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-6-1769874973220",
+    "username": "Dominator",
+    "score": 2362.3,
+    "gameType": "plinko",
+    "avatar": "DO",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-plinko-35-1769874973220",
+    "username": "Lightseeker",
+    "score": 1353.21,
+    "gameType": "plinko",
+    "avatar": "LI",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.222Z"
+  },
+  {
+    "id": "fake-minesweeper-19-1769874973220",
+    "username": "Delan",
+    "score": 1924.85,
+    "gameType": "minesweeper",
+    "avatar": "DE",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-crash-87-1769874973220",
+    "username": "Fluffy Ratchet",
+    "score": 1957.31,
+    "gameType": "crash",
+    "avatar": "FR",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
+  },
+  {
+    "id": "fake-minesweeper-77-1769874973220",
+    "username": "Kakashkaliandiia",
+    "score": 2522.83,
+    "gameType": "minesweeper",
+    "avatar": "KA",
+    "isFake": true,
+    "updatedAt": "2026-01-31T15:56:13.221Z"
   }
 ]
-
-
-
-
-
-
-
-
-
