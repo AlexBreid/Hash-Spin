@@ -173,7 +173,12 @@ export function RecordsPage() {
   return (
     <div className="pb-24 pt-6 px-4">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Таблица лидеров</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Таблица лидеров</h1>
+          <p className="text-sm text-muted-foreground">
+            Максимальный выигрыш за выбранный период
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
@@ -275,7 +280,7 @@ export function RecordsPage() {
       {/* Full Leaderboard */}
       <Card className="p-5">
         <h3 className="font-bold text-lg mb-5">
-          Общий рейтинг {leaderboard.length > 0 && `(${leaderboard.length})`}
+          Рейтинг по максимальному выигрышу {leaderboard.length > 0 && `(${leaderboard.length})`}
         </h3>
         <div className="space-y-4">
           {leaderboard.length > 0 ? (
