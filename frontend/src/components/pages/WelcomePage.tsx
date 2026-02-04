@@ -63,7 +63,7 @@ export function WelcomePage({ onEnter }: WelcomePageProps) {
 
   return (
     <div 
-      className="min-h-screen overflow-y-auto pb-8"
+      className="min-h-screen pb-12"
       style={{ backgroundColor: COLORS.background }}
     >
       {/* Hero Section */}
@@ -234,7 +234,7 @@ export function WelcomePage({ onEnter }: WelcomePageProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.2 }}
-        className="px-4 pb-8"
+        className="px-4 pb-12"
       >
         <div 
           className="p-4 rounded-xl text-center text-xs"

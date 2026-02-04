@@ -476,7 +476,7 @@ function AppContent() {
     // Показываем Welcome страницу для новых пользователей
     if (showWelcome) {
         return (
-            <div className="w-full max-w-[390px] mx-auto overflow-hidden" style={{ height: '100dvh' }}>
+            <div className="w-full max-w-[390px] mx-auto overflow-y-auto" style={{ height: '100dvh' }}>
                 <WelcomePage onEnter={handleWelcomeEnter} />
             </div>
         );
