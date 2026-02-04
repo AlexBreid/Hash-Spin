@@ -8,6 +8,8 @@ interface Game {
   title: string;
   image: string;
   category: string;
+  disabled?: boolean;
+  comingSoonLabel?: string;
 }
 
 interface GameSliderProps {
@@ -102,6 +104,8 @@ export function GameSlider({ games, onGameClick, playersCount }: GameSliderProps
               image={game.image}
               category={game.category}
               onClick={() => handleCardClick(game.id)}
+              disabled={game.disabled}
+              comingSoonLabel={game.comingSoonLabel}
               playersCount={playersCount?.[game.id]}
             />
           </div>

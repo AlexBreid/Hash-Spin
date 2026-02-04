@@ -7,6 +7,8 @@ interface GameCardProps {
   category: string;
   onClick: () => void;
   playersCount?: number;
+  disabled?: boolean;
+  comingSoonLabel?: string;
 }
 
 const getCategoryIcon = (category: string, title?: string) => {
@@ -25,13 +27,18 @@ const getCategoryIcon = (category: string, title?: string) => {
   }
 };
 
-export function GameCard({ title, image, category, onClick, playersCount }: GameCardProps) {
-  
-  
+export function GameCard({ title, image, category, onClick, playersCount, disabled, comingSoonLabel }: GameCardProps) {
+  const handleClick = () => {
+    if (disabled) return;
+    onClick();
+  };
+
   return (
     <div 
-      onClick={onClick}
-      className="bg-card border border-border rounded-2xl overflow-hidden cursor-pointer group hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:scale-105 w-full"
+      onClick={handleClick}
+      className={`bg-card border border-border rounded-2xl overflow-hidden group transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 w-full ${
+        disabled ? 'cursor-default opacity-80' : 'cursor-pointer hover:border-primary/50 hover:scale-105'
+      }`}
       style={{ maxWidth: '100%' }}
     >
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -41,11 +48,18 @@ export function GameCard({ title, image, category, onClick, playersCount }: Game
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <div className="bg-primary rounded-full p-3 transform group-hover:scale-110 transition-transform glow-effect">
-            <Play className="w-5 h-5 text-primary-foreground" />
+        {!disabled && (
+          <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <div className="bg-primary rounded-full p-3 transform group-hover:scale-110 transition-transform glow-effect">
+              <Play className="w-5 h-5 text-primary-foreground" />
+            </div>
           </div>
-        </div>
+        )}
+        {comingSoonLabel && (
+          <div className="absolute top-3 left-3 bg-black/70 border border-yellow-400/70 text-yellow-200 text-[11px] font-semibold px-2 py-1 rounded-full shadow-md">
+            {comingSoonLabel}
+          </div>
+        )}
         <div className="absolute top-3 right-3">
           <div className="bg-accent/90 backdrop-blur-sm p-2 rounded-full text-accent-foreground flex items-center justify-center">
             {getCategoryIcon(category, title)}

@@ -11,12 +11,15 @@ import type { PanInfo } from 'framer-motion';
 import imgMines from '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp';
 import imgCrash from '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp';
 import imgPlinko from '../../assets/plinko.png';
+import imgCoinFlip from '../../assets/orel_reshka.jpg';
 
 interface Game {
   id: string;
   title: string;
   image: string;
   category: string;
+  disabled?: boolean;
+  comingSoonLabel?: string;
 }
 
 const featuredGames: Game[] = [
@@ -38,6 +41,14 @@ const featuredGames: Game[] = [
     image: imgPlinko,
     category: 'Ставки'
   },
+  {
+    id: 'coinflip',
+    title: 'Орёл и решка',
+    image: imgCoinFlip,
+    category: 'Ставки',
+    disabled: true,
+    comingSoonLabel: 'Скоро'
+  },
 ];
 
 const popularGames: Game[] = [
@@ -58,6 +69,14 @@ const popularGames: Game[] = [
     title: 'Plinko',
     image: imgPlinko,
     category: 'Ставки'
+  },
+  {
+    id: 'coinflip',
+    title: 'Орёл и решка',
+    image: imgCoinFlip,
+    category: 'Ставки',
+    disabled: true,
+    comingSoonLabel: 'Скоро'
   },
 ];
 
@@ -255,8 +274,11 @@ export function HomePage() {
   }, [profileData]);
 
   const handleGameClick = (gameId: string) => {
-    
-    
+    // Для игр, которые ещё в разработке, ничего не делаем
+    if (gameId === 'coinflip') {
+      return;
+    }
+
     if (gameId === 'minesweeper') {
       navigate('/minesweeper');
     } 
