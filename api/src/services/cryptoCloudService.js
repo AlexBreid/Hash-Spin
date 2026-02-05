@@ -31,19 +31,33 @@ class CryptoCloudService {
     });
 
     // Создаем отдельный axios instance для выводов (с другим API ключом)
+    // Для выводов используем базовый URL без /v2, так как endpoint уже содержит путь
+    const withdrawApiKey = (CRYPTO_CLOUD_WITHDRAW_API_KEY || CRYPTO_CLOUD_API_KEY || '').trim();
+    
+    if (!withdrawApiKey) {
+      logger.error('CRYPTOCLOUD', 'No withdraw API key configured! Withdrawals will fail.');
+    } else {
+      // Логируем первые и последние символы ключа для отладки (безопасно)
+      const keyPreview = withdrawApiKey.length > 20 
+        ? `${withdrawApiKey.substring(0, 10)}...${withdrawApiKey.substring(withdrawApiKey.length - 10)}`
+        : '***';
+      logger.info('CRYPTOCLOUD', 'Withdraw API key configured', {
+        hasWithdrawKey: !!CRYPTO_CLOUD_WITHDRAW_API_KEY,
+        usingMainKey: !CRYPTO_CLOUD_WITHDRAW_API_KEY && !!CRYPTO_CLOUD_API_KEY,
+        keyLength: withdrawApiKey.length,
+        keyPreview: keyPreview
+      });
+    }
+    
     this.withdrawApi = axios.create({
-      baseURL: CRYPTO_CLOUD_API_URL,
+      baseURL: 'https://api.cryptocloud.plus', // Без /v2 для выводов
       timeout: 30000,
       headers: {
-        'Authorization': `Token ${CRYPTO_CLOUD_WITHDRAW_API_KEY || CRYPTO_CLOUD_API_KEY}`,
+        'Authorization': `Token ${withdrawApiKey}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
     });
-
-    if (CRYPTO_CLOUD_WITHDRAW_API_KEY) {
-      logger.info('CRYPTOCLOUD', 'Withdraw API key configured separately');
-    }
   }
 
   /**
@@ -941,42 +955,194 @@ class CryptoCloudService {
    */
   async withdraw(currencyCode, toAddress, amount) {
     try {
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error('Invalid amount');
+      }
+
+      // Проверяем наличие API ключа
+      const withdrawApiKey = (CRYPTO_CLOUD_WITHDRAW_API_KEY || CRYPTO_CLOUD_API_KEY || '').trim();
+      if (!withdrawApiKey) {
+        throw new Error('Withdraw API key is not configured');
+      }
+
       logger.info('CRYPTOCLOUD', 'Creating withdrawal', {
         currencyCode,
         toAddress: toAddress.substring(0, 10) + '...',
-        amount
+        amount: amountNum,
+        fullAddress: toAddress,
+        hasWithdrawKey: !!CRYPTO_CLOUD_WITHDRAW_API_KEY,
+        usingMainKey: !CRYPTO_CLOUD_WITHDRAW_API_KEY && !!CRYPTO_CLOUD_API_KEY
       });
 
-      // Используем отдельный API для выводов
-      const response = await this.withdrawApi.post('/invoice/api/out/create', {
+      // Проверяем формат данных перед отправкой
+      const requestData = {
         currency_code: currencyCode,
         to_address: toAddress,
-        amount: parseFloat(amount).toString()
+        amount: amountNum.toString()
+      };
+
+      logger.info('CRYPTOCLOUD', 'Withdrawal request data', {
+        ...requestData,
+        to_address: requestData.to_address.substring(0, 10) + '...'
       });
 
+      // Используем правильный endpoint для выводов в CryptoCloud API v2
+      // Документация: https://docs.cryptocloud.plus/ru/api-reference-v2/withdrawals
+      // Endpoint: /v2/invoice/api/out/create
+      const withdrawResponse = await this.withdrawApi.post('/v2/invoice/api/out/create', requestData);
+      
       logger.info('CRYPTOCLOUD', 'Withdrawal response', {
-        status: response.data?.status,
-        result: response.data?.result
+        status: withdrawResponse.status,
+        statusText: withdrawResponse.statusText,
+        data: withdrawResponse.data
       });
 
-      if (response.data?.status === 'success' || response.data?.result === 'success') {
+      // Проверяем ответ
+      const responseData = withdrawResponse.data;
+      
+      logger.info('CRYPTOCLOUD', 'Withdrawal response details', {
+        status: withdrawResponse.status,
+        responseStatus: responseData?.status,
+        responseResult: responseData?.result,
+        fullResponse: JSON.stringify(responseData, null, 2)
+      });
+
+      if (responseData?.status === 'success' || responseData?.result === 'success' || responseData?.success) {
         return {
           success: true,
-          data: response.data.data || response.data,
-          txId: response.data.data?.id || response.data.id
+          data: responseData.data || responseData.result || responseData,
+          txId: responseData.data?.id || responseData.id || responseData.result?.id || responseData.uuid
         };
       }
 
-      throw new Error(response.data?.message || response.data?.error || 'Withdrawal failed');
+      // Если статус не success, но есть данные - возможно это нормально
+      if (responseData?.id || responseData?.uuid) {
+        logger.info('CRYPTOCLOUD', 'Withdrawal created but status not success', {
+          responseData
+        });
+        return {
+          success: true,
+          data: responseData,
+          txId: responseData.id || responseData.uuid
+        };
+      }
+
+      // Формируем понятное сообщение об ошибке
+      let errorMsg = 'Withdrawal failed';
+      
+      if (responseData?.message) {
+        errorMsg = String(responseData.message);
+      } else if (responseData?.error) {
+        errorMsg = String(responseData.error);
+      } else if (responseData?.result?.message) {
+        errorMsg = String(responseData.result.message);
+      } else if (responseData?.result?.error) {
+        errorMsg = String(responseData.result.error);
+      } else if (responseData?.detail) {
+        errorMsg = String(responseData.detail);
+      } else if (responseData) {
+        // Пробуем преобразовать объект в строку
+        try {
+          errorMsg = JSON.stringify(responseData);
+        } catch {
+          errorMsg = 'Withdrawal failed: Unknown error';
+        }
+      }
+      
+      throw new Error(errorMsg);
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
-      logger.error('CRYPTOCLOUD', 'Error withdrawing', { 
-        error: errorMessage,
-        status: error.response?.status,
+      const errorDetails = {
+        message: error.message,
+        responseStatus: error.response?.status,
+        responseData: error.response?.data,
         currencyCode,
         toAddress: toAddress.substring(0, 10) + '...',
-        amount 
+        amount
+      };
+
+      logger.error('CRYPTOCLOUD', 'Error withdrawing - FULL DETAILS', {
+        ...errorDetails,
+        errorDetailsString: JSON.stringify(errorDetails, null, 2),
+        responseDataString: error.response?.data ? JSON.stringify(error.response.data, null, 2) : 'no response data'
       });
+
+      // Формируем понятное сообщение об ошибке
+      let errorMessage = 'Unknown error';
+      
+      // Сначала пробуем получить сообщение из самого error
+      if (error.message) {
+        errorMessage = String(error.message);
+      }
+      
+      // Затем пробуем извлечь из response.data
+      if (error.response?.data) {
+        const apiError = error.response.data;
+        
+        // Если это строка
+        if (typeof apiError === 'string') {
+          errorMessage = apiError;
+        } 
+        // Если это объект, пробуем извлечь понятное сообщение
+        else if (apiError && typeof apiError === 'object') {
+          // Проверяем разные возможные поля с ошибками
+          if (apiError.detail) {
+            errorMessage = String(apiError.detail);
+          } else if (apiError.message) {
+            errorMessage = String(apiError.message);
+          } else if (apiError.error) {
+            errorMessage = String(apiError.error);
+          } else if (apiError.errors) {
+            // Если errors - массив или объект
+            if (Array.isArray(apiError.errors)) {
+              errorMessage = apiError.errors.map(e => String(e)).join(', ');
+            } else if (typeof apiError.errors === 'object') {
+              errorMessage = Object.values(apiError.errors).map(e => String(e)).join(', ');
+            } else {
+              errorMessage = String(apiError.errors);
+            }
+          } else if (apiError.result?.message) {
+            errorMessage = String(apiError.result.message);
+          } else if (apiError.result?.error) {
+            errorMessage = String(apiError.result.error);
+          } else {
+            // Последняя попытка - преобразовать весь объект в JSON
+            try {
+              errorMessage = JSON.stringify(apiError);
+            } catch (e) {
+              errorMessage = `API Error: ${error.response.status || 'Unknown'}`;
+            }
+          }
+        }
+      } 
+      // Если есть только статус
+      else if (error.response?.status) {
+        errorMessage = `HTTP ${error.response.status}: ${errorMessage}`;
+      }
+
+      // Убеждаемся, что errorMessage - это строка
+      errorMessage = String(errorMessage);
+
+      // Финальная проверка - убеждаемся, что errorMessage - это строка
+      if (typeof errorMessage !== 'string') {
+        try {
+          errorMessage = JSON.stringify(errorMessage);
+        } catch (e) {
+          errorMessage = 'Unknown error (cannot stringify)';
+        }
+      }
+      errorMessage = String(errorMessage);
+
+      logger.error('CRYPTOCLOUD', 'Withdrawal error message', { 
+        errorMessage,
+        errorType: typeof errorMessage,
+        originalError: error.message,
+        originalErrorType: typeof error.message,
+        responseStatus: error.response?.status,
+        responseData: error.response?.data,
+        responseDataString: error.response?.data ? JSON.stringify(error.response.data) : 'no response data'
+      });
+
       throw new Error(errorMessage);
     }
   }

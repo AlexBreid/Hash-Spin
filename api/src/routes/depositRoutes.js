@@ -157,8 +157,11 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    if (error.response) {
-      }
+    logger.error('DEPOSIT', 'Error creating deposit', {
+      error: error.message,
+      stack: error.stack,
+      apiResponse: error.response?.data
+    });
     
     res.status(500).json({ 
       success: false, 

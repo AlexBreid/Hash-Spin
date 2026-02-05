@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const tatumService = require('../services/tatumService');
+const logger = require('../utils/logger');
 
 /**
  * Получить баланс пользователя
@@ -749,6 +750,19 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       });
     }
 
+    // Получаем информацию о токене
+    const token = await prisma.cryptoToken.findUnique({
+      where: { id: tokenId }
+    });
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token not found',
+      });
+    }
+
+    // Списываем баланс
     const newBalance = await prisma.balance.update({
       where: { id: balance.id },
       data: {
@@ -758,7 +772,8 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       },
     });
 
-    await prisma.transaction.create({
+    // Создаем транзакцию в БД
+    const transaction = await prisma.transaction.create({
       data: {
         userId,
         tokenId,
@@ -769,14 +784,303 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       },
     });
 
-    res.json({
-      success: true,
-      data: {
-        newBalance: parseFloat(newBalance.amount.toString()),
-        status: 'PENDING',
-        message: 'Withdrawal request submitted',
-      },
-    });
+    // ✅ ОТПРАВЛЯЕМ ВЫВОД В CRYPTOCLOUD
+    const cryptoCloudService = require('../services/cryptoCloudService');
+    
+    try {
+      // Формируем код валюты для CryptoCloud (например, USDT_TRC20)
+      const currencyCode = cryptoCloudService.getCryptoCloudCurrency(token.symbol, token.network);
+      
+      logger.info('WITHDRAWAL', 'Sending withdrawal to CryptoCloud', {
+        transactionId: transaction.id,
+        userId,
+        tokenSymbol: token.symbol,
+        tokenNetwork: token.network,
+        currencyCode,
+        amount,
+        amountType: typeof amount,
+        walletAddress: walletAddress.substring(0, 10) + '...',
+        fullWalletAddress: walletAddress
+      });
+
+      // Валидация адреса
+      if (!walletAddress || walletAddress.trim().length === 0) {
+        throw new Error('Wallet address is required');
+      }
+
+      // Валидация суммы
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error('Invalid withdrawal amount');
+      }
+
+      // ✅ Проверяем баланс CryptoCloud перед выводом (опционально)
+      try {
+        const cryptoBalance = await cryptoCloudService.getWithdrawBalance();
+        logger.info('WITHDRAWAL', 'CryptoCloud balance check', {
+          balance: cryptoBalance,
+          requestedAmount: amountNum,
+          currencyCode
+        });
+      } catch (balanceError) {
+        logger.warn('WITHDRAWAL', 'Failed to check CryptoCloud balance', {
+          error: balanceError.message
+        });
+        // Продолжаем попытку вывода даже если проверка баланса не удалась
+      }
+
+      // Отправляем вывод в CryptoCloud
+      let withdrawResult;
+      try {
+        withdrawResult = await cryptoCloudService.withdraw(
+          currencyCode,
+          walletAddress.trim(),
+          amountNum
+        );
+      } catch (withdrawError) {
+        // Если ошибка уже обработана в cryptoCloudService, она будет иметь message
+        // Но на всякий случай обрабатываем и здесь
+        let errorMsg = 'Failed to send withdrawal to CryptoCloud';
+        if (withdrawError && typeof withdrawError === 'object') {
+          if (withdrawError.message && typeof withdrawError.message === 'string') {
+            errorMsg = withdrawError.message;
+          } else if (withdrawError.response?.data) {
+            const apiError = withdrawError.response.data;
+            if (typeof apiError === 'string') {
+              errorMsg = apiError;
+            } else if (apiError && typeof apiError === 'object') {
+              if (apiError.detail) {
+                errorMsg = String(apiError.detail);
+              } else if (apiError.message) {
+                errorMsg = String(apiError.message);
+              } else {
+                try {
+                  errorMsg = JSON.stringify(apiError);
+                } catch {
+                  errorMsg = 'Unknown API error';
+                }
+              }
+            }
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (withdrawResult && withdrawResult.success) {
+        // Обновляем транзакцию с ID вывода из CryptoCloud
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            txHash: withdrawResult.txId || withdrawResult.data?.id || 'pending',
+            status: 'PROCESSING' // Меняем статус на PROCESSING, так как отправлено в CryptoCloud
+          }
+        });
+
+        logger.info('WITHDRAWAL', 'Withdrawal sent to CryptoCloud successfully', {
+          transactionId: transaction.id,
+          cryptoCloudTxId: withdrawResult.txId
+        });
+
+        res.json({
+          success: true,
+          data: {
+            newBalance: parseFloat(newBalance.amount.toString()),
+            status: 'PROCESSING',
+            message: 'Withdrawal request submitted and sent to CryptoCloud',
+            transactionId: transaction.id
+          },
+        });
+      } else {
+        // Если не удалось отправить в CryptoCloud, возвращаем баланс
+        await prisma.balance.update({
+          where: { id: balance.id },
+          data: {
+            amount: {
+              increment: amount,
+            },
+          },
+        });
+
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED'
+          }
+        });
+
+        logger.error('WITHDRAWAL', 'Failed to send withdrawal to CryptoCloud', {
+          transactionId: transaction.id,
+          error: withdrawResult.error || 'Unknown error'
+        });
+
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to send withdrawal to CryptoCloud',
+        });
+      }
+    } catch (cryptoCloudError) {
+      // Если ошибка при отправке в CryptoCloud, возвращаем баланс
+      await prisma.balance.update({
+        where: { id: balance.id },
+        data: {
+          amount: {
+            increment: amount,
+          },
+        },
+      });
+
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: 'FAILED'
+        }
+      });
+
+      // Безопасно извлекаем сообщение об ошибке для логирования
+      let logError = 'Unknown error';
+      if (cryptoCloudError) {
+        if (typeof cryptoCloudError === 'string') {
+          logError = cryptoCloudError;
+        } else if (cryptoCloudError.message) {
+          if (typeof cryptoCloudError.message === 'string') {
+            logError = cryptoCloudError.message;
+          } else {
+            try {
+              logError = JSON.stringify(cryptoCloudError.message);
+            } catch {
+              logError = 'Error object (cannot stringify)';
+            }
+          }
+        } else {
+          try {
+            logError = JSON.stringify(cryptoCloudError);
+          } catch {
+            logError = 'Error object (cannot stringify)';
+          }
+        }
+      }
+
+      logger.error('WITHDRAWAL', 'Error sending withdrawal to CryptoCloud', {
+        transactionId: transaction.id,
+        error: logError,
+        errorStack: cryptoCloudError?.stack,
+        errorResponse: cryptoCloudError?.response?.data,
+        errorType: typeof cryptoCloudError,
+        errorMessageType: typeof cryptoCloudError?.message,
+        fullError: cryptoCloudError
+      });
+
+      // Формируем понятное сообщение об ошибке для пользователя
+      let errorMessage = 'Failed to process withdrawal';
+      
+      // Проверяем разные источники ошибки
+      if (cryptoCloudError) {
+        // Если это строка
+        if (typeof cryptoCloudError === 'string') {
+          errorMessage = cryptoCloudError;
+        }
+        // Если это объект Error с message
+        else if (cryptoCloudError.message) {
+          if (typeof cryptoCloudError.message === 'string') {
+            errorMessage = cryptoCloudError.message;
+          } else if (cryptoCloudError.message.detail) {
+            errorMessage = String(cryptoCloudError.message.detail);
+          } else if (cryptoCloudError.message.message) {
+            errorMessage = String(cryptoCloudError.message.message);
+          } else {
+            try {
+              errorMessage = JSON.stringify(cryptoCloudError.message);
+            } catch {
+              errorMessage = 'Unknown error';
+            }
+          }
+        }
+        // Если есть response.data
+        else if (cryptoCloudError.response?.data) {
+          const apiError = cryptoCloudError.response.data;
+          
+          if (typeof apiError === 'string') {
+            errorMessage = apiError;
+          } else if (apiError && typeof apiError === 'object') {
+            // Проверяем разные поля в объекте
+            if (apiError.detail) {
+              errorMessage = String(apiError.detail);
+            } else if (apiError.message) {
+              errorMessage = String(apiError.message);
+            } else if (apiError.error) {
+              errorMessage = String(apiError.error);
+            } else {
+              // Преобразуем весь объект в JSON
+              try {
+                errorMessage = JSON.stringify(apiError);
+              } catch (e) {
+                errorMessage = 'Unknown API error';
+              }
+            }
+          }
+        }
+        // Если это просто объект
+        else if (typeof cryptoCloudError === 'object') {
+          try {
+            errorMessage = JSON.stringify(cryptoCloudError);
+          } catch (e) {
+            errorMessage = 'Unknown error';
+          }
+        }
+      }
+      
+      // Финальная проверка - убеждаемся, что errorMessage - это строка
+      if (typeof errorMessage !== 'string') {
+        try {
+          errorMessage = JSON.stringify(errorMessage);
+        } catch {
+          errorMessage = 'Failed to process withdrawal: Unknown error';
+        }
+      }
+
+      // Финальная проверка - убеждаемся, что errorMessage - это строка
+      let finalErrorMessage = 'Failed to process withdrawal';
+      
+      if (errorMessage && typeof errorMessage === 'string') {
+        finalErrorMessage = errorMessage;
+      } else if (errorMessage) {
+        // Если это не строка, пробуем преобразовать
+        try {
+          if (typeof errorMessage === 'object') {
+            // Пробуем извлечь понятное сообщение из объекта
+            if (errorMessage.detail) {
+              finalErrorMessage = String(errorMessage.detail);
+            } else if (errorMessage.message) {
+              finalErrorMessage = String(errorMessage.message);
+            } else if (errorMessage.error) {
+              finalErrorMessage = String(errorMessage.error);
+            } else {
+              finalErrorMessage = JSON.stringify(errorMessage);
+            }
+          } else {
+            finalErrorMessage = String(errorMessage);
+          }
+        } catch (e) {
+          finalErrorMessage = 'Failed to process withdrawal: Unknown error';
+        }
+      }
+
+      // Финальная гарантия - всегда строка
+      finalErrorMessage = String(finalErrorMessage);
+
+      logger.error('WITHDRAWAL', 'Final error message', {
+        errorMessage: finalErrorMessage,
+        errorMessageType: typeof finalErrorMessage,
+        originalErrorType: typeof errorMessage,
+        errorMessageLength: finalErrorMessage.length,
+        errorMessagePreview: finalErrorMessage.substring(0, 200)
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: String(finalErrorMessage),
+      });
+    }
   } catch (error) {
     res.status(500).json({
       success: false,
