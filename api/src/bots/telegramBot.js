@@ -16,6 +16,8 @@ const path = require('path');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
+// ID канала для рассылки (формат: @channel_username или -1001234567890)
+const BROADCAST_CHANNEL_ID = process.env.BROADCAST_CHANNEL_ID || null;
 
 // ⭐ Telegram Stars Service
 let telegramStarsService;
@@ -144,6 +146,7 @@ async function notifyReferrerAboutNewReferee(bot, referrerTelegramId, newUserUse
 const waitingForTicketMessage = new Map();
 const supportTickets = new Map();
 const adminWaitingForReply = new Map();
+const adminWaitingForBroadcast = new Map(); // Состояние ожидания рассылки: userId -> { text: null, photo: null }
 
 // ====================================
 // 🛡️ АНТИСПАМ СИСТЕМА
@@ -549,9 +552,10 @@ if (!BOT_TOKEN) {
   // ====================================
 
   bot.on('message', async (ctx) => {
-    if (!ctx.message?.text) return;
-    const text = ctx.message.text.trim();
-    if (!text) return;
+    const text = ctx.message?.text?.trim() || '';
+    
+    // Пропускаем если нет текста и нет фото (кроме обработки рассылки)
+    if (!text && !ctx.message?.photo) return;
 
     try {
       const user = await prisma.user.findUnique({ 
@@ -567,6 +571,61 @@ if (!BOT_TOKEN) {
         logger.warn('BOT', `Blocked user sent message`, { userId: user.id });
         await ctx.reply('🚫 Ваш аккаунт заблокирован.');
         return;
+      }
+
+      // Обработка массовой рассылки
+      if (adminWaitingForBroadcast.has(user.id)) {
+        const broadcastData = adminWaitingForBroadcast.get(user.id);
+        
+        // Сохраняем message_id и chat_id для копирования сообщения со всем форматированием
+        broadcastData.messageId = ctx.message.message_id;
+        broadcastData.chatId = ctx.chat.id;
+        
+        // Если это фото
+        if (ctx.message.photo && ctx.message.photo.length > 0) {
+          const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Берем самое большое фото
+          broadcastData.photoFileId = photo.file_id;
+          broadcastData.photoCaption = ctx.message.caption || '';
+          
+          await ctx.reply(
+            `✅ Сообщение получено!\n\n` +
+            `📝 Текст: ${broadcastData.photoCaption || '(нет текста)'}\n` +
+            `🖼️ Фото: есть\n\n` +
+            `Готово к отправке! (сохраняется форматирование и цитаты)`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '✅ Отправить рассылку', callback_data: 'admin_broadcast_send' }],
+                  [{ text: '❌ Отменить', callback_data: 'admin_broadcast_cancel' }]
+                ]
+              }
+            }
+          );
+          return;
+        }
+        
+        // Если это текст
+        if (text && !text.startsWith('/')) {
+          broadcastData.text = text;
+          
+          const preview = `📢 ПРЕВЬЮ РАССЫЛКИ:\n\n`;
+          const previewText = broadcastData.text ? `📝 Текст: ${broadcastData.text}\n\n` : '';
+          const previewPhoto = broadcastData.photoFileId ? `🖼️ Фото: есть\n` : '';
+          const hasReply = ctx.message.reply_to_message ? `💬 Цитата: есть\n` : '';
+          
+          await ctx.reply(
+            preview + previewText + previewPhoto + hasReply + `\nГотовы отправить? (сохраняется форматирование и цитаты)`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '✅ Отправить рассылку', callback_data: 'admin_broadcast_send' }],
+                  [{ text: '❌ Отменить', callback_data: 'admin_broadcast_cancel' }]
+                ]
+              }
+            }
+          );
+          return;
+        }
       }
 
       if (adminWaitingForReply.has(user.id)) {
@@ -674,6 +733,10 @@ if (!BOT_TOKEN) {
       }
 
       // Все депозиты и выводы через веб-приложение
+      // Пропускаем switch если нет текста (только фото)
+      if (!text) {
+        return;
+      }
 
       switch (text) {
         case '🎰 Казино': {
@@ -727,6 +790,7 @@ if (!BOT_TOKEN) {
               reply_markup: {
                 inline_keyboard: [
                   [{ text: '🎫 Заявки поддержки', callback_data: 'admin_show_tickets' }],
+                  [{ text: '📢 Массовая рассылка', callback_data: 'admin_broadcast' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
               }
@@ -736,6 +800,10 @@ if (!BOT_TOKEN) {
         }
 
         default: {
+          // Пропускаем обработку если это фото без текста и не в режиме рассылки
+          if (!text && ctx.message?.photo) {
+            return;
+          }
           const menu = getMainMenuKeyboard(user.isAdmin);
           await ctx.reply('📋 Выберите действие:', menu);
         }
@@ -786,6 +854,7 @@ if (!BOT_TOKEN) {
         reply_markup: {
           inline_keyboard: [
             [{ text: 'Поддержка', callback_data: 'admin_show_tickets' }],
+            [{ text: '📢 Массовая рассылка', callback_data: 'admin_broadcast' }],
             [{ text: 'Назад', callback_data: 'back_to_menu' }]
           ]
         }
@@ -921,6 +990,204 @@ if (!BOT_TOKEN) {
         getMainMenuKeyboard(user.isAdmin)
       );
     }
+  });
+
+  // ====================================
+  // 📢 МАССОВАЯ РАССЫЛКА
+  // ====================================
+
+  bot.action('admin_broadcast', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    await ctx.answerCbQuery();
+    
+    // Инициализируем состояние рассылки
+    adminWaitingForBroadcast.set(user.id, {
+      text: null,
+      photoFileId: null,
+      photoCaption: null,
+      messageId: null,
+      chatId: null
+    });
+
+    await ctx.reply(
+      `📢 Массовая рассылка\n\n` +
+      `Просто отправьте:\n` +
+      `• Фото с текстом (текст в подписи к фото)\n` +
+      `• Или просто текст\n\n` +
+      `После этого нажмите "Отправить рассылку"`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '❌ Отменить', callback_data: 'admin_broadcast_cancel' }]
+          ]
+        }
+      }
+    );
+  });
+
+  bot.action('admin_broadcast_send', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    const broadcastData = adminWaitingForBroadcast.get(user.id);
+    
+    if (!broadcastData || (!broadcastData.text && !broadcastData.photoFileId)) {
+      await ctx.answerCbQuery('Нет данных для рассылки');
+      return;
+    }
+
+    await ctx.answerCbQuery('Начинаю рассылку...');
+
+    try {
+      // Получаем всех пользователей с telegramId
+      const allUsersRaw = await prisma.user.findMany({
+        where: {
+          isBlocked: false
+        },
+        select: {
+          id: true,
+          telegramId: true,
+          username: true
+        }
+      });
+      
+      // Фильтруем только тех, у кого есть telegramId
+      const allUsers = allUsersRaw.filter(user => user.telegramId !== null && user.telegramId !== undefined);
+      
+      const skippedUsers = allUsersRaw.length - allUsers.length;
+
+      let successCount = 0;
+      let failCount = 0;
+      const totalUsers = allUsers.length;
+
+      await ctx.reply(
+        `📢 Начинаю рассылку...\n\n` +
+        `👥 Всего пользователей: ${allUsersRaw.length}\n` +
+        `✅ С telegramId: ${totalUsers}\n` +
+        `⏭️ Пропущено (без telegramId): ${skippedUsers}`
+      );
+
+      // Отправляем сообщения всем пользователям
+      // Используем copyMessage для сохранения форматирования и цитат
+      if (broadcastData.messageId && broadcastData.chatId) {
+        // Копируем сообщение со всем форматированием (включая цитаты)
+        for (const targetUser of allUsers) {
+          try {
+            await bot.telegram.copyMessage(
+              targetUser.telegramId,  // Куда копируем
+              broadcastData.chatId,   // Откуда копируем (чат админа)
+              broadcastData.messageId // ID сообщения для копирования
+            );
+            
+            successCount++;
+            
+            // Небольшая задержка чтобы не превысить лимиты Telegram (30 сообщений в секунду)
+            if (successCount % 25 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (error) {
+            failCount++;
+            logger.warn('BOT', `Failed to send broadcast to user ${targetUser.id}`, { 
+              error: error.message,
+              telegramId: targetUser.telegramId 
+            });
+          }
+        }
+      } else {
+        // Fallback на старый способ, если нет messageId (для совместимости)
+        for (const targetUser of allUsers) {
+          try {
+            if (broadcastData.photoFileId) {
+              const caption = broadcastData.text || broadcastData.photoCaption || '';
+              await bot.telegram.sendPhoto(
+                targetUser.telegramId,
+                broadcastData.photoFileId,
+                caption ? { caption, parse_mode: 'HTML' } : {}
+              );
+            } else if (broadcastData.text) {
+              await bot.telegram.sendMessage(
+                targetUser.telegramId,
+                broadcastData.text,
+                { parse_mode: 'HTML' }
+              );
+            }
+            
+            successCount++;
+            
+            if (successCount % 25 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (error) {
+            failCount++;
+            logger.warn('BOT', `Failed to send broadcast to user ${targetUser.id}`, { 
+              error: error.message,
+              telegramId: targetUser.telegramId 
+            });
+          }
+        }
+      }
+
+      // Очищаем состояние
+      adminWaitingForBroadcast.delete(user.id);
+
+      await ctx.reply(
+        `✅ Рассылка завершена!\n\n` +
+        `📊 Статистика:\n` +
+        `✅ Успешно: ${successCount}\n` +
+        `❌ Ошибок: ${failCount}\n` +
+        `📈 Отправлено: ${totalUsers}\n` +
+        (skippedUsers > 0 ? `⏭️ Пропущено (без telegramId): ${skippedUsers}` : ''),
+        getMainMenuKeyboard(user.isAdmin)
+      );
+
+      logger.info('BOT', `Broadcast completed`, { 
+        adminId: user.id,
+        successCount,
+        failCount,
+        totalUsers
+      });
+
+    } catch (error) {
+      logger.error('BOT', `Error in broadcast`, { error: error.message });
+      adminWaitingForBroadcast.delete(user.id);
+      await ctx.reply(
+        `❌ Ошибка при рассылке:\n\n${error.message}`,
+        getMainMenuKeyboard(user.isAdmin)
+      );
+    }
+  });
+
+  bot.action('admin_broadcast_cancel', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    await ctx.answerCbQuery();
+    adminWaitingForBroadcast.delete(user.id);
+
+    await ctx.reply(
+      '❌ Рассылка отменена',
+      getMainMenuKeyboard(user.isAdmin)
+    );
   });
 
   // ====================================
