@@ -1,6 +1,6 @@
 // minesweeperService.js - ФИНАЛЬНАЯ ВЕРСИЯ БЕЗ SCHEMA ИЗМЕНЕНИЙ
 const prisma = require('../../prismaClient');
-const { Decimal } = require('@prisma/client');
+const Decimal = require('decimal.js');
 
 class MinesweeperService {
     /**
@@ -9,13 +9,23 @@ class MinesweeperService {
      * При 1 мине: 1 клетка = 1.03x, 2 клетки = 1.08x, макс = 24.8x (24 безопасных клетки)
      * При 15 минах: 1 клетка = 2.48x, макс = 24.8x (10 безопасных клеток)
      * При 24 минах: 1 клетка = 24.8x (1 безопасная клетка, сразу максимум)
-     * Скорость роста зависит от количества мин (чем больше мин, тем быстрее растет)
+     * Для игр с 1-5 минами скорость роста УМЕНЬШЕНА В 2 РАЗА
      */
     getMultiplier(revealedCount, minesCount) {
         if (revealedCount <= 0) return 1.0;
         
         const gridSize = 5;
         const totalSafeCells = (gridSize * gridSize) - minesCount;
+        
+        // Защита от деления на ноль
+        if (totalSafeCells <= 0) {
+            return 1.0;
+        }
+        
+        // Если открыто больше безопасных клеток, чем есть, возвращаем максимум
+        if (revealedCount >= totalSafeCells) {
+            return 24.8;
+        }
         
         // МАКСИМАЛЬНЫЙ МНОЖИТЕЛЬ ВСЕГДА 24.8x
         const maxMultiplier = 24.8;
@@ -52,33 +62,75 @@ class MinesweeperService {
             }
         }
         
-        // Прогресс от 0 до 1
-        const progress = revealedCount / totalSafeCells;
+        // Объявляем переменную multiplier
+        let multiplier;
         
-        // Скорость роста зависит от количества мин
-        // Чем больше мин, тем быстрее растет множитель (более крутая кривая)
-        // Используем степень, которая зависит от количества мин
-        // При 1 мине: более плавная кривая (степень 2.0)
-        // При большем количестве мин: более крутая кривая (меньше степень = быстрее рост)
-        // Формула: от 2.0 (1 мина) до 0.2 (24 мины) - более агрессивное уменьшение
-        const minPower = 0.2;
-        const maxPower = 2.0;
-        // Используем квадратичную функцию для более резкого изменения при большем количестве мин
-        const normalizedMines = (minesCount - 1) / 23; // От 0 до 1
-        const curvePower = maxPower - Math.pow(normalizedMines, 1.5) * (maxPower - minPower);
-        const exponentialCurve = Math.pow(progress, Math.max(0.1, curvePower));
-        
-        // Рассчитываем множитель: от базового до максимального (24.8x)
-        let multiplier = baseMultiplier + (maxMultiplier - baseMultiplier) * exponentialCurve;
-        
-        // Корректируем для точных значений на первых шагах
-        if (minesCount === 1) {
-            if (revealedCount === 1) {
-                multiplier = 1.03;
-            } else if (revealedCount === 2) {
-                multiplier = 1.08;
+        // Для игр с 1-5 минами используем специальную формулу с замедленной скоростью
+        if (minesCount >= 1 && minesCount <= 5) {
+            // Используем более плавную кривую для замедления роста
+            // Прогресс от 0 до 1
+            const progress = revealedCount / totalSafeCells;
+            // Увеличиваем степень в 2 раза для замедления (степень 4.0 вместо 2.0 для 1 мины)
+            const slowCurvePower = 4.0; // Фиксированная степень для 1-5 мин
+            const exponentialCurve = Math.pow(progress, slowCurvePower);
+            
+            // Рассчитываем множитель: от базового до максимального (24.8x)
+            multiplier = baseMultiplier + (maxMultiplier - baseMultiplier) * exponentialCurve;
+            
+            // Корректируем для точных значений на первых шагах для 1 мины
+            if (minesCount === 1) {
+                if (revealedCount === 1) {
+                    multiplier = 1.03;
+                } else if (revealedCount === 2) {
+                    multiplier = 1.08;
+                } else {
+                    // Для 3+ ячеек используем формулу с замедленной скоростью
+                    // Для первых 10 ячеек используем линейную интерполяцию для гарантии монотонного роста
+                    if (revealedCount <= 10 && totalSafeCells > 2) {
+                        // Линейная интерполяция между 1.08 (2 ячейки) и примерно 1.50 (10 ячеек)
+                        const linearProgress = (revealedCount - 2) / Math.max(1, 10 - 2); // От 0 до 1, защита от деления на ноль
+                        multiplier = 1.08 + (1.50 - 1.08) * linearProgress;
+                    } else {
+                        // Для остальных ячеек используем формулу с замедленной скоростью
+                        // Используем прогресс от 10 ячеек (1.50) до максимума (24.8)
+                        if (totalSafeCells > 10) {
+                            const progressFromTenth = (revealedCount - 10) / (totalSafeCells - 10); // От 0 до 1
+                            const slowCurveFromTenth = Math.pow(progressFromTenth, 4.0); // Степень 4.0 для замедления в 2 раза
+                            multiplier = 1.50 + (24.8 - 1.50) * slowCurveFromTenth;
+                        } else {
+                            // Если totalSafeCells <= 10, используем прямую интерполяцию
+                            const progress = (revealedCount - 2) / (totalSafeCells - 2);
+                            multiplier = 1.08 + (24.8 - 1.08) * Math.pow(progress, 4.0);
+                        }
+                    }
+                }
+            } else {
+                // Для других количеств мин (2-5) первая клетка должна точно равняться базовому множителю
+                if (revealedCount === 1) {
+                    multiplier = baseMultiplier;
+                }
             }
         } else {
+            // Для игр с 6+ минами используем обычную формулу
+            const progress = revealedCount / totalSafeCells;
+            
+            // Скорость роста зависит от количества мин
+            // Чем больше мин, тем быстрее растет множитель (более крутая кривая)
+            // Используем степень, которая зависит от количества мин
+            // При 1 мине: более плавная кривая (степень 2.0)
+            // При большем количестве мин: более крутая кривая (меньше степень = быстрее рост)
+            // Формула: от 2.0 (1 мина) до 0.2 (24 мины) - более агрессивное уменьшение
+            const minPower = 0.2;
+            const maxPower = 2.0;
+            // Используем квадратичную функцию для более резкого изменения при большем количестве мин
+            const normalizedMines = (minesCount - 1) / 23; // От 0 до 1 (от 1 до 24 мин)
+            const curvePower = maxPower - Math.pow(normalizedMines, 1.5) * (maxPower - minPower);
+            
+            const exponentialCurve = Math.pow(progress, Math.max(0.1, curvePower));
+            
+            // Рассчитываем множитель: от базового до максимального (24.8x)
+            multiplier = baseMultiplier + (maxMultiplier - baseMultiplier) * exponentialCurve;
+            
             // Для других количеств мин первая клетка должна точно равняться базовому множителю
             if (revealedCount === 1) {
                 multiplier = baseMultiplier;
@@ -92,6 +144,13 @@ class MinesweeperService {
      * 🆕 ПОЛУЧИТЬ СЛЕДУЮЩИЙ МНОЖИТЕЛЬ
      */
     getNextMultiplier(currentRevealedCount, minesCount) {
+        // Валидация параметров
+        if (currentRevealedCount === null || currentRevealedCount === undefined || currentRevealedCount < 0) {
+            currentRevealedCount = 0;
+        }
+        if (!minesCount || minesCount < 1 || minesCount > 24) {
+            minesCount = 6; // Значение по умолчанию
+        }
         return this.getMultiplier(currentRevealedCount + 1, minesCount);
     }
 
@@ -99,8 +158,15 @@ class MinesweeperService {
      * 🆕 ПОЛУЧИТЬ МАКСИМАЛЬНЫЙ МНОЖИТЕЛЬ
      */
     getMaxMultiplier(minesCount) {
+        // Валидация minesCount
+        if (!minesCount || minesCount < 1 || minesCount > 24) {
+            return 24.8; // Возвращаем максимальный множитель по умолчанию
+        }
         const gridSize = 5;
         const totalSafeCells = (gridSize * gridSize) - minesCount;
+        if (totalSafeCells <= 0) {
+            return 24.8; // Если нет безопасных клеток, возвращаем максимум
+        }
         return this.getMultiplier(totalSafeCells, minesCount);
     }
 
@@ -455,8 +521,13 @@ class MinesweeperService {
             }
 
             const grid = Array.isArray(gameStateData) ? gameStateData : (gameStateData?.grid || []);
-            const minesCount = gameStateData?.minesCount || 6;
+            let minesCount = gameStateData?.minesCount || 6;
             const gridSize = gameStateData?.gridSize || 5;
+
+            // Валидация minesCount
+            if (!minesCount || minesCount < 1 || minesCount > 24) {
+                minesCount = 6; // Значение по умолчанию
+            }
 
             // Проверяем, что grid - это массив массивов
             if (!Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0])) {
@@ -464,7 +535,17 @@ class MinesweeperService {
             }
 
             // Подготавливаем сетку для фронтенда (только раскрытые клетки)
-            const frontGrid = this.prepareGridForFront(grid);
+            let frontGrid;
+            try {
+                frontGrid = this.prepareGridForFront(grid);
+            } catch (error) {
+                throw new Error('Ошибка подготовки сетки для фронтенда: ' + error.message);
+            }
+
+            // Проверяем, что frontGrid валиден
+            if (!Array.isArray(frontGrid)) {
+                throw new Error('Некорректный формат подготовленной сетки');
+            }
 
             // Создаем пустое поле и заполняем только раскрытыми клетками
             const emptyGrid = Array(gridSize).fill(null).map(() =>
@@ -486,20 +567,31 @@ class MinesweeperService {
                 }
             }
 
-            const nextMultiplier = this.getNextMultiplier(game.revealedCells, minesCount);
+            // Валидация revealedCells
+            const revealedCells = game.revealedCells || 0;
+            if (revealedCells < 0) {
+                throw new Error('Некорректное количество открытых клеток');
+            }
+
+            const nextMultiplier = this.getNextMultiplier(revealedCells, minesCount);
             const maxMultiplier = this.getMaxMultiplier(minesCount);
-            const potentialWin = new Decimal(game.betAmount).mul(game.multiplier);
+            
+            // Валидация multiplier и betAmount
+            const currentMultiplier = game.multiplier ? parseFloat(game.multiplier.toString()) : 1.0;
+            const betAmount = game.betAmount ? parseFloat(game.betAmount.toString()) : 0;
+            
+            const potentialWin = new Decimal(betAmount).mul(currentMultiplier);
 
             return {
                 gameId: game.id,
                 grid: emptyGrid,
-                currentMultiplier: parseFloat(game.multiplier.toString()),
+                currentMultiplier: currentMultiplier,
                 nextMultiplier: nextMultiplier,
                 maxMultiplier: maxMultiplier,
                 potentialWin: potentialWin.toString(),
                 minesCount: minesCount,
-                revealedCells: game.revealedCells,
-                betAmount: parseFloat(game.betAmount.toString()),
+                revealedCells: revealedCells,
+                betAmount: betAmount,
             };
 
         } catch (error) {

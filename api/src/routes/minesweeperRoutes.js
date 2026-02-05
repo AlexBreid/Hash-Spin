@@ -121,7 +121,8 @@ router.post('/api/v1/minesweeper/start', authenticateToken, async (req, res) => 
     });
     
   } catch (error) {
-    logger.error('MINESWEEPER', 'Failed to start game', { error: error.message });
+    logger.error('MINESWEEPER', 'Failed to start game', { error: error.message, stack: error.stack });
+    console.error('MINESWEEPER START ERROR:', error);
     
     res.status(500).json({
       success: false,
@@ -299,7 +300,8 @@ router.get('/api/v1/minesweeper/active', authenticateToken, async (req, res) => 
       data: activeGame,
     });
   } catch (error) {
-    logger.error('MINESWEEPER', 'Failed to get active game', { error: error.message });
+    logger.error('MINESWEEPER', 'Failed to get active game', { error: error.message, stack: error.stack });
+    console.error('MINESWEEPER ACTIVE GAME ERROR:', error);
     
     res.status(500).json({
       success: false,
