@@ -133,12 +133,14 @@ async function deleteOldUsers() {
 /**
  * Создать запись Crash игры
  */
-async function createCrashRecord(userId, tokenId, amountInCrypto, multiplier) {
+async function createCrashRecord(userId, tokenId, amountInCrypto, multiplier, gameId = null) {
   const betAmount = amountInCrypto / multiplier;
+  
+  const finalGameId = gameId || `crash_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   
   const round = await prisma.crashRound.create({
     data: {
-      gameId: `crash_${Date.now()}_${Math.floor(Math.random() * 1000000)}`,
+      gameId: finalGameId,
       crashPoint: multiplier,
       totalPlayers: 1,
       winnersCount: 1,
@@ -150,7 +152,7 @@ async function createCrashRecord(userId, tokenId, amountInCrypto, multiplier) {
     }
   });
   
-  await prisma.crashBet.create({
+  const bet = await prisma.crashBet.create({
     data: {
       exitMultiplier: multiplier,
       result: 'won',
@@ -161,6 +163,16 @@ async function createCrashRecord(userId, tokenId, amountInCrypto, multiplier) {
       tokenId: tokenId,
     }
   });
+  
+  return {
+    tokenId: tokenId,
+    betAmount: betAmount,
+    exitMultiplier: multiplier,
+    winnings: amountInCrypto,
+    result: 'won',
+    gameId: finalGameId,
+    roundId: round.id
+  };
 }
 
 /**
@@ -174,8 +186,9 @@ async function createMinesweeperRecord(userId, tokenId, amountInCrypto, multipli
     ? difficulties[Math.floor(Math.random() * difficulties.length)]
     : null;
   
+  let finalDifficulty;
   if (!difficulty) {
-    const defaultDiff = await prisma.minesweeperDifficulty.create({
+    finalDifficulty = await prisma.minesweeperDifficulty.create({
       data: {
         name: 'Easy',
         minesCount: 3,
@@ -183,37 +196,36 @@ async function createMinesweeperRecord(userId, tokenId, amountInCrypto, multipli
         multiplier: 1.2
       }
     });
-    
-    await prisma.minesweeperGame.create({
-      data: {
-        userId: userId,
-        tokenId: tokenId,
-        difficultyId: defaultDiff.id,
-        gameState: { completed: true },
-        minesPositions: { mines: [] },
-        status: 'WON',
-        revealedCells: 22,
-        betAmount: betAmount,
-        winAmount: amountInCrypto,
-        multiplier: multiplier,
-      }
-    });
   } else {
-    await prisma.minesweeperGame.create({
-      data: {
-        userId: userId,
-        tokenId: tokenId,
-        difficultyId: difficulty.id,
-        gameState: { completed: true },
-        minesPositions: { mines: [] },
-        status: 'WON',
-        revealedCells: 22,
-        betAmount: betAmount,
-        winAmount: amountInCrypto,
-        multiplier: multiplier,
-      }
-    });
+    finalDifficulty = difficulty;
   }
+  
+  const revealedCells = Math.floor(randomInRange(10, 24));
+  
+  await prisma.minesweeperGame.create({
+    data: {
+      userId: userId,
+      tokenId: tokenId,
+      difficultyId: finalDifficulty.id,
+      gameState: { completed: true },
+      minesPositions: { mines: [] },
+      status: 'WON',
+      revealedCells: revealedCells,
+      betAmount: betAmount,
+      winAmount: amountInCrypto,
+      multiplier: multiplier,
+    }
+  });
+  
+  return {
+    tokenId: tokenId,
+    betAmount: betAmount,
+    winAmount: amountInCrypto,
+    status: 'WON',
+    difficultyId: finalDifficulty.id,
+    multiplier: multiplier,
+    revealedCells: revealedCells
+  };
 }
 
 /**
@@ -221,6 +233,8 @@ async function createMinesweeperRecord(userId, tokenId, amountInCrypto, multipli
  */
 async function createPlinkoRecord(userId, tokenId, amountInCrypto, multiplier) {
   const betAmount = amountInCrypto / multiplier;
+  const ballPath = generateBallPath();
+  const finalPosition = Math.floor(Math.random() * 15);
   
   await prisma.plinkoGame.create({
     data: {
@@ -228,12 +242,22 @@ async function createPlinkoRecord(userId, tokenId, amountInCrypto, multiplier) {
       tokenId: tokenId,
       betAmount: betAmount,
       winAmount: amountInCrypto,
-      ballPath: generateBallPath(),
-      finalPosition: Math.floor(Math.random() * 15),
+      ballPath: ballPath,
+      finalPosition: finalPosition,
       multiplier: multiplier,
       status: 'COMPLETED',
     }
   });
+  
+  return {
+    tokenId: tokenId,
+    betAmount: betAmount,
+    winAmount: amountInCrypto,
+    multiplier: multiplier,
+    status: 'COMPLETED',
+    finalPosition: finalPosition,
+    ballPath: ballPath
+  };
 }
 
 /**
@@ -285,6 +309,7 @@ async function generateRecords() {
   
   // Создаём всех 300 пользователей
   const users = [];
+  const usersRecordsData = []; // Массив для хранения данных рекордов
   const usedUsernames = new Set();
   
   for (let i = 1; i <= 300; i++) {
@@ -336,31 +361,57 @@ async function generateRecords() {
     // Crash
     const crashCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const crashToken = tokens[crashCurrency];
+    let crashData = null;
     if (crashToken) {
       const crashUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
       const crashAmountInCrypto = usdToCrypto(crashUsdAmount, crashCurrency);
       const crashMultiplier = randomInRange(10, 100);
-      await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
+      crashData = await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
     }
     
     // Minesweeper
     const minesweeperCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const minesweeperToken = tokens[minesweeperCurrency];
+    let minesweeperData = null;
     if (minesweeperToken) {
       const minesweeperUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
       const minesweeperAmountInCrypto = usdToCrypto(minesweeperUsdAmount, minesweeperCurrency);
       const minesweeperMultiplier = randomInRange(10, 100);
-      await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
+      minesweeperData = await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
     }
     
     // Plinko
     const plinkoCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const plinkoToken = tokens[plinkoCurrency];
+    let plinkoData = null;
     if (plinkoToken) {
       const plinkoUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
       const plinkoAmountInCrypto = usdToCrypto(plinkoUsdAmount, plinkoCurrency);
       const plinkoMultiplier = randomInRange(10, 100);
-      await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
+      plinkoData = await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
+    }
+    
+    // Сохраняем данные для users_records.json
+    if (crashData && minesweeperData && plinkoData) {
+      usersRecordsData.push({
+        userId: user.id,
+        username: user.username || `user${user.id}`,
+        crash: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...crashData
+        },
+        minesweeper: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...minesweeperData
+        },
+        plinko: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...plinkoData
+        }
+      });
     }
     
     console.log(`🏆 #${i + 1}: ${user.username} - ~${topAmounts[i].toFixed(0)} USD (разные суммы для каждой игры)`);
@@ -374,31 +425,57 @@ async function generateRecords() {
     // Crash
     const crashCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const crashToken = tokens[crashCurrency];
+    let crashData = null;
     if (crashToken) {
       const crashUsdAmount = randomInRange(100, 8000);
       const crashAmountInCrypto = usdToCrypto(crashUsdAmount, crashCurrency);
       const crashMultiplier = randomInRange(1.5, 50);
-      await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
+      crashData = await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
     }
     
     // Minesweeper
     const minesweeperCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const minesweeperToken = tokens[minesweeperCurrency];
+    let minesweeperData = null;
     if (minesweeperToken) {
       const minesweeperUsdAmount = randomInRange(100, 8000);
       const minesweeperAmountInCrypto = usdToCrypto(minesweeperUsdAmount, minesweeperCurrency);
       const minesweeperMultiplier = randomInRange(1.5, 50);
-      await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
+      minesweeperData = await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
     }
     
     // Plinko
     const plinkoCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const plinkoToken = tokens[plinkoCurrency];
+    let plinkoData = null;
     if (plinkoToken) {
       const plinkoUsdAmount = randomInRange(100, 8000);
       const plinkoAmountInCrypto = usdToCrypto(plinkoUsdAmount, plinkoCurrency);
       const plinkoMultiplier = randomInRange(1.5, 50);
-      await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
+      plinkoData = await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
+    }
+    
+    // Сохраняем данные для users_records.json
+    if (crashData && minesweeperData && plinkoData) {
+      usersRecordsData.push({
+        userId: user.id,
+        username: user.username || `user${user.id}`,
+        crash: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...crashData
+        },
+        minesweeper: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...minesweeperData
+        },
+        plinko: {
+          userId: user.id,
+          username: user.username || `user${user.id}`,
+          ...plinkoData
+        }
+      });
     }
     
     if ((i + 1) % 50 === 0) {
@@ -411,80 +488,17 @@ async function generateRecords() {
   
   // Создаем users_records.json для convert_records.js
   console.log('\n📝 Создаю users_records.json...');
-  await createUsersRecordsFile(users, tokens);
+  createUsersRecordsFileFromData(usersRecordsData);
 }
 
 /**
- * Создать users_records.json файл из данных БД
+ * Создать users_records.json файл из сохраненных данных
  */
-async function createUsersRecordsFile(users, tokens) {
-  const usersData = [];
-  
-  for (const user of users) {
-    // Получаем лучшие рекорды пользователя
-    const crashBet = await prisma.crashBet.findFirst({
-      where: { userId: user.id },
-      orderBy: { winnings: 'desc' },
-      include: { token: true, round: true }
-    });
-    
-    const minesweeperGame = await prisma.minesweeperGame.findFirst({
-      where: { userId: user.id },
-      orderBy: { winAmount: 'desc' },
-      include: { token: true, difficulty: true }
-    });
-    
-    const plinkoGame = await prisma.plinkoGame.findFirst({
-      where: { userId: user.id },
-      orderBy: { winAmount: 'desc' },
-      include: { token: true }
-    });
-    
-    if (!crashBet || !minesweeperGame || !plinkoGame) continue;
-    
-    usersData.push({
-      userId: user.id,
-      username: user.username || `user${user.id}`,
-      crash: {
-        userId: user.id,
-        username: user.username || `user${user.id}`,
-        tokenId: crashBet.tokenId,
-        betAmount: parseFloat(crashBet.betAmount),
-        exitMultiplier: parseFloat(crashBet.exitMultiplier),
-        winnings: parseFloat(crashBet.winnings),
-        result: crashBet.result,
-        gameId: crashBet.round.gameId,
-        roundId: crashBet.roundId
-      },
-      minesweeper: {
-        userId: user.id,
-        username: user.username || `user${user.id}`,
-        tokenId: minesweeperGame.tokenId,
-        betAmount: parseFloat(minesweeperGame.betAmount),
-        winAmount: parseFloat(minesweeperGame.winAmount),
-        status: minesweeperGame.status,
-        difficultyId: minesweeperGame.difficultyId,
-        multiplier: parseFloat(minesweeperGame.multiplier),
-        revealedCells: minesweeperGame.revealedCells
-      },
-      plinko: {
-        userId: user.id,
-        username: user.username || `user${user.id}`,
-        tokenId: plinkoGame.tokenId,
-        betAmount: parseFloat(plinkoGame.betAmount),
-        winAmount: parseFloat(plinkoGame.winAmount),
-        multiplier: parseFloat(plinkoGame.multiplier),
-        status: plinkoGame.status,
-        finalPosition: plinkoGame.finalPosition,
-        ballPath: plinkoGame.ballPath
-      }
-    });
-  }
-  
+function createUsersRecordsFileFromData(usersRecordsData) {
   const data = {
-    users: usersData,
+    users: usersRecordsData,
     metadata: {
-      totalUsers: usersData.length,
+      totalUsers: usersRecordsData.length,
       games: ['crash', 'minesweeper', 'plinko'],
       winRange: {
         min: 1000,
@@ -496,7 +510,7 @@ async function createUsersRecordsFile(users, tokens) {
   };
   
   fs.writeFileSync('users_records.json', JSON.stringify(data, null, 2), 'utf8');
-  console.log(`✅ Создан users_records.json с ${usersData.length} пользователями`);
+  console.log(`✅ Создан users_records.json с ${usersRecordsData.length} пользователями`);
 }
 
 // Запуск

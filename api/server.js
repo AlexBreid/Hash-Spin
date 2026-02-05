@@ -378,6 +378,10 @@ async function startServer() {
       const { startLeaderboardCron } = require('./src/cron/leaderboardCron');
       startLeaderboardCron();
       
+      // Generate records cron (генерация новых рекордов каждый день в 1:00 ночи)
+      const { startGenerateRecordsCron } = require('./src/cron/generateRecordsCron');
+      startGenerateRecordsCron();
+      
       console.log('✅ Cron Jobs: Started');
     } catch (error) {
       console.warn('⚠️ Cron Jobs: Failed to start -', error.message);
@@ -436,6 +440,15 @@ async function startServer() {
       console.log('✅ Records Updater stopped');
     } catch (error) {
       console.warn('⚠️ Failed to stop Records Updater:', error.message);
+    }
+
+    // Остановка Generate Records Cron
+    try {
+      const { stopGenerateRecordsCron } = require('./src/cron/generateRecordsCron');
+      stopGenerateRecordsCron();
+      console.log('✅ Generate Records Cron stopped');
+    } catch (error) {
+      console.warn('⚠️ Failed to stop Generate Records Cron:', error.message);
     }
 
     // Отключение БД
