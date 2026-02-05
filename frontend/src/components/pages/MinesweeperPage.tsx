@@ -587,7 +587,9 @@ export function MinesweeperPage({ onBack }: { onBack: () => void }) {
         .minesweeper-page {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 12px;
+          padding: 12px;
+          padding-bottom: 120px;
         }
         .minesweeper-header {
           display: flex;

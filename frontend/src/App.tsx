@@ -484,19 +484,21 @@ function AppContent() {
 
     return (
         <div
-            className="bg-background text-foreground w-full max-w-[390px] mx-auto relative overflow-hidden"
+            className={`bg-background text-foreground w-full max-w-[390px] mx-auto relative ${isMinesweeperPage ? 'overflow-y-auto' : 'overflow-hidden'}`}
             style={{ height: '100dvh', maxHeight: '100dvh' }}
         >
             {!isAuthPage && !isFullscreenPage && !isFinancePage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main 
                 className={
+                    isMinesweeperPage ? 'overflow-y-auto overflow-x-hidden' :
                     isFullscreenPage ? 'overflow-hidden' :
                     isAuthPage ? '' : 
                     'overflow-y-auto overflow-x-hidden'
                 }
                 style={{
-                    height: isFullscreenPage ? '100%' :
+                    height: isMinesweeperPage ? '100dvh' :
+                            isFullscreenPage ? '100%' :
                             isFinancePage ? 'calc(100dvh - 70px)' :
                             isAuthPage ? '100%' :
                             'calc(100dvh - 140px)'

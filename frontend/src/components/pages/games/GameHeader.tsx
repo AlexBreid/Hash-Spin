@@ -40,62 +40,52 @@ export function GameHeader({
 
   return (
     <header 
-      className="sticky top-0 z-20 backdrop-blur-md border-b flex-shrink-0"
+      className="sticky top-0 z-20 backdrop-blur-md border-b flex-shrink-0 overflow-hidden"
       style={{
-        backgroundColor: isDark ? 'rgba(11, 28, 58, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-        borderBottomColor: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-        padding: '12px 16px'
+        background: isDark 
+          ? 'linear-gradient(180deg, rgba(11, 28, 58, 0.98) 0%, rgba(11, 28, 58, 0.95) 100%)'
+          : 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%)',
+        borderBottomColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+        padding: '8px 10px',
+        boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 2px 10px rgba(0, 0, 0, 0.05)',
+        maxWidth: '100%'
       }}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-1 w-full">
         {/* Левая часть: Назад + Название */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <button
+        <div className="flex items-center gap-1.5">
+          <motion.button
             onClick={() => navigate('/')}
-            className="p-2 rounded-xl transition-all border"
+            className="p-1.5 rounded-full"
             style={{
-              background: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)',
-              borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)',
+              background: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+              border: `1px solid ${isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.15)'}`,
+            }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <ArrowLeft 
+              className="w-4 h-4" 
+              style={{ color: isDark ? '#93c5fd' : '#3b82f6' }}
+            />
+          </motion.button>
+          {icon && <span className="text-sm">{icon}</span>}
+          <h1 
+            className="text-sm font-bold"
+            style={{
+              background: isDark 
+                ? 'linear-gradient(135deg, #60a5fa, #a78bfa)'
+                : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
             }}
           >
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <ArrowLeft 
-                className="w-5 h-5" 
-                style={{ color: isDark ? '#93c5fd' : '#3b82f6' }}
-              />
-            </motion.div>
-          </button>
-          <div>
-            <h1 
-              className="text-lg font-black flex items-center gap-2"
-              style={{
-                background: isDark 
-                  ? 'linear-gradient(135deg, #10b981, #3b82f6)'
-                  : 'linear-gradient(135deg, #059669, #2563eb)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
-              }}
-            >
-              {icon && <span>{icon}</span>}
-              {title}
-            </h1>
-            {status && (
-              <p 
-                className="text-xs font-mono mt-0.5"
-                style={{ color: isDark ? '#10b981' : '#059669' }}
-              >
-                {status}
-              </p>
-            )}
-          </div>
+            {title}
+          </h1>
         </div>
 
         {/* Правая часть: Селектор валюты + Баланс */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 ml-auto">
           {/* Селектор валюты */}
           {onCurrencyChange && (
             <CurrencySelector
@@ -107,45 +97,29 @@ export function GameHeader({
           
           {/* Баланс */}
           <div 
-            className="px-3 py-2 flex items-center gap-2 rounded-xl border"
+            className="px-3 py-1.5 flex items-center gap-1.5 rounded-full"
             style={{
               background: isDark 
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.1))'
-                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.05))',
-              borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+                ? 'rgba(16, 185, 129, 0.15)'
+                : 'rgba(16, 185, 129, 0.1)',
+              border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)'}`,
             }}
           >
-            <div className="text-right">
-              <p 
-                className="text-xs"
-                style={{ color: isDark ? '#94a3b8' : '#64748b' }}
-              >
-                Баланс
-              </p>
-              <p 
-                className="text-sm font-black"
-                style={{ color: isDark ? '#10b981' : '#059669' }}
-              >
-                {formatBalance(balance)} {currency}
-              </p>
-            </div>
+            <span 
+              className="text-xs font-bold"
+              style={{ color: isDark ? '#34d399' : '#10b981' }}
+            >
+              {formatBalance(balance)}
+            </span>
             {onRefreshBalance && (
               <button 
                 onClick={onRefreshBalance} 
-                className="p-1.5 rounded-lg transition-all hover:opacity-80"
-                style={{
-                  background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)'
-                }}
+                className="p-1 rounded-full transition-all hover:bg-white/10"
               >
-                <motion.div
-                  whileHover={{ rotate: 180 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <RefreshCw 
-                    className="w-3.5 h-3.5" 
-                    style={{ color: isDark ? '#10b981' : '#059669' }}
-                  />
-                </motion.div>
+                <RefreshCw 
+                  className="w-3 h-3" 
+                  style={{ color: isDark ? '#34d399' : '#10b981' }}
+                />
               </button>
             )}
           </div>
