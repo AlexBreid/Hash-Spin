@@ -1,136 +1,199 @@
 /**
  * Cron для ежедневной генерации новых рекордов
- * Запускается каждый день в 1:00 ночи
+ * Запускается каждый день в 1:00 ночи по Москве
  */
 
+const cron = require('node-cron');
 const { spawn } = require('child_process');
 const path = require('path');
 const logger = require('../utils/logger');
 
-let cronInterval = null;
-let nextRunTimeout = null;
-
-/**
- * Вычислить время до следующего запуска в 1:00 ночи
- */
-function getTimeUntilNextRun() {
-  const now = new Date();
-  const nextRun = new Date();
-  
-  // Устанавливаем время на 1:00 ночи
-  nextRun.setHours(1, 0, 0, 0);
-  
-  // Если уже прошло 1:00 сегодня, планируем на завтра
-  if (now >= nextRun) {
-    nextRun.setDate(nextRun.getDate() + 1);
-  }
-  
-  return nextRun.getTime() - now.getTime();
-}
+let cronTask = null;
 
 /**
  * Запустить скрипт генерации рекордов
  */
-async function runGenerateRecords() {
+function runGenerateRecords() {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, '../../generate_records.js');
     
-    logger.info('RECORDS_CRON', 'Starting generate_records.js script...');
+    logger.info('RECORDS_CRON', '🎮 Starting generate_records.js...');
     
     const child = spawn('node', [scriptPath], {
       cwd: path.join(__dirname, '../..'),
-      stdio: 'inherit',
+      stdio: 'pipe',
       shell: true
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line) {
+        stdout += line + '\n';
+        logger.info('RECORDS_CRON', `[generate] ${line}`);
+      }
+    });
+    
+    child.stderr.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line) {
+        stderr += line + '\n';
+        logger.warn('RECORDS_CRON', `[generate stderr] ${line}`);
+      }
     });
     
     child.on('close', (code) => {
       if (code === 0) {
-        logger.info('RECORDS_CRON', 'generate_records.js completed successfully');
-        resolve();
+        logger.info('RECORDS_CRON', '✅ generate_records.js completed successfully');
+        resolve(stdout);
       } else {
-        logger.error('RECORDS_CRON', `generate_records.js exited with code ${code}`);
-        reject(new Error(`Script exited with code ${code}`));
+        logger.error('RECORDS_CRON', `❌ generate_records.js exited with code ${code}`);
+        reject(new Error(`Script exited with code ${code}. stderr: ${stderr}`));
       }
     });
     
     child.on('error', (error) => {
-      logger.error('RECORDS_CRON', `Failed to start generate_records.js: ${error.message}`);
+      logger.error('RECORDS_CRON', `❌ Failed to start generate_records.js: ${error.message}`);
       reject(error);
     });
   });
 }
 
 /**
- * Запустить cron (каждый день в 1:00 ночи)
+ * Запустить скрипт конвертации рекордов
+ */
+function runConvertRecords() {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, '../../convert_records.js');
+    
+    logger.info('RECORDS_CRON', '📝 Starting convert_records.js...');
+    
+    const child = spawn('node', [scriptPath], {
+      cwd: path.join(__dirname, '../..'),
+      stdio: 'pipe',
+      shell: true
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line) {
+        stdout += line + '\n';
+        logger.info('RECORDS_CRON', `[convert] ${line}`);
+      }
+    });
+    
+    child.stderr.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line) {
+        stderr += line + '\n';
+        logger.warn('RECORDS_CRON', `[convert stderr] ${line}`);
+      }
+    });
+    
+    child.on('close', (code) => {
+      if (code === 0) {
+        logger.info('RECORDS_CRON', '✅ convert_records.js completed successfully');
+        resolve(stdout);
+      } else {
+        logger.error('RECORDS_CRON', `❌ convert_records.js exited with code ${code}`);
+        reject(new Error(`Script exited with code ${code}. stderr: ${stderr}`));
+      }
+    });
+    
+    child.on('error', (error) => {
+      logger.error('RECORDS_CRON', `❌ Failed to start convert_records.js: ${error.message}`);
+      reject(error);
+    });
+  });
+}
+
+/**
+ * Полный цикл: генерация + конвертация
+ */
+async function runFullCycle() {
+  const startTime = Date.now();
+  logger.info('RECORDS_CRON', '🚀 ========== DAILY RECORDS GENERATION STARTED ==========');
+  logger.info('RECORDS_CRON', `⏰ Current time: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (MSK)`);
+  
+  try {
+    // Шаг 1: Генерация рекордов
+    await runGenerateRecords();
+    
+    // Шаг 2: Конвертация рекордов  
+    await runConvertRecords();
+    
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.info('RECORDS_CRON', `🎉 ========== COMPLETED in ${duration}s ==========`);
+    
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.error('RECORDS_CRON', `💥 ========== FAILED after ${duration}s ==========`);
+    logger.error('RECORDS_CRON', `Error: ${error.message}`);
+  }
+}
+
+/**
+ * Запустить cron (каждый день в 1:00 ночи по Москве)
  */
 function startGenerateRecordsCron() {
-  if (cronInterval || nextRunTimeout) {
+  if (cronTask) {
     logger.warn('RECORDS_CRON', 'Cron already started');
     return;
   }
 
-  function scheduleNextRun() {
-    const timeUntilNext = getTimeUntilNextRun();
-    const hoursUntilNext = Math.floor(timeUntilNext / (1000 * 60 * 60));
-    const minutesUntilNext = Math.floor((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60));
-    
-    logger.info('RECORDS_CRON', `Next run scheduled in ${hoursUntilNext}h ${minutesUntilNext}m`);
-    
-    nextRunTimeout = setTimeout(async () => {
-      try {
-        await runGenerateRecords();
-        
-        // После выполнения запускаем convert_records.js
-        const convertPath = path.join(__dirname, '../../convert_records.js');
-        const convertChild = spawn('node', [convertPath], {
-          cwd: path.join(__dirname, '../..'),
-          stdio: 'inherit',
-          shell: true
-        });
-        
-        convertChild.on('close', (code) => {
-          if (code === 0) {
-            logger.info('RECORDS_CRON', 'convert_records.js completed successfully');
-          } else {
-            logger.error('RECORDS_CRON', `convert_records.js exited with code ${code}`);
-          }
-        });
-        
-      } catch (error) {
-        logger.error('RECORDS_CRON', `Error running generate_records: ${error.message}`);
-      }
-      
-      // Планируем следующий запуск
-      scheduleNextRun();
-    }, timeUntilNext);
-  }
+  // Cron expression: минута час день месяц день_недели
+  // "0 1 * * *" = каждый день в 1:00
+  cronTask = cron.schedule('0 1 * * *', async () => {
+    await runFullCycle();
+  }, {
+    scheduled: true,
+    timezone: 'Europe/Moscow'
+  });
 
-  // Запускаем первый раз
-  scheduleNextRun();
+  // Логируем текущее время МСК и время до следующего запуска
+  const nowMsk = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
   
-  logger.info('RECORDS_CRON', 'Generate records cron started (runs daily at 1:00 AM)');
+  // Вычисляем время до следующего запуска
+  const now = new Date();
+  const mskOffset = 3 * 60; // MSK = UTC+3
+  const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const mskNow = new Date(utcNow + (mskOffset * 60000));
+  
+  const nextRun = new Date(mskNow);
+  nextRun.setHours(1, 0, 0, 0);
+  if (mskNow >= nextRun) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  
+  const diffMs = nextRun.getTime() - mskNow.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  logger.info('RECORDS_CRON', `✅ Cron started — runs daily at 01:00 MSK`);
+  logger.info('RECORDS_CRON', `⏰ Current MSK time: ${nowMsk}`);
+  logger.info('RECORDS_CRON', `⏳ Next run in: ${diffHours}h ${diffMinutes}m`);
 }
 
 /**
  * Остановить cron
  */
 function stopGenerateRecordsCron() {
-  if (nextRunTimeout) {
-    clearTimeout(nextRunTimeout);
-    nextRunTimeout = null;
+  if (cronTask) {
+    cronTask.stop();
+    cronTask = null;
+    logger.info('RECORDS_CRON', 'Cron stopped');
   }
-  
-  if (cronInterval) {
-    clearInterval(cronInterval);
-    cronInterval = null;
-  }
-  
-  logger.info('RECORDS_CRON', 'Generate records cron stopped');
 }
 
 module.exports = {
   runGenerateRecords,
+  runConvertRecords,
+  runFullCycle,
   startGenerateRecordsCron,
   stopGenerateRecordsCron
 };
-
