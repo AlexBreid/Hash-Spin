@@ -371,31 +371,39 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
           75%  { transform: rotateY(-20deg) rotateX(8deg); }
         }
 
-        /* Анимации подбрасывания — 1с */
+        /* Анимации подбрасывания — 1с, плавный разворот */
         @keyframes flipToSide1 {
-          0%   { transform: rotateY(0deg) rotateX(15deg) scale(1); }
-          10%  { transform: rotateY(100deg) rotateX(5deg) scale(1.2); }
-          25%  { transform: rotateY(250deg) rotateX(-2deg) scale(1.5); }
-          40%  { transform: rotateY(420deg) rotateX(0deg) scale(1.75); }
-          55%  { transform: rotateY(560deg) rotateX(0deg) scale(1.55); }
-          70%  { transform: rotateY(660deg) rotateX(3deg) scale(1.25); }
-          82%  { transform: rotateY(700deg) rotateX(6deg) scale(1.08); }
-          92%  { transform: rotateY(716deg) rotateX(8deg) scale(0.98); }
-          100% { transform: rotateY(720deg) rotateX(10deg) scale(1); }
+          0%   { transform: rotateY(0deg)   rotateX(15deg) scale(1); }
+          5%   { transform: rotateY(18deg)  rotateX(12deg) scale(1.05); }
+          12%  { transform: rotateY(45deg)  rotateX(8deg)  scale(1.15); }
+          20%  { transform: rotateY(80deg)  rotateX(4deg)  scale(1.3); }
+          30%  { transform: rotateY(130deg) rotateX(0deg)  scale(1.5); }
+          40%  { transform: rotateY(180deg) rotateX(-2deg) scale(1.65); }
+          50%  { transform: rotateY(230deg) rotateX(-1deg) scale(1.7); }
+          60%  { transform: rotateY(275deg) rotateX(0deg)  scale(1.6); }
+          70%  { transform: rotateY(310deg) rotateX(2deg)  scale(1.4); }
+          80%  { transform: rotateY(335deg) rotateX(5deg)  scale(1.2); }
+          88%  { transform: rotateY(348deg) rotateX(7deg)  scale(1.08); }
+          94%  { transform: rotateY(356deg) rotateX(9deg)  scale(1.02); }
+          100% { transform: rotateY(360deg) rotateX(10deg) scale(1); }
         }
         @keyframes flipToSide2 {
-          0%   { transform: rotateY(0deg) rotateX(15deg) scale(1); }
-          10%  { transform: rotateY(120deg) rotateX(5deg) scale(1.2); }
-          25%  { transform: rotateY(280deg) rotateX(-2deg) scale(1.5); }
-          40%  { transform: rotateY(470deg) rotateX(0deg) scale(1.75); }
-          55%  { transform: rotateY(640deg) rotateX(0deg) scale(1.55); }
-          70%  { transform: rotateY(790deg) rotateX(3deg) scale(1.25); }
-          82%  { transform: rotateY(860deg) rotateX(6deg) scale(1.08); }
-          92%  { transform: rotateY(895deg) rotateX(8deg) scale(0.98); }
-          100% { transform: rotateY(900deg) rotateX(10deg) scale(1); }
+          0%   { transform: rotateY(0deg)   rotateX(15deg) scale(1); }
+          5%   { transform: rotateY(28deg)  rotateX(12deg) scale(1.05); }
+          12%  { transform: rotateY(68deg)  rotateX(8deg)  scale(1.15); }
+          20%  { transform: rotateY(120deg) rotateX(4deg)  scale(1.3); }
+          30%  { transform: rotateY(195deg) rotateX(0deg)  scale(1.5); }
+          40%  { transform: rotateY(270deg) rotateX(-2deg) scale(1.65); }
+          50%  { transform: rotateY(345deg) rotateX(-1deg) scale(1.7); }
+          60%  { transform: rotateY(410deg) rotateX(0deg)  scale(1.6); }
+          70%  { transform: rotateY(465deg) rotateX(2deg)  scale(1.4); }
+          80%  { transform: rotateY(505deg) rotateX(5deg)  scale(1.2); }
+          88%  { transform: rotateY(525deg) rotateX(7deg)  scale(1.08); }
+          94%  { transform: rotateY(536deg) rotateX(9deg)  scale(1.02); }
+          100% { transform: rotateY(540deg) rotateX(10deg) scale(1); }
         }
-        .coin-3d.flip-1 { animation: flipToSide1 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
-        .coin-3d.flip-2 { animation: flipToSide2 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
+        .coin-3d.flip-1 { animation: flipToSide1 1s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
+        .coin-3d.flip-2 { animation: flipToSide2 1s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
 
         /* Тень */
         .coin-shadow {
@@ -551,7 +559,7 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
                 }`}
                 style={
                   !isFlipping && showResult && flipResult
-                    ? { transform: `rotateY(${resultIsHeads ? '720' : '900'}deg) rotateX(10deg) scale(1)` }
+                    ? { transform: `rotateY(${resultIsHeads ? '360' : '540'}deg) rotateX(10deg) scale(1)` }
                     : undefined
                 }
               >
