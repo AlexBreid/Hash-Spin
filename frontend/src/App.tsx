@@ -19,6 +19,7 @@ import { WithdrawPage } from './components/pages/WithdrawPage';
 import DepositPage from './components/pages/DepositPage';
 import { MinesweeperPage } from './components/pages/MinesweeperPage';
 import PlinkoGame from './components/pages/games/Plinkogame';
+import { CoinFlipPage } from './components/pages/CoinFlipPage';
 import { HistoryPage } from './components/pages/HistoryPage';
 import { AdminWithdrawalsPage } from './components/pages/AdminWithdrawalsPage';
 import { AccessDeniedPage } from './components/pages/AccessDeniedPage';
@@ -38,7 +39,7 @@ import { ServerErrorPage } from './components/pages/ServerErrorPage';
 import { BlockedPage } from './components/pages/BlockedPage';
 
 // Страницы, требующие авторизации (home и support доступны всем)
-const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'history', 'admin-withdrawals'];
+const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'coinflip', 'history', 'admin-withdrawals'];
 
 // Ключ для localStorage - показывалась ли welcome страница
 const WELCOME_SHOWN_KEY = 'safarix_welcome_shown';
@@ -176,6 +177,7 @@ function AppContent() {
         if (path === '/crash') return 'crash';
         if (path === '/minesweeper') return 'minesweeper';
         if (path === '/plinko') return 'plinko';
+        if (path === '/coinflip') return 'coinflip';
         if (path === '/withdraw') return 'withdraw';
         if (path === '/deposit') return 'deposit';
         if (path === '/history') return 'history';
@@ -385,6 +387,8 @@ function AppContent() {
                 return <MinesweeperPage onBack={() => handlePageChange('home')} />;
             case 'plinko':
                 return <PlinkoGame />;
+            case 'coinflip':
+                return <CoinFlipPage onBack={() => handlePageChange('home')} />;
             case 'withdraw':
                 return <WithdrawPage />;
             case 'deposit':
@@ -428,12 +432,13 @@ function AppContent() {
     const isCrashPage = currentPage === 'crash';
     const isMinesweeperPage = currentPage === 'minesweeper';
     const isPlinkoPage = currentPage === 'plinko';
+    const isCoinFlipPage = currentPage === 'coinflip';
     const isWithdrawPage = currentPage === 'withdraw';
     const isDepositPage = currentPage === 'deposit';
     const isHistoryPage = currentPage === 'history';
     const isAdminWithdrawalsPage = currentPage === 'admin-withdrawals';
     const isCallbackPage = currentPage === 'callback' || currentPage === 'successful-payment' || currentPage === 'failed-payment';
-    const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage;
+    const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage || isCoinFlipPage;
     const isFullscreenPage = isGamePage || isCallbackPage;
     const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage || isAdminWithdrawalsPage;
 
@@ -484,20 +489,20 @@ function AppContent() {
 
     return (
         <div
-            className={`bg-background text-foreground w-full max-w-[390px] mx-auto relative ${isMinesweeperPage ? 'overflow-y-auto' : 'overflow-hidden'}`}
+            className={`bg-background text-foreground w-full max-w-[390px] mx-auto relative ${(isMinesweeperPage || isCoinFlipPage) ? 'overflow-y-auto' : 'overflow-hidden'}`}
             style={{ height: '100dvh', maxHeight: '100dvh' }}
         >
             {!isAuthPage && !isFullscreenPage && !isFinancePage && <TopNavigation onProfileClick={handleProfileClick} />}
 
             <main 
                 className={
-                    isMinesweeperPage ? 'overflow-y-auto overflow-x-hidden' :
+                    (isMinesweeperPage || isCoinFlipPage) ? 'overflow-y-auto overflow-x-hidden' :
                     isFullscreenPage ? 'overflow-hidden' :
                     isAuthPage ? '' : 
                     'overflow-y-auto overflow-x-hidden'
                 }
                 style={{
-                    height: isMinesweeperPage ? '100dvh' :
+                    height: (isMinesweeperPage || isCoinFlipPage) ? '100dvh' :
                             isFullscreenPage ? '100%' :
                             isFinancePage ? 'calc(100dvh - 70px)' :
                             isAuthPage ? '100%' :

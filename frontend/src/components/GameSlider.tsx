@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { GameCard } from './GameCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import '../styles/gameSlider.css';
+import '../styles/gameSlider.css'; 
 
 interface Game {
   id: string;
@@ -10,6 +10,7 @@ interface Game {
   category: string;
   disabled?: boolean;
   comingSoonLabel?: string;
+  isNew?: boolean;
 }
 
 interface GameSliderProps {
@@ -107,6 +108,7 @@ export function GameSlider({ games, onGameClick, playersCount }: GameSliderProps
               disabled={game.disabled}
               comingSoonLabel={game.comingSoonLabel}
               playersCount={playersCount?.[game.id]}
+              isNew={game.isNew}
             />
           </div>
         ))}

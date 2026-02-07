@@ -1,5 +1,5 @@
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Play, Brain, TrendingUp, Target, Users } from 'lucide-react';
+import { Play, Brain, TrendingUp, Target, Users, Coins } from 'lucide-react';
 
 interface GameCardProps {
   title: string;
@@ -9,12 +9,17 @@ interface GameCardProps {
   playersCount?: number;
   disabled?: boolean;
   comingSoonLabel?: string;
+  isNew?: boolean;
 }
 
 const getCategoryIcon = (category: string, title?: string) => {
   // Специальная иконка для Plinko
   if (title?.toLowerCase() === 'plinko') {
     return <Target className="w-4 h-4" />;
+  }
+  // Специальная иконка для Coinflip
+  if (title?.toLowerCase().includes('орёл')) {
+    return <Coins className="w-4 h-4" />;
   }
   
   switch (category.toLowerCase()) {
@@ -27,11 +32,14 @@ const getCategoryIcon = (category: string, title?: string) => {
   }
 };
 
-export function GameCard({ title, image, category, onClick, playersCount, disabled, comingSoonLabel }: GameCardProps) {
+export function GameCard({ title, image, category, onClick, playersCount, disabled, comingSoonLabel, isNew }: GameCardProps) {
   const handleClick = () => {
     if (disabled) return;
     onClick();
   };
+
+  // NEW бейдж — по пропу ИЛИ для новых игр по названию
+  const showNewBadge = isNew || title?.toLowerCase().includes('орёл');
 
   return (
     <div 
@@ -60,7 +68,30 @@ export function GameCard({ title, image, category, onClick, playersCount, disabl
             {comingSoonLabel}
           </div>
         )}
-        <div className="absolute top-3 right-3">
+        {showNewBadge && !comingSoonLabel && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              zIndex: 30,
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#fff',
+              fontSize: '9px',
+              fontWeight: 900,
+              letterSpacing: '0.1em',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              border: '1.5px solid rgba(255,255,255,0.4)',
+              boxShadow: '0 2px 10px rgba(16,185,129,0.6), 0 0 0 1px rgba(0,0,0,0.2)',
+              textTransform: 'uppercase',
+              lineHeight: '1',
+            }}
+          >
+            NEW
+          </div>
+        )}
+        <div className="absolute top-3 right-3" style={{ zIndex: 15 }}>
           <div className="bg-accent/90 backdrop-blur-sm p-2 rounded-full text-accent-foreground flex items-center justify-center">
             {getCategoryIcon(category, title)}
           </div>

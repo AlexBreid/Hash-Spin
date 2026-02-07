@@ -11,7 +11,7 @@ import type { PanInfo } from 'framer-motion';
 import imgMines from '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp';
 import imgCrash from '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp';
 import imgPlinko from '../../assets/plinko.png';
-import imgCoinFlip from '../../assets/orel_reshka.jpg';
+import imgCoinFlip from '../../assets/coinflip.png';
 
 interface Game {
   id: string;
@@ -20,6 +20,7 @@ interface Game {
   category: string;
   disabled?: boolean;
   comingSoonLabel?: string;
+  isNew?: boolean;
 }
 
 const featuredGames: Game[] = [
@@ -46,8 +47,7 @@ const featuredGames: Game[] = [
     title: 'Орёл и решка',
     image: imgCoinFlip,
     category: 'Ставки',
-    disabled: true,
-    comingSoonLabel: 'Скоро'
+    isNew: true,
   },
 ];
 
@@ -75,8 +75,7 @@ const popularGames: Game[] = [
     title: 'Орёл и решка',
     image: imgCoinFlip,
     category: 'Ставки',
-    disabled: true,
-    comingSoonLabel: 'Скоро'
+    isNew: true,
   },
 ];
 
@@ -100,13 +99,14 @@ export function HomePage() {
   const [dragOffset, setDragOffset] = useState(0);
   const hasLoadedRef = useRef(false);
   
-  // Количество игроков для каждой игры (с базовым значением + случайный бонус)
+  // Количество игроков для каждой игры (с базовым значением + случайный бонус) 
   const [playersCount, setPlayersCount] = useState<Record<string, number>>(() => {
     // Инициализируем сразу значениями, чтобы они отображались
     const realCounts = {
       minesweeper: Math.floor(Math.random() * 50) + 10,
       crash: Math.floor(Math.random() * 80) + 30,
       plinko: Math.floor(Math.random() * 40) + 15,
+      coinflip: Math.floor(Math.random() * 60) + 20,
     };
     const bonusCounts: Record<string, number> = {};
     Object.keys(realCounts).forEach((gameId) => {
@@ -165,6 +165,7 @@ export function HomePage() {
           minesweeper: Math.floor(Math.random() * 50) + 10, // 10-60 реальных игроков
           crash: Math.floor(Math.random() * 80) + 30, // 30-110 реальных игроков
           plinko: Math.floor(Math.random() * 40) + 15, // 15-55 реальных игроков
+          coinflip: Math.floor(Math.random() * 60) + 20, // 20-80 реальных игроков
         };
 
         // Добавляем случайный бонус от 100 до 300 к каждому (только один раз при инициализации)
@@ -274,11 +275,6 @@ export function HomePage() {
   }, [profileData]);
 
   const handleGameClick = (gameId: string) => {
-    // Для игр, которые ещё в разработке, ничего не делаем
-    if (gameId === 'coinflip') {
-      return;
-    }
-
     if (gameId === 'minesweeper') {
       navigate('/minesweeper');
     } 
@@ -287,6 +283,9 @@ export function HomePage() {
     } 
     else if (gameId === 'plinko') {
       navigate('/plinko');
+    } 
+    else if (gameId === 'coinflip') {
+      navigate('/coinflip');
     } 
     else {
       
@@ -460,6 +459,7 @@ export function HomePage() {
                 category={game.category}
                 onClick={() => handleGameClick(game.id)}
                 playersCount={playersCount[game.id]}
+                isNew={game.isNew}
               />
             </div>
           ))}
