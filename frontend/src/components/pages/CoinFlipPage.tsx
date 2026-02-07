@@ -10,6 +10,8 @@ import { GameHeader } from './games/GameHeader';
 import { BigWinModal } from '../modals/BigWinModal';
 import { CurrencyInfo, getGlobalCurrency } from '../CurrencySelector';
 import './games/games.css';
+import imgOrel from '../../assets/orel.png';
+import imgReshka from '../../assets/reshka.png';
 
 interface BalanceItem {
   tokenId: number;
@@ -286,13 +288,18 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
         }
 
         .coin-face .coin-icon {
-          font-size: 46px;
-          line-height: 1;
           display: flex;
           align-items: center;
           justify-content: center;
           width: 100%;
           height: 100%;
+          pointer-events: none;
+        }
+        .coin-face .coin-icon img {
+          width: 85%;
+          height: 85%;
+          object-fit: contain;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
         }
 
         /* ОРЁЛ — передняя (gold) */
@@ -556,10 +563,10 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
                   );
                 })}
                 <div className="coin-face coin-face--heads">
-                  <span className="coin-icon">🦅</span>
+                  <span className="coin-icon"><img src={imgOrel} alt="Орёл" draggable={false} /></span>
                 </div>
                 <div className="coin-face coin-face--tails">
-                  <span className="coin-icon">👑</span>
+                  <span className="coin-icon"><img src={imgReshka} alt="Решка" draggable={false} /></span>
                 </div>
               </div>
             </div>
@@ -597,7 +604,7 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
                   className={`history-dot ${item.isWin ? 'win' : 'loss'} ${idx === 0 ? 'new-entry' : ''}`}
                   title={item.isWin ? `Победа +${item.winAmount.toFixed(2)}` : `Проигрыш -${item.betAmount.toFixed(2)}`}
                 >
-                  {item.result === 1 ? '🦅' : '👑'}
+                  <img src={item.result === 1 ? imgOrel : imgReshka} alt="" style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
                 </div>
               ))}
             </div>
@@ -617,7 +624,7 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
                 onClick={() => setChoice(1)}
                 disabled={isFlipping}
               >
-                <span style={{ fontSize: '18px' }}>🦅</span>
+                <img src={imgOrel} alt="Орёл" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
                 <span>Орёл</span>
               </button>
               <button
@@ -625,7 +632,7 @@ export function CoinFlipPage({ onBack }: { onBack: () => void }) {
                 onClick={() => setChoice(2)}
                 disabled={isFlipping}
               >
-                <span style={{ fontSize: '18px' }}>👑</span>
+                <img src={imgReshka} alt="Решка" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
                 <span>Решка</span>
               </button>
             </div>
