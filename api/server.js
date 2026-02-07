@@ -303,6 +303,15 @@ try {
   console.error('❌ Error loading wallet routes:', err.message);
 }
 
+// ✅ Явно подключаем coinflipRoutes
+try {
+  const coinflipRoutes = require('./src/routes/coinflipRoutes');
+  app.use('/', coinflipRoutes);
+  console.log('✅ Coinflip routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading coinflip routes:', err.message);
+}
+
 console.log(`✅ ${routers.length} route(s) loaded`);
 
 // ====================================

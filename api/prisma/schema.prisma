@@ -27,6 +27,8 @@ model CryptoToken {
         minesweeperBets     MinesweeperBet[]      @relation("MinesweeperBetTokens")
         plinkoGames         PlinkoGame[]          @relation("PlinkoGames")
         plinkoBets          PlinkoBet[]           @relation("PlinkoBetTokens")
+        coinFlipGames       CoinFlipGame[]        @relation("CoinFlipGames")
+        coinFlipBets        CoinFlipBet[]         @relation("CoinFlipBetTokens")
         balances            Balance[]
         wallets             UserWallet[]
         transactions        Transaction[]
@@ -48,6 +50,7 @@ enum GameType {
   CRASH
   LIVE_DEALER
   MINESWEEPER
+  COINFLIP
 }
 
 enum TransactionType {
@@ -115,6 +118,8 @@ model User {
   minesweeperBets    MinesweeperBet[]      @relation("MinesweeperBets")
   plinkoGames        PlinkoGame[]          @relation("PlinkoGames")
   plinkoBets         PlinkoBet[]           @relation("PlinkoBets")
+  coinFlipGames      CoinFlipGame[]        @relation("CoinFlipGames")
+  coinFlipBets       CoinFlipBet[]         @relation("CoinFlipBets")
   balances           Balance[]
   wallets            UserWallet[]
   transactions       Transaction[] @relation("UserTransactions")
@@ -631,6 +636,56 @@ model PlinkoBet {
   winAmount Decimal @db.Decimal(30, 18)
 
   result     String // "won" или "lost"
+  multiplier Float
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ====================================================
+// 13. COINFLIP GAME MODELS
+// ====================================================
+
+model CoinFlipGame {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation("CoinFlipGames", fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenId Int
+  token   CryptoToken @relation("CoinFlipGames", fields: [tokenId], references: [id])
+
+  betAmount  Decimal  @db.Decimal(30, 18)
+  winAmount  Decimal? @db.Decimal(30, 18)
+
+  choice     String   // "heads" или "tails" (орёл или решка)
+  result     String   // "heads" или "tails" — результат подбрасывания
+  multiplier Float    @default(1.8)
+  status     String   @default("COMPLETED") // COMPLETED
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model CoinFlipBet {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation("CoinFlipBets", fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenId Int
+  token   CryptoToken @relation("CoinFlipBetTokens", fields: [tokenId], references: [id])
+
+  gameId Int
+
+  betAmount Decimal  @db.Decimal(30, 18)
+  winAmount Decimal? @db.Decimal(30, 18)
+
+  choice     String  // "heads" или "tails"
+  result     String  // "heads" или "tails"
   multiplier Float
 
   createdAt DateTime @default(now())
