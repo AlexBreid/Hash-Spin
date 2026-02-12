@@ -324,12 +324,30 @@ if (!BOT_TOKEN) {
   logger.info('BOT', 'AntiSpam middleware enabled');
 
   // ====================================
+  // 🔵 СИНЯЯ КНОПКА MINI APP (Menu Button)
+  // ====================================
+  if (FRONTEND_URL && FRONTEND_URL.startsWith('https://')) {
+    bot.telegram.setChatMenuButton({
+      menuButton: {
+        type: 'web_app',
+        text: 'Казино',
+        web_app: { url: FRONTEND_URL }
+      }
+    }).then(() => {
+      logger.info('BOT', `Menu button set to: ${FRONTEND_URL}`);
+    }).catch(err => {
+      logger.warn('BOT', 'Failed to set menu button', { error: err.message });
+    });
+  } else {
+    logger.warn('BOT', 'FRONTEND_URL is not HTTPS, menu button not set');
+  }
+
+  // ====================================
   // КЛАВИАТУРЫ
   // ====================================
 
   const getMainMenuKeyboard = (isAdmin = false) => {
     const baseButtons = [
-      [{ text: '🎰 Казино' }],
       [{ text: 'ℹ️ Инфо' }]
     ];
 
@@ -739,23 +757,6 @@ if (!BOT_TOKEN) {
       }
 
       switch (text) {
-        case '🎰 Казино': {
-          const oneTimeToken = await generateOneTimeToken(user.id);
-          const authUrl = `${FRONTEND_URL}/login?token=${oneTimeToken}`;
-          if (FRONTEND_URL && FRONTEND_URL.startsWith('https://')) {
-            await ctx.reply('🚀 Открываем казино...', {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: '🚀 Открыть Казино', web_app: { url: authUrl } }]
-                ]
-              }
-            });
-          } else {
-            await ctx.reply(`🔗 Ссылка для входа:\n${authUrl}`);
-          }
-          break;
-        }
-
         case 'ℹ️ Инфо': {
           const infoMessage = `ℹ️ Информация о проекте\n\n` +
             `📧 Контакты:\n` +
