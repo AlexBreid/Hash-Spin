@@ -15,7 +15,7 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FRONTEND_URL = process.env.FRONTEND_URL;
-const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2025-12-04_19-25-39.jpg');
+const WELCOME_IMAGE_PATH = path.join(__dirname, '../../assets/photo_2026-02-12_13-54-34.jpg');
 // ID канала для рассылки (формат: @channel_username или -1001234567890)
 const BROADCAST_CHANNEL_ID = process.env.BROADCAST_CHANNEL_ID || null;
 
