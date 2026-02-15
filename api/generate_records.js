@@ -346,90 +346,46 @@ async function generateRecords() {
   // Перемешиваем для рандомных позиций
   const shuffled = users.sort(() => Math.random() - 0.5);
   
-  // Топ-3 с большими суммами
-  const topAmounts = [
-    randomInRange(50000, 60000),  // #1: 50-60k USD
-    randomInRange(20000, 30000),  // #2: 20-30k USD
-    randomInRange(5000, 10000),   // #3: 5-10k USD
+  // Тиры выигрышей — каждая игра у юзера получает НЕЗАВИСИМЫЙ тир
+  const WIN_TIERS = [
+    { min: 50, max: 500 },       // Мелкий
+    { min: 500, max: 2000 },     // Небольшой
+    { min: 2000, max: 8000 },    // Средний
+    { min: 8000, max: 25000 },   // Крупный
+    { min: 25000, max: 60000 },  // Огромный
   ];
   
-  // Создаем рекорды для топ-3 (для всех трех игр с разными суммами)
-  for (let i = 0; i < 3; i++) {
-    const user = shuffled[i];
-    
-    // Для каждой игры своя валюта и сумма
-    // Crash
-    const crashCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
-    const crashToken = tokens[crashCurrency];
-    let crashData = null;
-    if (crashToken) {
-      const crashUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
-      const crashAmountInCrypto = usdToCrypto(crashUsdAmount, crashCurrency);
-      const crashMultiplier = randomInRange(10, 100);
-      crashData = await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
+  // Веса тиров (мелкие чаще, крупные реже)
+  const TIER_WEIGHTS = [30, 30, 25, 10, 5]; // сумма = 100
+  
+  function pickRandomTier() {
+    const roll = Math.random() * 100;
+    let cumulative = 0;
+    for (let t = 0; t < TIER_WEIGHTS.length; t++) {
+      cumulative += TIER_WEIGHTS[t];
+      if (roll < cumulative) return WIN_TIERS[t];
     }
-    
-    // Minesweeper
-    const minesweeperCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
-    const minesweeperToken = tokens[minesweeperCurrency];
-    let minesweeperData = null;
-    if (minesweeperToken) {
-      const minesweeperUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
-      const minesweeperAmountInCrypto = usdToCrypto(minesweeperUsdAmount, minesweeperCurrency);
-      const minesweeperMultiplier = randomInRange(10, 100);
-      minesweeperData = await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
-    }
-    
-    // Plinko
-    const plinkoCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
-    const plinkoToken = tokens[plinkoCurrency];
-    let plinkoData = null;
-    if (plinkoToken) {
-      const plinkoUsdAmount = topAmounts[i] * randomInRange(0.8, 1.2); // Вариация ±20%
-      const plinkoAmountInCrypto = usdToCrypto(plinkoUsdAmount, plinkoCurrency);
-      const plinkoMultiplier = randomInRange(10, 100);
-      plinkoData = await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
-    }
-    
-    // Сохраняем данные для users_records.json
-    if (crashData && minesweeperData && plinkoData) {
-      usersRecordsData.push({
-        userId: user.id,
-        username: user.username || `user${user.id}`,
-        crash: {
-          userId: user.id,
-          username: user.username || `user${user.id}`,
-          ...crashData
-        },
-        minesweeper: {
-          userId: user.id,
-          username: user.username || `user${user.id}`,
-          ...minesweeperData
-        },
-        plinko: {
-          userId: user.id,
-          username: user.username || `user${user.id}`,
-          ...plinkoData
-        }
-      });
-    }
-    
-    console.log(`🏆 #${i + 1}: ${user.username} - ~${topAmounts[i].toFixed(0)} USD (разные суммы для каждой игры)`);
+    return WIN_TIERS[0];
   }
   
-  // Остальные с разбросом от $100 до $8000 (для всех трех игр с разными суммами)
-  for (let i = 3; i < shuffled.length; i++) {
+  function getRandomWinUsd() {
+    const tier = pickRandomTier();
+    return randomInRange(tier.min, tier.max);
+  }
+  
+  // Генерируем рекорды для каждого пользователя
+  for (let i = 0; i < shuffled.length; i++) {
     const user = shuffled[i];
     
-    // Для каждой игры своя валюта и сумма
+    // Каждая игра получает ПОЛНОСТЬЮ НЕЗАВИСИМУЮ сумму и валюту
     // Crash
     const crashCurrency = CURRENCIES[Math.floor(Math.random() * CURRENCIES.length)];
     const crashToken = tokens[crashCurrency];
     let crashData = null;
     if (crashToken) {
-      const crashUsdAmount = randomInRange(100, 8000);
+      const crashUsdAmount = getRandomWinUsd();
       const crashAmountInCrypto = usdToCrypto(crashUsdAmount, crashCurrency);
-      const crashMultiplier = randomInRange(1.5, 50);
+      const crashMultiplier = randomInRange(1.5, 100);
       crashData = await createCrashRecord(user.id, crashToken.id, crashAmountInCrypto, crashMultiplier);
     }
     
@@ -438,9 +394,9 @@ async function generateRecords() {
     const minesweeperToken = tokens[minesweeperCurrency];
     let minesweeperData = null;
     if (minesweeperToken) {
-      const minesweeperUsdAmount = randomInRange(100, 8000);
+      const minesweeperUsdAmount = getRandomWinUsd();
       const minesweeperAmountInCrypto = usdToCrypto(minesweeperUsdAmount, minesweeperCurrency);
-      const minesweeperMultiplier = randomInRange(1.5, 50);
+      const minesweeperMultiplier = randomInRange(1.5, 100);
       minesweeperData = await createMinesweeperRecord(user.id, minesweeperToken.id, minesweeperAmountInCrypto, minesweeperMultiplier);
     }
     
@@ -449,9 +405,9 @@ async function generateRecords() {
     const plinkoToken = tokens[plinkoCurrency];
     let plinkoData = null;
     if (plinkoToken) {
-      const plinkoUsdAmount = randomInRange(100, 8000);
+      const plinkoUsdAmount = getRandomWinUsd();
       const plinkoAmountInCrypto = usdToCrypto(plinkoUsdAmount, plinkoCurrency);
-      const plinkoMultiplier = randomInRange(1.5, 50);
+      const plinkoMultiplier = randomInRange(1.5, 100);
       plinkoData = await createPlinkoRecord(user.id, plinkoToken.id, plinkoAmountInCrypto, plinkoMultiplier);
     }
     
