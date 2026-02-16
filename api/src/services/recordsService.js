@@ -291,18 +291,13 @@ async function updateRecords() {
 let updateInterval = null;
 
 /**
- * Запускает автоматическое обновление рекордов
+ * Запускает сервис рекордов
+ * (Больше не запускает интервал, так как обновление управляется через cron)
  */
 function startRecordsUpdater() {
-  // Сначала обновляем сразу
+  // Обновляем при старте, чтобы данные были свежими
   updateRecords();
-  
-  // Затем запускаем интервал на 24 часа
-  updateInterval = setInterval(() => {
-    updateRecords();
-  }, UPDATE_INTERVAL);
-  
-  logger.info('RECORDS', `Records updater started. Next update in 24 hours.`);
+  logger.info('RECORDS', 'Records service initialized (updates managed by cron)');
 }
 
 /**

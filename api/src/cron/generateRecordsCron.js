@@ -1,12 +1,13 @@
 /**
  * Cron для ежедневной генерации новых рекордов
- * Запускается каждый день в 1:00 ночи по Москве
+ * Запускается каждый день в 2:00 ночи по Ирландии (Europe/Dublin)
  */
 
 const cron = require('node-cron');
 const { spawn } = require('child_process');
 const path = require('path');
 const logger = require('../utils/logger');
+const { updateRecords } = require('../services/recordsService'); // Import updateRecords
 
 let cronTask = null;
 
@@ -118,7 +119,7 @@ function runConvertRecords() {
 async function runFullCycle() {
   const startTime = Date.now();
   logger.info('RECORDS_CRON', '🚀 ========== DAILY RECORDS GENERATION STARTED ==========');
-  logger.info('RECORDS_CRON', `⏰ Current time: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (MSK)`);
+  logger.info('RECORDS_CRON', `⏰ Current time: ${new Date().toLocaleString('en-IE', { timeZone: 'Europe/Dublin' })} (Ireland)`);
   
   try {
     // Шаг 1: Генерация рекордов
@@ -126,6 +127,9 @@ async function runFullCycle() {
     
     // Шаг 2: Конвертация рекордов  
     await runConvertRecords();
+    
+    // Шаг 3: Обновление сервиса рекордов (синхронизация дат и кэша)
+    await updateRecords();
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info('RECORDS_CRON', `🎉 ========== COMPLETED in ${duration}s ==========`);
@@ -138,7 +142,7 @@ async function runFullCycle() {
 }
 
 /**
- * Запустить cron (каждый день в 1:00 ночи по Москве)
+ * Запустить cron (каждый день в 2:00 ночи по Ирландии)
  */
 function startGenerateRecordsCron() {
   if (cronTask) {
@@ -147,35 +151,34 @@ function startGenerateRecordsCron() {
   }
 
   // Cron expression: минута час день месяц день_недели
-  // "0 1 * * *" = каждый день в 1:00
-  cronTask = cron.schedule('0 1 * * *', async () => {
+  // "0 2 * * *" = каждый день в 2:00 по Europe/Dublin
+  cronTask = cron.schedule('0 2 * * *', async () => {
     await runFullCycle();
   }, {
     scheduled: true,
-    timezone: 'Europe/Moscow'
+    timezone: 'Europe/Dublin'
   });
 
-  // Логируем текущее время МСК и время до следующего запуска
-  const nowMsk = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+  // Логируем текущее ирландское время и время до следующего запуска
+  const nowIreland = new Date().toLocaleString('en-IE', { timeZone: 'Europe/Dublin' });
   
-  // Вычисляем время до следующего запуска
+  // Вычисляем время до следующего запуска (Ireland = UTC+0 зимой, UTC+1 летом)
   const now = new Date();
-  const mskOffset = 3 * 60; // MSK = UTC+3
-  const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const mskNow = new Date(utcNow + (mskOffset * 60000));
+  const irelandNowStr = now.toLocaleString('en-US', { timeZone: 'Europe/Dublin' });
+  const irelandNow = new Date(irelandNowStr);
   
-  const nextRun = new Date(mskNow);
-  nextRun.setHours(1, 0, 0, 0);
-  if (mskNow >= nextRun) {
+  const nextRun = new Date(irelandNow);
+  nextRun.setHours(2, 0, 0, 0);
+  if (irelandNow >= nextRun) {
     nextRun.setDate(nextRun.getDate() + 1);
   }
   
-  const diffMs = nextRun.getTime() - mskNow.getTime();
+  const diffMs = nextRun.getTime() - irelandNow.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
   
-  logger.info('RECORDS_CRON', `✅ Cron started — runs daily at 01:00 MSK`);
-  logger.info('RECORDS_CRON', `⏰ Current MSK time: ${nowMsk}`);
+  logger.info('RECORDS_CRON', `✅ Cron started — runs daily at 02:00 Ireland (Europe/Dublin)`);
+  logger.info('RECORDS_CRON', `⏰ Current Ireland time: ${nowIreland}`);
   logger.info('RECORDS_CRON', `⏳ Next run in: ${diffHours}h ${diffMinutes}m`);
 }
 
