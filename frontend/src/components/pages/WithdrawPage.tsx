@@ -3,6 +3,7 @@ import { useFetch } from "../../hooks/useDynamicApi";
 import { ArrowLeft, Send, AlertCircle, Loader2, Check, Star, Wallet, ArrowRight, ChevronDown, Coins } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
+import { CryptoIcon } from '../ui/CryptoIcon';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -419,9 +420,7 @@ export function WithdrawPage({ onBack }: WithdrawPageProps = {}) {
                         }}
                         className="w-full p-4 rounded-xl border-2 border-border hover:border-primary transition-all flex items-center gap-4"
                       >
-                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                          {token.symbol.charAt(0)}
-                        </div>
+                        <CryptoIcon symbol={token.symbol} size={40} />
                         <div className="flex-1 text-left">
                           <p className="font-semibold">{token.symbol}</p>
                           <p className="text-sm text-muted-foreground">{token.name}</p>

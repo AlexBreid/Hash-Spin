@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, Check, Zap, DollarSign, Star, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, Zap, DollarSign, Star, Loader2, Wallet, Globe } from 'lucide-react';
 import { useTelegramWebApp } from '../../hooks/useTelegramWebApp';
 import { toast } from 'sonner';
+import { CryptoIcon } from '../ui/CryptoIcon';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -39,8 +40,14 @@ interface NetworkOption {
   speed: string;
 }
 
+// 💎 Валюты, поддерживаемые Crypto Bot (@CryptoBot)
+const CRYPTOBOT_SUPPORTED_ASSETS = ['USDT', 'TON', 'BTC', 'ETH', 'LTC', 'BNB', 'TRX', 'USDC'];
+
+// 💳 Валюты, поддерживаемые официальным Telegram Wallet (@wallet)
+const WALLET_SUPPORTED_ASSETS = ['TON', 'USDT', 'BTC'];
+
 interface DepositFormProps {
-  onSubmit: (data: { amount: string; currency: string; tokenId?: number; network?: string }) => void;
+  onSubmit: (data: { amount: string; currency: string; tokenId?: number; network?: string; method?: 'onchain' | 'cryptobot' | 'wallet' }) => void;
   loading: boolean;
   error?: string | null;
   availableTokens: CryptoToken[];
@@ -326,6 +333,7 @@ export default function DepositForm({
   const [networks, setNetworks] = useState<NetworkOption[]>([]);
   const [networksLoading, setNetworksLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'onchain' | 'cryptobot' | 'wallet'>('onchain');
 
   // Устанавливаем дефолтный токен
   useEffect(() => {
@@ -382,6 +390,21 @@ export default function DepositForm({
   // ✅ Динамический минимальный депозит для выбранной валюты
   const minAmount = selectedCoin?.minDeposit || 10;
 
+  // 💎 Проверяем, поддерживается ли валюта через Crypto Bot и Wallet
+  const isCryptoBotSupported = selectedCoin ? CRYPTOBOT_SUPPORTED_ASSETS.includes(selectedCoin.symbol) : false;
+  const isWalletSupported = selectedCoin ? WALLET_SUPPORTED_ASSETS.includes(selectedCoin.symbol) : false;
+  const isStars = isStarsToken(selectedCoin);
+
+  // Автоматически переключаем на onchain если валюта не поддерживается выбранным методом
+  useEffect(() => {
+    if (isStars) return;
+    if (paymentMethod === 'cryptobot' && !isCryptoBotSupported) {
+      setPaymentMethod('onchain');
+    } else if (paymentMethod === 'wallet' && !isWalletSupported) {
+      setPaymentMethod('onchain');
+    }
+  }, [selectedCoin, isCryptoBotSupported, isWalletSupported, paymentMethod, isStars]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
@@ -402,7 +425,8 @@ export default function DepositForm({
       return;
     }
     
-    if (!selectedNetwork) {
+    // Для cryptobot и wallet методов сеть не нужна
+    if (paymentMethod === 'onchain' && !isStars && !selectedNetwork) {
       setValidationError('Выберите сеть для пополнения');
       return;
     }
@@ -411,7 +435,8 @@ export default function DepositForm({
       amount, 
       currency, 
       tokenId: selectedTokenId || undefined,
-      network: selectedNetwork
+      network: selectedNetwork || undefined,
+      method: isStars ? undefined : paymentMethod,
     });
   };
 
@@ -501,26 +526,24 @@ export default function DepositForm({
                       NEW
                     </div>
                   )}
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: isSelected 
-                      ? isStars 
+                  {isStars ? (
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      background: isSelected 
                         ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
-                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                      : isStars 
-                        ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(202, 138, 4, 0.3) 100%)'
-                        : '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    fontSize: '11px',
-                    color: '#fff',
-                  }}>
-                    {isStars ? '⭐' : token.symbol.substring(0, 3)}
-                  </div>
+                        : 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(202, 138, 4, 0.3) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '18px',
+                    }}>
+                      ⭐
+                    </div>
+                  ) : (
+                    <CryptoIcon symbol={token.symbol} size={36} />
+                  )}
                   <span style={{
                     fontSize: '13px',
                     fontWeight: '600',
@@ -542,11 +565,143 @@ export default function DepositForm({
         <StarsDepositBlock />
       )}
 
-      {/* ШАГ 2: Выбор сети (не для Stars) */}
+      {/* ШАГ 2: Способ оплаты (не для Stars) */}
       {selectedCoin && !isStarsToken(selectedCoin) && (
         <div className="form-group">
           <label style={{ marginBottom: '12px', display: 'block', fontSize: '14px', color: '#9ca3af' }}>
-            2. Выберите сеть для {selectedCoin.symbol}
+            2. Способ оплаты
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {/* On-chain */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('onchain')}
+              style={{
+                padding: '14px 8px',
+                background: paymentMethod === 'onchain'
+                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.15) 100%)'
+                  : '#1f2937',
+                border: paymentMethod === 'onchain' ? '2px solid #10b981' : '1px solid #374151',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Globe size={20} style={{ color: paymentMethod === 'onchain' ? '#10b981' : '#9ca3af' }} />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: paymentMethod === 'onchain' ? '#10b981' : '#e5e7eb' }}>
+                On-chain
+              </span>
+              <span style={{ fontSize: '9px', color: '#6b7280', lineHeight: 1.2, textAlign: 'center' }}>
+                На адрес
+              </span>
+            </button>
+
+            {/* Crypto Bot */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isCryptoBotSupported) setPaymentMethod('cryptobot');
+              }}
+              style={{
+                padding: '14px 8px',
+                background: paymentMethod === 'cryptobot'
+                  ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
+                  : isCryptoBotSupported ? '#1f2937' : 'rgba(31, 41, 55, 0.5)',
+                border: paymentMethod === 'cryptobot' ? '2px solid #8b5cf6' : '1px solid #374151',
+                borderRadius: '12px',
+                cursor: isCryptoBotSupported ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: isCryptoBotSupported ? 1 : 0.5,
+                position: 'relative',
+              }}
+            >
+              <Wallet size={20} style={{ color: paymentMethod === 'cryptobot' ? '#8b5cf6' : '#9ca3af' }} />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: paymentMethod === 'cryptobot' ? '#8b5cf6' : '#e5e7eb' }}>
+                CryptoBot
+              </span>
+              <span style={{ fontSize: '9px', color: '#6b7280', lineHeight: 1.2, textAlign: 'center' }}>
+                @CryptoBot
+              </span>
+              {!isCryptoBotSupported && (
+                <div style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: '7px',
+                  fontWeight: '700',
+                  padding: '1px 3px',
+                  borderRadius: '4px',
+                }}>
+                  N/A
+                </div>
+              )}
+            </button>
+
+            {/* Telegram Wallet */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isWalletSupported) setPaymentMethod('wallet');
+              }}
+              style={{
+                padding: '14px 8px',
+                background: paymentMethod === 'wallet'
+                  ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.15) 100%)'
+                  : isWalletSupported ? '#1f2937' : 'rgba(31, 41, 55, 0.5)',
+                border: paymentMethod === 'wallet' ? '2px solid #3b82f6' : '1px solid #374151',
+                borderRadius: '12px',
+                cursor: isWalletSupported ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: isWalletSupported ? 1 : 0.5,
+                position: 'relative',
+              }}
+            >
+              <Wallet size={20} style={{ color: paymentMethod === 'wallet' ? '#3b82f6' : '#9ca3af' }} />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: paymentMethod === 'wallet' ? '#3b82f6' : '#e5e7eb' }}>
+                Wallet
+              </span>
+              <span style={{ fontSize: '9px', color: '#6b7280', lineHeight: 1.2, textAlign: 'center' }}>
+                @wallet
+              </span>
+              {!isWalletSupported && (
+                <div style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: '7px',
+                  fontWeight: '700',
+                  padding: '1px 3px',
+                  borderRadius: '4px',
+                }}>
+                  N/A
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ШАГ 3: Выбор сети (только для on-chain, не для Stars, cryptobot и wallet) */}
+      {selectedCoin && !isStarsToken(selectedCoin) && paymentMethod === 'onchain' && (
+        <div className="form-group">
+          <label style={{ marginBottom: '12px', display: 'block', fontSize: '14px', color: '#9ca3af' }}>
+            3. Выберите сеть для {selectedCoin.symbol}
           </label>
           
           {networksLoading ? (
@@ -635,12 +790,54 @@ export default function DepositForm({
         </div>
       )}
 
-      {/* ШАГ 3: Сумма (не для Stars) */}
+      {/* Инфо для Crypto Bot */}
+      {selectedCoin && !isStarsToken(selectedCoin) && paymentMethod === 'cryptobot' && (
+        <div style={{
+          padding: '16px',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          borderRadius: '12px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <Wallet size={16} style={{ color: '#8b5cf6' }} />
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#8b5cf6' }}>
+              Crypto Bot
+            </span>
+          </div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+            Оплата через @CryptoBot в Telegram. Поддерживает множество криптовалют.
+            После создания платежа вы получите ссылку для оплаты.
+          </div>
+        </div>
+      )}
+
+      {/* Инфо для Telegram Wallet */}
+      {selectedCoin && !isStarsToken(selectedCoin) && paymentMethod === 'wallet' && (
+        <div style={{
+          padding: '16px',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '12px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <Wallet size={16} style={{ color: '#3b82f6' }} />
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#3b82f6' }}>
+              Telegram Wallet
+            </span>
+          </div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+            Оплата через официальный кошелёк Telegram (@wallet). Быстро и удобно.
+            После создания платежа вы получите ссылку для оплаты.
+          </div>
+        </div>
+      )}
+
+      {/* ШАГ (3 или 4): Сумма (не для Stars) */}
       {selectedCoin && !isStarsToken(selectedCoin) && (
         <>
           <div className="form-group">
             <label htmlFor="amount" style={{ marginBottom: '8px', display: 'block', fontSize: '14px', color: '#9ca3af' }}>
-              3. Сумма ({currency})
+              {paymentMethod === 'onchain' ? '4' : '3'}. Сумма ({currency})
             </label>
             <input
               id="amount"
@@ -667,8 +864,8 @@ export default function DepositForm({
             </small>
           </div>
 
-          {/* Информация */}
-          {selectedNetwork && (
+          {/* Информация для on-chain */}
+          {paymentMethod === 'onchain' && selectedNetwork && (
             <div style={{
               padding: '16px',
               background: 'rgba(16, 185, 129, 0.1)',
@@ -690,11 +887,22 @@ export default function DepositForm({
           <button
             type="submit"
             className="submit-button"
-            disabled={loading || tokensLoading || networksLoading || !amount || !selectedNetwork}
+            disabled={
+              loading || tokensLoading || networksLoading || !amount || 
+              (paymentMethod === 'onchain' && !selectedNetwork) ||
+              (paymentMethod === 'cryptobot' && !isCryptoBotSupported) ||
+              (paymentMethod === 'wallet' && !isWalletSupported)
+            }
             style={{
               width: '100%',
               padding: '16px',
-              background: loading ? '#374151' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: loading 
+                ? '#374151' 
+                : paymentMethod === 'cryptobot'
+                  ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+                  : paymentMethod === 'wallet'
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               border: 'none',
               borderRadius: '12px',
               color: '#fff',
@@ -702,9 +910,30 @@ export default function DepositForm({
               fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
             }}
           >
-            {loading ? '⏳ Создание платежа...' : `Пополнить ${amount || '0'} ${currency}`}
+            {loading ? (
+              <>
+                <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                Создание платежа...
+              </>
+            ) : paymentMethod === 'cryptobot' ? (
+              <>
+                <Wallet size={18} />
+                Оплатить через Crypto Bot
+              </>
+            ) : paymentMethod === 'wallet' ? (
+              <>
+                <Wallet size={18} />
+                Оплатить через @wallet
+              </>
+            ) : (
+              `Пополнить ${amount || '0'} ${currency}`
+            )}
           </button>
         </>
       )}

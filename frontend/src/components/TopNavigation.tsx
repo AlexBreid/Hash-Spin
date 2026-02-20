@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import logoSU from '../assets/SU.png';
+import { CryptoIcon } from './ui/CryptoIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -498,24 +499,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                       }}
                     >
                       {/* Иконка валюты */}
-                      <div
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: theme === 'dark' 
-                            ? 'rgba(16, 185, 129, 0.2)' 
-                            : 'rgba(16, 185, 129, 0.1)',
-                          color: '#10b981',
-                          fontWeight: '700',
-                          fontSize: '12px',
-                        }}
-                      >
-                        {wallet.symbol.substring(0, 3)}
-                      </div>
+                      <CryptoIcon symbol={wallet.symbol} size={36} />
                       
                       {/* Информация о валюте */}
                       <div style={{ flex: 1 }}>
@@ -620,24 +604,7 @@ export function TopNavigation({ onProfileClick }: TopNavigationProps) {
                         opacity: 0.6,
                       }}
                     >
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: theme === 'dark' 
-                            ? 'rgba(148, 163, 184, 0.08)' 
-                            : 'rgba(148, 163, 184, 0.05)',
-                          color: mutedColor,
-                          fontWeight: '600',
-                          fontSize: '9px',
-                        }}
-                      >
-                        {token.symbol.substring(0, 3)}
-                      </div>
+                      <CryptoIcon symbol={token.symbol} size={28} />
                       <div style={{ flex: 1 }}>
                         <div style={{
                           fontSize: '12px',

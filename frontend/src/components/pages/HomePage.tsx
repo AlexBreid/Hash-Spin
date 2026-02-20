@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+// HomePage.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameCard } from '../GameCard';
 import { GameSlider } from '../GameSlider';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
-import { ChevronRight, Star, Zap, Gift, Rocket } from 'lucide-react';
+import { ChevronRight, Star, Zap, Gift, Rocket, Plus, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFetch } from '../../hooks/useDynamicApi';
+import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import imgMines from '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp';
 import imgCrash from '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp';
 import imgPlinko from '../../assets/plinko.png';
 import imgCoinFlip from '../../assets/coinflip.png';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 interface Game {
   id: string;
@@ -21,6 +26,23 @@ interface Game {
   disabled?: boolean;
   comingSoonLabel?: string;
   isNew?: boolean;
+}
+
+interface Banner {
+  id: number;
+  imageUrl: string;
+  title?: string;
+  text?: string;
+  buttonText?: string;
+  linkUrl?: string;
+  actionType: 'LINK' | 'BONUS' | 'NONE';
+  bonusId?: number;
+  bonus?: {
+    id: number;
+    code: string;
+    name: string;
+    percentage: number;
+  };
 }
 
 const featuredGames: Game[] = [
@@ -117,9 +139,60 @@ export function HomePage() {
   });
   const hasInitializedPlayers = useRef(false);
 
+  const { token } = useAuth();
   const { data: profileData, execute: fetchProfile } = useFetch('USER_GET_profile', 'GET');
   
-  const slides = [0, 1];
+  // Safe admin check
+  const isAdmin = profileData?.data?.isAdmin || profileData?.isAdmin || false;
+  
+  const [banners, setBanners] = useState<Banner[]>([]);
+
+  // Загрузка баннеров напрямую (contentRoutes не в dynamic API)
+  const fetchBanners = useCallback(async () => {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_URL}/api/content/banners`, { headers });
+      if (res.ok) {
+        const result = await res.json();
+        const data = result.success ? result.data : (Array.isArray(result) ? result : []);
+        if (Array.isArray(data)) {
+          setBanners(data);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching banners:', err);
+    }
+  }, [token]);
+
+  // Fallback banners if no dynamic ones
+  const defaultBanners: Banner[] = [
+    {
+      id: -1,
+      imageUrl: '', // Will be handled by custom render
+      title: 'Получите бонус!',
+      text: 'Введите реферальный код и получите +100% к пополнению',
+      buttonText: 'Получить бонус',
+      actionType: 'BONUS',
+      linkUrl: '/referrals'
+    },
+    {
+      id: -2,
+      imageUrl: '',
+      title: 'Промо для новичков!',
+      text: 'Получите +50% к первому депозиту автоматически',
+      buttonText: 'Пополнить счёт',
+      actionType: 'LINK',
+      linkUrl: '/deposit'
+    }
+  ];
+
+  const activeBanners = banners.length > 0 ? banners : defaultBanners;
+  const slides = activeBanners.map((_, i) => i);
 
   const handleDrag = (_event: any, info: PanInfo) => {
     setDragOffset(info.offset.x);
@@ -240,13 +313,16 @@ export function HomePage() {
     };
   };
 
+  // Загружаем баннеры при монтировании
+  useEffect(() => {
+    fetchBanners();
+  }, [fetchBanners]);
+
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       
-      
       fetchProfile().catch((err: Error) => {
-        
         setHasReferrer(false);
       });
     }
@@ -274,26 +350,65 @@ export function HomePage() {
     }
   }, [profileData]);
 
-  const handleGameClick = (gameId: string) => {
-    if (gameId === 'minesweeper') {
-      navigate('/minesweeper');
-    } 
-    else if (gameId === 'crash') {
-      navigate('/crash');
-    } 
-    else if (gameId === 'plinko') {
-      navigate('/plinko');
-    } 
-    else if (gameId === 'coinflip') {
-      navigate('/coinflip');
-    } 
-    else {
-      
+  const handleBannerAction = (banner: Banner) => {
+    if (banner.actionType === 'LINK' && banner.linkUrl) {
+      if (banner.linkUrl.startsWith('http')) {
+        window.open(banner.linkUrl, '_blank');
+      } else {
+        navigate(banner.linkUrl);
+      }
+    } else if (banner.actionType === 'BONUS') {
+      // Активация бонуса
+      if (banner.bonus?.code) {
+        activateBonus(banner.bonus.code);
+      } else {
+        toast.error('Бонус недоступен');
+      }
+    } else if (banner.actionType === 'NONE' && banner.linkUrl) {
+      // Баннер без действия, но с ссылкой - редирект при клике
+      if (banner.linkUrl.startsWith('http')) {
+        window.open(banner.linkUrl, '_blank');
+      } else {
+        navigate(banner.linkUrl);
+      }
     }
   };
 
-  const handleBonusClick = () => {
-    navigate('/referrals');
+  const activateBonus = async (bonusCode: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/referral/link-referrer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ referralCode: bonusCode }),
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok && (result.success || !result.error)) {
+        toast.success(`🎉 Бонус "${bonusCode}" активирован!`);
+        // Обновляем профиль чтобы отразить новый статус
+        fetchProfile().catch(() => {});
+      } else {
+        toast.error(result.error || result.message || 'Не удалось активировать бонус');
+      }
+    } catch (err) {
+      toast.error('Ошибка при активации бонуса');
+    }
+  };
+
+  const handleGameClick = (gameId: string) => {
+    if (gameId === 'minesweeper') {
+      navigate('/minesweeper');
+    } else if (gameId === 'crash') {
+      navigate('/crash');
+    } else if (gameId === 'plinko') {
+      navigate('/plinko');
+    } else if (gameId === 'coinflip') {
+      navigate('/coinflip');
+    }
   };
 
   return (
@@ -325,84 +440,128 @@ export function HomePage() {
               {/* Рендерим слайды с копиями для кругового эффекта */}
               {[-slides.length, 0, slides.length].map((offset) => (
                 <React.Fragment key={offset}>
-                  {/* БАННЕР 1: РЕФЕРАЛЬНЫЙ БОНУС */}
-                  <motion.div
-                    key={`banner-0-${offset}`}
-                    style={{
-                      ...getSlideStyle(0, offset),
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
-                    <div className="relative h-full w-full">
-                      <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-600 rounded-3xl blur-xl opacity-50 animate-pulse" />
-                      <Card className="relative border-0 rounded-3xl overflow-hidden shadow-2xl h-full w-full" style={{ backgroundColor: colors.card }}>
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 z-0" />
-                        <div className="relative z-10 p-6 h-full flex flex-col justify-center">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Gift className="w-6 h-6" style={{ color: colors.accent }} />
-                            <h2 className="text-2xl font-bold" style={{ color: colors.foreground }}>Получите бонус!</h2>
-                          </div>
-                          <p className="mb-4 text-sm" style={{ color: colors.mutedForeground }}>Введите реферальный код и получите +100% к пополнению</p>
-                          <Button 
-                            onClick={handleBonusClick}
-                            className="font-semibold shadow-lg transition-all active:scale-95"
-                            style={{
-                              background: colors.accent,
-                              color: 'white'
-                            }}
-                          >
-                            Получить бонус
-                          </Button>
-                        </div>
-                      </Card>
-                    </div>
-                  </motion.div>
+                  {activeBanners.map((banner, index) => (
+                    <motion.div
+                      key={`banner-${banner.id}-${offset}`}
+                      style={{
+                        ...getSlideStyle(index, offset),
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                      }}
+                    >
+                      <div className="relative h-full w-full">
+                        {/* Background Effect */}
+                        <div className={`absolute -inset-0.5 rounded-3xl blur-xl opacity-50 animate-pulse ${
+                          index % 2 === 0 
+                            ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-600' 
+                            : 'bg-gradient-to-r from-blue-400 via-purple-500 to-pink-600'
+                        }`} />
+                        
+                        <Card className="relative border-0 rounded-3xl overflow-hidden shadow-2xl h-full w-full" style={{ backgroundColor: colors.card }}>
+                          {/* Фон баннера */}
+                          {banner.imageUrl ? (
+                            <img 
+                              src={banner.imageUrl.startsWith('/') ? `${API_URL}${banner.imageUrl}` : banner.imageUrl} 
+                              alt={banner.title || 'Banner'} 
+                              className="absolute inset-0 w-full h-full object-cover z-0"
+                            />
+                          ) : (
+                            <div className={`absolute inset-0 z-0 ${
+                              index % 2 === 0
+                                ? 'bg-gradient-to-br from-yellow-500/20 via-orange-500/10 to-pink-600/20'
+                                : 'bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-pink-600/20'
+                            }`}>
+                              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10" />
+                            </div>
+                          )}
+                          
+                          {/* Контент поверх — текст / кнопка */}
+                          {(banner.title || banner.text || banner.buttonText) && (
+                            <div className="relative z-10 p-6 h-full flex flex-col justify-center" style={{
+                              background: banner.imageUrl ? 'linear-gradient(to right, rgba(0,0,0,0.7), rgba(0,0,0,0.2))' : 'transparent'
+                            }}>
+                              {banner.title && (
+                                <div className="flex items-center space-x-2 mb-3">
+                                  {banner.actionType === 'BONUS' ? (
+                                    <Gift className="w-6 h-6" style={{ color: colors.accent }} />
+                                  ) : (
+                                    <Star className="w-6 h-6" style={{ color: '#3b82f6' }} />
+                                  )}
+                                  <h2 className="text-2xl font-bold" style={{ color: banner.imageUrl ? 'white' : colors.foreground }}>
+                                    {banner.title}
+                                  </h2>
+                                </div>
+                              )}
+                              
+                              {banner.text && (
+                                <p className="mb-4 text-sm" style={{ color: banner.imageUrl ? 'rgba(255,255,255,0.8)' : colors.mutedForeground }}>
+                                  {banner.text}
+                                </p>
+                              )}
 
-                  {/* БАННЕР 2: ПРОМО ОТ КАЗИНО */}
-                  <motion.div
-                    key={`banner-1-${offset}`}
-                    style={{
-                      ...getSlideStyle(1, offset),
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
-                    <div className="relative h-full w-full">
-                      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-600 rounded-3xl blur-xl opacity-50 animate-pulse" />
-                      <Card className="relative border-0 rounded-3xl overflow-hidden shadow-2xl h-full w-full" style={{ backgroundColor: colors.card }}>
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 z-0" />
-                        <div className="relative z-10 p-6 h-full flex flex-col justify-center">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Star className="w-6 h-6" style={{ color: '#3b82f6' }} />
-                            <h2 className="text-2xl font-bold" style={{ color: colors.foreground }}>Промо для новичков!</h2>
-                          </div>
-                          <p className="mb-4 text-sm" style={{ color: colors.mutedForeground }}>Получите +50% к первому депозиту автоматически</p>
-                          <Button 
-                            onClick={() => navigate('/deposit')}
-                            className="font-semibold shadow-lg transition-all active:scale-95"
-                            style={{
-                              background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
-                              color: 'white'
-                            }}
-                          >
-                            <Rocket className="w-4 h-4 mr-2 inline" /> Пополнить счёт
-                          </Button>
-                        </div>
-                      </Card>
-                    </div>
-                  </motion.div>
+                              {banner.bonus && banner.actionType === 'BONUS' && (
+                                <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-500/30 w-fit">
+                                  <Gift className="w-4 h-4 text-purple-400" />
+                                  <span className="text-sm font-semibold text-purple-300">
+                                    +{banner.bonus.percentage}% бонус
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {banner.buttonText && (
+                                <Button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleBannerAction(banner);
+                                  }}
+                                  className="font-semibold shadow-lg transition-all active:scale-95 w-fit"
+                                  style={{
+                                    background: banner.actionType === 'BONUS' 
+                                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)' 
+                                      : (index % 2 === 0 ? colors.accent : 'linear-gradient(to right, #3b82f6, #8b5cf6)'),
+                                    color: 'white'
+                                  }}
+                                >
+                                  {banner.actionType === 'BONUS' && <Gift className="w-4 h-4 mr-2 inline" />}
+                                  {banner.actionType === 'LINK' && <Rocket className="w-4 h-4 mr-2 inline" />}
+                                  {banner.buttonText}
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Кликабельная зона — если нет кнопки, но есть ссылка или действие */}
+                          {!banner.buttonText && (banner.linkUrl || banner.actionType !== 'NONE') && (
+                            <div 
+                              className="absolute inset-0 z-20 cursor-pointer" 
+                              onClick={() => handleBannerAction(banner)}
+                            />
+                          )}
+                        </Card>
+                      </div>
+                    </motion.div>
+                  ))}
                 </React.Fragment>
               ))}
             </motion.div>
 
           </div>
+        </div>
+      )}
+
+      {/* Admin Manage Banners Button (Always visible for admins) */}
+      {isAdmin && (
+        <div className="px-4 mb-8 flex justify-center">
+          <Button 
+            onClick={() => navigate('/admin/banners')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-2"
+          >
+            <Settings className="w-5 h-5" />
+            Управление баннерами
+          </Button>
         </div>
       )}
 

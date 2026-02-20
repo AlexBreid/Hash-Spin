@@ -1,8 +1,13 @@
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { ArrowLeft, Zap, Gift, Users, HelpCircle, TrendingUp, Zap as ZapIcon } from 'lucide-react';
+import { ArrowLeft, Zap, Gift, Users, HelpCircle, TrendingUp, Zap as ZapIcon, MessageSquare, Plus, Send, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 const faqData = [
   {
@@ -60,13 +65,421 @@ const getThemeColors = () => ({
 
 export function SupportPage() {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const colors = getThemeColors();
   const searchParams = new URLSearchParams(window.location.search);
   const section = searchParams.get('section');
+  const viewParam = searchParams.get('view');
+  
+  const [view, setView] = useState<'faq' | 'list' | 'create' | 'detail'>(
+    (viewParam === 'list' || viewParam === 'create') ? (viewParam as any) : 'faq'
+  );
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [currentTicket, setCurrentTicket] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Form states
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [replyMessage, setReplyMessage] = useState('');
 
+  useEffect(() => {
+    if (view === 'list' && isAuthenticated) {
+      fetchTickets();
+    }
+  }, [view, isAuthenticated]);
+
+  const fetchTickets = async () => {
+    setLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('casino_jwt_token');
+      
+      const response = await fetch(`${API_BASE_URL}/api/support/my-tickets`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTickets(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tickets', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTicketDetails = async (id: number, silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('casino_jwt_token');
+      
+      const response = await fetch(`${API_BASE_URL}/api/support/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Check for new messages if we already have data
+        if (currentTicket && data.messages.length > currentTicket.messages.length) {
+            const lastMsg = data.messages[data.messages.length - 1];
+            if (lastMsg.sender === 'ADMIN') {
+                toast.success('Новое сообщение от поддержки!', {
+                    description: lastMsg.text.substring(0, 50) + (lastMsg.text.length > 50 ? '...' : '')
+                });
+            }
+        }
+
+        setCurrentTicket(data);
+        if (!silent) setView('detail');
+      }
+    } catch (error) {
+      if (!silent) toast.error('Не удалось загрузить тикет');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  // Polling for updates when in detail view
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (view === 'detail' && currentTicket) {
+        interval = setInterval(() => {
+            fetchTicketDetails(currentTicket.id, true);
+        }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [view, currentTicket?.id]);
+
+  const createTicket = async () => {
+    if (!subject.trim() || !message.trim()) {
+      toast.error('Заполните тему и сообщение');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('casino_jwt_token');
+      
+      const response = await fetch(`${API_BASE_URL}/api/support/create`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ subject, message })
+      });
+      
+      if (response.ok) {
+        toast.success('Заявка создана');
+        setSubject('');
+        setMessage('');
+        setView('list');
+      } else {
+        toast.error('Ошибка при создании заявки');
+      }
+    } catch (error) {
+      toast.error('Ошибка сети');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!replyMessage.trim() || !currentTicket) return;
+
+    if (currentTicket.status === 'CLOSED') {
+      toast.error('Этот тикет закрыт. Создайте новый.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('casino_jwt_token');
+      
+      const response = await fetch(`${API_BASE_URL}/api/support/${currentTicket.id}/reply`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: replyMessage })
+      });
+      
+      if (response.ok) {
+        const newMessage = await response.json();
+        setCurrentTicket((prev: any) => ({
+          ...prev,
+          messages: [...prev.messages, newMessage],
+          status: 'OPEN'
+        }));
+        setReplyMessage('');
+      } else {
+        toast.error('Ошибка отправки');
+      }
+    } catch (error) {
+      toast.error('Ошибка сети');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // RENDER HELPERS
+  const renderStatus = (status: string) => {
+    switch(status) {
+      case 'OPEN': return <span className="text-yellow-400 text-xs font-bold px-2 py-1 bg-yellow-400/10 rounded-full">Открыт</span>;
+      case 'ANSWERED': return <span className="text-green-400 text-xs font-bold px-2 py-1 bg-green-400/10 rounded-full">Ответ получен</span>;
+      case 'CLOSED': return <span className="text-gray-400 text-xs font-bold px-2 py-1 bg-gray-400/10 rounded-full">Закрыт</span>;
+      default: return null;
+    }
+  };
+
+  // MAIN RENDER
   return (
-    <div className="pb-24 pt-6 px-4 transition-colors duration-300" style={{ backgroundColor: colors.background, color: colors.foreground }}>
-      {/* BONUS CONDITIONS SECTION */}
+    <div className="pb-24 pt-6 px-4 transition-colors duration-300 min-h-screen" style={{ backgroundColor: colors.background, color: colors.foreground }}>
+      
+      {/* HEADER & NAVIGATION */}
+      <div className="mb-6 flex items-center justify-between">
+        {view === 'faq' && !section ? (
+          <div>
+            <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">
+              Поддержка
+            </h1>
+            <p style={{ color: colors.mutedForeground }} className="text-sm mt-1">Мы всегда готовы помочь</p>
+          </div>
+        ) : (
+          <Button 
+            onClick={() => {
+              if (view === 'detail') setView('list');
+              else if (view === 'create') setView('list');
+              else if (view === 'list') setView('faq');
+              else navigate('/support');
+            }}
+            variant="ghost"
+            className="-ml-2"
+            style={{ color: colors.foreground }}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Назад
+          </Button>
+        )}
+
+        {view === 'faq' && !section && isAuthenticated && (
+          <Button 
+            onClick={() => setView('list')}
+            size="sm"
+            className="bg-cyan-500 hover:bg-cyan-600 text-white"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Мои заявки
+          </Button>
+        )}
+      </div>
+
+      {/* VIEW: FAQ (DEFAULT) */}
+      {view === 'faq' && !section && (
+        <>
+          {/* Quick Links */}
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            <Card className="p-4 border cursor-pointer transition-all hover:scale-105" style={{
+              backgroundColor: colors.card,
+              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(249, 115, 22, 0.1))',
+              borderColor: 'rgba(234, 179, 8, 0.3)'
+            }}
+              onClick={() => navigate('/support?section=bonus')}>
+              <div className="flex flex-col items-center gap-2">
+                <Gift className="w-5 h-5 text-yellow-400" />
+                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>Бонусы</p>
+              </div>
+            </Card>
+
+            <Card className="p-4 border cursor-pointer transition-all hover:scale-105" style={{
+              backgroundColor: colors.card,
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.1))',
+              borderColor: 'rgba(168, 85, 247, 0.3)'
+            }}
+              onClick={() => navigate('/support?section=referral')}>
+              <div className="flex flex-col items-center gap-2">
+                <Users className="w-5 h-5 text-purple-400" />
+                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>Рефералы</p>
+              </div>
+            </Card>
+
+            <Card className="p-4 border cursor-pointer transition-all hover:scale-105" style={{
+              backgroundColor: colors.card,
+              background: 'linear-gradient(135deg, rgba(34, 197, 238, 0.2), rgba(59, 130, 246, 0.1))',
+              borderColor: 'rgba(34, 197, 238, 0.3)'
+            }}
+              onClick={() => {
+                if (isAuthenticated) setView('create');
+                else toast.error('Войдите, чтобы создать заявку');
+              }}>
+              <div className="flex flex-col items-center gap-2">
+                <ZapIcon className="w-5 h-5 text-cyan-400" />
+                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>Создать тикет</p>
+              </div>
+            </Card>
+          </div>
+
+          {/* FAQ Section */}
+          <Card className="p-6 border transition-colors" style={{
+            backgroundColor: colors.card,
+            borderColor: colors.border
+          }}>
+            <h2 className="font-bold text-xl mb-4 flex items-center gap-2" style={{ color: colors.foreground }}>
+              <HelpCircle className="w-5 h-5 text-cyan-400" />
+              Часто задаваемые вопросы
+            </h2>
+            <Accordion type="single" collapsible className="w-full">
+              {faqData.map((faq, index) => (
+                <AccordionItem key={index} value={`item-${index}`} style={{ borderColor: colors.border }}>
+                  <AccordionTrigger style={{ color: colors.foreground }} className="font-semibold hover:text-cyan-400 transition-colors text-left">
+                    {faq.question}
+                  </AccordionTrigger>
+                  <AccordionContent style={{ color: colors.mutedForeground }} className="leading-relaxed">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </Card>
+        </>
+      )}
+
+      {/* VIEW: TICKET LIST */}
+      {view === 'list' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Мои заявки</h2>
+            <Button onClick={() => setView('create')} size="sm" className="bg-cyan-500 hover:bg-cyan-600">
+              <Plus className="w-4 h-4 mr-1" /> Создать
+            </Button>
+          </div>
+
+          {loading && tickets.length === 0 ? (
+            <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+          ) : tickets.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground bg-secondary/20 rounded-xl">
+              <p>У вас пока нет заявок</p>
+            </div>
+          ) : (
+            tickets.map(ticket => (
+              <Card 
+                key={ticket.id} 
+                className="p-4 cursor-pointer hover:bg-secondary/10 transition-colors border-l-4"
+                style={{ borderLeftColor: ticket.status === 'ANSWERED' ? '#4ade80' : ticket.status === 'CLOSED' ? '#9ca3af' : '#facc15' }}
+                onClick={() => fetchTicketDetails(ticket.id)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-mono text-xs text-muted-foreground">#{ticket.id}</span>
+                  {renderStatus(ticket.status)}
+                </div>
+                <h3 className="font-bold mb-1">{ticket.subject}</h3>
+                <p className="text-sm text-muted-foreground line-clamp-1">
+                  {ticket.messages[0]?.text || 'Без сообщений'}
+                </p>
+                <div className="mt-2 text-xs text-muted-foreground text-right">
+                  {new Date(ticket.updatedAt).toLocaleDateString()}
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* VIEW: CREATE TICKET */}
+      {view === 'create' && (
+        <Card className="p-6">
+          <h2 className="text-xl font-bold mb-4">Новая заявка</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Тема</label>
+              <Input 
+                placeholder="Например: Проблема с депозитом" 
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Сообщение</label>
+              <Textarea 
+                placeholder="Опишите вашу проблему подробно..." 
+                className="min-h-[150px]"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
+            <Button 
+              className="w-full bg-cyan-500 hover:bg-cyan-600" 
+              onClick={createTicket}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="animate-spin" /> : 'Отправить заявку'}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* VIEW: TICKET DETAIL */}
+      {view === 'detail' && currentTicket && (
+        <div className="flex flex-col h-[calc(100vh-140px)]">
+          <Card className="p-4 mb-4 flex-shrink-0">
+            <div className="flex justify-between items-start mb-2">
+              <h2 className="text-lg font-bold">#{currentTicket.id} {currentTicket.subject}</h2>
+              {renderStatus(currentTicket.status)}
+            </div>
+          </Card>
+
+          <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+            {currentTicket.messages.map((msg: any) => (
+              <div 
+                key={msg.id} 
+                className={`flex ${msg.sender === 'USER' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`max-w-[85%] p-3 rounded-2xl ${
+                    msg.sender === 'USER' 
+                      ? 'bg-cyan-500/20 rounded-tr-none' 
+                      : 'bg-secondary rounded-tl-none'
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                  <div className="text-[10px] opacity-50 mt-1 text-right">
+                    {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2 mt-auto">
+            {currentTicket.status === 'CLOSED' ? (
+              <div className="w-full p-3 text-center text-sm text-muted-foreground bg-secondary/20 rounded-xl border border-dashed">
+                🔒 Тикет закрыт. Вы не можете отправлять сообщения.
+              </div>
+            ) : (
+              <>
+                <Input 
+                  placeholder="Напишите ответ..." 
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendReply()}
+                />
+                <Button size="icon" onClick={sendReply} disabled={loading || !replyMessage.trim()}>
+                  {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BONUS & REFERRAL SECTIONS (Keep existing code) */}
       {section === 'bonus' && (
         <div className="mb-6">
           <Button 
@@ -396,113 +809,8 @@ export function SupportPage() {
                 <li>✓ Вывод в криптовалютах и стандартных валютах</li>
               </ul>
             </Card>
-
-            {/* Support Card */}
-            <Card className="p-4 border transition-colors" style={{
-              background: 'linear-gradient(135deg, rgba(34, 197, 238, 0.1), rgba(59, 130, 246, 0.1))',
-              borderColor: 'rgba(34, 197, 238, 0.2)'
-            }}>
-              <div className="flex gap-3">
-                <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(34, 197, 238, 0.2)' }}>
-                  <HelpCircle className="w-4 h-4 text-cyan-400" />
-                </div>
-                <div className="text-sm">
-                  <p style={{ color: colors.foreground }} className="font-semibold mb-1">Нужна помощь?</p>
-                  <p style={{ color: colors.mutedForeground }} className="text-xs">Наша команда поддержки работает 24/7 на всех языках</p>
-                </div>
-              </div>
-            </Card>
           </div>
         </div>
-      )}
-
-      {/* DEFAULT SUPPORT PAGE - FAQ ONLY */}
-      {!section && (
-        <>
-          <div className="mb-6">
-            <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">
-              Центр поддержки
-            </h1>
-            <p style={{ color: colors.mutedForeground }} className="text-sm mt-2">Ответы на все твои вопросы</p>
-          </div>
-
-          {/* Quick Links */}
-          <div className="grid grid-cols-3 gap-2 mb-6">
-            <Card className="p-4 border cursor-pointer transition-all hover:scale-105" style={{
-              backgroundColor: colors.card,
-              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(249, 115, 22, 0.1))',
-              borderColor: 'rgba(234, 179, 8, 0.3)'
-            }}
-              onClick={() => navigate('/support?section=bonus')}>
-              <div className="flex flex-col items-center gap-2">
-                <Gift className="w-5 h-5 text-yellow-400" />
-                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>Бонус рефералов</p>
-              </div>
-            </Card>
-
-            <Card className="p-4 border cursor-pointer transition-all hover:scale-105" style={{
-              backgroundColor: colors.card,
-              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.1))',
-              borderColor: 'rgba(168, 85, 247, 0.3)'
-            }}
-              onClick={() => navigate('/support?section=referral')}>
-              <div className="flex flex-col items-center gap-2">
-                <Users className="w-5 h-5 text-purple-400" />
-                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>Рефералы</p>
-              </div>
-            </Card>
-
-            <Card className="p-4 border" style={{
-              backgroundColor: colors.card,
-              background: 'linear-gradient(135deg, rgba(34, 197, 238, 0.2), rgba(59, 130, 246, 0.1))',
-              borderColor: 'rgba(34, 197, 238, 0.3)'
-            }}>
-              <div className="flex flex-col items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-cyan-400" />
-                <p className="text-xs font-semibold text-center" style={{ color: colors.foreground }}>FAQ</p>
-              </div>
-            </Card>
-          </div>
-
-          {/* FAQ Section */}
-          <Card className="p-6 border transition-colors" style={{
-            backgroundColor: colors.card,
-            borderColor: colors.border
-          }}>
-            <h2 className="font-bold text-xl mb-4 flex items-center gap-2" style={{ color: colors.foreground }}>
-              <HelpCircle className="w-5 h-5 text-cyan-400" />
-              Часто задаваемые вопросы
-            </h2>
-            <Accordion type="single" collapsible className="w-full">
-              {faqData.map((faq, index) => (
-                <AccordionItem key={index} value={`item-${index}`} style={{ borderColor: colors.border }}>
-                  <AccordionTrigger style={{ color: colors.foreground }} className="font-semibold hover:text-cyan-400 transition-colors">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent style={{ color: colors.mutedForeground }} className="leading-relaxed">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </Card>
-
-          {/* Help Card */}
-          <Card className="p-4 border mt-6 transition-colors" style={{
-            background: 'linear-gradient(135deg, rgba(34, 197, 238, 0.1), rgba(59, 130, 246, 0.1))',
-            borderColor: 'rgba(34, 197, 238, 0.2)'
-          }}>
-            <div className="flex gap-3">
-              <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(34, 197, 238, 0.2)' }}>
-                <HelpCircle className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div className="text-sm">
-                <p style={{ color: colors.foreground }} className="font-semibold mb-1">Не нашёл ответ?</p>
-                <p style={{ color: colors.mutedForeground }} className="text-xs">Если твой вопрос не освещён в FAQ, оставляй заявку в чате</p>
-              </div>
-            </div>
-          </Card>
-        </>
       )}
     </div>
   );

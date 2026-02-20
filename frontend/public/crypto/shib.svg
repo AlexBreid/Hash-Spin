@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
+  <defs>
+    <linearGradient id="shibBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9D00"/>
+      <stop offset="100%" stop-color="#E2473B"/>
+    </linearGradient>
+  </defs>
+  <circle cx="28" cy="28" r="28" fill="url(#shibBg)"/>
+  <!-- Simplified Shiba ears -->
+  <path d="M18 26L14 12L24 22Z" fill="rgba(255,255,255,0.9)"/>
+  <path d="M38 26L42 12L32 22Z" fill="rgba(255,255,255,0.9)"/>
+  <!-- Face outline -->
+  <ellipse cx="28" cy="32" rx="14" ry="12" fill="rgba(255,255,255,0.95)"/>
+  <!-- Eyes -->
+  <circle cx="22" cy="29" r="2.5" fill="#1a1a2e"/>
+  <circle cx="34" cy="29" r="2.5" fill="#1a1a2e"/>
+  <!-- Eye shine -->
+  <circle cx="23" cy="28" r="0.8" fill="white"/>
+  <circle cx="35" cy="28" r="0.8" fill="white"/>
+  <!-- Nose -->
+  <ellipse cx="28" cy="34" rx="3" ry="2" fill="#1a1a2e"/>
+  <!-- Mouth -->
+  <path d="M24 36.5Q28 40 32 36.5" fill="none" stroke="#1a1a2e" stroke-width="1.2" stroke-linecap="round"/>
+</svg>
+
+
+

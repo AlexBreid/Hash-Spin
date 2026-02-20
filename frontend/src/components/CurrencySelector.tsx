@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, Coins } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { CryptoIcon } from './ui/CryptoIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -226,20 +227,7 @@ export function CurrencySelector({
             transition: 'all 0.2s ease',
           }}
         >
-          <div style={{
-            width: compact ? '24px' : '32px',
-            height: compact ? '24px' : '32px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: '700',
-            fontSize: compact ? '9px' : '11px',
-            color: '#fff',
-          }}>
-            {selectedCurrency.symbol.substring(0, 3)}
-          </div>
+          <CryptoIcon symbol={selectedCurrency.symbol} size={compact ? 24 : 32} />
           
           <div style={{ textAlign: 'left' }}>
             <div style={{
@@ -314,22 +302,7 @@ export function CurrencySelector({
                 : '1px solid transparent',
             }}
           >
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: selectedCurrency?.tokenId === currency.tokenId
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : theme === 'dark' ? '#374151' : '#e5e7eb',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: '600',
-              fontSize: '10px',
-              color: selectedCurrency?.tokenId === currency.tokenId ? '#fff' : mutedColor,
-            }}>
-              {currency.symbol.substring(0, 3)}
-            </div>
+            <CryptoIcon symbol={currency.symbol} size={32} />
             
             <div style={{ flex: 1 }}>
               <div style={{

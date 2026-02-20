@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ExternalLink, Check, Gift, CreditCard } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Check, Gift, CreditCard, Tag, Clock, Users, ChevronRight, Sparkles, X, Wallet } from 'lucide-react';
 import DepositForm from '../forms/DepositForm';
 import '../../styles/deposit.css';
 
@@ -9,21 +9,26 @@ type DepositStep = 'FORM' | 'BONUS_CHOICE' | 'PAYMENT' | 'PENDING' | 'SUCCESS' |
 
 interface CryptoCloudInvoice {
   invoiceId: string;
-  payUrl: string | null;  // null для статического кошелька
-  amount: number;  // Сумма введённая пользователем
-  amountUSD?: number;  // Сумма в USD
+  payUrl: string | null;
+  amount: number;
+  amountUSD?: number;
   currency: string;
   network?: string;
   withBonus: boolean;
-  orderId: string;
-  // Данные для встроенного виджета (статический кошелёк)
-  address?: string;  // Адрес для оплаты
-  staticWallet?: boolean;  // Флаг статического кошелька
-  warning?: string;  // Предупреждение
-  testMode?: boolean;  // Тестовый режим (без статического кошелька)
-  // ✅ Точная сумма к оплате от CryptoCloud (с комиссиями)
-  amountToPay?: string | number;  // Точная сумма крипты к оплате
-  paymentCurrency?: string;  // Валюта для оплаты
+  promoCode?: string | null;
+  promoPercentage?: number | null;
+  orderId?: string;
+  address?: string;
+  staticWallet?: boolean;
+  warning?: string;
+  testMode?: boolean;
+  amountToPay?: string | number;
+  paymentCurrency?: string;
+  method?: 'onchain' | 'cryptobot' | 'wallet';
+  directPayLink?: string;
+  miniAppUrl?: string;
+  webAppUrl?: string;
+  expiresAt?: string;
   invoiceInfo?: {
     amountCrypto?: string;
     currency?: string;
@@ -46,6 +51,23 @@ interface BonusInfo {
   };
 }
 
+interface PromoItem {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  percentage: number;
+  wagerMultiplier: number;
+  minDeposit: number;
+  maxDeposit: number | null;
+  expiresAt: string | null;
+  maxUsages: number | null;
+  usedCount: number;
+  status: 'available' | 'used' | 'exhausted' | 'expired' | 'blocked';
+  reason: string;
+  canUse: boolean;
+}
+
 interface CryptoToken {
   id: number;
   symbol: string;
@@ -56,7 +78,7 @@ interface CryptoToken {
 
 interface DepositPageProps {
   onBack: () => void;
-  defaultCurrency?: string | null; // Предвыбранная валюта (USDT, BTC, ETH и т.д.)
+  defaultCurrency?: string | null;
 }
 
 export default function DepositPage({ onBack, defaultCurrency }: DepositPageProps) {
@@ -67,90 +89,119 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
   const [tokensLoading, setTokensLoading] = useState(true);
   const [invoice, setInvoice] = useState<CryptoCloudInvoice | null>(null);
   const [bonusInfo, setBonusInfo] = useState<BonusInfo | null>(null);
+  const [promos, setPromos] = useState<PromoItem[]>([]);
+  const [promoInput, setPromoInput] = useState('');
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [selectedPromo, setSelectedPromo] = useState<PromoItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iframeError, setIframeError] = useState(false);
+  const [depositMethod, setDepositMethod] = useState<'onchain' | 'cryptobot' | 'wallet'>('onchain');
 
-  // Загружаем информацию о бонусе и валютах при монтировании
+  const getAuthToken = () =>
+    localStorage.getItem('casino_jwt_token')
+    || localStorage.getItem('authToken')
+    || localStorage.getItem('token');
+
   useEffect(() => {
     loadBonusInfo();
     loadAvailableCurrencies();
+    loadPromos();
   }, []);
 
   const loadAvailableCurrencies = async () => {
     try {
       setTokensLoading(true);
-      const token = localStorage.getItem('casino_jwt_token') 
-        || localStorage.getItem('authToken') 
-        || localStorage.getItem('token');
-
-      if (!token) {
-        setTokensLoading(false);
-        return;
-      }
+      const token = getAuthToken();
+      if (!token) { setTokensLoading(false); return; }
 
       const response = await fetch(`${API_BASE_URL}/api/v1/deposit/currencies`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setAvailableTokens(data.data);
-          
-          // Если передана defaultCurrency — выбираем её
           let tokenToSelect: CryptoToken | undefined;
-          
           if (defaultCurrency) {
             tokenToSelect = data.data.find((t: CryptoToken) => t.symbol === defaultCurrency);
           }
-          
-          // Иначе выбираем USDT или первую доступную
           if (!tokenToSelect) {
             tokenToSelect = data.data.find((t: CryptoToken) => t.symbol === 'USDT') || data.data[0];
           }
-          
-          if (tokenToSelect) {
-            setSelectedToken(tokenToSelect);
-          }
+          if (tokenToSelect) setSelectedToken(tokenToSelect);
         }
       }
-    } catch (err) {
-      
-    } finally {
-      setTokensLoading(false);
-    }
+    } catch (err) { /* ignore */ } finally { setTokensLoading(false); }
   };
 
   const loadBonusInfo = async () => {
     try {
-      const token = localStorage.getItem('casino_jwt_token') 
-        || localStorage.getItem('authToken') 
-        || localStorage.getItem('token');
-
+      const token = getAuthToken();
       if (!token) return;
-
       const response = await fetch(`${API_BASE_URL}/api/v1/deposit/check-bonus`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          setBonusInfo(data.data);
-        }
+        if (data.success) setBonusInfo(data.data);
       }
-    } catch (err) {
-      
+    } catch (err) { /* ignore */ }
+  };
+
+  const loadPromos = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/v1/deposit/promos`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) setPromos(data.data || []);
+      }
+    } catch (err) { /* ignore */ }
+  };
+
+  const validatePromoCode = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoValidating(true);
+    setPromoError(null);
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/deposit/validate-promo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ code, amount: depositAmount }),
+      });
+      const data = await response.json();
+      if (data.success && data.data.valid) {
+        const p = data.data.promo;
+        setSelectedPromo({
+          id: p.id, code: p.code, name: p.name,
+          description: null, percentage: p.percentage,
+          wagerMultiplier: p.wagerMultiplier,
+          minDeposit: p.minDeposit, maxDeposit: p.maxDeposit,
+          expiresAt: null, maxUsages: null, usedCount: 0,
+          status: 'available', reason: '', canUse: true,
+        });
+        setPromoError(null);
+      } else {
+        setPromoError(data.data?.reason || data.message || 'Промокод недействителен');
+        setSelectedPromo(null);
+      }
+    } catch {
+      setPromoError('Ошибка проверки промокода');
+    } finally {
+      setPromoValidating(false);
     }
   };
 
   // Обработка отправки формы
-  const handleFormSubmit = async (formData: { amount: string; currency: string; tokenId?: number }) => {
+  const handleFormSubmit = async (formData: { amount: string; currency: string; tokenId?: number; method?: 'onchain' | 'wallet' }) => {
     setLoading(true);
     setError(null);
 
@@ -160,7 +211,6 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         throw new Error('Некорректная сумма');
       }
 
-      // Находим выбранный токен
       const token = availableTokens.find(t => 
         t.symbol === formData.currency || t.id === formData.tokenId
       ) || selectedToken;
@@ -171,16 +221,14 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
 
       setDepositAmount(amount);
       setSelectedToken(token);
+      setDepositMethod(formData.method || 'onchain');
+      setSelectedPromo(null);
+      setPromoInput('');
+      setPromoError(null);
 
-      // Если доступен бонус, показываем выбор бонуса для любой криптовалюты
-      if (bonusInfo?.canUseBonus) {
-        setStep('BONUS_CHOICE');
-      } else {
-        // Сразу создаем депозит без бонуса
-        await createDeposit(amount, false, token);
-      }
+      // Всегда показываем экран бонуса — там промокоды + реферальный бонус
+      setStep('BONUS_CHOICE');
     } catch (err) {
-      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     } finally {
@@ -189,12 +237,9 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
   };
 
   // Создать депозит
-  const createDeposit = async (amount: number, withBonus: boolean, token?: CryptoToken) => {
+  const createDeposit = async (amount: number, withBonus: boolean, token?: CryptoToken, promoCode?: string) => {
     try {
-      const authToken = localStorage.getItem('casino_jwt_token') 
-        || localStorage.getItem('authToken') 
-        || localStorage.getItem('token');
-
+      const authToken = getAuthToken();
       if (!authToken) {
         throw new Error('Токен авторизации не найден. Авторизуйтесь заново.');
       }
@@ -204,18 +249,29 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
         throw new Error('Валюта не выбрана');
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/deposit/create`, {
+      const body: Record<string, unknown> = {
+        amount,
+        withBonus,
+        tokenId: selectedTokenForDeposit.id,
+        currency: `${selectedTokenForDeposit.symbol}_${selectedTokenForDeposit.network}`,
+      };
+      if (promoCode) body.promoCode = promoCode;
+
+      // Выбираем endpoint в зависимости от метода оплаты
+      let endpoint = `${API_BASE_URL}/api/v1/deposit/create`;
+      if (depositMethod === 'cryptobot') {
+        endpoint = `${API_BASE_URL}/api/v1/deposit/cryptobot/create`;
+      } else if (depositMethod === 'wallet') {
+        endpoint = `${API_BASE_URL}/api/v1/deposit/wallet/create`;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
-        body: JSON.stringify({
-          amount: amount,
-          withBonus: withBonus,
-          tokenId: selectedTokenForDeposit.id,
-          currency: `${selectedTokenForDeposit.symbol}_${selectedTokenForDeposit.network}`
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -224,30 +280,29 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
       }
 
       const data = await response.json();
+      if (!data.success) throw new Error(data.message || 'Ошибка создания депозита');
 
-      if (!data.success) {
-        throw new Error(data.message || 'Ошибка создания депозита');
-      }
-
-      setInvoice(data.data);
+      setInvoice({ ...data.data, method: depositMethod });
       setStep('PAYMENT');
-      
-      // ✅ Запускаем мониторинг статуса в фоне
       startPaymentMonitoring(data.data.invoiceId);
     } catch (err) {
-      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     }
   };
 
-  // Выбор бонуса
-  const handleBonusChoice = async (withBonus: boolean) => {
+  // Выбор бонуса: referral, promo, or none
+  const handleBonusChoice = async (mode: 'none' | 'referral' | 'promo') => {
     setLoading(true);
     try {
-      await createDeposit(depositAmount, withBonus);
+      if (mode === 'promo' && selectedPromo) {
+        await createDeposit(depositAmount, true, undefined, selectedPromo.code);
+      } else if (mode === 'referral') {
+        await createDeposit(depositAmount, true);
+      } else {
+        await createDeposit(depositAmount, false);
+      }
     } catch (err) {
-      
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
       setStep('ERROR');
     } finally {
@@ -257,13 +312,9 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
 
   // Мониторинг статуса платежа (в фоне, не меняет шаг)
   const startPaymentMonitoring = (invoiceId: string) => {
-    // ✅ НЕ меняем шаг на PENDING - остаёмся на PAYMENT с iframe CryptoCloud
-    
     const interval = setInterval(async () => {
       try {
-        const token = localStorage.getItem('casino_jwt_token')
-          || localStorage.getItem('authToken') 
-          || localStorage.getItem('token');
+        const token = getAuthToken();
         
         if (!token) return;
 
@@ -344,101 +395,606 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
           />
         )}
 
-        {/* STEP 2: ВЫБОР БОНУСА */}
-        {step === 'BONUS_CHOICE' && bonusInfo && (
-          <div className="bonus-choice-section" style={{
-            padding: '24px',
-            background: 'var(--background, #0f1d3a)',
-            borderRadius: '16px',
-            border: '1px solid var(--border, #3b82f640)',
+        {/* STEP 2: ВЫБОР БОНУСА / ПРОМОКОД */}
+        {step === 'BONUS_CHOICE' && (
+          <div style={{
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
           }}>
-            <h2 style={{ marginBottom: '8px', fontSize: '24px', color: 'var(--text, #fafafa)' }}>
-              🎁 Доступен бонус +100%!
-            </h2>
-            <p style={{ marginBottom: '24px', color: 'var(--muted, #a0aac0)', fontSize: '14px' }}>
-              Пополнение на {depositAmount.toFixed(2)} {selectedToken?.symbol || 'USDT'} ({selectedToken?.network || 'TRC-20'})
-            </p>
-
-            {/* Вариант с бонусом */}
-            <div 
-              onClick={() => handleBonusChoice(true)}
-              style={{
-                padding: '20px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '12px',
-                marginBottom: '16px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                border: '2px solid transparent',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.border = '2px solid #fff')}
-              onMouseLeave={(e) => e.currentTarget.style.border = '2px solid transparent'}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-                <Gift size={24} style={{ marginRight: '12px' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', margin: 0 }}>
-                  ✅ С БОНУСОМ +100%
-                </h3>
-              </div>
-              <ul style={{ 
-                margin: '12px 0 0 0', 
-                paddingLeft: '20px',
-                color: '#fff',
-                fontSize: '14px',
-                lineHeight: '1.8'
-              }}>
-                <li>+100% к пополнению (до ${bonusInfo.limits.maxBonus} эквивалент)</li>
-                <li>Отыграй {bonusInfo.limits.wageringMultiplier}x от суммы</li>
-                <li>Выигрыш до {bonusInfo.limits.maxPayoutMultiplier}x</li>
-                <li>Действителен {bonusInfo.limits.bonusExpiryDays} дней</li>
-              </ul>
-            </div>
-
-            {/* Вариант без бонуса */}
-            <div 
-              onClick={() => handleBonusChoice(false)}
-              style={{
-                padding: '20px',
-                background: 'var(--card-bg, #1f2937)',
-                borderRadius: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                border: '2px solid var(--border, #374151)',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.border = '2px solid #3b82f6')}
-              onMouseLeave={(e) => e.currentTarget.style.border = '2px solid var(--border, #374151)'}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <CreditCard size={24} style={{ marginRight: '12px', color: 'var(--text, #fafafa)' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text, #fafafa)', margin: 0 }}>
-                  💎 БЕЗ БОНУСА
-                </h3>
-              </div>
-              <p style={{ 
-                margin: '12px 0 0 0', 
-                color: 'var(--muted, #a0aac0)',
-                fontSize: '14px'
-              }}>
-                Сразу на счёт, без условий отыгрыша
+            {/* Заголовок */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎁</div>
+              <h2 style={{ fontSize: '20px', color: '#fff', margin: '0 0 4px' }}>Бонус к депозиту</h2>
+              <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
+                Пополнение: {depositAmount.toFixed(2)} {selectedToken?.symbol || 'USDT'}
               </p>
             </div>
 
+            {/* ── Ввод промокода ── */}
+            <div style={{
+              background: '#1e293b',
+              borderRadius: '12px',
+              padding: '14px',
+              border: selectedPromo ? '1px solid #10b981' : '1px solid #334155',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <Tag size={16} color="#a78bfa" />
+                <span style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>Промокод</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                  placeholder="Введите промокод"
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none',
+                    fontFamily: 'monospace',
+                    letterSpacing: '1px',
+                  }}
+                />
+                <button
+                  onClick={validatePromoCode}
+                  disabled={!promoInput.trim() || promoValidating}
+                  style={{
+                    padding: '10px 16px',
+                    background: promoInput.trim() ? '#6366f1' : '#334155',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: promoInput.trim() ? 'pointer' : 'not-allowed',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    opacity: promoValidating ? 0.7 : 1,
+                  }}
+                >
+                  {promoValidating ? '...' : 'Применить'}
+                </button>
+              </div>
+              {promoError && (
+                <p style={{ color: '#f87171', fontSize: '12px', margin: '8px 0 0' }}>{promoError}</p>
+              )}
+              {selectedPromo && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '10px 12px',
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(99,102,241,0.1))',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(16,185,129,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{ color: '#10b981', fontSize: '13px', fontWeight: 700 }}>
+                      ✅ {selectedPromo.code} — +{selectedPromo.percentage}%
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
+                      Вейджер: x{selectedPromo.wagerMultiplier}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedPromo(null); setPromoInput(''); }}
+                    style={{
+                      background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px',
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Доступные промокоды ── */}
+            {promos.length > 0 && !selectedPromo && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <Sparkles size={16} color="#fbbf24" />
+                  <span style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>Доступные бонусы</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {promos.map((p) => {
+                    const isAvail = p.canUse;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          if (isAvail) {
+                            setPromoInput(p.code);
+                            setSelectedPromo(p);
+                            setPromoError(null);
+                          }
+                        }}
+                        style={{
+                          padding: '12px',
+                          background: isAvail
+                            ? 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12))'
+                            : '#1e293b',
+                          borderRadius: '10px',
+                          border: isAvail ? '1px solid rgba(99,102,241,0.3)' : '1px solid #334155',
+                          cursor: isAvail ? 'pointer' : 'default',
+                          opacity: isAvail ? 1 : 0.5,
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              background: isAvail ? '#6366f1' : '#475569',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontFamily: 'monospace',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: '#fff',
+                              letterSpacing: '0.5px',
+                            }}>
+                              {p.code}
+                            </div>
+                            <span style={{
+                              color: isAvail ? '#a78bfa' : '#64748b',
+                              fontWeight: 700,
+                              fontSize: '15px',
+                            }}>
+                              +{p.percentage}%
+                            </span>
+                          </div>
+                          {isAvail && <ChevronRight size={16} color="#6366f1" />}
+                        </div>
+                        <div style={{ marginTop: '6px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Gift size={11} /> x{p.wagerMultiplier} вейджер
+                          </span>
+                          {p.minDeposit > 0 && (
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              мин. ${p.minDeposit}
+                            </span>
+                          )}
+                          {p.expiresAt && (
+                            <span style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Clock size={11} /> до {new Date(p.expiresAt).toLocaleDateString()}
+                            </span>
+                          )}
+                          {p.maxUsages !== null && (
+                            <span style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Users size={11} /> {p.usedCount}/{p.maxUsages}
+                            </span>
+                          )}
+                        </div>
+                        {!isAvail && p.reason && (
+                          <p style={{ color: '#f87171', fontSize: '11px', margin: '6px 0 0' }}>{p.reason}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Реферальный бонус (если доступен и не выбран промокод) ── */}
+            {bonusInfo?.canUseBonus && !selectedPromo && (
+              <div
+                onClick={() => !loading && handleBonusChoice('referral')}
+                style={{
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '12px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                  border: '2px solid transparent',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <Gift size={20} color="#fff" />
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                    Реферальный бонус +{bonusInfo.limits.depositBonusPercent}%
+                  </h3>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                    Макс. ${bonusInfo.limits.maxBonus}
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                    Вейджер x{bonusInfo.limits.wageringMultiplier}
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                    {bonusInfo.limits.bonusExpiryDays} дней
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ── Кнопки действия ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              {selectedPromo && (
+                <button
+                  onClick={() => handleBonusChoice('promo')}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <Sparkles size={18} />
+                  Пополнить с промокодом {selectedPromo.code} (+{selectedPromo.percentage}%)
+                </button>
+              )}
+              <button
+                onClick={() => handleBonusChoice('none')}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: '#1e293b',
+                  color: '#94a3b8',
+                  border: '1px solid #334155',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <CreditCard size={16} />
+                Без бонуса
+              </button>
+            </div>
+
             {loading && (
-              <div style={{ 
-                marginTop: '16px', 
-                textAlign: 'center', 
-                color: 'var(--muted, #a0aac0)' 
-              }}>
-                ⏳ Создание счета...
+              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                ⏳ Создание счёта...
               </div>
             )}
           </div>
         )}
 
-        {/* STEP 3: ОПЛАТА - ВСТРОЕННАЯ СТРАНИЦА CRYPTOCLOUD */}
-        {step === 'PAYMENT' && invoice && invoice.payUrl && (
+        {/* STEP 3: ОПЛАТА ЧЕРЕЗ CRYPTO BOT */}
+        {step === 'PAYMENT' && invoice && invoice.method === 'cryptobot' && invoice.payUrl && (
+          <div className="payment-section" style={{
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            {/* Заголовок */}
+            <div style={{
+              textAlign: 'center',
+              padding: '20px',
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
+              borderRadius: '16px',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>💎</div>
+              <h2 style={{ fontSize: '20px', color: '#fff', margin: '0 0 8px' }}>
+                Оплата через Crypto Bot
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
+                Нажмите кнопку ниже для оплаты через @CryptoBot
+              </p>
+            </div>
+
+            {/* Информация о платеже */}
+            <div style={{
+              background: '#1f2937',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Сумма</span>
+                <span style={{ color: '#fff', fontSize: '18px', fontWeight: '700' }}>
+                  {invoice.amount} {invoice.currency}
+                </span>
+              </div>
+              {invoice.amountUSD && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>В USD</span>
+                  <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                    ≈ ${invoice.amountUSD.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {invoice.withBonus && (
+                <div style={{
+                  padding: '8px 12px',
+                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <Gift size={14} style={{ color: '#a855f7' }} />
+                  <span style={{ color: '#a855f7', fontSize: '12px', fontWeight: '600' }}>
+                    Бонус +{invoice.promoPercentage || '100'}% будет начислен после оплаты
+                    {invoice.promoCode && ` (${invoice.promoCode})`}
+                  </span>
+                </div>
+              )}
+              {invoice.expiresAt && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Действителен до</span>
+                  <span style={{ color: '#6b7280', fontSize: '12px' }}>
+                    {new Date(invoice.expiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Кнопка оплаты */}
+            <button
+              onClick={() => {
+                if (invoice.payUrl) {
+                  const tg = (window as any).Telegram?.WebApp;
+                  if (tg?.openTelegramLink) {
+                    tg.openTelegramLink(invoice.payUrl);
+                  } else {
+                    window.open(invoice.payUrl, '_blank');
+                  }
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Wallet size={20} />
+              Оплатить через @CryptoBot
+              <ExternalLink size={16} />
+            </button>
+
+            {/* Подсказка */}
+            <div style={{
+              textAlign: 'center',
+              padding: '12px',
+              background: 'rgba(139, 92, 246, 0.08)',
+              borderRadius: '8px',
+            }}>
+              <p style={{ color: '#6b7280', fontSize: '12px', margin: '0 0 4px', lineHeight: 1.4 }}>
+                После оплаты баланс зачислится автоматически.
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '11px', margin: 0 }}>
+                Обычно зачисление происходит мгновенно ⚡
+              </p>
+            </div>
+
+            {/* Ожидание оплаты */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px',
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #8b5cf6',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>
+                Ожидаем подтверждение оплаты...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: ОПЛАТА ЧЕРЕЗ TELEGRAM WALLET */}
+        {step === 'PAYMENT' && invoice && invoice.method === 'wallet' && invoice.payUrl && (
+          <div className="payment-section" style={{
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            {/* Заголовок */}
+            <div style={{
+              textAlign: 'center',
+              padding: '20px',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%)',
+              borderRadius: '16px',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>💎</div>
+              <h2 style={{ fontSize: '20px', color: '#fff', margin: '0 0 8px' }}>
+                Оплата через Telegram Wallet
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
+                Нажмите кнопку ниже для оплаты через @wallet
+              </p>
+            </div>
+
+            {/* Информация о платеже */}
+            <div style={{
+              background: '#1f2937',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Сумма</span>
+                <span style={{ color: '#fff', fontSize: '18px', fontWeight: '700' }}>
+                  {invoice.amount} {invoice.currency}
+                </span>
+              </div>
+              {invoice.amountUSD && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>В USD</span>
+                  <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                    ≈ ${invoice.amountUSD.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {invoice.withBonus && (
+                <div style={{
+                  padding: '8px 12px',
+                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <Gift size={14} style={{ color: '#a855f7' }} />
+                  <span style={{ color: '#a855f7', fontSize: '12px', fontWeight: '600' }}>
+                    Бонус +{invoice.promoPercentage || '100'}% будет начислен после оплаты
+                    {invoice.promoCode && ` (${invoice.promoCode})`}
+                  </span>
+                </div>
+              )}
+              {invoice.expiresAt && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Действителен до</span>
+                  <span style={{ color: '#6b7280', fontSize: '12px' }}>
+                    {new Date(invoice.expiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Кнопка оплаты */}
+            <button
+              onClick={() => {
+                if (invoice.payUrl) {
+                  // Для Telegram Mini App используем openTelegramLink, иначе window.open
+                  const tg = (window as any).Telegram?.WebApp;
+                  if (tg?.openTelegramLink) {
+                    tg.openTelegramLink(invoice.payUrl);
+                  } else {
+                    window.open(invoice.payUrl, '_blank');
+                  }
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Wallet size={20} />
+              Оплатить через @wallet
+              <ExternalLink size={16} />
+            </button>
+
+            {/* Прямая ссылка (fallback) */}
+            {invoice.directPayLink && (
+              <button
+                onClick={() => window.open(invoice.directPayLink!, '_blank')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: 'transparent',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '12px',
+                  color: '#3b82f6',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <ExternalLink size={14} />
+                Открыть через браузер
+              </button>
+            )}
+
+            {/* Подсказка */}
+            <div style={{
+              textAlign: 'center',
+              padding: '12px',
+              background: 'rgba(59, 130, 246, 0.08)',
+              borderRadius: '8px',
+            }}>
+              <p style={{ color: '#6b7280', fontSize: '12px', margin: '0 0 4px', lineHeight: 1.4 }}>
+                После оплаты баланс зачислится автоматически.
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '11px', margin: 0 }}>
+                Обычно зачисление происходит мгновенно ⚡
+              </p>
+            </div>
+
+            {/* Ожидание оплаты */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px',
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #3b82f6',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>
+                Ожидаем подтверждение оплаты...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: ОПЛАТА - ВСТРОЕННАЯ СТРАНИЦА CRYPTOCLOUD (on-chain) */}
+        {step === 'PAYMENT' && invoice && invoice.method === 'onchain' && invoice.payUrl && (
           <div className="payment-section" style={{
             width: '100%',
             height: 'calc(100vh - 140px)',
@@ -468,7 +1024,8 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
                   color: '#fff',
                   fontSize: '11px',
                 }}>
-                  🎁 Бонус +100% будет начислен после оплаты
+                  🎁 Бонус +{invoice.promoPercentage || '100'}% будет начислен после оплаты
+                  {invoice.promoCode && ` (${invoice.promoCode})`}
                 </div>
               )}
             </div>
@@ -802,10 +1359,12 @@ export default function DepositPage({ onBack, defaultCurrency }: DepositPageProp
                 color: '#fff',
               }}>
                 <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
-                  🎁 Бонус +100% начислен!
+                  🎁 Бонус +{invoice.promoPercentage || bonusInfo?.limits.depositBonusPercent || 100}% начислен!
                 </p>
                 <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
-                  Отыграйте {bonusInfo?.limits.wageringMultiplier || 10}x для вывода
+                  {invoice.promoCode
+                    ? `Промокод ${invoice.promoCode} применён`
+                    : `Отыграйте ${bonusInfo?.limits.wageringMultiplier || 10}x для вывода`}
                 </p>
               </div>
             )}

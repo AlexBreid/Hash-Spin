@@ -13,6 +13,7 @@ import {
   ArrowUpCircle,
   History,
   Shield,
+  MessageSquare,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -533,44 +534,67 @@ export function AccountPage() {
               </motion.button>
             </div>
 
-            {/* КНОПКА ИСТОРИЯ */}
-            <motion.button
-              onClick={() => navigate('/history')}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
-              style={{
-                background: `linear-gradient(135deg, 
-                  color-mix(in srgb, ${COLORS.accent} 15%, transparent), 
-                  color-mix(in srgb, ${COLORS.primary} 10%, transparent)
-                )`,
-                borderColor: `color-mix(in srgb, ${COLORS.accent} 40%, ${COLORS.primary})`,
-                color: COLORS.foreground,
-              }}
-            >
-              <History size={18} style={{ color: COLORS.accent }} />
-              <span>История операций</span>
-            </motion.button>
-
-            {/* КНОПКА АДМИН-ПАНЕЛИ (только для админов) */}
-            {profileData?.isAdmin && (
+            {/* КНОПКИ ДЕЙСТВИЙ: ИСТОРИЯ И ЗАЯВКИ */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <motion.button
-                onClick={() => navigate('/admin-withdrawals')}
+                onClick={() => navigate('/history')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
                 style={{
                   background: `linear-gradient(135deg, 
-                    color-mix(in srgb, #8B5CF6 20%, transparent), 
-                    color-mix(in srgb, #6D28D9 15%, transparent)
+                    color-mix(in srgb, ${COLORS.accent} 15%, transparent), 
+                    color-mix(in srgb, ${COLORS.primary} 10%, transparent)
                   )`,
-                  borderColor: '#8B5CF6',
+                  borderColor: `color-mix(in srgb, ${COLORS.accent} 40%, ${COLORS.primary})`,
                   color: COLORS.foreground,
                 }}
               >
-                <Shield size={18} style={{ color: '#8B5CF6' }} />
-                <span>Заявки на вывод</span>
+                <History size={18} style={{ color: COLORS.accent }} />
+                <span>История</span>
               </motion.button>
+
+              <motion.button
+                onClick={() => navigate('/support?view=list')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    color-mix(in srgb, #06b6d4 15%, transparent), 
+                    color-mix(in srgb, #3b82f6 10%, transparent)
+                  )`,
+                  borderColor: '#06b6d4',
+                  borderOpacity: 0.5,
+                  color: COLORS.foreground,
+                }}
+              >
+                <MessageSquare size={18} className="text-cyan-500" />
+                <span>Мои заявки</span>
+              </motion.button>
+            </div>
+
+            {/* КНОПКА АДМИН-ПАНЕЛИ (только для админов) */}
+            {profileData?.isAdmin && (
+              <div className="grid grid-cols-1 gap-4 mb-4">
+                <motion.button
+                  onClick={() => navigate('/admin-withdrawals')}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="rounded-xl p-3 border transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                  style={{
+                    background: `linear-gradient(135deg, 
+                      color-mix(in srgb, #8B5CF6 20%, transparent), 
+                      color-mix(in srgb, #6D28D9 15%, transparent)
+                    )`,
+                    borderColor: '#8B5CF6',
+                    color: COLORS.foreground,
+                  }}
+                >
+                  <Shield size={18} style={{ color: '#8B5CF6' }} />
+                  <span>Выводы</span>
+                </motion.button>
+              </div>
             )}
           </motion.div>
 

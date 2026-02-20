@@ -22,6 +22,7 @@ import PlinkoGame from './components/pages/games/Plinkogame';
 import { CoinFlipPage } from './components/pages/CoinFlipPage';
 import { HistoryPage } from './components/pages/HistoryPage';
 import { AdminWithdrawalsPage } from './components/pages/AdminWithdrawalsPage';
+import { AdminBannersPage } from './components/pages/admin/AdminBannersPage';
 import { AccessDeniedPage } from './components/pages/AccessDeniedPage';
 import { Toaster } from './components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
@@ -39,7 +40,7 @@ import { ServerErrorPage } from './components/pages/ServerErrorPage';
 import { BlockedPage } from './components/pages/BlockedPage';
 
 // Страницы, требующие авторизации (home и support доступны всем)
-const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'coinflip', 'history', 'admin-withdrawals'];
+const AUTH_REQUIRED_PAGES = ['records', 'referrals', 'account', 'settings', 'crash', 'withdraw', 'deposit', 'minesweeper', 'plinko', 'coinflip', 'history', 'admin-withdrawals', 'admin-banners'];
 
 // Ключ для localStorage - показывалась ли welcome страница
 const WELCOME_SHOWN_KEY = 'safarix_welcome_shown';
@@ -182,6 +183,7 @@ function AppContent() {
         if (path === '/deposit') return 'deposit';
         if (path === '/history') return 'history';
         if (path === '/admin-withdrawals' || path === '/admin/withdrawals') return 'admin-withdrawals';
+        if (path === '/admin/banners') return 'admin-banners';
         if (path === '/records') return 'records';
         if (path === '/referrals') return 'referrals';
         if (path === '/account') return 'account';
@@ -401,6 +403,12 @@ function AppContent() {
                     return <AccessDeniedPage />;
                 }
                 return <AdminWithdrawalsPage />;
+            case 'admin-banners':
+                // Проверяем права админа
+                if (!isAdmin) {
+                    return <AccessDeniedPage />;
+                }
+                return <AdminBannersPage />;
             case 'records':
                 return <RecordsPage />;
             case 'referrals':
@@ -437,10 +445,11 @@ function AppContent() {
     const isDepositPage = currentPage === 'deposit';
     const isHistoryPage = currentPage === 'history';
     const isAdminWithdrawalsPage = currentPage === 'admin-withdrawals';
+    const isAdminBannersPage = currentPage === 'admin-banners';
     const isCallbackPage = currentPage === 'callback' || currentPage === 'successful-payment' || currentPage === 'failed-payment';
     const isGamePage = isCrashPage || isMinesweeperPage || isPlinkoPage || isCoinFlipPage;
     const isFullscreenPage = isGamePage || isCallbackPage;
-    const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage || isAdminWithdrawalsPage;
+    const isFinancePage = isWithdrawPage || isDepositPage || isHistoryPage || isAdminWithdrawalsPage || isAdminBannersPage;
 
     // Показываем страницу блокировки IP
     if (isBlocked) {
