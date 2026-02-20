@@ -144,9 +144,10 @@ async function notifyReferrerAboutNewReferee(bot, referrerTelegramId, newUserUse
 // ====================================
 
 const waitingForTicketMessage = new Map();
-const supportTickets = new Map();
+// const supportTickets = new Map(); // REMOVED: Using DB now
 const adminWaitingForReply = new Map();
 const adminWaitingForBroadcast = new Map(); // Состояние ожидания рассылки: userId -> { text: null, photo: null }
+const adminWaitingForBonus = new Map(); // Состояние создания бонуса: userId -> { step, data }
 
 // ====================================
 // 🛡️ АНТИСПАМ СИСТЕМА
@@ -648,54 +649,137 @@ if (!BOT_TOKEN) {
 
       if (adminWaitingForReply.has(user.id)) {
         const ticketId = adminWaitingForReply.get(user.id);
-        let ticketUser = null;
+        adminWaitingForReply.delete(user.id);
 
-        for (const [userId, ticket] of supportTickets.entries()) {
-          if (ticket.ticketId === ticketId) {
-            ticketUser = userId;
-            break;
-          }
-        }
-
-        if (ticketUser) {
-          const ticket = supportTickets.get(ticketUser);
-          adminWaitingForReply.delete(user.id);
-
-          const ticketUser_ = await prisma.user.findUnique({ 
-            where: { id: ticketUser }, 
-            select: { telegramId: true } 
+        try {
+          // Сохраняем ответ админа
+          await prisma.supportMessage.create({
+            data: {
+              ticketId,
+              sender: 'ADMIN',
+              text: text
+            }
           });
 
-          if (ticketUser_?.telegramId) {
+          // Обновляем статус тикета
+          const ticket = await prisma.supportTicket.update({
+            where: { id: ticketId },
+            data: { status: 'ANSWERED' },
+            include: { user: true }
+          });
+
+          // Уведомляем пользователя
+          if (ticket.user.telegramId) {
             try {
               await bot.telegram.sendMessage(
-                ticketUser_.telegramId,
-                `💬 Ответ администратора\n\n` +
-                `🎫 Тикет: ${ticketId}\n\n` +
-                `📝 Ваше сообщение:\n${ticket.message}\n\n` +
-                `✅ Ответ:\n${text}`
+                ticket.user.telegramId,
+                `💬 *Ответ от поддержки*\n\n` +
+                `🎫 Тикет #${ticketId}: ${ticket.subject}\n\n` +
+                `${text}`,
+                { parse_mode: 'Markdown' }
               );
-
-              ticket.status = 'RESOLVED';
-
-              await ctx.reply(
-                `✅ Ответ отправлен пользователю ${ticketUser}`,
-                getMainMenuKeyboard(user.isAdmin)
-              );
-
-              logger.info('BOT', `Admin replied to ticket`, { ticketId, adminId: user.id });
             } catch (e) {
               logger.warn('BOT', `Failed to send reply to user`, { error: e.message });
-              await ctx.reply('❌ Ошибка при отправке ответа.');
             }
           }
+
+          await ctx.reply(
+            `✅ Ответ отправлен в тикет #${ticketId}`,
+            getMainMenuKeyboard(user.isAdmin)
+          );
+
+          logger.info('BOT', `Admin replied to ticket`, { ticketId, adminId: user.id });
+        } catch (e) {
+          logger.error('BOT', `Error saving admin reply`, { error: e.message });
+          await ctx.reply('❌ Ошибка при отправке ответа.');
+        }
+        return;
+      }
+
+      // 🎁 WIZARD СОЗДАНИЯ БОНУСА
+      if (adminWaitingForBonus.has(user.id)) {
+        const state = adminWaitingForBonus.get(user.id);
+        
+        switch (state.step) {
+          case 'NAME':
+            state.data.name = text;
+            state.step = 'CODE';
+            await ctx.reply('Введите код бонуса (например: WELCOME100):');
+            break;
+            
+          case 'CODE':
+            state.data.code = text.toUpperCase();
+            state.step = 'PERCENTAGE';
+            await ctx.reply('Введите процент бонуса (число, например: 100):');
+            break;
+            
+          case 'PERCENTAGE':
+            const percent = parseInt(text);
+            if (isNaN(percent) || percent < 0) {
+              await ctx.reply('❌ Пожалуйста, введите корректное число.');
+              return;
+            }
+            state.data.percentage = percent;
+            state.step = 'WAGER';
+            await ctx.reply('Введите вейджер (множитель отыгрыша, например: 10):');
+            break;
+            
+          case 'WAGER':
+            const wager = parseInt(text);
+            if (isNaN(wager) || wager < 0) {
+              await ctx.reply('❌ Пожалуйста, введите корректное число.');
+              return;
+            }
+            state.data.wagerMultiplier = wager;
+            state.step = 'MIN_DEPOSIT';
+            await ctx.reply('Введите минимальный депозит для активации (например: 10):');
+            break;
+            
+          case 'MIN_DEPOSIT':
+            const minDep = parseFloat(text);
+            if (isNaN(minDep) || minDep < 0) {
+              await ctx.reply('❌ Пожалуйста, введите корректное число.');
+              return;
+            }
+            state.data.minDeposit = minDep;
+            
+            // Финализация: Создаем бонус в БД
+            try {
+              const bonus = await prisma.bonusTemplate.create({
+                data: {
+                  name: state.data.name,
+                  code: state.data.code,
+                  percentage: state.data.percentage,
+                  wagerMultiplier: state.data.wagerMultiplier,
+                  minDeposit: state.data.minDeposit,
+                  isActive: true
+                }
+              });
+              
+              adminWaitingForBonus.delete(user.id);
+              
+              await ctx.reply(
+                `✅ Бонус успешно создан!\n\n` +
+                `📌 Название: ${bonus.name}\n` +
+                `🔑 Код: ${bonus.code}\n` +
+                `💰 Процент: ${bonus.percentage}%\n` +
+                `🔄 Вейджер: x${bonus.wagerMultiplier}\n` +
+                `💵 Мин. депозит: ${bonus.minDeposit}`,
+                getMainMenuKeyboard(user.isAdmin)
+              );
+              
+            } catch (error) {
+              logger.error('BOT', `Error creating bonus`, { error: error.message });
+              await ctx.reply('❌ Ошибка при сохранении бонуса. Возможно, такой код уже существует.');
+              adminWaitingForBonus.delete(user.id);
+            }
+            break;
         }
         return;
       }
 
       if (waitingForTicketMessage.has(user.id)) {
         const ticketType = waitingForTicketMessage.get(user.id);
-        const ticketId = generateTicketId();
         const messageText = text;
 
         const typeLabels = {
@@ -705,25 +789,32 @@ if (!BOT_TOKEN) {
 
         const typeLabel = typeLabels[ticketType] || ticketType;
 
-        supportTickets.set(user.id, {
-          ticketId,
-          type: ticketType,
-          status: 'OPEN',
-          message: messageText,
-          createdAt: new Date()
+        // Создаем тикет в БД
+        const ticket = await prisma.supportTicket.create({
+          data: {
+            userId: user.id,
+            subject: `Запрос из бота (${typeLabel})`,
+            status: 'OPEN',
+            messages: {
+              create: {
+                sender: 'USER',
+                text: messageText
+              }
+            }
+          }
         });
 
         waitingForTicketMessage.delete(user.id);
 
         logger.info('BOT', `Support ticket created`, { 
-          ticketId, 
+          ticketId: ticket.id, 
           userId: user.id, 
           type: ticketType 
         });
 
         await ctx.reply(
           `✅ Заявка создана!\n\n` +
-          `🎫 Номер: ${ticketId}\n` +
+          `🎫 Номер: #${ticket.id}\n` +
           `📝 Тип: ${typeLabel}\n` +
           `⏳ Статус: На рассмотрении\n\n` +
           `Администратор рассмотрит вашу заявку в ближайшее время и напишет вам в чат.`,
@@ -737,10 +828,17 @@ if (!BOT_TOKEN) {
               await bot.telegram.sendMessage(
                 admin.telegramId,
                 `🎫 НОВАЯ ЗАЯВКА ПОДДЕРЖКИ\n\n` +
-                `🎫 Номер: ${ticketId}\n` +
+                `🎫 Номер: #${ticket.id}\n` +
                 `👤 От пользователя: ${user.id}\n` +
                 `📝 Тип: ${typeLabel}\n\n` +
-                `📄 Сообщение:\n${messageText}`
+                `📄 Сообщение:\n${messageText}`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: `✍️ Ответить`, callback_data: `reply_ticket_${ticket.id}` }]
+                        ]
+                    }
+                }
               );
             } catch (e) {
               logger.warn('BOT', `Failed to notify admin about ticket`, { error: e.message });
@@ -791,6 +889,7 @@ if (!BOT_TOKEN) {
               reply_markup: {
                 inline_keyboard: [
                   [{ text: '🎫 Заявки поддержки', callback_data: 'admin_show_tickets' }],
+                  [{ text: '🎁 Бонусы', callback_data: 'admin_bonuses' }],
                   [{ text: '📢 Массовая рассылка', callback_data: 'admin_broadcast' }],
                   [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
                 ]
@@ -854,9 +953,10 @@ if (!BOT_TOKEN) {
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: 'Поддержка', callback_data: 'admin_show_tickets' }],
+            [{ text: '🎫 Поддержка', callback_data: 'admin_show_tickets' }],
+            [{ text: '🎁 Бонусы', callback_data: 'admin_bonuses' }],
             [{ text: '📢 Массовая рассылка', callback_data: 'admin_broadcast' }],
-            [{ text: 'Назад', callback_data: 'back_to_menu' }]
+            [{ text: '◀️ Назад', callback_data: 'back_to_menu' }]
           ]
         }
       }
@@ -875,52 +975,112 @@ if (!BOT_TOKEN) {
       return;
     }
 
-    if (supportTickets.size === 0) {
+    // Получаем открытые тикеты из БД
+    const tickets = await prisma.supportTicket.findMany({
+      where: { status: { in: ['OPEN', 'ANSWERED'] } },
+      include: { user: true, messages: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      orderBy: { updatedAt: 'desc' },
+      take: 10
+    });
+
+    if (tickets.length === 0) {
       await ctx.editMessageText('Нет открытых тикетов.');
       await ctx.answerCbQuery();
       return;
     }
 
-    let msg = 'ПОДДЕРЖКА (' + supportTickets.size + '):\n\n';
-    let ticketsList = [];
-
-    for (const [userId, ticket] of supportTickets.entries()) {
-      if (ticket.status === 'OPEN' || ticket.status === 'REPLIED') {
-        const typeLabel = ticket.type === 'CONTACT' ? 'ЧАТ' : 'Q';
-
-        ticketsList.push({
-          id: ticket.ticketId,
-          userId,
-          type: typeLabel,
-          message: ticket.message.substring(0, 40) + (ticket.message.length > 40 ? '...' : '')
-        });
-      }
-    }
-
-    if (ticketsList.length === 0) {
-      await ctx.editMessageText('Нет открытых тикетов.');
-      await ctx.answerCbQuery();
-      return;
-    }
-
-    for (const t of ticketsList) {
-      msg += t.type + ' ' + t.id + '\n' +
-             'User: ' + t.userId + '\n' +
-             'Msg: ' + t.message + '\n\n';
-    }
-
+    let msg = `ПОДДЕРЖКА (${tickets.length}):\n\n`;
     const buttons = [];
-    for (const t of ticketsList) {
-      buttons.push([
-        { text: 'Ответить ' + t.id, callback_data: 'reply_ticket_action_' + t.id }
-      ]);
+
+    for (const ticket of tickets) {
+        const lastMsg = ticket.messages[0]?.text || '(нет сообщений)';
+        const shortMsg = lastMsg.substring(0, 30) + (lastMsg.length > 30 ? '...' : '');
+        const username = ticket.user?.username || 'No username';
+        
+        msg += `🎫 #${ticket.id} User: ${username} (ID: ${ticket.userId})\n` +
+               `📝 ${ticket.subject}\n` +
+               `💬 ${shortMsg}\n\n`;
+
+        buttons.push([
+            { text: `✍️ Ответить #${ticket.id}`, callback_data: `reply_ticket_${ticket.id}` },
+            { text: `🔒 Закрыть`, callback_data: `close_ticket_${ticket.id}` }
+        ]);
     }
+    
     buttons.push([{ text: 'Назад', callback_data: 'back_to_admin_menu' }]);
 
     await ctx.editMessageText(msg, {
       reply_markup: { inline_keyboard: buttons }
     });
     await ctx.answerCbQuery();
+  });
+
+  bot.action(/reply_ticket_(\d+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+        where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+        await ctx.answerCbQuery('Нет доступа');
+        return;
+    }
+
+    const ticketId = parseInt(ctx.match[1]);
+    
+    adminWaitingForReply.set(user.id, ticketId);
+    
+    await ctx.reply(
+        `✍️ Введите ответ для тикета #${ticketId}:`,
+        { reply_markup: { force_reply: true } }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/close_ticket_(\d+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+        where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+        await ctx.answerCbQuery('Нет доступа');
+        return;
+    }
+
+    const ticketId = parseInt(ctx.match[1]);
+
+    try {
+      const ticket = await prisma.supportTicket.update({
+        where: { id: ticketId },
+        data: { status: 'CLOSED' },
+        include: { user: true }
+      });
+
+      // Уведомляем пользователя
+      if (ticket.user.telegramId) {
+        try {
+          await bot.telegram.sendMessage(
+            ticket.user.telegramId,
+            `🔒 *Тикет #${ticketId} закрыт*\n\n` +
+            `Если у вас остались вопросы, вы можете создать новый тикет.`,
+            { parse_mode: 'Markdown' }
+          );
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      await ctx.reply(`🔒 Тикет #${ticketId} закрыт.`);
+      await ctx.answerCbQuery('Тикет закрыт');
+      
+      // Обновляем сообщение с кнопками (убираем кнопки)
+      try {
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+      } catch (e) {}
+
+    } catch (error) {
+      logger.error('BOT', `Error closing ticket`, { error: error.message });
+      await ctx.answerCbQuery('Ошибка при закрытии');
+    }
   });
 
   bot.action(/approve_withdrawal_(\d+)/, async (ctx) => {
@@ -1192,6 +1352,124 @@ if (!BOT_TOKEN) {
   });
 
   // ====================================
+  // 🎁 БОНУСЫ (АДМИН)
+  // ====================================
+
+  bot.action('admin_bonuses', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    const bonuses = await prisma.bonusTemplate.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let msg = `🎁 БОНУСЫ (${bonuses.length}):\n\n`;
+    const buttons = [];
+
+    if (bonuses.length === 0) {
+      msg += 'Нет активных бонусных программ.';
+    } else {
+      for (const bonus of bonuses) {
+        msg += `🔹 *${escapeMarkdown(bonus.name)}*\n` +
+               `   Код: \`${escapeMarkdown(bonus.code)}\`\n` +
+               `   Бонус: ${bonus.percentage}%\n` +
+               `   Вейджер: x${bonus.wagerMultiplier}\n` +
+               `   Мин. деп: ${bonus.minDeposit}\n\n`;
+        
+        buttons.push([{ text: `❌ Удалить ${bonus.code}`, callback_data: `admin_delete_bonus_${bonus.id}` }]);
+      }
+    }
+
+    buttons.push([{ text: '➕ Создать новый бонус', callback_data: 'admin_create_bonus' }]);
+    buttons.push([{ text: '◀️ Назад', callback_data: 'back_to_admin_menu' }]);
+
+    try {
+      await ctx.editMessageText(msg, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      });
+    } catch (e) {
+      // Fallback if markdown fails
+      await ctx.editMessageText(msg.replace(/\*/g, '').replace(/`/g, ''), {
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('admin_create_bonus', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    adminWaitingForBonus.set(user.id, { step: 'NAME', data: {} });
+
+    await ctx.reply(
+      '🎁 Создание нового бонуса\n\n' +
+      'Введите название бонуса (например: Welcome Bonus):',
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: '❌ Отмена', callback_data: 'admin_cancel_bonus' }]]
+        }
+      }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('admin_cancel_bonus', async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+    
+    if (user) {
+      adminWaitingForBonus.delete(user.id);
+      await ctx.reply('❌ Создание бонуса отменено.');
+      // Return to bonus list
+      // We can trigger the admin_bonuses logic manually or just show menu
+    }
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/admin_delete_bonus_(\d+)/, async (ctx) => {
+    const user = await prisma.user.findUnique({ 
+      where: { telegramId: ctx.from.id.toString() } 
+    });
+
+    if (!user || !user.isAdmin) {
+      await ctx.answerCbQuery('Нет доступа');
+      return;
+    }
+
+    const bonusId = parseInt(ctx.match[1]);
+
+    try {
+      await prisma.bonusTemplate.delete({ where: { id: bonusId } });
+      await ctx.answerCbQuery('Бонус удален');
+      
+      // Refresh list
+      // We can't easily call the handler function, so we just edit the message or send a new one.
+      // Simpler to just send a success message and let them navigate back.
+      await ctx.reply('✅ Бонус успешно удален.');
+      
+      // Ideally we would refresh the list, but for now let's just show the menu
+    } catch (error) {
+      logger.error('BOT', `Error deleting bonus`, { error: error.message });
+      await ctx.answerCbQuery('Ошибка при удалении');
+    }
+  });
+
+  // ====================================
   // ⭐ TELEGRAM STARS PAYMENT HANDLERS
   // ====================================
 
@@ -1320,7 +1598,7 @@ if (!BOT_TOKEN) {
       logger.info('BOT', 'Telegram Bot started successfully');
     },
     botInstance: bot,
-    supportTickets,
+    supportTickets: new Map(), // Dummy map for export compatibility if needed elsewhere
     setStateTimeout,
     generateTicketId,
     parseReferralCode,
@@ -1332,4 +1610,3 @@ if (!BOT_TOKEN) {
     escapeMarkdown
   };
 }
-

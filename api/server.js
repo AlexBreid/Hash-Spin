@@ -18,8 +18,9 @@ const prisma = require('./prismaClient');
 const telegramBot = require('./src/bots/telegramBot');
 const RouteLoader = require('./src/utils/routeLoader');
 
-// ✅ ИСПРАВЛЕНИЕ #1: Импортируем webhook handler
-const { handleCryptoPayWebhook } = require('./src/bots/telegramBot');
+// ✅ Импортируем оба сервиса для webhook обработки
+const cryptoPayService = require('./src/services/cryptoPayService');
+const walletPayService = require('./src/services/walletPayService');
 
 // 🛡️ SECURITY: Импортируем middleware безопасности
 const { 
@@ -37,7 +38,6 @@ const { startRecordsUpdater, stopRecordsUpdater } = require('./src/services/reco
 // ====================================
 const requiredEnvVars = [
   'TELEGRAM_BOT_TOKEN',
-  'CRYPTO_PAY_TOKEN',
   'DATABASE_URL',
 ];
 
@@ -97,8 +97,25 @@ app.use(cors({
 }));
 
 app.options('*', cors());
+
+// 🔍 LOGGING MIDDLEWARE (DEBUG)
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.url}`);
+  // console.log('Headers:', req.headers);
+  next();
+});
+
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+
+// ====================================
+// 📁 STATIC FILES - Uploads (before security!)
+// ====================================
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '7d',
+  etag: true
+}));
+console.log('✅ Static uploads served at /uploads');
 
 // ====================================
 // 🛡️ SECURITY MIDDLEWARE
@@ -240,25 +257,27 @@ app.get('/', (req, res) => {
 });
 
 // ====================================
-// ✅ ИСПРАВЛЕНИЕ #1: WEBHOOK HANDLER
+// ✅ WEBHOOK HANDLERS — Оба метода оплаты
 // ====================================
 /**
  * POST /webhook/crypto-pay
- * Обработка уведомлений от Crypto Pay
+ * Обработка уведомлений от Crypto Pay (@CryptoBot)
  */
 app.post('/webhook/crypto-pay', async (req, res) => {
   console.log('\n🪝 [WEBHOOK] Received Crypto Pay notification');
   
   try {
-    // Передаем bot instance для отправки уведомлений
-    req.app.locals.bot = telegramBot.botInstance;
+    const signature = req.headers['crypto-pay-api-signature'];
+    const result = await cryptoPayService.handleWebhook(req.body, signature);
     
-    // Обрабатываем webhook
-    await handleCryptoPayWebhook(req, res);
+    res.status(200).json({ 
+      success: true, 
+      processed: result.processed,
+      message: result.reason || 'OK'
+    });
     
   } catch (error) {
     console.error('❌ [WEBHOOK] Fatal error:', error.message);
-    // Всегда возвращаем 200 OK (чтобы Crypto Pay не повторял)
     res.status(200).json({ 
       success: false, 
       message: 'Error processed'
@@ -266,7 +285,43 @@ app.post('/webhook/crypto-pay', async (req, res) => {
   }
 });
 
-console.log('✅ Webhook route registered: POST /webhook/crypto-pay');
+/**
+ * POST /webhook/wallet-pay
+ * Обработка уведомлений от Wallet Pay (официальный @wallet Telegram)
+ */
+app.post('/webhook/wallet-pay', async (req, res) => {
+  console.log('\n🪝 [WEBHOOK] Received Wallet Pay notification');
+  
+  try {
+    const timestamp = req.headers['walletpay-timestamp'];
+    const signature = req.headers['walletpay-signature'];
+    
+    const result = await walletPayService.handleWebhook(
+      req.body,
+      timestamp,
+      signature,
+      'POST',
+      '/webhook/wallet-pay'
+    );
+    
+    res.status(200).json({ 
+      success: true, 
+      processed: result.processed,
+      message: result.reason || 'OK'
+    });
+    
+  } catch (error) {
+    console.error('❌ [WEBHOOK] Fatal error:', error.message);
+    res.status(200).json({ 
+      success: false, 
+      message: 'Error processed'
+    });
+  }
+});
+
+console.log('✅ Webhook routes registered:');
+console.log('   - POST /webhook/crypto-pay (Crypto Bot)');
+console.log('   - POST /webhook/wallet-pay (Telegram Wallet)');
 
 // ====================================
 // ПОДКЛЮЧЕНИЕ ОСТАЛЬНЫХ МАРШРУТОВ
@@ -310,6 +365,33 @@ try {
   console.log('✅ Coinflip routes explicitly loaded');
 } catch (err) {
   console.error('❌ Error loading coinflip routes:', err.message);
+}
+
+// ✅ Явно подключаем adminContentRoutes
+try {
+  const adminContentRoutes = require('./src/routes/adminContentRoutes');
+  app.use('/api/admin', adminContentRoutes);
+  console.log('✅ Admin Content routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading admin content routes:', err.message);
+}
+
+// ✅ Явно подключаем contentRoutes (public)
+try {
+  const contentRoutes = require('./src/routes/contentRoutes');
+  app.use('/api/content', contentRoutes);
+  console.log('✅ Public Content routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading public content routes:', err.message);
+}
+
+// ✅ Явно подключаем supportRoutes
+try {
+  const supportRoutes = require('./src/routes/supportRoutes');
+  app.use('/api/support', supportRoutes);
+  console.log('✅ Support routes explicitly loaded');
+} catch (err) {
+  console.error('❌ Error loading support routes:', err.message);
 }
 
 console.log(`✅ ${routers.length} route(s) loaded`);
@@ -403,7 +485,9 @@ async function startServer() {
       console.log(`\n📚 Info:`);
       console.log(`   - Health: ${API_BASE_URL}/health`);
       console.log(`   - Docs: ${API_BASE_URL}/api-docs`);
-      console.log(`   - Webhook: POST ${API_BASE_URL}/webhook/crypto-pay\n`);
+      console.log(`   - Webhooks:`);
+      console.log(`     • Crypto Bot: POST ${API_BASE_URL}/webhook/crypto-pay`);
+      console.log(`     • Wallet Pay: POST ${API_BASE_URL}/webhook/wallet-pay\n`);
     });
 
     // === ШАГ 6: Запуск сервиса рекордов (обновление каждые 24 часа) ===

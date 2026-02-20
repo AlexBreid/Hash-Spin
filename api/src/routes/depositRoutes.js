@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../prismaClient');
 const cryptoCloudService = require('../services/cryptoCloudService');
+const cryptoPayService = require('../services/cryptoPayService');
+const walletPayService = require('../services/walletPayService');
 const referralService = require('../services/ReferralService');
 const currencySyncService = require('../services/currencySyncService');
 const walletService = require('../services/walletService');
@@ -10,12 +12,158 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const logger = require('../utils/logger');
 
 /**
+ * GET /api/v1/deposit/promos
+ * Получить доступные промокоды для пользователя
+ */
+router.get('/api/v1/deposit/promos', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const now = new Date();
+
+    // Все активные промо-шаблоны
+    const allPromos = await prisma.bonusTemplate.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: now } }
+        ]
+      },
+      orderBy: { percentage: 'desc' }
+    });
+
+    // Какие промо уже использовал этот юзер
+    const usedPromos = await prisma.promoUsage.findMany({
+      where: { userId },
+      select: { bonusId: true }
+    });
+    const usedIds = new Set(usedPromos.map(u => u.bonusId));
+
+    // Есть ли активный бонус
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: { userId, isActive: true, isCompleted: false }
+    });
+
+    const promos = allPromos.map(p => {
+      const isUsed = usedIds.has(p.id);
+      const isFull = p.maxUsages !== null && p.usedCount >= p.maxUsages;
+      const isExpired = p.expiresAt && new Date(p.expiresAt) < now;
+      const hasActiveBonus = !!activeBonus;
+
+      let status = 'available';
+      let reason = '';
+      if (isUsed) { status = 'used'; reason = 'Вы уже использовали этот промокод'; }
+      else if (isFull) { status = 'exhausted'; reason = 'Лимит использований исчерпан'; }
+      else if (isExpired) { status = 'expired'; reason = 'Срок действия истёк'; }
+      else if (hasActiveBonus) { status = 'blocked'; reason = 'У вас есть активный бонус'; }
+
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        description: p.description,
+        percentage: p.percentage,
+        wagerMultiplier: p.wagerMultiplier,
+        minDeposit: parseFloat(p.minDeposit?.toString() || '0'),
+        maxDeposit: p.maxDeposit ? parseFloat(p.maxDeposit.toString()) : null,
+        expiresAt: p.expiresAt,
+        maxUsages: p.maxUsages,
+        usedCount: p.usedCount,
+        status,
+        reason,
+        canUse: status === 'available'
+      };
+    });
+
+    res.json({ success: true, data: promos });
+  } catch (error) {
+    logger.error('DEPOSIT', 'Error fetching promos', { error: error.message });
+    res.status(500).json({ success: false, message: 'Ошибка получения промокодов' });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/validate-promo
+ * Проверить промокод перед использованием
+ */
+router.post('/api/v1/deposit/validate-promo', authenticateToken, async (req, res) => {
+  try {
+    const { code, amount } = req.body;
+    const userId = req.user.userId;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Укажите промокод' });
+    }
+
+    const promo = await prisma.bonusTemplate.findUnique({
+      where: { code: code.toUpperCase().trim() }
+    });
+
+    if (!promo) {
+      return res.json({ success: true, data: { valid: false, reason: 'Промокод не найден' } });
+    }
+    if (!promo.isActive) {
+      return res.json({ success: true, data: { valid: false, reason: 'Промокод неактивен' } });
+    }
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+      return res.json({ success: true, data: { valid: false, reason: 'Срок действия истёк' } });
+    }
+    if (promo.maxUsages !== null && promo.usedCount >= promo.maxUsages) {
+      return res.json({ success: true, data: { valid: false, reason: 'Лимит использований исчерпан' } });
+    }
+
+    // Проверяем, не использовал ли уже
+    const used = await prisma.promoUsage.findUnique({
+      where: { userId_bonusId: { userId, bonusId: promo.id } }
+    });
+    if (used) {
+      return res.json({ success: true, data: { valid: false, reason: 'Вы уже использовали этот промокод' } });
+    }
+
+    // Проверяем активный бонус
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: { userId, isActive: true, isCompleted: false }
+    });
+    if (activeBonus) {
+      return res.json({ success: true, data: { valid: false, reason: 'У вас уже есть активный бонус' } });
+    }
+
+    // Проверяем мин. депозит
+    const amountNum = amount ? parseFloat(amount) : 0;
+    const minDep = parseFloat(promo.minDeposit?.toString() || '0');
+    if (amountNum > 0 && amountNum < minDep) {
+      return res.json({ success: true, data: { valid: false, reason: `Минимальный депозит: $${minDep}` } });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        valid: true,
+        promo: {
+          id: promo.id,
+          code: promo.code,
+          name: promo.name,
+          percentage: promo.percentage,
+          wagerMultiplier: promo.wagerMultiplier,
+          minDeposit: minDep,
+          maxDeposit: promo.maxDeposit ? parseFloat(promo.maxDeposit.toString()) : null,
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('DEPOSIT', 'Error validating promo', { error: error.message });
+    res.status(500).json({ success: false, message: 'Ошибка валидации промокода' });
+  }
+});
+
+/**
  * POST /api/v1/deposit/create
  * Создать депозит через CryptoCloud или CryptoBot
+ * Поддерживает promoCode для применения промо-бонуса
  */
 router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
   try {
-    const { amount, withBonus, currency, tokenId, method = 'cryptocloud' } = req.body;
+    const { amount, withBonus, promoCode, currency, tokenId, method = 'cryptocloud' } = req.body;
     const userId = req.user.userId;
 
     // Валидация суммы
@@ -34,18 +182,13 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
         where: { id: parseInt(tokenId) }
       });
     } else if (currency) {
-      // Если передан currency (например, "USDT_TRC20"), парсим его
       const [symbol, network] = currency.split('_');
       selectedToken = await currencySyncService.getCurrencyBySymbolAndNetwork(symbol, network || 'ERC-20');
     }
 
-    // Если токен не найден, используем USDT по умолчанию
     if (!selectedToken) {
       selectedToken = await prisma.cryptoToken.findFirst({
-        where: {
-          symbol: 'USDT',
-          network: 'TRC-20'
-        }
+        where: { symbol: 'USDT', network: 'TRC-20' }
       });
     }
 
@@ -65,9 +208,38 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
       });
     }
 
-    // Проверяем доступность бонуса
+    // ── ПРОМОКОД ──
+    let promoTemplate = null;
+    if (promoCode) {
+      const code = promoCode.toUpperCase().trim();
+      promoTemplate = await prisma.bonusTemplate.findUnique({ where: { code } });
+
+      if (!promoTemplate || !promoTemplate.isActive) {
+        return res.status(400).json({ success: false, message: 'Промокод недействителен' });
+      }
+      if (promoTemplate.expiresAt && new Date(promoTemplate.expiresAt) < new Date()) {
+        return res.status(400).json({ success: false, message: 'Срок действия промокода истёк' });
+      }
+      if (promoTemplate.maxUsages !== null && promoTemplate.usedCount >= promoTemplate.maxUsages) {
+        return res.status(400).json({ success: false, message: 'Лимит использований промокода исчерпан' });
+      }
+      const alreadyUsed = await prisma.promoUsage.findUnique({
+        where: { userId_bonusId: { userId, bonusId: promoTemplate.id } }
+      });
+      if (alreadyUsed) {
+        return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
+      }
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: { userId, isActive: true, isCompleted: false }
+      });
+      if (activeBonus) {
+        return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+      }
+    }
+
+    // Проверяем доступность бонуса (старая реферальная система)
     let canUseBonus = false;
-    if (withBonus) {
+    if (withBonus && !promoTemplate) {
       const bonusAvailability = await referralService.checkBonusAvailability(userId);
       canUseBonus = bonusAvailability.canUseBonus;
       
@@ -79,6 +251,11 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
             : 'Бонус недоступен'
         });
       }
+    }
+
+    // Если промокод — ставим флаг бонуса
+    if (promoTemplate) {
+      canUseBonus = true;
     }
 
     // ⭐ Специальная обработка для Telegram Stars (XTR)
@@ -132,7 +309,8 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
         userId, 
         canUseBonus,
         selectedToken.symbol, // Криптовалюта (BTC, ETH, USDT и т.д.)
-        selectedToken.network // Сеть (TRC-20, ERC-20, BTC и т.д.)
+        selectedToken.network, // Сеть (TRC-20, ERC-20, BTC и т.д.)
+        promoTemplate ? promoTemplate.code : null // Промокод
       );
     }
 
@@ -147,6 +325,8 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
         network: selectedToken.network,
         tokenId: selectedToken.id,
         withBonus: canUseBonus,
+        promoCode: promoTemplate ? promoTemplate.code : null,
+        promoPercentage: promoTemplate ? promoTemplate.percentage : null,
         orderId: invoice.orderId,
         // ✅ Данные для встроенного виджета (статический кошелёк)
         address: invoice.address || null,  // Адрес для оплаты
@@ -907,6 +1087,357 @@ router.get('/api/v1/deposit/stars/test', authenticateToken, async (req, res) => 
       error: error.message,
       code: error.code || 'UNKNOWN'
     });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 💎 CRYPTO BOT (@CryptoBot) — Альтернативный способ оплаты
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/v1/deposit/cryptobot/info
+ * Проверить доступность Crypto Bot и поддерживаемые валюты
+ */
+router.get('/api/v1/deposit/cryptobot/info', authenticateToken, async (req, res) => {
+  try {
+    const available = cryptoPayService.isAvailable();
+    const supportedAssets = cryptoPayService.getSupportedAssets();
+
+    res.json({
+      success: true,
+      data: {
+        available,
+        supportedAssets,
+        name: 'Crypto Bot',
+        description: 'Оплата через @CryptoBot в Telegram',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/cryptobot/create
+ * Создать инвойс для пополнения через Crypto Bot (@CryptoBot)
+ */
+router.post('/api/v1/deposit/cryptobot/create', authenticateToken, async (req, res) => {
+  try {
+    const { amount, currency, tokenId, withBonus, promoCode } = req.body;
+    const userId = req.user.userId;
+
+    // Валидация суммы
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ success: false, message: 'Некорректная сумма' });
+    }
+
+    // Определяем валюту
+    let asset = 'USDT';
+    let selectedToken = null;
+
+    if (tokenId) {
+      selectedToken = await prisma.cryptoToken.findUnique({ where: { id: parseInt(tokenId) } });
+      if (selectedToken) asset = selectedToken.symbol;
+    } else if (currency) {
+      const parts = currency.split('_');
+      asset = parts[0];
+      selectedToken = await prisma.cryptoToken.findFirst({ where: { symbol: asset } });
+    }
+
+    // Проверяем поддержку валюты
+    if (!cryptoPayService.isAssetSupported(asset)) {
+      return res.status(400).json({
+        success: false,
+        message: `${asset} не поддерживается для оплаты через Crypto Bot. Используйте: ${cryptoPayService.getSupportedAssets().join(', ')}`,
+      });
+    }
+
+    // Проверяем минимальную сумму
+    const minDeposit = currencySyncService.getMinDepositForCurrency(asset);
+    if (amountNum < minDeposit) {
+      return res.status(400).json({
+        success: false,
+        message: `Минимальная сумма: ${minDeposit} ${asset} (≈$10)`,
+      });
+    }
+
+    // ── ПРОМОКОД ──
+    let promoTemplate = null;
+    if (promoCode) {
+      const code = promoCode.toUpperCase().trim();
+      promoTemplate = await prisma.bonusTemplate.findUnique({ where: { code } });
+
+      if (!promoTemplate || !promoTemplate.isActive) {
+        return res.status(400).json({ success: false, message: 'Промокод недействителен' });
+      }
+      if (promoTemplate.expiresAt && new Date(promoTemplate.expiresAt) < new Date()) {
+        return res.status(400).json({ success: false, message: 'Срок действия промокода истёк' });
+      }
+      if (promoTemplate.maxUsages !== null && promoTemplate.usedCount >= promoTemplate.maxUsages) {
+        return res.status(400).json({ success: false, message: 'Лимит использований промокода исчерпан' });
+      }
+      const alreadyUsed = await prisma.promoUsage.findUnique({
+        where: { userId_bonusId: { userId, bonusId: promoTemplate.id } },
+      });
+      if (alreadyUsed) {
+        return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
+      }
+    }
+
+    // Проверяем реферальный бонус
+    let canUseBonus = false;
+    if (withBonus && !promoTemplate) {
+      const bonusAvailability = await referralService.checkBonusAvailability(userId);
+      canUseBonus = bonusAvailability.canUseBonus;
+    }
+    if (promoTemplate) canUseBonus = true;
+
+    // Создаём инвойс через Crypto Pay
+    const invoice = await cryptoPayService.createInvoice(
+      userId,
+      amountNum,
+      asset,
+      canUseBonus,
+      promoTemplate ? promoTemplate.code : null
+    );
+
+    res.json({
+      success: true,
+      data: {
+        invoiceId: invoice.invoiceId,
+        payUrl: invoice.payUrl,
+        miniAppUrl: invoice.miniAppInvoiceUrl,
+        webAppUrl: invoice.webAppInvoiceUrl,
+        amount: invoice.amount,
+        amountUSD: invoice.amountUSD,
+        currency: invoice.asset,
+        withBonus: canUseBonus,
+        promoCode: promoTemplate ? promoTemplate.code : null,
+        promoPercentage: promoTemplate ? promoTemplate.percentage : null,
+        method: 'cryptobot',
+        expiresAt: invoice.expirationDate,
+      },
+    });
+  } catch (error) {
+    logger.error('DEPOSIT', 'Error creating Crypto Bot deposit', {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка создания платежа через Crypto Bot',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/cryptobot/webhook
+ * Webhook от Crypto Pay (@CryptoBot) для обработки платежей
+ */
+router.post('/api/v1/deposit/cryptobot/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['crypto-pay-api-signature'];
+    const body = req.body;
+
+    logger.info('CRYPTO_PAY_WEBHOOK', 'Received webhook', {
+      updateType: body?.update_type,
+      hasSignature: !!signature,
+    });
+
+    const result = await cryptoPayService.handleWebhook(body, signature);
+
+    res.status(200).json({
+      success: true,
+      processed: result.processed,
+      message: result.reason || 'OK',
+    });
+  } catch (error) {
+    logger.error('CRYPTO_PAY_WEBHOOK', 'Error', { error: error.message });
+    res.status(200).json({ success: false, message: error.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 💳 TELEGRAM WALLET — Официальный кошелёк Telegram (@wallet)
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/v1/deposit/wallet/info
+ * Проверить доступность Telegram Wallet и поддерживаемые валюты
+ */
+router.get('/api/v1/deposit/wallet/info', authenticateToken, async (req, res) => {
+  try {
+    const available = walletPayService.isAvailable();
+    const supportedCurrencies = walletPayService.getSupportedCurrencies();
+
+    res.json({
+      success: true,
+      data: {
+        available,
+        supportedCurrencies,
+        name: 'Telegram Wallet',
+        description: 'Оплата через официальный кошелёк Telegram (@wallet)',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/wallet/create
+ * Создать заказ для пополнения через официальный Telegram Wallet
+ */
+router.post('/api/v1/deposit/wallet/create', authenticateToken, async (req, res) => {
+  try {
+    const { amount, currency, tokenId, withBonus, promoCode } = req.body;
+    const userId = req.user.userId;
+
+    // Валидация суммы
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ success: false, message: 'Некорректная сумма' });
+    }
+
+    // Определяем валюту
+    let asset = 'TON';
+    let selectedToken = null;
+
+    if (tokenId) {
+      selectedToken = await prisma.cryptoToken.findUnique({ where: { id: parseInt(tokenId) } });
+      if (selectedToken) asset = selectedToken.symbol;
+    } else if (currency) {
+      const parts = currency.split('_');
+      asset = parts[0];
+      selectedToken = await prisma.cryptoToken.findFirst({ where: { symbol: asset } });
+    }
+
+    // Проверяем поддержку валюты
+    if (!walletPayService.isCurrencySupported(asset)) {
+      return res.status(400).json({
+        success: false,
+        message: `${asset} не поддерживается через Telegram Wallet. Доступны: ${walletPayService.getSupportedCurrencies().join(', ')}`,
+      });
+    }
+
+    // Проверяем минимальную сумму
+    const minDeposit = currencySyncService.getMinDepositForCurrency(asset);
+    if (amountNum < minDeposit) {
+      return res.status(400).json({
+        success: false,
+        message: `Минимальная сумма: ${minDeposit} ${asset} (≈$10)`,
+      });
+    }
+
+    // ── ПРОМОКОД ──
+    let promoTemplate = null;
+    if (promoCode) {
+      const code = promoCode.toUpperCase().trim();
+      promoTemplate = await prisma.bonusTemplate.findUnique({ where: { code } });
+
+      if (!promoTemplate || !promoTemplate.isActive) {
+        return res.status(400).json({ success: false, message: 'Промокод недействителен' });
+      }
+      if (promoTemplate.expiresAt && new Date(promoTemplate.expiresAt) < new Date()) {
+        return res.status(400).json({ success: false, message: 'Срок действия промокода истёк' });
+      }
+      if (promoTemplate.maxUsages !== null && promoTemplate.usedCount >= promoTemplate.maxUsages) {
+        return res.status(400).json({ success: false, message: 'Лимит использований промокода исчерпан' });
+      }
+      const alreadyUsed = await prisma.promoUsage.findUnique({
+        where: { userId_bonusId: { userId, bonusId: promoTemplate.id } },
+      });
+      if (alreadyUsed) {
+        return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
+      }
+    }
+
+    // Проверяем реферальный бонус
+    let canUseBonus = false;
+    if (withBonus && !promoTemplate) {
+      const bonusAvailability = await referralService.checkBonusAvailability(userId);
+      canUseBonus = bonusAvailability.canUseBonus;
+    }
+    if (promoTemplate) canUseBonus = true;
+
+    // Получаем telegramId пользователя
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true },
+    });
+
+    // Создаём заказ в Wallet Pay
+    const order = await walletPayService.createOrder(
+      userId,
+      amountNum,
+      asset,
+      canUseBonus,
+      promoTemplate ? promoTemplate.code : null,
+      user?.telegramId || null
+    );
+
+    res.json({
+      success: true,
+      data: {
+        invoiceId: order.invoiceId,
+        payUrl: order.payLink,
+        directPayLink: order.directPayLink,
+        walletOrderId: order.walletOrderId,
+        amount: order.amount,
+        amountUSD: order.amountUSD,
+        currency: order.asset,
+        withBonus: canUseBonus,
+        promoCode: promoTemplate ? promoTemplate.code : null,
+        promoPercentage: promoTemplate ? promoTemplate.percentage : null,
+        method: 'wallet',
+        expiresAt: order.expiresAt,
+      },
+    });
+  } catch (error) {
+    logger.error('DEPOSIT', 'Error creating Wallet Pay deposit', {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Ошибка создания платежа через Telegram Wallet',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/wallet/webhook
+ * Webhook от Wallet Pay (официальный кошелёк Telegram)
+ */
+router.post('/api/v1/deposit/wallet/webhook', async (req, res) => {
+  try {
+    const timestamp = req.headers['walletpay-timestamp'];
+    const signature = req.headers['walletpay-signature'];
+    const body = req.body;
+
+    logger.info('WALLET_PAY_WEBHOOK', 'Received webhook', {
+      type: body?.type,
+      eventId: body?.eventId,
+      hasSignature: !!signature,
+    });
+
+    const result = await walletPayService.handleWebhook(
+      body,
+      timestamp,
+      signature,
+      'POST',
+      '/api/v1/deposit/wallet/webhook'
+    );
+
+    res.status(200).json({
+      success: true,
+      processed: result.processed,
+      message: result.reason || 'OK',
+    });
+  } catch (error) {
+    logger.error('WALLET_PAY_WEBHOOK', 'Error', { error: error.message });
+    res.status(200).json({ success: false, message: error.message });
   }
 });
 

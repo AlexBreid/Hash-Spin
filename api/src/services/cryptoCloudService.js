@@ -399,7 +399,7 @@ class CryptoCloudService {
    * Статический кошелёк гарантирует оплату только выбранной криптой.
    * В тестовом режиме CryptoCloud - используется обычный инвойс.
    */
-  async createStaticWalletInvoice(amount, userId, withBonus = false, cryptoCurrency = 'USDT', network = 'TRC-20') {
+  async createStaticWalletInvoice(amount, userId, withBonus = false, cryptoCurrency = 'USDT', network = 'TRC-20', promoCode = null) {
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       throw new Error('Invalid amount');
@@ -456,7 +456,8 @@ class CryptoCloudService {
         asset: cryptoCurrency,
         network: network,
         status: 'pending',
-        withBonus: withBonus
+        withBonus: withBonus,
+        promoCode: promoCode || null
       }
     });
 
@@ -826,27 +827,41 @@ class CryptoCloudService {
       // Если выбран бонус, начисляем его для любой криптовалюты
       if (withBonus) {
         try {
-          const user = await prisma.user.findUnique({
-            where: { id: userIdNum },
-            select: { referredById: true }
-          });
-
-          if (user?.referredById) {
-            logger.info('CRYPTOCLOUD', 'Granting bonus', { userId: userIdNum, asset: assetStr });
-            
-            const bonusInfo = await referralService.grantDepositBonus(
-              userIdNum,
-              amountNum,
-              token.id,
-              user.referredById
-            );
-
-            if (bonusInfo) {
-              logger.info('CRYPTOCLOUD', 'Bonus granted', { 
+          // ── ПРОМОКОД-БОНУС ──
+          if (pendingDeposit?.promoCode) {
+            const promoResult = await this._applyPromoBonus(userIdNum, amountNum, token.id, pendingDeposit.promoCode);
+            if (promoResult) {
+              logger.info('CRYPTOCLOUD', 'Promo bonus granted', { 
                 userId: userIdNum, 
-                bonusAmount: bonusInfo.bonusAmount,
+                promoCode: pendingDeposit.promoCode,
+                bonusAmount: promoResult.bonusAmount,
                 asset: assetStr
               });
+            }
+          } else {
+            // ── РЕФЕРАЛЬНЫЙ БОНУС ──
+            const user = await prisma.user.findUnique({
+              where: { id: userIdNum },
+              select: { referredById: true }
+            });
+
+            if (user?.referredById) {
+              logger.info('CRYPTOCLOUD', 'Granting referral bonus', { userId: userIdNum, asset: assetStr });
+              
+              const bonusInfo = await referralService.grantDepositBonus(
+                userIdNum,
+                amountNum,
+                token.id,
+                user.referredById
+              );
+
+              if (bonusInfo) {
+                logger.info('CRYPTOCLOUD', 'Referral bonus granted', { 
+                  userId: userIdNum, 
+                  bonusAmount: bonusInfo.bonusAmount,
+                  asset: assetStr
+                });
+              }
             }
           }
         } catch (bonusError) {
@@ -1199,6 +1214,108 @@ class CryptoCloudService {
       });
       throw error;
     }
+  }
+
+  /**
+   * 🎁 Применить промо-бонус при депозите
+   * @param {number} userId - ID пользователя
+   * @param {number} depositAmount - Сумма депозита в криптовалюте
+   * @param {number} tokenId - ID токена
+   * @param {string} promoCode - Промокод
+   * @returns {Promise<Object|null>} Результат или null если ошибка
+   */
+  async _applyPromoBonus(userId, depositAmount, tokenId, promoCode) {
+    const promo = await prisma.bonusTemplate.findUnique({
+      where: { code: promoCode.toUpperCase().trim() }
+    });
+    if (!promo || !promo.isActive) return null;
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return null;
+    if (promo.maxUsages !== null && promo.usedCount >= promo.maxUsages) return null;
+
+    // Уже использовал?
+    const used = await prisma.promoUsage.findUnique({
+      where: { userId_bonusId: { userId, bonusId: promo.id } }
+    });
+    if (used) return null;
+
+    // Активный бонус?
+    const active = await prisma.userBonus.findFirst({
+      where: { userId, isActive: true, isCompleted: false }
+    });
+    if (active) return null;
+
+    const { getCurrencyRateAsync } = require('./currencySyncService');
+    const token = await prisma.cryptoToken.findUnique({ where: { id: tokenId } });
+    if (!token) return null;
+
+    const rate = await getCurrencyRateAsync(token.symbol);
+    const depositInUSD = depositAmount * rate;
+
+    // Минимальный депозит
+    const minDep = parseFloat(promo.minDeposit?.toString() || '0');
+    if (minDep > 0 && depositInUSD < minDep) return null;
+
+    // Рассчёт бонуса
+    let bonusAmount = depositAmount * (promo.percentage / 100);
+    // Если есть maxDeposit — ограничиваем в USD эквиваленте
+    if (promo.maxDeposit) {
+      const maxInCrypto = parseFloat(promo.maxDeposit.toString()) / rate;
+      if (bonusAmount > maxInCrypto) bonusAmount = maxInCrypto;
+    }
+
+    const totalAmount = depositAmount + bonusAmount;
+    const requiredWager = totalAmount * promo.wagerMultiplier;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 дней на отыгрыш
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Создаём UserBonus
+      await tx.userBonus.create({
+        data: {
+          userId,
+          tokenId,
+          grantedAmount: bonusAmount.toFixed(8),
+          requiredWager: requiredWager.toFixed(8),
+          wageredAmount: '0',
+          isActive: true,
+          isCompleted: false,
+          expiresAt
+        }
+      });
+
+      // 2. Начисляем бонус на BONUS баланс
+      await tx.balance.upsert({
+        where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } },
+        create: { userId, tokenId, type: 'BONUS', amount: totalAmount.toFixed(8) },
+        update: { amount: { increment: totalAmount } }
+      });
+
+      // 3. Записываем использование промокода
+      await tx.promoUsage.create({
+        data: {
+          userId,
+          bonusId: promo.id,
+          depositAmount: depositAmount.toFixed(8),
+          bonusAmount: bonusAmount.toFixed(8)
+        }
+      });
+
+      // 4. Увеличиваем счётчик использований
+      await tx.bonusTemplate.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } }
+      });
+    });
+
+    return {
+      promoCode: promo.code,
+      percentage: promo.percentage,
+      bonusAmount,
+      totalAmount,
+      requiredWager,
+      expiresAt
+    };
   }
 }
 

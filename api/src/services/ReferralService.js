@@ -8,8 +8,8 @@
  * КОМИССИИ:
  * 1. REGULAR: (House Edge × newTurnover / 2) × Commission Rate
  *    Пример: (0.02 × 1000 / 2) × 0.30 = 3 USDT
- * 2. WORKER: 5% от newLosses
- *    Пример: 100 × 0.05 = 5 USDT
+ * 2. WORKER: 10% от newLosses
+ *    Пример: 100 × 0.10 = 10 USDT
  */
 
 const prisma = require('../../prismaClient');
@@ -38,7 +38,7 @@ class ReferralService {
     // КОМИССИИ
     HOUSE_EDGE: 0.02,               // 2% HE (преимущество казино) от оборота
     REGULAR_COMMISSION_RATE: 30,    // 30% от (HE × Turnover / 2)
-    WORKER_PROFIT_SHARE: 5.0,       // 5% от потерь рефералов
+    WORKER_PROFIT_SHARE: 10.0,      // 10% от потерь рефералов
     
     // ПОРОГ ВЫПЛАТЫ
     COMMISSION_PAYOUT_THRESHOLD: 1  // Выплачивать только если > 1 USDT
@@ -408,7 +408,7 @@ class ReferralService {
    * ⭐ ИСПРАВЛЕНО: считаем рефералов по User.referredById, а не по ReferralStats
    * 
    * 🟢 REGULAR: (House Edge × newTurnover / 2) × Commission Rate
-   * 🔴 WORKER: 5% от newLosses
+   * 🔴 WORKER: 10% от newLosses
    */
   async getReferrerStats(userId) {
     try {
@@ -460,7 +460,7 @@ class ReferralService {
             pendingCommission = pendingCommission.plus(commission);
           }
         } else if (user.referrerType === 'WORKER') {
-          // ✅ WORKER: 5% от newLosses
+          // ✅ WORKER: 10% от newLosses
           const losses = new Decimal(stat.newLossesSinceLastPayout || 0);
           if (losses.greaterThan(0)) {
             const workerShare = new Decimal(ReferralService.CONFIG.WORKER_PROFIT_SHARE);
@@ -552,9 +552,9 @@ class ReferralService {
    *   - Делим на 2 (fair share) = 10 USDT
    *   - Комиссия 30% = 10 × 0.30 = 3 USDT
    * 
-   * WORKER: 5% от потерь рефералов
+   * WORKER: 10% от потерь рефералов
    * Пример: Потери 100 USDT
-   *   - Комиссия = 100 × 0.05 = 5 USDT
+   *   - Комиссия = 100 × 0.10 = 10 USDT
    */
   async processAllPendingCommissions(tokenId = 2) {
     try {
@@ -593,7 +593,7 @@ class ReferralService {
               }
 
           } else if (referrerType === 'WORKER') {
-            // 🔴 WORKER: 5% от newLosses
+            // 🔴 WORKER: 10% от newLosses
             const losses = new Decimal(stat.newLossesSinceLastPayout || 0);
             
             if (losses.greaterThan(0)) {

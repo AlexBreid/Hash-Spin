@@ -133,6 +133,9 @@ model User {
 
   referralStatsAsReferrer ReferralStats[] @relation("ReferrerStats")
   referralStatsAsReferee  ReferralStats[] @relation("RefereeStats")
+
+  supportTickets SupportTicket[]
+  promoUsages    PromoUsage[]
 }
 
 // ====================================================
@@ -565,6 +568,7 @@ model PendingDeposit {
   network   String?  // Сеть валюты (TRC-20, ERC-20, BTC и т.д.)
   status    String   @default("pending")
   withBonus Boolean  @default(false)
+    promoCode String?  // Промокод, если использован при создании депозита
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -691,4 +695,103 @@ model CoinFlipBet {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ====================================================
+// 14. SUPPORT SYSTEM
+// ====================================================
+
+model SupportTicket {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  subject   String
+  status    String   @default("OPEN") // OPEN, CLOSED, ANSWERED
+  
+  messages  SupportMessage[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+}
+
+model SupportMessage {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  sender    String   // "USER" or "ADMIN"
+  text      String
+  
+  createdAt DateTime @default(now())
+  
+  @@index([ticketId])
+}
+
+// ====================================================
+// 15. DYNAMIC CONTENT & BONUSES
+// ====================================================
+
+model Banner {
+  id          Int      @id @default(autoincrement())
+  imageUrl    String
+  title       String?
+  text        String?
+  buttonText  String?
+  linkUrl     String?
+  actionType  String   // 'LINK', 'BONUS', 'NONE'
+  
+  bonusId     Int?
+  bonus       BonusTemplate? @relation(fields: [bonusId], references: [id])
+  
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BonusTemplate {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique // e.g. "WELCOME100"
+  name            String
+  description     String?
+  
+  minDeposit      Decimal  @default(0) @db.Decimal(30, 18)
+  maxDeposit      Decimal? @db.Decimal(30, 18)
+  percentage      Int      @default(100) // % to deposit
+  wagerMultiplier Int      @default(10)  // x10 wager
+  
+  maxUsages       Int?     // null = unlimited
+  usedCount       Int      @default(0)
+  
+  isActive        Boolean  @default(true)
+  expiresAt       DateTime? // Expiration date for the bonus
+
+  banners         Banner[]
+  usages          PromoUsage[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PromoUsage {
+  id        Int      @id @default(autoincrement())
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bonusId   Int
+  bonus     BonusTemplate @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+  
+  depositAmount Decimal @db.Decimal(30, 18)
+  bonusAmount   Decimal @db.Decimal(30, 18)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, bonusId]) // One usage per user per promo
+  @@index([bonusId])
 }

@@ -1,5 +1,6 @@
 // src/middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
+const prisma = require('../../prismaClient');
 
 /**
  * 🔐 Верификация JWT токена
@@ -12,7 +13,7 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    
+    console.log('❌ Auth Middleware: No token provided'); // Added log
     return res.status(401).json({ 
       success: false, 
       error: 'Access token required. Format: Bearer <token>' 
@@ -23,9 +24,10 @@ const authenticateToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     req.user = decoded; // { userId, telegramId, ... }
     
+    // console.log('✅ Auth Middleware: Token verified', { userId: decoded.userId }); // Added log (commented out for now)
     next();
   } catch (error) {
-    
+    console.error('❌ Auth Middleware: Token verification failed', error.message); // Added log
     
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ 
@@ -38,6 +40,32 @@ const authenticateToken = (req, res, next) => {
       success: false, 
       error: 'Invalid token' 
     });
+  }
+};
+
+/**
+ * 👑 Проверка прав администратора
+ */
+const isAdmin = async (req, res, next) => {
+  if (!req.user || !req.user.userId) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAdmin: true }
+    });
+
+    if (user && user.isAdmin) {
+      next();
+    } else {
+      console.warn(`⛔ Access denied: User ${req.user.userId} is not admin`);
+      res.status(403).json({ success: false, error: 'Access denied. Admin only.' });
+    }
+  } catch (error) {
+    console.error('❌ Error checking admin status:', error);
+    res.status(500).json({ success: false, error: 'Server error checking admin status' });
   }
 };
 
@@ -83,6 +111,7 @@ const authenticateUserAndServer = (req, res, next) => {
 
 module.exports = {
   authenticateToken,
+  isAdmin,
   checkServerSecret,
   authenticateUserAndServer
 };

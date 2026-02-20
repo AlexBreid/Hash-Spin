@@ -31,6 +31,11 @@ class RouteLoader {
           continue;
         }
 
+        // ⚠️ EXCLUDE supportRoutes.js (mounted manually with prefix)
+        if (file === 'supportRoutes.js' || file === 'adminContentRoutes.js' || file === 'contentRoutes.js') {
+          continue;
+        }
+
         const filePath = path.join(this.routesDir, file);
 
         try {
