@@ -25,6 +25,7 @@ import { AdminWithdrawalsPage } from './components/pages/AdminWithdrawalsPage';
 import { AdminBannersPage } from './components/pages/admin/AdminBannersPage';
 import { AccessDeniedPage } from './components/pages/AccessDeniedPage';
 import { Toaster } from './components/ui/sonner';
+import { Toaster as HotToaster } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { BonusModal } from './components/modals/Bonusmodal';
 import { BonusFloatingButton } from './components/modals/Bonusfloatingbutton';
@@ -550,6 +551,7 @@ function AppContent() {
             />
 
             <Toaster />
+            <HotToaster position="top-center" />
         </div>
     );
 }
