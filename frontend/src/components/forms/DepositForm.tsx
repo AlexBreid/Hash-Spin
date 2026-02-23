@@ -400,10 +400,11 @@ export default function DepositForm({
     if (isStars) return;
     if (paymentMethod === 'cryptobot' && !isCryptoBotSupported) {
       setPaymentMethod('onchain');
-    } else if (paymentMethod === 'wallet' && !isWalletSupported) {
+    } else if (paymentMethod === 'wallet') {
+      // Wallet всегда недоступен (скоро...)
       setPaymentMethod('onchain');
     }
-  }, [selectedCoin, isCryptoBotSupported, isWalletSupported, paymentMethod, isStars]);
+  }, [selectedCoin, isCryptoBotSupported, paymentMethod, isStars]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,48 +651,29 @@ export default function DepositForm({
             {/* Telegram Wallet */}
             <button
               type="button"
-              onClick={() => {
-                if (isWalletSupported) setPaymentMethod('wallet');
-              }}
+              disabled
               style={{
                 padding: '14px 8px',
-                background: paymentMethod === 'wallet'
-                  ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.15) 100%)'
-                  : isWalletSupported ? '#1f2937' : 'rgba(31, 41, 55, 0.5)',
-                border: paymentMethod === 'wallet' ? '2px solid #3b82f6' : '1px solid #374151',
+                background: 'rgba(31, 41, 55, 0.5)',
+                border: '1px solid #374151',
                 borderRadius: '12px',
-                cursor: isWalletSupported ? 'pointer' : 'not-allowed',
+                cursor: 'not-allowed',
                 transition: 'all 0.2s ease',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '6px',
-                opacity: isWalletSupported ? 1 : 0.5,
+                opacity: 0.5,
                 position: 'relative',
               }}
             >
-              <Wallet size={20} style={{ color: paymentMethod === 'wallet' ? '#3b82f6' : '#9ca3af' }} />
-              <span style={{ fontSize: '12px', fontWeight: '600', color: paymentMethod === 'wallet' ? '#3b82f6' : '#e5e7eb' }}>
-                Wallet
+              <Wallet size={20} style={{ color: '#6b7280' }} />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>
+                Скоро...
               </span>
               <span style={{ fontSize: '9px', color: '#6b7280', lineHeight: 1.2, textAlign: 'center' }}>
                 @wallet
               </span>
-              {!isWalletSupported && (
-                <div style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: '#ef4444',
-                  color: '#fff',
-                  fontSize: '7px',
-                  fontWeight: '700',
-                  padding: '1px 3px',
-                  borderRadius: '4px',
-                }}>
-                  N/A
-                </div>
-              )}
             </button>
           </div>
         </div>
@@ -811,26 +793,6 @@ export default function DepositForm({
         </div>
       )}
 
-      {/* Инфо для Telegram Wallet */}
-      {selectedCoin && !isStarsToken(selectedCoin) && paymentMethod === 'wallet' && (
-        <div style={{
-          padding: '16px',
-          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <Wallet size={16} style={{ color: '#3b82f6' }} />
-            <span style={{ fontSize: '14px', fontWeight: '600', color: '#3b82f6' }}>
-              Telegram Wallet
-            </span>
-          </div>
-          <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-            Оплата через официальный кошелёк Telegram (@wallet). Быстро и удобно.
-            После создания платежа вы получите ссылку для оплаты.
-          </div>
-        </div>
-      )}
 
       {/* ШАГ (3 или 4): Сумма (не для Stars) */}
       {selectedCoin && !isStarsToken(selectedCoin) && (
@@ -891,7 +853,7 @@ export default function DepositForm({
               loading || tokensLoading || networksLoading || !amount || 
               (paymentMethod === 'onchain' && !selectedNetwork) ||
               (paymentMethod === 'cryptobot' && !isCryptoBotSupported) ||
-              (paymentMethod === 'wallet' && !isWalletSupported)
+              paymentMethod === 'wallet'
             }
             style={{
               width: '100%',

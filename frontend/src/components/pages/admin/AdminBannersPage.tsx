@@ -20,11 +20,14 @@ import {
   Tag,
   Clock,
   Users,
-  Edit3
+  Edit3,
+  MessageSquare,
+  CreditCard,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Card } from '../../ui/card';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface Banner {
   id: number;
@@ -50,6 +53,8 @@ interface BonusTemplate {
   code: string;
   name: string;
   description?: string | null;
+  isFreebet?: boolean;
+  freebetAmount?: string | null;
   percentage: number;
   wagerMultiplier: number;
   minDeposit: string;
@@ -102,6 +107,8 @@ export function AdminBannersPage() {
     code: '',
     name: '',
     description: '',
+    isFreebet: false,
+    freebetAmount: '',
     percentage: '100',
     wagerMultiplier: '10',
     minDeposit: '0',
@@ -161,7 +168,7 @@ export function AdminBannersPage() {
 
   // ── BONUS CRUD ──
   const resetBonusForm = () => {
-    setBonusForm({ code: '', name: '', description: '', percentage: '100', wagerMultiplier: '10', minDeposit: '0', maxDeposit: '', maxUsages: '', expiresAt: '', isActive: true });
+    setBonusForm({ code: '', name: '', description: '', isFreebet: false, freebetAmount: '', percentage: '100', wagerMultiplier: '10', minDeposit: '0', maxDeposit: '', maxUsages: '', expiresAt: '', isActive: true });
     setEditingBonus(null);
   };
 
@@ -171,6 +178,8 @@ export function AdminBannersPage() {
       code: b.code,
       name: b.name,
       description: b.description || '',
+      isFreebet: b.isFreebet || false,
+      freebetAmount: b.freebetAmount ? String(parseFloat(b.freebetAmount)) : '',
       percentage: String(b.percentage),
       wagerMultiplier: String(b.wagerMultiplier),
       minDeposit: String(parseFloat(b.minDeposit || '0')),
@@ -193,10 +202,12 @@ export function AdminBannersPage() {
         code: bonusForm.code.trim().toUpperCase(),
         name: bonusForm.name.trim(),
         description: bonusForm.description || null,
-        percentage: parseInt(bonusForm.percentage) || 100,
+        isFreebet: bonusForm.isFreebet,
+        freebetAmount: bonusForm.isFreebet && bonusForm.freebetAmount ? parseFloat(bonusForm.freebetAmount) : null,
+        percentage: bonusForm.isFreebet ? 0 : (parseInt(bonusForm.percentage) || 100),
         wagerMultiplier: parseInt(bonusForm.wagerMultiplier) || 10,
-        minDeposit: parseFloat(bonusForm.minDeposit) || 0,
-        maxDeposit: bonusForm.maxDeposit ? parseFloat(bonusForm.maxDeposit) : null,
+        minDeposit: bonusForm.isFreebet ? 0 : (parseFloat(bonusForm.minDeposit) || 0),
+        maxDeposit: bonusForm.isFreebet ? null : (bonusForm.maxDeposit ? parseFloat(bonusForm.maxDeposit) : null),
         maxUsages: bonusForm.maxUsages ? parseInt(bonusForm.maxUsages) : null,
         expiresAt: bonusForm.expiresAt || null,
         isActive: bonusForm.isActive,
@@ -379,20 +390,20 @@ export function AdminBannersPage() {
     <div className="min-h-[100dvh] bg-[#0b0e14] text-white pb-[env(safe-area-inset-bottom)]">
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-30 bg-[#0b0e14]/95 backdrop-blur-xl border-b border-white/[0.04]">
-        <div className="flex items-center justify-between px-3 py-3 max-w-lg mx-auto">
-          <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-30 bg-gradient-to-b from-[#0b0e14] via-[#0b0e14]/98 to-[#0b0e14]/95 backdrop-blur-xl border-b border-white/[0.06] shadow-lg shadow-black/20">
+        <div className="flex items-center justify-between px-4 py-4 max-w-lg mx-auto">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl active:bg-white/10 transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 transition-all duration-200 group"
             >
-              <ArrowLeft size={20} className="text-gray-400" />
+              <ArrowLeft size={20} className="text-gray-400 group-hover:text-white transition-colors" />
             </button>
             <div>
-              <h1 className="text-base font-bold leading-tight">
+              <h1 className="text-lg font-bold leading-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                 {activeTab === 'banners' ? 'Баннеры' : 'Промокоды'}
               </h1>
-              <p className="text-[11px] text-gray-500 leading-tight">
+              <p className="text-[11px] text-gray-400 leading-tight mt-0.5">
                 {activeTab === 'banners' ? `${banners.length} шт.` : `${bonuses.length} шт.`}
               </p>
             </div>
@@ -405,109 +416,150 @@ export function AdminBannersPage() {
                 resetBonusForm(); setIsCreatingBonus(true);
               }
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 active:bg-blue-700 text-[13px] font-semibold transition-colors touch-manipulation"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 active:scale-95 text-[13px] font-semibold transition-all duration-200 shadow-lg shadow-blue-500/30 touch-manipulation"
           >
-            <Plus size={15} strokeWidth={2.5} />
+            <Plus size={16} strokeWidth={2.5} />
             Создать
           </button>
         </div>
         {/* ── TABS ── */}
-        <div className="flex max-w-lg mx-auto px-3 pb-2 gap-1">
+        <div className="flex max-w-lg mx-auto px-4 pb-3 gap-2">
           <button
             onClick={() => setActiveTab('banners')}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all touch-manipulation ${
+            className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 touch-manipulation relative overflow-hidden ${
               activeTab === 'banners'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-500 active:bg-white/5'
+                ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white shadow-lg shadow-blue-500/10 border border-blue-500/30'
+                : 'text-gray-400 hover:text-gray-300 hover:bg-white/5 active:bg-white/10'
             }`}
           >
             <ImageIcon size={14} className="inline mr-1.5 -mt-0.5" />
             Баннеры
+            {activeTab === 'banners' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-xl"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              />
+            )}
           </button>
           <button
             onClick={() => setActiveTab('bonuses')}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all touch-manipulation ${
+            className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 touch-manipulation relative overflow-hidden ${
               activeTab === 'bonuses'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-500 active:bg-white/5'
+                ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white shadow-lg shadow-purple-500/10 border border-purple-500/30'
+                : 'text-gray-400 hover:text-gray-300 hover:bg-white/5 active:bg-white/10'
             }`}
           >
             <Tag size={14} className="inline mr-1.5 -mt-0.5" />
             Промокоды
+            {activeTab === 'bonuses' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-xl"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              />
+            )}
           </button>
         </div>
       </div>
 
       {/* ── СПИСОК ПРОМОКОДОВ ── */}
       {activeTab === 'bonuses' && (
-        <div className="max-w-lg mx-auto px-3 py-4">
+        <div className="max-w-lg mx-auto px-4 py-4">
           {bonuses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-3">
-                <Tag size={28} className="text-gray-600" />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-gray-500"
+            >
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mb-4 border border-purple-500/20">
+                <Tag size={32} className="text-purple-400" />
               </div>
-              <p className="font-medium text-gray-400 text-sm">Нет промокодов</p>
-              <p className="text-xs mt-1 text-gray-600">Нажмите «Создать» чтобы добавить</p>
-            </div>
+              <p className="font-semibold text-gray-300 text-base mb-1">Нет промокодов</p>
+              <p className="text-xs text-gray-500">Нажмите «Создать» чтобы добавить</p>
+            </motion.div>
           ) : (
-            <div className="space-y-2">
-              {bonuses.map(b => {
+            <div className="space-y-3">
+              {bonuses.map((b, index) => {
                 const isExpired = b.expiresAt && new Date(b.expiresAt) < new Date();
                 const isFull = b.maxUsages !== null && b.usedCount >= b.maxUsages;
-                const statusColor = !b.isActive ? 'text-gray-500' : isExpired ? 'text-red-400' : isFull ? 'text-yellow-400' : 'text-green-400';
+                const statusColor = !b.isActive 
+                  ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' 
+                  : isExpired 
+                  ? 'bg-red-500/20 text-red-400 border-red-500/30' 
+                  : isFull 
+                  ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' 
+                  : 'bg-green-500/20 text-green-400 border-green-500/30';
                 const statusText = !b.isActive ? 'Неактивен' : isExpired ? 'Истёк' : isFull ? 'Лимит' : 'Активен';
                 return (
-                  <div key={b.id} className="rounded-2xl bg-[#12151d] border border-white/[0.04] p-3.5">
-                    <div className="flex items-start justify-between gap-2">
+                  <motion.div
+                    key={b.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0f1219] border border-white/[0.08] p-4 hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300"
+                  >
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-[12px] font-mono font-bold tracking-wider">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className="px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 text-[13px] font-mono font-bold tracking-wider border border-indigo-500/30 shadow-sm">
                             {b.code}
                           </span>
-                          <span className={`text-[11px] font-semibold ${statusColor}`}>
+                          <span className={`px-2 py-1 rounded-lg text-[11px] font-semibold border ${statusColor}`}>
                             {statusText}
                           </span>
+                          {b.isFreebet && (
+                            <span className="px-2 py-1 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 text-[11px] font-semibold border border-green-500/30">
+                              🎁 Фрибет
+                            </span>
+                          )}
                         </div>
-                        <p className="text-[14px] font-semibold text-white truncate">{b.name}</p>
+                        <p className="text-[15px] font-bold text-white mb-1 truncate">{b.name}</p>
                         {b.description && (
-                          <p className="text-[11px] text-gray-500 mt-0.5 truncate">{b.description}</p>
+                          <p className="text-[12px] text-gray-400 mt-1 line-clamp-2">{b.description}</p>
                         )}
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                          <span className="text-[12px] text-purple-400 font-bold">+{b.percentage}%</span>
-                          <span className="text-[11px] text-gray-500 flex items-center gap-1">
+                        <div className="flex items-center gap-3 mt-3 flex-wrap">
+                          {b.isFreebet ? (
+                            <span className="text-[13px] text-green-400 font-bold flex items-center gap-1">
+                              <Gift size={12} /> {b.freebetAmount || 0} USDT
+                            </span>
+                          ) : (
+                            <span className="text-[13px] text-purple-400 font-bold">+{b.percentage}%</span>
+                          )}
+                          <span className="text-[11px] text-gray-400 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5">
                             <Gift size={11} /> x{b.wagerMultiplier}
                           </span>
                           {b.maxUsages !== null && (
-                            <span className="text-[11px] text-gray-500 flex items-center gap-1">
+                            <span className="text-[11px] text-gray-400 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5">
                               <Users size={11} /> {b.usedCount}/{b.maxUsages}
                             </span>
                           )}
                           {b.expiresAt && (
-                            <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                              <Clock size={11} /> {new Date(b.expiresAt).toLocaleDateString()}
+                            <span className="text-[11px] text-gray-400 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5">
+                              <Clock size={11} /> {new Date(b.expiresAt).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })}
                             </span>
                           )}
-                          {parseFloat(b.minDeposit || '0') > 0 && (
-                            <span className="text-[11px] text-gray-500">мин. ${parseFloat(b.minDeposit)}</span>
+                          {!b.isFreebet && parseFloat(b.minDeposit || '0') > 0 && (
+                            <span className="text-[11px] text-gray-400 px-2 py-1 rounded-md bg-white/5">мин. ${parseFloat(b.minDeposit)}</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => openEditBonus(b)}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg active:bg-white/10 transition-colors"
+                          className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 text-blue-400 hover:text-blue-300 transition-all duration-200 group/edit"
                         >
-                          <Edit3 size={15} className="text-blue-400" />
+                          <Edit3 size={16} className="group-hover/edit:scale-110 transition-transform" />
                         </button>
                         <button
                           onClick={() => deleteBonus(b.id)}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg active:bg-white/10 transition-colors"
+                          className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 active:scale-95 text-red-400 hover:text-red-300 transition-all duration-200 group/delete"
                         >
-                          <Trash2 size={15} className="text-red-400" />
+                          <Trash2 size={16} className="group-hover/delete:scale-110 transition-transform" />
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -516,76 +568,85 @@ export function AdminBannersPage() {
       )}
 
       {/* ── СПИСОК БАННЕРОВ ── */}
-      {activeTab === 'banners' && <div className="max-w-lg mx-auto px-3 py-4">
-        {banners.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-3">
-              <ImageIcon size={28} className="text-gray-600" />
-            </div>
-            <p className="font-medium text-gray-400 text-sm">Нет баннеров</p>
-            <p className="text-xs mt-1 text-gray-600">Нажмите «Создать» чтобы добавить</p>
-          </div>
-        ) : (
-          <Reorder.Group axis="y" values={banners} onReorder={handleReorder} className="space-y-2">
-            {banners.map((banner) => (
-              <Reorder.Item key={banner.id} value={banner}>
-                <motion.div
-                  layout
-                  className="rounded-2xl bg-[#12151d] border border-white/[0.04] overflow-hidden touch-manipulation"
-                >
-                  <div className="flex items-center gap-2.5 p-2.5">
-                    {/* Drag handle — larger touch target */}
-                    <div className="w-8 h-12 flex items-center justify-center text-gray-600 shrink-0 cursor-grab active:cursor-grabbing">
-                      <GripVertical size={16} />
-                    </div>
+      {activeTab === 'banners' && (
+        <div className="max-w-lg mx-auto px-4 py-4">
+          {banners.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-gray-500"
+            >
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center mb-4 border border-blue-500/20">
+                <ImageIcon size={32} className="text-blue-400" />
+              </div>
+              <p className="font-semibold text-gray-300 text-base mb-1">Нет баннеров</p>
+              <p className="text-xs text-gray-500">Нажмите «Создать» чтобы добавить</p>
+            </motion.div>
+          ) : (
+            <Reorder.Group axis="y" values={banners} onReorder={handleReorder} className="space-y-3">
+              {banners.map((banner, index) => (
+                <Reorder.Item key={banner.id} value={banner}>
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0f1219] border border-white/[0.08] overflow-hidden touch-manipulation hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-3 p-3.5">
+                      {/* Drag handle */}
+                      <div className="w-10 h-14 flex items-center justify-center text-gray-500 group-hover:text-gray-400 shrink-0 cursor-grab active:cursor-grabbing transition-colors">
+                        <GripVertical size={18} />
+                      </div>
 
-                    {/* Preview thumbnail */}
-                    <div className="w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-white/5 flex items-center justify-center">
-                      {banner.imageUrl ? (
-                        <img src={resolveImg(banner.imageUrl)} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <Type size={15} className="text-gray-600" />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold truncate leading-tight">
-                        {banner.title || (banner.imageUrl ? 'Картинка' : 'Баннер')}
-                      </p>
-                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                        {banner.actionType === 'BONUS' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 font-medium leading-tight">
-                            🎁 {banner.bonus ? `+${banner.bonus.percentage}%` : 'Бонус'}
-                          </span>
-                        )}
-                        {banner.actionType === 'LINK' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-400 font-medium leading-tight">
-                            🔗 Ссылка
-                          </span>
-                        )}
-                        {banner.linkUrl && (
-                          <span className="text-[9px] text-gray-600 truncate max-w-[80px] leading-tight">
-                            {banner.linkUrl}
-                          </span>
+                      {/* Preview thumbnail */}
+                      <div className="w-16 h-12 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center border border-white/10 shadow-lg">
+                        {banner.imageUrl ? (
+                          <img src={resolveImg(banner.imageUrl)} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Type size={18} className="text-gray-500" />
                         )}
                       </div>
-                    </div>
 
-                    {/* Delete — 44px min touch target */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(banner.id); }}
-                      className="w-10 h-10 flex items-center justify-center rounded-xl active:bg-red-500/15 text-gray-500 active:text-red-400 transition-colors shrink-0 touch-manipulation"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </motion.div>
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
-        )}
-      </div>}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-bold text-white truncate leading-tight mb-1.5">
+                          {banner.title || (banner.imageUrl ? 'Картинка' : 'Баннер')}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {banner.actionType === 'BONUS' && (
+                            <span className="text-[10px] px-2 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 font-semibold leading-tight border border-purple-500/30">
+                              🎁 {banner.bonus ? `+${banner.bonus.percentage}%` : 'Бонус'}
+                            </span>
+                          )}
+                          {banner.actionType === 'LINK' && (
+                            <span className="text-[10px] px-2 py-1 rounded-lg bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 font-semibold leading-tight border border-blue-500/30">
+                              🔗 Ссылка
+                            </span>
+                          )}
+                          {banner.linkUrl && (
+                            <span className="text-[10px] text-gray-500 truncate max-w-[100px] leading-tight px-2 py-1 rounded-lg bg-white/5">
+                              {banner.linkUrl}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(banner.id); }}
+                        className="w-11 h-11 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 active:scale-95 text-red-400 hover:text-red-300 transition-all duration-200 shrink-0 touch-manipulation group/delete"
+                      >
+                        <Trash2 size={16} className="group-hover/delete:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                  </motion.div>
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
+          )}
+        </div>
+      )}
 
       {/* ── FULLSCREEN MODAL СОЗДАНИЯ ПРОМОКОДА ── */}
       <AnimatePresence>
@@ -606,19 +667,21 @@ export function AdminBannersPage() {
               className="fixed inset-0 z-50 bg-[#0b0e14] overflow-y-auto overscroll-contain"
             >
               {/* Modal header */}
-              <div className="sticky top-0 z-10 bg-[#0b0e14]/95 backdrop-blur-xl border-b border-white/[0.04]">
-                <div className="flex items-center justify-between px-3 py-3 max-w-lg mx-auto">
+              <div className="sticky top-0 z-10 bg-gradient-to-b from-[#0b0e14] via-[#0b0e14]/98 to-[#0b0e14]/95 backdrop-blur-xl border-b border-white/[0.06] shadow-lg">
+                <div className="flex items-center justify-between px-4 py-4 max-w-lg mx-auto">
                   <button
                     onClick={() => { setIsCreatingBonus(false); resetBonusForm(); }}
-                    className="w-10 h-10 flex items-center justify-center rounded-xl active:bg-white/10"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-all duration-200"
                   >
                     <X size={20} className="text-gray-400" />
                   </button>
-                  <h2 className="text-[15px] font-bold">{editingBonus ? 'Редактировать' : 'Новый промокод'}</h2>
+                  <h2 className="text-[16px] font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                    {editingBonus ? 'Редактировать промокод' : 'Новый промокод'}
+                  </h2>
                   <button
                     onClick={saveBonus}
                     disabled={bonusSaving}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 active:bg-blue-700 text-[13px] font-semibold disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 active:scale-95 text-[13px] font-semibold disabled:opacity-50 transition-all duration-200 shadow-lg shadow-blue-500/30"
                   >
                     {bonusSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                     {editingBonus ? 'Сохранить' : 'Создать'}
@@ -627,129 +690,249 @@ export function AdminBannersPage() {
               </div>
 
               {/* Modal body */}
-              <div className="max-w-lg mx-auto px-3 py-4 space-y-4 pb-20">
+              <div className="max-w-lg mx-auto px-4 py-6 space-y-5 pb-24">
                 {/* Код */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Промокод *</label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <Tag size={14} className="text-purple-400" />
+                    Промокод <span className="text-red-400">*</span>
+                  </label>
                   <input
                     value={bonusForm.code}
                     onChange={e => setBonusForm({...bonusForm, code: e.target.value.toUpperCase()})}
                     placeholder="WELCOME100"
-                    className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50 font-mono tracking-wider"
+                    className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all duration-200 font-mono tracking-wider shadow-lg"
                   />
                 </div>
 
                 {/* Название */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Название *</label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <Type size={14} className="text-blue-400" />
+                    Название <span className="text-red-400">*</span>
+                  </label>
                   <input
                     value={bonusForm.name}
                     onChange={e => setBonusForm({...bonusForm, name: e.target.value})}
                     placeholder="Приветственный бонус"
-                    className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
+                    className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all duration-200 shadow-lg"
                   />
                 </div>
 
                 {/* Описание */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Описание</label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <MessageSquare size={14} className="text-cyan-400" />
+                    Описание
+                  </label>
                   <textarea
                     value={bonusForm.description}
                     onChange={e => setBonusForm({...bonusForm, description: e.target.value})}
                     placeholder="Описание для пользователей"
-                    rows={2}
-                    className="w-full rounded-xl bg-white/5 border border-white/[0.06] px-3.5 py-2.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50 resize-none"
+                    rows={3}
+                    className="w-full rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 py-3 text-[14px] text-white placeholder:text-gray-500 outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all duration-200 resize-none shadow-lg"
                   />
                 </div>
 
-                {/* Процент + Вейджер */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Бонус %</label>
-                    <input
-                      type="number"
-                      value={bonusForm.percentage}
-                      onChange={e => setBonusForm({...bonusForm, percentage: e.target.value})}
-                      placeholder="100"
-                      className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
-                    />
+                {/* Тип бонуса: Фрибет или Обычный */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/10 p-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gift size={16} className="text-green-400" />
+                        <span className="text-[14px] text-white font-bold">Фрибет (без депозита)</span>
+                      </div>
+                      <p className="text-[12px] text-gray-400 ml-6">Бесплатные деньги на бонусный баланс</p>
+                    </div>
+                    <button
+                      onClick={() => setBonusForm({...bonusForm, isFreebet: !bonusForm.isFreebet})}
+                      className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-lg ${
+                        bonusForm.isFreebet 
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                          : 'bg-gray-600/50'
+                      }`}
+                    >
+                      <motion.div
+                        animate={{
+                          x: bonusForm.isFreebet ? 24 : 4,
+                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className="absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg"
+                      />
+                    </button>
                   </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Вейджер x</label>
+                </div>
+
+                {/* Фрибет: Сумма фрибета */}
+                {bonusForm.isFreebet && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2"
+                  >
+                    <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                      <Gift size={14} className="text-green-400" />
+                      Сумма фрибета (USDT) <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={bonusForm.freebetAmount}
+                        onChange={e => setBonusForm({...bonusForm, freebetAmount: e.target.value})}
+                        placeholder="10.00"
+                        className="w-full h-12 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-green-400/50 focus:bg-green-500/15 transition-all duration-200 shadow-lg"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">USDT</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Обычный бонус: Процент + Вейджер */}
+                {!bonusForm.isFreebet && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-4"
+                  >
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                          <TrendingUp size={14} className="text-purple-400" />
+                          Бонус %
+                        </label>
+                        <input
+                          type="number"
+                          value={bonusForm.percentage}
+                          onChange={e => setBonusForm({...bonusForm, percentage: e.target.value})}
+                          placeholder="100"
+                          className="w-full h-12 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/30 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-purple-400/50 focus:bg-purple-500/15 transition-all duration-200 shadow-lg"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                          <Gift size={14} className="text-blue-400" />
+                          Вейджер x
+                        </label>
+                        <input
+                          type="number"
+                          value={bonusForm.wagerMultiplier}
+                          onChange={e => setBonusForm({...bonusForm, wagerMultiplier: e.target.value})}
+                          placeholder="10"
+                          className="w-full h-12 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/30 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-blue-400/50 focus:bg-blue-500/15 transition-all duration-200 shadow-lg"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Мин/Макс депозит */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                          <CreditCard size={14} className="text-green-400" />
+                          Мин. депозит $
+                        </label>
+                        <input
+                          type="number"
+                          value={bonusForm.minDeposit}
+                          onChange={e => setBonusForm({...bonusForm, minDeposit: e.target.value})}
+                          placeholder="0"
+                          className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-green-500/50 focus:bg-white/10 transition-all duration-200 shadow-lg"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                          <CreditCard size={14} className="text-yellow-400" />
+                          Макс. депозит $
+                        </label>
+                        <input
+                          type="number"
+                          value={bonusForm.maxDeposit}
+                          onChange={e => setBonusForm({...bonusForm, maxDeposit: e.target.value})}
+                          placeholder="∞"
+                          className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-yellow-500/50 focus:bg-white/10 transition-all duration-200 shadow-lg"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Вейджер (для обоих типов) */}
+                {bonusForm.isFreebet && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2"
+                  >
+                    <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                      <Gift size={14} className="text-blue-400" />
+                      Вейджер x
+                    </label>
                     <input
                       type="number"
                       value={bonusForm.wagerMultiplier}
                       onChange={e => setBonusForm({...bonusForm, wagerMultiplier: e.target.value})}
                       placeholder="10"
-                      className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
+                      className="w-full h-12 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/30 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-blue-400/50 focus:bg-blue-500/15 transition-all duration-200 shadow-lg"
                     />
-                  </div>
-                </div>
-
-                {/* Мин/Макс депозит */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Мин. депозит $</label>
-                    <input
-                      type="number"
-                      value={bonusForm.minDeposit}
-                      onChange={e => setBonusForm({...bonusForm, minDeposit: e.target.value})}
-                      placeholder="0"
-                      className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Макс. депозит $</label>
-                    <input
-                      type="number"
-                      value={bonusForm.maxDeposit}
-                      onChange={e => setBonusForm({...bonusForm, maxDeposit: e.target.value})}
-                      placeholder="∞"
-                      className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
-                    />
-                  </div>
-                </div>
+                  </motion.div>
+                )}
 
                 {/* Макс использований */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">
-                    Макс. использований <span className="text-gray-600 normal-case">(пусто = ∞)</span>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <Users size={14} className="text-orange-400" />
+                    Макс. использований <span className="text-gray-500 normal-case text-[10px] font-normal">(пусто = ∞)</span>
                   </label>
                   <input
                     type="number"
                     value={bonusForm.maxUsages}
                     onChange={e => setBonusForm({...bonusForm, maxUsages: e.target.value})}
                     placeholder="Без ограничений"
-                    className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50"
+                    className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white placeholder:text-gray-500 outline-none focus:border-orange-500/50 focus:bg-white/10 transition-all duration-200 shadow-lg"
                   />
                 </div>
 
                 {/* Дата истечения */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">
-                    Действует до <span className="text-gray-600 normal-case">(пусто = бессрочно)</span>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <Clock size={14} className="text-pink-400" />
+                    Действует до <span className="text-gray-500 normal-case text-[10px] font-normal">(пусто = бессрочно)</span>
                   </label>
                   <input
                     type="datetime-local"
                     value={bonusForm.expiresAt}
                     onChange={e => setBonusForm({...bonusForm, expiresAt: e.target.value})}
-                    className="w-full h-11 rounded-xl bg-white/5 border border-white/[0.06] px-3.5 text-[14px] text-white outline-none focus:border-blue-500/50 [color-scheme:dark]"
+                    className="w-full h-12 rounded-2xl bg-gradient-to-br from-white/8 to-white/4 border-2 border-white/10 px-4 text-[15px] font-semibold text-white outline-none focus:border-pink-500/50 focus:bg-white/10 transition-all duration-200 shadow-lg [color-scheme:dark]"
                   />
                 </div>
 
                 {/* Активен */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/[0.06]">
-                  <span className="text-[13px] text-gray-300">Активен</span>
-                  <button
-                    onClick={() => setBonusForm({...bonusForm, isActive: !bonusForm.isActive})}
-                    className={`w-12 h-7 rounded-full transition-colors relative ${
-                      bonusForm.isActive ? 'bg-green-500' : 'bg-gray-600'
-                    }`}
-                  >
-                    <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-transform ${
-                      bonusForm.isActive ? 'translate-x-5' : 'translate-x-0.5'
-                    }`} />
-                  </button>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/10 p-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={16} className={bonusForm.isActive ? 'text-green-400' : 'text-gray-500'} />
+                      <span className="text-[14px] text-white font-bold">Активен</span>
+                    </div>
+                    <button
+                      onClick={() => setBonusForm({...bonusForm, isActive: !bonusForm.isActive})}
+                      className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-lg ${
+                        bonusForm.isActive 
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                          : 'bg-gray-600/50'
+                      }`}
+                    >
+                      <motion.div
+                        animate={{
+                          x: bonusForm.isActive ? 24 : 4,
+                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className="absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg"
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Preview */}
@@ -760,8 +943,15 @@ export function AdminBannersPage() {
                       <div>
                         <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-[12px] font-mono font-bold">{bonusForm.code}</span>
                         <p className="text-[13px] font-semibold text-white mt-1.5">{bonusForm.name}</p>
+                        {bonusForm.isFreebet && bonusForm.freebetAmount && (
+                          <p className="text-[11px] text-gray-400 mt-1">Фрибет: {bonusForm.freebetAmount} USDT</p>
+                        )}
                       </div>
-                      <span className="text-[18px] font-bold text-purple-400">+{bonusForm.percentage || 0}%</span>
+                      {bonusForm.isFreebet ? (
+                        <span className="text-[18px] font-bold text-green-400">{bonusForm.freebetAmount || '0'} USDT</span>
+                      ) : (
+                        <span className="text-[18px] font-bold text-purple-400">+{bonusForm.percentage || 0}%</span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -781,7 +971,7 @@ export function AdminBannersPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md"
+              className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md"
               onClick={() => { setIsCreating(false); resetForm(); }}
             />
 
@@ -790,7 +980,7 @@ export function AdminBannersPage() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
               className="fixed inset-0 z-50 bg-[#0b0e14] flex flex-col"
             >
               {/* ── Modal Header ── */}

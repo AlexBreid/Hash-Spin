@@ -5,7 +5,7 @@ import { X, Upload, Link as LinkIcon, Gift } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { useFetch } from '../../hooks/useDynamicApi';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface CreateBannerModalProps {
   isOpen: boolean;

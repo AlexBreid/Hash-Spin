@@ -10,7 +10,7 @@ import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import imgMines from '../../assets/task_01kbn75ywbfpz83qvdbm3c9sbx_1764870071_img_1.webp';
 import imgCrash from '../../assets/task_01kbn7a4xqenbt8px4rsk9zexr_1764870172_img_0.webp';
 import imgPlinko from '../../assets/plinko.png';
