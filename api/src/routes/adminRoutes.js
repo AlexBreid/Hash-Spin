@@ -83,6 +83,331 @@ router.get('/api/admin/stats', requireAdminAuth, async (req, res) => {
 });
 
 // ====================================
+// 📊 СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ФЕЙКОВЫХ)
+// ====================================
+
+router.get('/api/admin/stats/users', requireAdminAuth, async (req, res) => {
+    try {
+        // Исключаем фейковые аккаунты (telegramId начинается с 'fake_')
+        const whereNotFake = {
+            telegramId: {
+                not: {
+                    startsWith: 'fake_'
+                }
+            }
+        };
+
+        // Общая статистика
+        const totalUsers = await prisma.user.count({ where: whereNotFake });
+        const activeUsers = await prisma.user.count({
+            where: {
+                ...whereNotFake,
+                transactions: {
+                    some: {
+                        createdAt: {
+                            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 дней
+                        }
+                    }
+                }
+            }
+        });
+        const newUsersToday = await prisma.user.count({
+            where: {
+                ...whereNotFake,
+                createdAt: {
+                    gte: new Date(new Date().setHours(0, 0, 0, 0))
+                }
+            }
+        });
+        const newUsersWeek = await prisma.user.count({
+            where: {
+                ...whereNotFake,
+                createdAt: {
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+        const newUsersMonth = await prisma.user.count({
+            where: {
+                ...whereNotFake,
+                createdAt: {
+                    gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+        const blockedUsers = await prisma.user.count({
+            where: {
+                ...whereNotFake,
+                isBlocked: true
+            }
+        });
+
+        // Статистика по регистрациям за последние 30 дней (по дням)
+        const registrationsByDay = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            date.setHours(0, 0, 0, 0);
+            const nextDate = new Date(date);
+            nextDate.setDate(nextDate.getDate() + 1);
+
+            const count = await prisma.user.count({
+                where: {
+                    ...whereNotFake,
+                    createdAt: {
+                        gte: date,
+                        lt: nextDate
+                    }
+                }
+            });
+
+            registrationsByDay.push({
+                date: date.toISOString().split('T')[0],
+                count
+            });
+        }
+
+        // Топ пользователей по балансу
+        const topUsersByBalance = await prisma.user.findMany({
+            where: whereNotFake,
+            include: {
+                balances: {
+                    include: {
+                        token: true
+                    }
+                }
+            },
+            take: 10
+        });
+
+        const topUsers = topUsersByBalance.map(user => {
+            const totalBalance = user.balances.reduce((sum, bal) => {
+                return sum + parseFloat(bal.amount.toString());
+            }, 0);
+            return {
+                id: user.id,
+                username: user.username || user.telegramId,
+                firstName: user.firstName,
+                telegramId: user.telegramId,
+                totalBalance,
+                createdAt: user.createdAt
+            };
+        }).sort((a, b) => b.totalBalance - a.totalBalance).slice(0, 10);
+
+        res.json({
+            success: true,
+            data: {
+                totalUsers,
+                activeUsers,
+                newUsersToday,
+                newUsersWeek,
+                newUsersMonth,
+                blockedUsers,
+                registrationsByDay,
+                topUsers
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ====================================
+// 📊 СТАТИСТИКА ПОПОЛНЕНИЙ (БЕЗ ФЕЙКОВЫХ)
+// ====================================
+
+router.get('/api/admin/stats/deposits', requireAdminAuth, async (req, res) => {
+    try {
+        // Исключаем фейковые аккаунты
+        const whereNotFake = {
+            user: {
+                telegramId: {
+                    not: {
+                        startsWith: 'fake_'
+                    }
+                }
+            }
+        };
+
+        // Общая статистика
+        const totalDeposits = await prisma.transaction.aggregate({
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED'
+            },
+            _sum: { amount: true },
+            _count: true,
+            _avg: { amount: true }
+        });
+
+        const depositsToday = await prisma.transaction.aggregate({
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED',
+                createdAt: {
+                    gte: new Date(new Date().setHours(0, 0, 0, 0))
+                }
+            },
+            _sum: { amount: true },
+            _count: true
+        });
+
+        const depositsWeek = await prisma.transaction.aggregate({
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED',
+                createdAt: {
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                }
+            },
+            _sum: { amount: true },
+            _count: true
+        });
+
+        const depositsMonth = await prisma.transaction.aggregate({
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED',
+                createdAt: {
+                    gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                }
+            },
+            _sum: { amount: true },
+            _count: true
+        });
+
+        // Статистика по дням за последние 30 дней
+        const depositsByDay = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            date.setHours(0, 0, 0, 0);
+            const nextDate = new Date(date);
+            nextDate.setDate(nextDate.getDate() + 1);
+
+            const dayStats = await prisma.transaction.aggregate({
+                where: {
+                    ...whereNotFake,
+                    type: 'DEPOSIT',
+                    status: 'COMPLETED',
+                    createdAt: {
+                        gte: date,
+                        lt: nextDate
+                    }
+                },
+                _sum: { amount: true },
+                _count: true
+            });
+
+            depositsByDay.push({
+                date: date.toISOString().split('T')[0],
+                totalAmount: parseFloat(dayStats._sum.amount?.toString() || '0'),
+                count: dayStats._count
+            });
+        }
+
+        // Статистика по валютам
+        const depositsByToken = await prisma.transaction.groupBy({
+            by: ['tokenId'],
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED'
+            },
+            _sum: { amount: true },
+            _count: true
+        });
+
+        const depositsByCurrency = await Promise.all(
+            depositsByToken.map(async (stat) => {
+                const token = await prisma.cryptoToken.findUnique({
+                    where: { id: stat.tokenId }
+                });
+                return {
+                    tokenId: stat.tokenId,
+                    symbol: token?.symbol || 'UNKNOWN',
+                    name: token?.name || 'Unknown',
+                    totalAmount: parseFloat(stat._sum.amount?.toString() || '0'),
+                    count: stat._count
+                };
+            })
+        );
+
+        // Топ пользователей по пополнениям
+        const topDepositors = await prisma.transaction.groupBy({
+            by: ['userId'],
+            where: {
+                ...whereNotFake,
+                type: 'DEPOSIT',
+                status: 'COMPLETED'
+            },
+            _sum: { amount: true },
+            _count: true,
+            orderBy: {
+                _sum: {
+                    amount: 'desc'
+                }
+            },
+            take: 10
+        });
+
+        const topDepositorsWithUsers = await Promise.all(
+            topDepositors.map(async (stat) => {
+                const user = await prisma.user.findUnique({
+                    where: { id: stat.userId },
+                    select: {
+                        id: true,
+                        username: true,
+                        firstName: true,
+                        telegramId: true
+                    }
+                });
+                return {
+                    userId: stat.userId,
+                    username: user?.username || user?.telegramId || 'Unknown',
+                    firstName: user?.firstName,
+                    telegramId: user?.telegramId,
+                    totalAmount: parseFloat(stat._sum.amount?.toString() || '0'),
+                    count: stat._count
+                };
+            })
+        );
+
+        res.json({
+            success: true,
+            data: {
+                total: {
+                    amount: parseFloat(totalDeposits._sum.amount?.toString() || '0'),
+                    count: totalDeposits._count,
+                    average: parseFloat(totalDeposits._avg.amount?.toString() || '0')
+                },
+                today: {
+                    amount: parseFloat(depositsToday._sum.amount?.toString() || '0'),
+                    count: depositsToday._count
+                },
+                week: {
+                    amount: parseFloat(depositsWeek._sum.amount?.toString() || '0'),
+                    count: depositsWeek._count
+                },
+                month: {
+                    amount: parseFloat(depositsMonth._sum.amount?.toString() || '0'),
+                    count: depositsMonth._count
+                },
+                depositsByDay,
+                depositsByCurrency,
+                topDepositors: topDepositorsWithUsers
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ====================================
 // 👥 УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ
 // ====================================
 

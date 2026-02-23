@@ -419,6 +419,7 @@ class CryptoPayService {
     const code = promoCode.toUpperCase().trim();
     const promo = await prisma.bonusTemplate.findUnique({ where: { code } });
     if (!promo || !promo.isActive) return;
+    if (promo.isFreebet) return; // Фрибеты не применяются при депозите
 
     const bonusAmount = amountUSD * (promo.percentage / 100);
     const wager = bonusAmount * (promo.wagerMultiplier || 1);

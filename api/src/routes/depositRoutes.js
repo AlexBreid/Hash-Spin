@@ -120,19 +120,22 @@ router.post('/api/v1/deposit/validate-promo', authenticateToken, async (req, res
       return res.json({ success: true, data: { valid: false, reason: 'Вы уже использовали этот промокод' } });
     }
 
-    // Проверяем активный бонус
-    const activeBonus = await prisma.userBonus.findFirst({
-      where: { userId, isActive: true, isCompleted: false }
-    });
-    if (activeBonus) {
-      return res.json({ success: true, data: { valid: false, reason: 'У вас уже есть активный бонус' } });
-    }
+    // Для фрибетов не проверяем активный бонус и депозит
+    if (!promo.isFreebet) {
+      // Проверяем активный бонус (только для обычных бонусов)
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: { userId, isActive: true, isCompleted: false }
+      });
+      if (activeBonus) {
+        return res.json({ success: true, data: { valid: false, reason: 'У вас уже есть активный бонус' } });
+      }
 
-    // Проверяем мин. депозит
-    const amountNum = amount ? parseFloat(amount) : 0;
-    const minDep = parseFloat(promo.minDeposit?.toString() || '0');
-    if (amountNum > 0 && amountNum < minDep) {
-      return res.json({ success: true, data: { valid: false, reason: `Минимальный депозит: $${minDep}` } });
+      // Проверяем мин. депозит (только для обычных бонусов)
+      const amountNum = amount ? parseFloat(amount) : 0;
+      const minDep = parseFloat(promo.minDeposit?.toString() || '0');
+      if (amountNum > 0 && amountNum < minDep) {
+        return res.json({ success: true, data: { valid: false, reason: `Минимальный депозит: $${minDep}` } });
+      }
     }
 
     res.json({
@@ -143,9 +146,11 @@ router.post('/api/v1/deposit/validate-promo', authenticateToken, async (req, res
           id: promo.id,
           code: promo.code,
           name: promo.name,
+          isFreebet: promo.isFreebet || false,
+          freebetAmount: promo.freebetAmount ? parseFloat(promo.freebetAmount.toString()) : null,
           percentage: promo.percentage,
           wagerMultiplier: promo.wagerMultiplier,
-          minDeposit: minDep,
+          minDeposit: promo.minDeposit ? parseFloat(promo.minDeposit.toString()) : 0,
           maxDeposit: promo.maxDeposit ? parseFloat(promo.maxDeposit.toString()) : null,
         }
       }
@@ -153,6 +158,138 @@ router.post('/api/v1/deposit/validate-promo', authenticateToken, async (req, res
   } catch (error) {
     logger.error('DEPOSIT', 'Error validating promo', { error: error.message });
     res.status(500).json({ success: false, message: 'Ошибка валидации промокода' });
+  }
+});
+
+/**
+ * POST /api/v1/deposit/apply-freebet
+ * Применить фрибет промокод (без депозита)
+ */
+router.post('/api/v1/deposit/apply-freebet', authenticateToken, async (req, res) => {
+  try {
+    const { code, tokenId } = req.body;
+    const userId = req.user.userId;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Укажите промокод' });
+    }
+
+    const promo = await prisma.bonusTemplate.findUnique({
+      where: { code: code.toUpperCase().trim() }
+    });
+
+    if (!promo) {
+      return res.status(404).json({ success: false, message: 'Промокод не найден' });
+    }
+
+    if (!promo.isActive) {
+      return res.status(400).json({ success: false, message: 'Промокод неактивен' });
+    }
+
+    if (!promo.isFreebet) {
+      return res.status(400).json({ success: false, message: 'Этот промокод не является фрибетом' });
+    }
+
+    if (!promo.freebetAmount || parseFloat(promo.freebetAmount.toString()) <= 0) {
+      return res.status(400).json({ success: false, message: 'Неверная сумма фрибета' });
+    }
+
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+      return res.status(400).json({ success: false, message: 'Срок действия промокода истёк' });
+    }
+
+    if (promo.maxUsages !== null && promo.usedCount >= promo.maxUsages) {
+      return res.status(400).json({ success: false, message: 'Лимит использований исчерпан' });
+    }
+
+    // Проверяем, не использовал ли уже
+    const used = await prisma.promoUsage.findUnique({
+      where: { userId_bonusId: { userId, bonusId: promo.id } }
+    });
+    if (used) {
+      return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
+    }
+
+    // Проверяем активный бонус
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: { userId, isActive: true, isCompleted: false }
+    });
+    if (activeBonus) {
+      return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+    }
+
+    // Определяем токен (по умолчанию USDT)
+    let targetTokenId = tokenId;
+    if (!targetTokenId) {
+      const usdtToken = await prisma.cryptoToken.findFirst({
+        where: { symbol: 'USDT', network: 'TRC-20' }
+      });
+      if (!usdtToken) {
+        return res.status(500).json({ success: false, message: 'Токен USDT не найден' });
+      }
+      targetTokenId = usdtToken.id;
+    }
+
+    const freebetAmount = parseFloat(promo.freebetAmount.toString());
+    const requiredWager = freebetAmount * promo.wagerMultiplier;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 дней на отыгрыш
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Создаём UserBonus
+      await tx.userBonus.create({
+        data: {
+          userId,
+          tokenId: targetTokenId,
+          grantedAmount: freebetAmount.toFixed(8),
+          requiredWager: requiredWager.toFixed(8),
+          wageredAmount: '0',
+          isActive: true,
+          isCompleted: false,
+          expiresAt
+        }
+      });
+
+      // 2. Начисляем фрибет на BONUS баланс
+      await tx.balance.upsert({
+        where: { userId_tokenId_type: { userId, tokenId: targetTokenId, type: 'BONUS' } },
+        create: { userId, tokenId: targetTokenId, type: 'BONUS', amount: freebetAmount.toFixed(8) },
+        update: { amount: { increment: freebetAmount } }
+      });
+
+      // 3. Записываем использование промокода
+      await tx.promoUsage.create({
+        data: {
+          userId,
+          bonusId: promo.id,
+          depositAmount: '0', // Для фрибета депозит = 0
+          bonusAmount: freebetAmount.toFixed(8)
+        }
+      });
+
+      // 4. Увеличиваем счётчик использований
+      await tx.bonusTemplate.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } }
+      });
+    });
+
+    logger.info('DEPOSIT', 'Freebet applied', { userId, promoCode: promo.code, amount: freebetAmount });
+
+    res.json({
+      success: true,
+      message: `Фрибет ${freebetAmount} USDT успешно активирован!`,
+      data: {
+        freebetAmount,
+        requiredWager,
+        wagerMultiplier: promo.wagerMultiplier,
+        expiresAt: expiresAt.toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('DEPOSIT', 'Error applying freebet', { error: error.message });
+    res.status(500).json({ success: false, message: 'Ошибка применения фрибета' });
   }
 });
 

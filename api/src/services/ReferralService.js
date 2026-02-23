@@ -30,7 +30,7 @@ class ReferralService {
     
     // МИНИМУМЫ И МАКСИМУМЫ
     MIN_DEPOSIT_AMOUNT: 10,
-    MINIMUM_BONUS_BALANCE: 0.20,
+    MINIMUM_BONUS_BALANCE: 0.01, // 1 цент
     
     // СРОКИ
     BONUS_EXPIRY_DAYS: 7,
@@ -298,7 +298,7 @@ class ReferralService {
   }
 
   /**
-   * ⚡ АННУЛИРОВАТЬ БОНУС если баланс < 0.20 USDT
+   * ⚡ АННУЛИРОВАТЬ БОНУС если баланс < 0.01 USDT (1 цент)
    */
   async checkAndAnnulateBonusIfLow(userId, tokenId, userBonusId) {
     try {

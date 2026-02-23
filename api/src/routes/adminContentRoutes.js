@@ -199,16 +199,18 @@ router.get('/banners', authenticateToken, isAdmin, async (req, res) => {
 // Create Bonus Template
 router.post('/bonuses', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const { code, name, description, minDeposit, maxDeposit, percentage, wagerMultiplier, maxUsages, isActive, expiresAt } = req.body;
+    const { code, name, description, minDeposit, maxDeposit, percentage, wagerMultiplier, maxUsages, isActive, expiresAt, isFreebet, freebetAmount } = req.body;
 
     const bonus = await prisma.bonusTemplate.create({
       data: {
         code: code.toUpperCase().trim(),
         name,
         description: description || null,
-        minDeposit: minDeposit || 0,
-        maxDeposit: maxDeposit || null,
-        percentage: parseInt(percentage) || 100,
+        isFreebet: isFreebet === true,
+        freebetAmount: isFreebet && freebetAmount ? parseFloat(freebetAmount) : null,
+        minDeposit: isFreebet ? 0 : (minDeposit || 0),
+        maxDeposit: isFreebet ? null : (maxDeposit || null),
+        percentage: isFreebet ? 0 : (parseInt(percentage) || 100),
         wagerMultiplier: parseInt(wagerMultiplier) || 10,
         maxUsages: maxUsages ? parseInt(maxUsages) : null,
         isActive: isActive !== undefined ? isActive : true,
@@ -232,11 +234,26 @@ router.put('/bonuses/:id', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     const data = { ...req.body };
 
-    if (data.percentage) data.percentage = parseInt(data.percentage);
-    if (data.wagerMultiplier) data.wagerMultiplier = parseInt(data.wagerMultiplier);
+    if (data.percentage !== undefined) data.percentage = parseInt(data.percentage);
+    if (data.wagerMultiplier !== undefined) data.wagerMultiplier = parseInt(data.wagerMultiplier);
     if (data.maxUsages !== undefined) data.maxUsages = data.maxUsages ? parseInt(data.maxUsages) : null;
     if (data.expiresAt !== undefined) data.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
     if (data.code) data.code = data.code.toUpperCase().trim();
+    if (data.isFreebet !== undefined) data.isFreebet = data.isFreebet === true;
+    if (data.freebetAmount !== undefined) {
+      data.freebetAmount = data.freebetAmount ? parseFloat(data.freebetAmount) : null;
+    }
+    
+    // Если это фрибет, обнуляем поля депозита
+    if (data.isFreebet === true) {
+      data.minDeposit = 0;
+      data.maxDeposit = null;
+      data.percentage = 0;
+    }
+    // Если это обычный бонус, обнуляем фрибет
+    if (data.isFreebet === false) {
+      data.freebetAmount = null;
+    }
 
     const bonus = await prisma.bonusTemplate.update({
       where: { id: parseInt(id) },

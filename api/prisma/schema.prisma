@@ -760,10 +760,16 @@ model BonusTemplate {
   name            String
   description     String?
   
+  // Обычный бонус (требует депозит)
   minDeposit      Decimal  @default(0) @db.Decimal(30, 18)
   maxDeposit      Decimal? @db.Decimal(30, 18)
   percentage      Int      @default(100) // % to deposit
-  wagerMultiplier Int      @default(10)  // x10 wager
+  
+  // Фрибет (не требует депозит)
+  isFreebet       Boolean  @default(false) // true = фрибет, false = обычный бонус
+  freebetAmount   Decimal? @db.Decimal(30, 18) // Сумма фрибета (если isFreebet = true)
+  
+  wagerMultiplier Int      @default(10)  // x10 wager (для обоих типов)
   
   maxUsages       Int?     // null = unlimited
   usedCount       Int      @default(0)

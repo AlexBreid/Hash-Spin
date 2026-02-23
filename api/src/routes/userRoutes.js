@@ -180,7 +180,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
     let allGames = [];
     try {
-      // ✅ UNION: собираем игры из ВСЕХ таблиц
+      // ✅ UNION: собираем игры из ВСЕХ таблиц (динамически)
       allGames = await prisma.$queryRaw`
         -- CRASH ИГРЫ
         SELECT 
@@ -195,15 +195,44 @@ router.get('/profile', authenticateToken, async (req, res) => {
         
         UNION ALL
         
-        -- MINESWEEPER ИГРЫ
+        -- MINESWEEPER ИГРЫ (используем MinesweeperGame, а не MinesweeperBet)
         SELECT 
           'MINESWEEPER' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          CASE 
+            WHEN "status" IN ('WON', 'CASHED_OUT') AND "winAmount" IS NOT NULL AND "winAmount" > 0 THEN "winAmount" - "betAmount"
+            ELSE 0 - "betAmount"
+          END as "netAmount",
+          "createdAt",
+          COALESCE("winAmount", 0) as "payout"
+        FROM "MinesweeperGame"
+        WHERE "userId" = ${userId} AND "status" IN ('WON', 'LOST', 'CASHED_OUT')
+        
+        UNION ALL
+        
+        -- PLINKO ИГРЫ
+        SELECT 
+          'PLINKO' as "gameType",
           ${userId} as "userId",
           "betAmount",
           COALESCE("winAmount", 0) - "betAmount" as "netAmount",
           "createdAt",
           COALESCE("winAmount", 0) as "payout"
-        FROM "MinesweeperBet"
+        FROM "PlinkoBet"
+        WHERE "userId" = ${userId}
+        
+        UNION ALL
+        
+        -- COINFLIP ИГРЫ
+        SELECT 
+          'COINFLIP' as "gameType",
+          ${userId} as "userId",
+          "betAmount",
+          COALESCE("winAmount", 0) - "betAmount" as "netAmount",
+          "createdAt",
+          COALESCE("winAmount", 0) as "payout"
+        FROM "CoinFlipBet"
         WHERE "userId" = ${userId}
         
         UNION ALL
@@ -223,11 +252,12 @@ router.get('/profile', authenticateToken, async (req, res) => {
       `;
 
       } catch (err) {
+      logger.error('USER', 'Error fetching games', { userId, error: err.message });
       allGames = [];
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // ЭТАП 3: ПОДСЧЁТ СТАТИСТИКИ
+    // ЭТАП 3: ПОДСЧЁТ СТАТИСТИКИ (ОБЩАЯ И ПО ИГРАМ)
     // ════════════════════════════════════════════════════════════════════════════
 
     const totalGames = allGames.length;
@@ -237,10 +267,16 @@ router.get('/profile', authenticateToken, async (req, res) => {
     let largestWin = null;
     let largestWinAmount = 0;
 
+    // ✅ ДИНАМИЧЕСКАЯ СТАТИСТИКА ПО ИГРАМ (только количество игр и максимальный выигрыш)
+    const gameStats = {};
+
     for (const game of allGames) {
       const betAmount = toNumber(game.betAmount);
       const netAmount = toNumber(game.netAmount);
+      const gameType = (game.gameType || 'UNKNOWN').toUpperCase();
+      const payout = toNumber(game.payout || 0);
 
+      // Общая статистика
       totalWagered += betAmount;
       totalScore += netAmount;
 
@@ -255,7 +291,29 @@ router.get('/profile', authenticateToken, async (req, res) => {
           };
         }
       }
+
+      // Статистика по игре (только количество игр и максимальный выигрыш)
+      if (!gameStats[gameType]) {
+        gameStats[gameType] = {
+          gameType,
+          totalGames: 0,
+          largestWin: 0,
+        };
+      }
+
+      const stats = gameStats[gameType];
+      stats.totalGames++;
+      
+      // Обновляем максимальный выигрыш (используем payout для выигранных игр)
+      if (payout > 0 && payout > stats.largestWin) {
+        stats.largestWin = payout;
+      }
     }
+
+    // Округляем значения
+    Object.values(gameStats).forEach(stats => {
+      stats.largestWin = Math.round(stats.largestWin * 100) / 100;
+    });
 
     // ════════════════════════════════════════════════════════════════════════════
     // ЭТАП 4: РАСЧЁТЫ МЕТРИК
@@ -304,6 +362,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
         date: largestWin.date,
       } : null,
       referrerId: user.referredById,
+      // ✅ ДИНАМИЧЕСКАЯ СТАТИСТИКА ПО ИГРАМ
+      gameStats: Object.values(gameStats),
     };
 
     logger.info('USER', 'Profile fetched successfully', {

@@ -217,6 +217,11 @@ async function deductBetFromBalance(userId, betAmount, tokenId, retryCount = 0) 
     // Отслеживаем для реферальной системы (вне транзакции, т.к. не критично)
     await trackBet(userId, betAmount, tokenId, result.balanceType);
 
+    // Проверяем и обнуляем бонус, если баланс < 0.01 USDT (после списания)
+    if (result.balanceType === 'BONUS' && result.userBonusId && result.newBalance < 0.01) {
+      await referralService.checkAndAnnulateBonusIfLow(userId, tokenId, result.userBonusId);
+    }
+
     return result;
 
   } catch (error) {
@@ -285,6 +290,23 @@ async function creditWinnings(userId, winAmount, tokenId, balanceType = 'MAIN') 
     });
 
     const newBalance = parseFloat(updated.amount.toString());
+    
+    // Проверяем и обнуляем бонус, если баланс < 0.01 USDT
+    if (balanceType === 'BONUS') {
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: {
+          userId,
+          tokenId,
+          isActive: true,
+          isCompleted: false
+        }
+      });
+      
+      if (activeBonus && newBalance < 0.01) {
+        await referralService.checkAndAnnulateBonusIfLow(userId, tokenId, activeBonus.id);
+      }
+    }
+    
     return { success: true, newBalance };
 
   } catch (error) {
@@ -330,6 +352,18 @@ async function updateWagerAndCheckConversion(userId, wagerAmount, tokenId, userB
     // Проверяем выполнен ли вейджер
     if (newWagered >= requiredNum) {
       return await convertBonusToMain(userId, tokenId, userBonusId);
+    }
+
+    // Проверяем и обнуляем бонус, если баланс < 0.01 USDT
+    const bonusBalance = await prisma.balance.findUnique({
+      where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } }
+    });
+    
+    if (bonusBalance) {
+      const bonusAmount = parseFloat(bonusBalance.amount.toString());
+      if (bonusAmount < 0.01) {
+        await referralService.checkAndAnnulateBonusIfLow(userId, tokenId, userBonusId);
+      }
     }
 
     return { converted: false };

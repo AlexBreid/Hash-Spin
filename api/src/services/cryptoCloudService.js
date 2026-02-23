@@ -1229,6 +1229,7 @@ class CryptoCloudService {
       where: { code: promoCode.toUpperCase().trim() }
     });
     if (!promo || !promo.isActive) return null;
+    if (promo.isFreebet) return null; // Фрибеты не применяются при депозите
     if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return null;
     if (promo.maxUsages !== null && promo.usedCount >= promo.maxUsages) return null;
 

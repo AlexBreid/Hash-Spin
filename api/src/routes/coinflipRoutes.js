@@ -15,8 +15,9 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const currencySyncService = require('../services/currencySyncService');
 const logger = require('../utils/logger');
 const { deductBetFromBalance, creditWinnings } = require('./helpers/gameReferralHelper');
+const CoinFlipService = require('../services/CoinFlipService');
 
-const COINFLIP_MULTIPLIER = 1.8;
+const COINFLIP_MULTIPLIER = CoinFlipService.MULTIPLIER; // 1.9x для house edge 5%
 
 /**
  * 💰 GET /api/v1/coinflip/balance
@@ -120,10 +121,11 @@ router.post('/api/v1/coinflip/play', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, error: deductResult.error || 'Недостаточно средств' });
     }
 
-    // 🎲 Генерируем результат (50/50) — число 1 или 2
-    const resultNum = Math.random() < 0.5 ? 1 : 2;
+    // 🎲 Генерируем результат с динамической вероятностью (house edge 5%)
+    const gameResult = await CoinFlipService.generateResult(userId, tokenId, choiceNum);
+    const resultNum = gameResult.result;
     const resultStr = resultNum === 1 ? 'heads' : 'tails';
-    const isWin = choiceNum === resultNum;
+    const isWin = gameResult.isWin;
     const winAmount = isWin ? parseFloat((betAmount * COINFLIP_MULTIPLIER).toFixed(8)) : 0;
 
     // 💾 Сохраняем игру в БД (храним строки для совместимости)
@@ -177,6 +179,7 @@ router.post('/api/v1/coinflip/play', authenticateToken, async (req, res) => {
       result: resultNum,
       betAmount: parseFloat(betAmount),
       winAmount,
+      winProbability: gameResult.winProbability,
     });
 
     res.json({
@@ -265,10 +268,38 @@ router.get('/api/v1/coinflip/config', async (req, res) => {
         minBet,
         maxBet,
         choices: ['heads', 'tails'],
+        houseEdge: CoinFlipService.HOUSE_EDGE,
+        rtp: CoinFlipService.RTP,
       }
     });
 
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 📊 GET /api/v1/coinflip/stats
+ * Статистика игрока
+ */
+router.get('/api/v1/coinflip/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const tokenId = parseInt(req.query.tokenId) || 2;
+
+    const stats = await CoinFlipService.getPlayerStats(userId, tokenId);
+
+    if (!stats) {
+      return res.status(500).json({ success: false, error: 'Failed to get stats' });
+    }
+
+    res.json({
+      success: true,
+      stats
+    });
+
+  } catch (error) {
+    logger.error('COINFLIP', 'Failed to get stats', { error: error.message });
     res.status(500).json({ success: false, error: error.message });
   }
 });
