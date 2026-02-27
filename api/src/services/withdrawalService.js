@@ -192,21 +192,25 @@ class WithdrawalService {
         const wagered = parseFloat(activeBonus.wageredAmount.toString());
         const required = parseFloat(activeBonus.requiredWager.toString());
         const remaining = Math.max(required - wagered, 0);
-
-        return {
-          success: false,
-          userMessage: 
-            `❌ *Вывод заблокирован*\n\n` +
-            `🎁 У вас активен бонус!\n` +
-            `⚡ Осталось отыграть: ${remaining.toFixed(8)} USDT\n\n` +
-            `💡 После завершения отыгрыша сможете выводить деньги.`,
-          error: 'Active bonus exists',
-          bonus: {
-            wagered: wagered.toFixed(8),
-            required: required.toFixed(8),
-            remaining: remaining.toFixed(8)
-          }
-        };
+        // Без отыгрыша (required === 0): вывод разрешён
+        if (remaining <= 0) {
+          // Пропускаем блокировку
+        } else {
+          return {
+            success: false,
+            userMessage:
+              `❌ *Вывод заблокирован*\n\n` +
+              `🎁 У вас активен бонус!\n` +
+              `⚡ Осталось отыграть: ${remaining.toFixed(8)} USDT\n\n` +
+              `💡 После завершения отыгрыша сможете выводить деньги.`,
+            error: 'Active bonus exists',
+            bonus: {
+              wagered: wagered.toFixed(8),
+              required: required.toFixed(8),
+              remaining: remaining.toFixed(8)
+            }
+          };
+        }
       }
 
       // Получаем MAIN баланс (не BONUS!)

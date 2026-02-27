@@ -1239,11 +1239,13 @@ class CryptoCloudService {
     });
     if (used) return null;
 
-    // Активный бонус?
-    const active = await prisma.userBonus.findFirst({
-      where: { userId, isActive: true, isCompleted: false }
-    });
-    if (active) return null;
+    const wagerMult = promo.wagerMultiplier ?? 10;
+    if (wagerMult > 0) {
+      const active = await prisma.userBonus.findFirst({
+        where: { userId, isActive: true, isCompleted: false }
+      });
+      if (active) return null;
+    }
 
     const { getCurrencyRateAsync } = require('./currencySyncService');
     const token = await prisma.cryptoToken.findUnique({ where: { id: tokenId } });
@@ -1264,14 +1266,54 @@ class CryptoCloudService {
       if (bonusAmount > maxInCrypto) bonusAmount = maxInCrypto;
     }
 
-    const totalAmount = depositAmount + bonusAmount;
-    const requiredWager = totalAmount * promo.wagerMultiplier;
+    const noWager = wagerMult === 0;
 
+    if (noWager) {
+      // Без отыгрыша: только на основной счёт, без UserBonus
+      await prisma.$transaction(async (tx) => {
+        await tx.balance.upsert({
+          where: { userId_tokenId_type: { userId, tokenId, type: 'MAIN' } },
+          create: { userId, tokenId, type: 'MAIN', amount: bonusAmount.toFixed(8) },
+          update: { amount: { increment: bonusAmount } }
+        });
+        await tx.transaction.create({
+          data: {
+            userId,
+            tokenId,
+            type: 'BONUS',
+            status: 'COMPLETED',
+            amount: bonusAmount.toFixed(8)
+          }
+        });
+        await tx.promoUsage.create({
+          data: {
+            userId,
+            bonusId: promo.id,
+            depositAmount: depositAmount.toFixed(8),
+            bonusAmount: bonusAmount.toFixed(8)
+          }
+        });
+        await tx.bonusTemplate.update({
+          where: { id: promo.id },
+          data: { usedCount: { increment: 1 } }
+        });
+      });
+      return {
+        promoCode: promo.code,
+        percentage: promo.percentage,
+        bonusAmount,
+        totalAmount: depositAmount + bonusAmount,
+        requiredWager: 0,
+        expiresAt: null
+      };
+    }
+
+    const totalAmount = depositAmount + bonusAmount;
+    const requiredWager = totalAmount * wagerMult;
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 дней на отыгрыш
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     await prisma.$transaction(async (tx) => {
-      // 1. Создаём UserBonus
       await tx.userBonus.create({
         data: {
           userId,
@@ -1284,15 +1326,11 @@ class CryptoCloudService {
           expiresAt
         }
       });
-
-      // 2. Начисляем бонус на BONUS баланс
       await tx.balance.upsert({
         where: { userId_tokenId_type: { userId, tokenId, type: 'BONUS' } },
         create: { userId, tokenId, type: 'BONUS', amount: totalAmount.toFixed(8) },
         update: { amount: { increment: totalAmount } }
       });
-
-      // 3. Записываем использование промокода
       await tx.promoUsage.create({
         data: {
           userId,
@@ -1301,8 +1339,6 @@ class CryptoCloudService {
           bonusAmount: bonusAmount.toFixed(8)
         }
       });
-
-      // 4. Увеличиваем счётчик использований
       await tx.bonusTemplate.update({
         where: { id: promo.id },
         data: { usedCount: { increment: 1 } }

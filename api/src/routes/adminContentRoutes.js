@@ -72,8 +72,8 @@ router.post('/banners', authenticateToken, isAdmin, async (req, res) => {
         text: text || null,
         buttonText: buttonText || null,
         linkUrl: linkUrl || null,
-        actionType: actionType || 'NONE', // 'LINK', 'BONUS', 'NONE'
-        bonusId: bonusId ? parseInt(bonusId) : null,
+        actionType: actionType || 'NONE', // 'LINK', 'BONUS', 'NONE', 'DAILY_CASE'
+        bonusId: (actionType === 'BONUS' && bonusId) ? parseInt(bonusId) : null,
         isActive: isActive !== undefined ? isActive : true,
         priority: priority ? parseInt(priority) : 0
       },
@@ -180,7 +180,9 @@ router.get('/banners', authenticateToken, isAdmin, async (req, res) => {
             code: true,
             name: true,
             percentage: true,
-            wagerMultiplier: true
+            wagerMultiplier: true,
+            isFreebet: true,
+            freebetAmount: true
           }
         }
       }
@@ -211,7 +213,7 @@ router.post('/bonuses', authenticateToken, isAdmin, async (req, res) => {
         minDeposit: isFreebet ? 0 : (minDeposit || 0),
         maxDeposit: isFreebet ? null : (maxDeposit || null),
         percentage: isFreebet ? 0 : (parseInt(percentage) || 100),
-        wagerMultiplier: parseInt(wagerMultiplier) || 10,
+        wagerMultiplier: (wagerMultiplier !== undefined && wagerMultiplier !== '' && !isNaN(Number(wagerMultiplier))) ? parseInt(wagerMultiplier) : 10,
         maxUsages: maxUsages ? parseInt(maxUsages) : null,
         isActive: isActive !== undefined ? isActive : true,
         expiresAt: expiresAt ? new Date(expiresAt) : null
@@ -235,7 +237,7 @@ router.put('/bonuses/:id', authenticateToken, isAdmin, async (req, res) => {
     const data = { ...req.body };
 
     if (data.percentage !== undefined) data.percentage = parseInt(data.percentage);
-    if (data.wagerMultiplier !== undefined) data.wagerMultiplier = parseInt(data.wagerMultiplier);
+    if (data.wagerMultiplier !== undefined) data.wagerMultiplier = isNaN(Number(data.wagerMultiplier)) ? 10 : parseInt(data.wagerMultiplier);
     if (data.maxUsages !== undefined) data.maxUsages = data.maxUsages ? parseInt(data.maxUsages) : null;
     if (data.expiresAt !== undefined) data.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
     if (data.code) data.code = data.code.toUpperCase().trim();
@@ -292,6 +294,112 @@ router.get('/bonuses', authenticateToken, isAdmin, async (req, res) => {
   } catch (error) {
     logger.error('ADMIN', 'Error fetching bonus templates', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to fetch bonus templates' });
+  }
+});
+
+// ====================================================
+// DAILY CASE REWARDS (Ежедневный бесплатный кейс)
+// ====================================================
+
+router.get('/daily-case/rewards', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const rewards = await prisma.dailyCaseReward.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      include: {
+        token: { select: { id: true, symbol: true, name: true } },
+        bonusTemplate: { select: { id: true, code: true, name: true, percentage: true, wagerMultiplier: true, isFreebet: true, freebetAmount: true } },
+      },
+    });
+    res.json({ success: true, data: rewards });
+  } catch (error) {
+    logger.error('ADMIN', 'Error fetching daily case rewards', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch rewards' });
+  }
+});
+
+router.post('/daily-case/rewards', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { rewardType, label, dropWeight, sortOrder, isActive, amount, tokenId, bonusTemplateId } = req.body;
+
+    if (!rewardType || !label) {
+      return res.status(400).json({ success: false, error: 'Укажите тип награды и название' });
+    }
+
+    if (rewardType !== 'BALANCE_TOPUP' && rewardType !== 'DEPOSIT_BONUS') {
+      return res.status(400).json({ success: false, error: 'Тип награды: BALANCE_TOPUP или DEPOSIT_BONUS' });
+    }
+
+    if (rewardType === 'BALANCE_TOPUP' && (!amount || parseFloat(amount) <= 0)) {
+      return res.status(400).json({ success: false, error: 'Укажите сумму пополнения на счёт' });
+    }
+
+    if (rewardType === 'DEPOSIT_BONUS' && !bonusTemplateId) {
+      return res.status(400).json({ success: false, error: 'Укажите промокод (бонус к пополнению)' });
+    }
+
+    const reward = await prisma.dailyCaseReward.create({
+      data: {
+        rewardType,
+        label: String(label).trim(),
+        dropWeight: Math.max(0, parseInt(dropWeight) || 10),
+        sortOrder: parseInt(sortOrder) || 0,
+        isActive: isActive !== false,
+        amount: rewardType === 'BALANCE_TOPUP' && amount ? parseFloat(amount) : null,
+        tokenId: tokenId ? parseInt(tokenId) : null,
+        bonusTemplateId: rewardType === 'DEPOSIT_BONUS' && bonusTemplateId ? parseInt(bonusTemplateId) : null,
+      },
+      include: {
+        token: { select: { id: true, symbol: true } },
+        bonusTemplate: { select: { id: true, code: true, name: true } },
+      },
+    });
+
+    res.status(201).json({ success: true, data: reward });
+  } catch (error) {
+    logger.error('ADMIN', 'Error creating daily case reward', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to create reward' });
+  }
+});
+
+router.put('/daily-case/rewards/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const body = req.body;
+
+    const data = {};
+    if (body.rewardType !== undefined) data.rewardType = body.rewardType;
+    if (body.label !== undefined) data.label = String(body.label).trim();
+    if (body.dropWeight !== undefined) data.dropWeight = Math.max(0, parseInt(body.dropWeight) || 0);
+    if (body.sortOrder !== undefined) data.sortOrder = parseInt(body.sortOrder) || 0;
+    if (body.isActive !== undefined) data.isActive = body.isActive !== false;
+    if (body.amount !== undefined) data.amount = body.amount ? parseFloat(body.amount) : null;
+    if (body.tokenId !== undefined) data.tokenId = body.tokenId ? parseInt(body.tokenId) : null;
+    if (body.bonusTemplateId !== undefined) data.bonusTemplateId = body.bonusTemplateId ? parseInt(body.bonusTemplateId) : null;
+
+    const reward = await prisma.dailyCaseReward.update({
+      where: { id },
+      data,
+      include: {
+        token: { select: { id: true, symbol: true } },
+        bonusTemplate: { select: { id: true, code: true, name: true } },
+      },
+    });
+
+    res.json({ success: true, data: reward });
+  } catch (error) {
+    logger.error('ADMIN', 'Error updating daily case reward', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to update reward' });
+  }
+});
+
+router.delete('/daily-case/rewards/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.dailyCaseReward.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('ADMIN', 'Error deleting daily case reward', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to delete reward' });
   }
 });
 

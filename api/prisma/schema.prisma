@@ -37,6 +37,7 @@ model CryptoToken {
         userBonuses         UserBonus[]
         referralCommissions ReferralTransaction[]
         referralStats       ReferralStats[]
+        dailyCaseRewards    DailyCaseReward[]
 
   // Уникальность по комбинации symbol + network (можно иметь USDT TRC-20, USDT ERC-20 и т.д.)
   @@unique([symbol, network])
@@ -136,6 +137,7 @@ model User {
 
   supportTickets SupportTicket[]
   promoUsages    PromoUsage[]
+  dailyCaseClaims UserDailyCaseClaim[]
 }
 
 // ====================================================
@@ -742,7 +744,7 @@ model Banner {
   text        String?
   buttonText  String?
   linkUrl     String?
-  actionType  String   // 'LINK', 'BONUS', 'NONE'
+  actionType  String   // 'LINK', 'BONUS', 'NONE', 'DAILY_CASE'
   
   bonusId     Int?
   bonus       BonusTemplate? @relation(fields: [bonusId], references: [id])
@@ -752,6 +754,45 @@ model Banner {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Ежедневный бесплатный кейс: награды с настраиваемым % выпадения
+model DailyCaseReward {
+  id              Int      @id @default(autoincrement())
+  rewardType      String   // 'BALANCE_TOPUP' | 'DEPOSIT_BONUS'
+  label           String   // Название для админа и отображения
+  dropWeight      Int      @default(10) // Вес выпадения (1-100), относительная вероятность
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+
+  // BALANCE_TOPUP: пополнение на основной счёт (например 0.01 USDT)
+  amount          Decimal? @db.Decimal(30, 18)
+  tokenId         Int?
+  token           CryptoToken? @relation(fields: [tokenId], references: [id])
+
+  // DEPOSIT_BONUS: бонус к пополнению (без отыгрыша или с отыгрышем) — ссылка на шаблон
+  bonusTemplateId Int?
+  bonusTemplate   BonusTemplate? @relation(fields: [bonusTemplateId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  claims    UserDailyCaseClaim[]
+
+  @@index([isActive, sortOrder])
+}
+
+// Один раз в день на пользователя
+model UserDailyCaseClaim {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claimedAt DateTime @default(now())
+  rewardId  Int?
+  reward    DailyCaseReward? @relation(fields: [rewardId], references: [id])
+
+  @@index([userId])
+  @@index([userId, claimedAt])
 }
 
 model BonusTemplate {
@@ -779,7 +820,8 @@ model BonusTemplate {
 
   banners         Banner[]
   usages          PromoUsage[]
-  
+  dailyCaseRewards DailyCaseReward[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

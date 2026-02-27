@@ -112,11 +112,12 @@ async function createStarsWithdrawal(userId, starsAmount, method = 'convert') {
         const wagered = parseFloat(activeBonus.wageredAmount.toString());
         const required = parseFloat(activeBonus.requiredWager.toString());
         const remaining = Math.max(required - wagered, 0);
-        
-        return {
-          success: false,
-          error: `Вывод заблокирован! Активен бонус. Осталось отыграть: ${remaining.toFixed(2)} USDT`
-        };
+        if (remaining > 0) {
+          return {
+            success: false,
+            error: `Вывод заблокирован! Активен бонус. Осталось отыграть: ${remaining.toFixed(2)} USDT`
+          };
+        }
       }
     }
     

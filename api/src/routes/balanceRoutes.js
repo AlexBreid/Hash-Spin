@@ -62,13 +62,12 @@ router.get('/api/v1/balance/get-balances', authenticateToken, async (req, res) =
     if (activeBonus) {
       const wagered = parseFloat(activeBonus.wageredAmount.toString());
       const required = parseFloat(activeBonus.requiredWager.toString());
-      
       bonusInfo = {
         id: activeBonus.id,
         granted: parseFloat(activeBonus.grantedAmount.toString()),
         required: required,
         wagered: wagered,
-        progress: Math.min((wagered / required) * 100, 100),
+        progress: required > 0 ? Math.min((wagered / required) * 100, 100) : 100,
         remaining: Math.max(required - wagered, 0),
         expiresAt: activeBonus.expiresAt,
         isExpired: new Date() > activeBonus.expiresAt
@@ -202,17 +201,19 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
     });
 
     let bonusInfo = null;
+    let canWithdraw = true;
     if (activeBonus) {
       const wagered = parseFloat(activeBonus.wageredAmount.toString());
       const required = parseFloat(activeBonus.requiredWager.toString());
-      
+      const remaining = Math.max(required - wagered, 0);
       bonusInfo = {
         granted: parseFloat(activeBonus.grantedAmount.toString()),
         required: required,
         wagered: wagered,
-        progress: Math.min((wagered / required) * 100, 100),
-        remaining: Math.max(required - wagered, 0)
+        progress: required > 0 ? Math.min((wagered / required) * 100, 100) : 100,
+        remaining
       };
+      canWithdraw = remaining <= 0; // Без отыгрыша (required=0) или уже отыграно
     }
 
     // Логируем для отладки
@@ -225,7 +226,7 @@ router.get('/api/v1/wallet/balance', authenticateToken, async (req, res) => {
       success: true,
       data: formatted,
       bonus: bonusInfo,
-      canWithdraw: !activeBonus  // ✅ Нельзя выводить если есть активный бонус
+      canWithdraw
     });
   } catch (error) {
     logger.error('BALANCE', 'Failed to get wallet balance', { 

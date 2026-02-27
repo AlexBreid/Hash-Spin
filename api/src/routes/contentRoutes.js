@@ -15,8 +15,11 @@ router.get('/banners', async (req, res) => {
             id: true,
             code: true,
             name: true,
+            description: true,
             percentage: true,
-            wagerMultiplier: true
+            wagerMultiplier: true,
+            isFreebet: true,
+            freebetAmount: true
           }
         }
       }

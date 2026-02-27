@@ -120,14 +120,16 @@ router.post('/api/v1/deposit/validate-promo', authenticateToken, async (req, res
       return res.json({ success: true, data: { valid: false, reason: 'Вы уже использовали этот промокод' } });
     }
 
-    // Для фрибетов не проверяем активный бонус и депозит
+    // Для фрибетов не проверяем депозит. Активный бонус не блокирует промо без отыгрыша (wager 0).
     if (!promo.isFreebet) {
-      // Проверяем активный бонус (только для обычных бонусов)
-      const activeBonus = await prisma.userBonus.findFirst({
-        where: { userId, isActive: true, isCompleted: false }
-      });
-      if (activeBonus) {
-        return res.json({ success: true, data: { valid: false, reason: 'У вас уже есть активный бонус' } });
+      const wager = promo.wagerMultiplier ?? 10;
+      if (wager > 0) {
+        const activeBonus = await prisma.userBonus.findFirst({
+          where: { userId, isActive: true, isCompleted: false }
+        });
+        if (activeBonus) {
+          return res.json({ success: true, data: { valid: false, reason: 'У вас уже есть активный бонус' } });
+        }
       }
 
       // Проверяем мин. депозит (только для обычных бонусов)
@@ -210,12 +212,15 @@ router.post('/api/v1/deposit/apply-freebet', authenticateToken, async (req, res)
       return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
     }
 
-    // Проверяем активный бонус
-    const activeBonus = await prisma.userBonus.findFirst({
-      where: { userId, isActive: true, isCompleted: false }
-    });
-    if (activeBonus) {
-      return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+    // Промо без отыгрыша (wager 0) можно применить даже при активном бонусе
+    const wager = promo.wagerMultiplier ?? 10;
+    if (wager > 0) {
+      const activeBonus = await prisma.userBonus.findFirst({
+        where: { userId, isActive: true, isCompleted: false }
+      });
+      if (activeBonus) {
+        return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+      }
     }
 
     // Определяем токен (по умолчанию USDT)
@@ -231,13 +236,52 @@ router.post('/api/v1/deposit/apply-freebet', authenticateToken, async (req, res)
     }
 
     const freebetAmount = parseFloat(promo.freebetAmount.toString());
-    const requiredWager = freebetAmount * promo.wagerMultiplier;
+    const wagerMult = promo.wagerMultiplier ?? 10;
+    const requiredWager = freebetAmount * wagerMult;
+    const noWager = wagerMult === 0;
+
+    if (noWager) {
+      // Без отыгрыша: на основной счёт, без UserBonus
+      await prisma.$transaction(async (tx) => {
+        await tx.balance.upsert({
+          where: { userId_tokenId_type: { userId, tokenId: targetTokenId, type: 'MAIN' } },
+          create: { userId, tokenId: targetTokenId, type: 'MAIN', amount: freebetAmount.toFixed(8) },
+          update: { amount: { increment: freebetAmount } }
+        });
+        await tx.transaction.create({
+          data: {
+            userId,
+            tokenId: targetTokenId,
+            type: 'BONUS',
+            status: 'COMPLETED',
+            amount: freebetAmount.toFixed(8)
+          }
+        });
+        await tx.promoUsage.create({
+          data: {
+            userId,
+            bonusId: promo.id,
+            depositAmount: '0',
+            bonusAmount: freebetAmount.toFixed(8)
+          }
+        });
+        await tx.bonusTemplate.update({
+          where: { id: promo.id },
+          data: { usedCount: { increment: 1 } }
+        });
+      });
+      logger.info('DEPOSIT', 'Freebet (no wager) applied to MAIN', { userId, promoCode: promo.code, amount: freebetAmount });
+      return res.json({
+        success: true,
+        message: `Фрибет ${freebetAmount} USDT зачислен на основной счёт!`,
+        data: { freebetAmount, wagerMultiplier: 0 }
+      });
+    }
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 дней на отыгрыш
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     await prisma.$transaction(async (tx) => {
-      // 1. Создаём UserBonus
       await tx.userBonus.create({
         data: {
           userId,
@@ -250,25 +294,19 @@ router.post('/api/v1/deposit/apply-freebet', authenticateToken, async (req, res)
           expiresAt
         }
       });
-
-      // 2. Начисляем фрибет на BONUS баланс
       await tx.balance.upsert({
         where: { userId_tokenId_type: { userId, tokenId: targetTokenId, type: 'BONUS' } },
         create: { userId, tokenId: targetTokenId, type: 'BONUS', amount: freebetAmount.toFixed(8) },
         update: { amount: { increment: freebetAmount } }
       });
-
-      // 3. Записываем использование промокода
       await tx.promoUsage.create({
         data: {
           userId,
           bonusId: promo.id,
-          depositAmount: '0', // Для фрибета депозит = 0
+          depositAmount: '0',
           bonusAmount: freebetAmount.toFixed(8)
         }
       });
-
-      // 4. Увеличиваем счётчик использований
       await tx.bonusTemplate.update({
         where: { id: promo.id },
         data: { usedCount: { increment: 1 } }
@@ -366,11 +404,14 @@ router.post('/api/v1/deposit/create', authenticateToken, async (req, res) => {
       if (alreadyUsed) {
         return res.status(400).json({ success: false, message: 'Вы уже использовали этот промокод' });
       }
-      const activeBonus = await prisma.userBonus.findFirst({
-        where: { userId, isActive: true, isCompleted: false }
-      });
-      if (activeBonus) {
-        return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+      const wager = promoTemplate.wagerMultiplier ?? 10;
+      if (wager > 0) {
+        const activeBonus = await prisma.userBonus.findFirst({
+          where: { userId, isActive: true, isCompleted: false }
+        });
+        if (activeBonus) {
+          return res.status(400).json({ success: false, message: 'У вас уже есть активный бонус' });
+        }
       }
     }
 

@@ -140,6 +140,62 @@ router.get('/active-bonus', authenticateToken, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// 🚫 POST /cancel-active-bonus — отменить активный бонус и обнулить бонусный счёт
+// ════════════════════════════════════════════════════════════════════════════════
+
+router.post('/cancel-active-bonus', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const activeBonus = await prisma.userBonus.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        isCompleted: false,
+      },
+    });
+
+    if (!activeBonus) {
+      return res.status(400).json({
+        success: false,
+        message: 'У вас нет активного бонуса для отмены',
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userBonus.update({
+        where: { id: activeBonus.id },
+        data: {
+          isActive: false,
+          isCompleted: true,
+          completedAt: new Date(),
+        },
+      });
+      await tx.balance.updateMany({
+        where: { userId, type: 'BONUS' },
+        data: { amount: '0' },
+      });
+    });
+
+    logger.info('USER', 'Active bonus cancelled', { userId, bonusId: activeBonus.id });
+
+    return res.json({
+      success: true,
+      message: 'Бонус отменён. Бонусный счёт обнулён.',
+    });
+  } catch (error) {
+    logger.error('USER', 'Error cancelling active bonus', {
+      userId,
+      error: error.message,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Ошибка отмены бонуса',
+    });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // 📊 ГЛАВНЫЙ МАРШРУТ: GET /profile (С UNION)
 // ════════════════════════════════════════════════════════════════════════════════
 
