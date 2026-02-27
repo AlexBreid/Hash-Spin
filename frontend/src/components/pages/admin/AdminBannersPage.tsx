@@ -36,13 +36,16 @@ interface Banner {
   text?: string;
   buttonText?: string;
   linkUrl?: string;
-  actionType: 'LINK' | 'BONUS' | 'NONE';
+  actionType: 'LINK' | 'BONUS' | 'NONE' | 'DAILY_CASE';
   bonusId?: number;
   bonus?: {
     id: number;
     code: string;
     name: string;
     percentage: number;
+    wagerMultiplier?: number;
+    isFreebet?: boolean;
+    freebetAmount?: string | number | null;
   };
   isActive: boolean;
   priority: number;
@@ -66,6 +69,20 @@ interface BonusTemplate {
   _count?: { usages: number };
 }
 
+interface DailyCaseReward {
+  id: number;
+  rewardType: string;
+  label: string;
+  dropWeight: number;
+  sortOrder: number;
+  isActive: boolean;
+  amount?: string | null;
+  tokenId?: number | null;
+  token?: { id: number; symbol: string; name?: string } | null;
+  bonusTemplateId?: number | null;
+  bonusTemplate?: { id: number; code: string; name: string } | null;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const resolveImg = (url: string) =>
@@ -84,7 +101,7 @@ export function AdminBannersPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Tab
-  const [activeTab, setActiveTab] = useState<'banners' | 'bonuses'>('banners');
+  const [activeTab, setActiveTab] = useState<'banners' | 'bonuses' | 'dailyCase'>('banners');
 
   // Banner form
   const [bannerMode, setBannerMode] = useState<'content' | 'image'>('content');
@@ -94,9 +111,25 @@ export function AdminBannersPage() {
     title: '',
     text: '',
     buttonText: '',
-    actionType: 'NONE' as 'LINK' | 'BONUS' | 'NONE',
+    actionType: 'NONE' as 'LINK' | 'BONUS' | 'NONE' | 'DAILY_CASE',
     linkUrl: '',
     bonusId: undefined as number | undefined,
+  });
+
+  // Daily case rewards
+  const [dailyCaseRewards, setDailyCaseRewards] = useState<DailyCaseReward[]>([]);
+  const [dailyCaseModal, setDailyCaseModal] = useState(false);
+  const [editingReward, setEditingReward] = useState<DailyCaseReward | null>(null);
+  const [rewardSaving, setRewardSaving] = useState(false);
+  const [rewardForm, setRewardForm] = useState({
+    rewardType: 'BALANCE_TOPUP' as 'BALANCE_TOPUP' | 'DEPOSIT_BONUS',
+    label: '',
+    dropWeight: '25',
+    sortOrder: '0',
+    isActive: true,
+    amount: '0.01',
+    tokenId: '',
+    bonusTemplateId: '',
   });
 
   // Bonus form
@@ -145,9 +178,10 @@ export function AdminBannersPage() {
     try {
       setLoading(true);
       const h = headers();
-      const [bRes, bonRes] = await Promise.all([
+      const [bRes, bonRes, dcRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/banners`, { headers: h }),
-        fetch(`${API_URL}/api/admin/bonuses`, { headers: h })
+        fetch(`${API_URL}/api/admin/bonuses`, { headers: h }),
+        fetch(`${API_URL}/api/admin/daily-case/rewards`, { headers: h }),
       ]);
       if (bRes.ok) {
         const r = await bRes.json();
@@ -158,6 +192,10 @@ export function AdminBannersPage() {
         const r = await bonRes.json();
         const d = r.success ? r.data : (Array.isArray(r) ? r : []);
         setBonuses(Array.isArray(d) ? d : []);
+      }
+      if (dcRes.ok) {
+        const r = await dcRes.json();
+        setDailyCaseRewards(r.success && Array.isArray(r.data) ? r.data : []);
       }
     } catch {
       toast.error('Ошибка загрузки данных');
@@ -205,7 +243,7 @@ export function AdminBannersPage() {
         isFreebet: bonusForm.isFreebet,
         freebetAmount: bonusForm.isFreebet && bonusForm.freebetAmount ? parseFloat(bonusForm.freebetAmount) : null,
         percentage: bonusForm.isFreebet ? 0 : (parseInt(bonusForm.percentage) || 100),
-        wagerMultiplier: parseInt(bonusForm.wagerMultiplier) || 10,
+        wagerMultiplier: (bonusForm.wagerMultiplier !== '' && !isNaN(Number(bonusForm.wagerMultiplier))) ? parseInt(bonusForm.wagerMultiplier) : 10,
         minDeposit: bonusForm.isFreebet ? 0 : (parseFloat(bonusForm.minDeposit) || 0),
         maxDeposit: bonusForm.isFreebet ? null : (bonusForm.maxDeposit ? parseFloat(bonusForm.maxDeposit) : null),
         maxUsages: bonusForm.maxUsages ? parseInt(bonusForm.maxUsages) : null,
@@ -248,6 +286,55 @@ export function AdminBannersPage() {
       fetchData();
     } catch {
       toast.error('Ошибка удаления');
+    }
+  };
+
+  const saveDailyCaseReward = async () => {
+    if (!rewardForm.label.trim()) {
+      toast.error('Укажите название награды');
+      return;
+    }
+    if (rewardForm.rewardType === 'BALANCE_TOPUP' && (!rewardForm.amount || parseFloat(rewardForm.amount) <= 0)) {
+      toast.error('Укажите сумму пополнения');
+      return;
+    }
+    if (rewardForm.rewardType === 'DEPOSIT_BONUS' && !rewardForm.bonusTemplateId) {
+      toast.error('Выберите промокод (бонус к пополнению)');
+      return;
+    }
+    setRewardSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        rewardType: rewardForm.rewardType,
+        label: rewardForm.label.trim(),
+        dropWeight: parseInt(rewardForm.dropWeight) || 10,
+        sortOrder: parseInt(rewardForm.sortOrder) || 0,
+        isActive: rewardForm.isActive,
+        amount: rewardForm.rewardType === 'BALANCE_TOPUP' ? parseFloat(rewardForm.amount) : null,
+        tokenId: rewardForm.tokenId ? parseInt(rewardForm.tokenId) : null,
+        bonusTemplateId: rewardForm.rewardType === 'DEPOSIT_BONUS' && rewardForm.bonusTemplateId ? parseInt(rewardForm.bonusTemplateId) : null,
+      };
+      const isEdit = !!editingReward;
+      const url = isEdit
+        ? `${API_URL}/api/admin/daily-case/rewards/${editingReward.id}`
+        : `${API_URL}/api/admin/daily-case/rewards`;
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: headers(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.error || 'Ошибка');
+      }
+      toast.success(isEdit ? 'Награда обновлена' : 'Награда добавлена');
+      setDailyCaseModal(false);
+      setEditingReward(null);
+      fetchData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
+      setRewardSaving(false);
     }
   };
 
@@ -401,10 +488,10 @@ export function AdminBannersPage() {
             </button>
             <div>
               <h1 className="text-lg font-bold leading-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                {activeTab === 'banners' ? 'Баннеры' : 'Промокоды'}
+                {activeTab === 'banners' ? 'Баннеры' : activeTab === 'bonuses' ? 'Промокоды' : 'Ежед. кейс'}
               </h1>
               <p className="text-[11px] text-gray-400 leading-tight mt-0.5">
-                {activeTab === 'banners' ? `${banners.length} шт.` : `${bonuses.length} шт.`}
+                {activeTab === 'banners' ? `${banners.length} шт.` : activeTab === 'bonuses' ? `${bonuses.length} шт.` : `${dailyCaseRewards.length} наград`}
               </p>
             </div>
           </div>
@@ -412,8 +499,12 @@ export function AdminBannersPage() {
             onClick={() => {
               if (activeTab === 'banners') {
                 resetForm(); setIsCreating(true);
-              } else {
+              } else if (activeTab === 'bonuses') {
                 resetBonusForm(); setIsCreatingBonus(true);
+              } else if (activeTab === 'dailyCase') {
+                setEditingReward(null);
+                setRewardForm({ rewardType: 'BALANCE_TOPUP', label: '', dropWeight: '25', sortOrder: '0', isActive: true, amount: '0.01', tokenId: '', bonusTemplateId: '' });
+                setDailyCaseModal(true);
               }
             }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 active:scale-95 text-[13px] font-semibold transition-all duration-200 shadow-lg shadow-blue-500/30 touch-manipulation"
@@ -456,6 +547,24 @@ export function AdminBannersPage() {
               <motion.div
                 layoutId="activeTab"
                 className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-xl"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('dailyCase')}
+            className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 touch-manipulation relative overflow-hidden ${
+              activeTab === 'dailyCase'
+                ? 'bg-gradient-to-r from-pink-600/20 to-rose-600/20 text-white shadow-lg shadow-pink-500/10 border border-pink-500/30'
+                : 'text-gray-400 hover:text-gray-300 hover:bg-white/5 active:bg-white/10'
+            }`}
+          >
+            <Gift size={14} className="inline mr-1.5 -mt-0.5" />
+            Кейс
+            {activeTab === 'dailyCase' && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-gradient-to-r from-pink-600/10 to-rose-600/10 rounded-xl"
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}
@@ -513,6 +622,11 @@ export function AdminBannersPage() {
                               🎁 Фрибет
                             </span>
                           )}
+                          {!b.isFreebet && b.wagerMultiplier === 0 && (
+                            <span className="px-2 py-1 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 text-[11px] font-semibold border border-cyan-500/30">
+                              Без отыгрыша
+                            </span>
+                          )}
                         </div>
                         <p className="text-[15px] font-bold text-white mb-1 truncate">{b.name}</p>
                         {b.description && (
@@ -527,7 +641,7 @@ export function AdminBannersPage() {
                             <span className="text-[13px] text-purple-400 font-bold">+{b.percentage}%</span>
                           )}
                           <span className="text-[11px] text-gray-400 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5">
-                            <Gift size={11} /> x{b.wagerMultiplier}
+                            <Gift size={11} /> {b.wagerMultiplier === 0 ? 'Без отыгрыша' : `x${b.wagerMultiplier}`}
                           </span>
                           {b.maxUsages !== null && (
                             <span className="text-[11px] text-gray-400 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5">
@@ -562,6 +676,92 @@ export function AdminBannersPage() {
                   </motion.div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── НАГРАДЫ ЕЖЕДНЕВНОГО КЕЙСА ── */}
+      {activeTab === 'dailyCase' && (
+        <div className="max-w-lg mx-auto px-4 py-4">
+          {dailyCaseRewards.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-gray-500"
+            >
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500/10 to-rose-500/10 flex items-center justify-center mb-4 border border-pink-500/20">
+                <Gift size={32} className="text-pink-400" />
+              </div>
+              <p className="font-semibold text-gray-300 text-base mb-1">Нет наград</p>
+              <p className="text-xs text-gray-500">Добавьте награды и создайте баннер с действием «Ежед. кейс»</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-3">
+              {dailyCaseRewards.map((r, index) => (
+                <motion.div
+                  key={r.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0f1219] border border-white/[0.08] p-4 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-bold text-white truncate">{r.label}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="text-[11px] px-2 py-0.5 rounded-lg bg-white/10 text-gray-400">
+                        {r.rewardType === 'BALANCE_TOPUP' ? 'На счёт' : 'Бонус к пополнению'}
+                      </span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-lg bg-pink-500/20 text-pink-300 font-semibold">
+                        Вес: {r.dropWeight}%
+                      </span>
+                      {r.rewardType === 'BALANCE_TOPUP' && r.amount != null && (
+                        <span className="text-[11px] text-green-400">{r.amount} {r.token?.symbol || 'USDT'}</span>
+                      )}
+                      {r.rewardType === 'DEPOSIT_BONUS' && r.bonusTemplate && (
+                        <span className="text-[11px] text-purple-400">{r.bonusTemplate.name}</span>
+                      )}
+                      {!r.isActive && <span className="text-[11px] text-red-400">Неактивен</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        setEditingReward(r);
+                        setRewardForm({
+                          rewardType: r.rewardType as 'BALANCE_TOPUP' | 'DEPOSIT_BONUS',
+                          label: r.label,
+                          dropWeight: String(r.dropWeight),
+                          sortOrder: String(r.sortOrder),
+                          isActive: r.isActive,
+                          amount: r.amount ? String(parseFloat(r.amount)) : '0.01',
+                          tokenId: r.tokenId ? String(r.tokenId) : '',
+                          bonusTemplateId: r.bonusTemplateId ? String(r.bonusTemplateId) : '',
+                        });
+                        setDailyCaseModal(true);
+                      }}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Удалить награду?')) return;
+                        try {
+                          await fetch(`${API_URL}/api/admin/daily-case/rewards/${r.id}`, { method: 'DELETE', headers: headers() });
+                          toast.success('Награда удалена');
+                          fetchData();
+                        } catch {
+                          toast.error('Ошибка удаления');
+                        }
+                      }}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           )}
         </div>
@@ -616,7 +816,18 @@ export function AdminBannersPage() {
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           {banner.actionType === 'BONUS' && (
                             <span className="text-[10px] px-2 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 font-semibold leading-tight border border-purple-500/30">
-                              🎁 {banner.bonus ? `+${banner.bonus.percentage}%` : 'Бонус'}
+                              🎁 {banner.bonus
+                                ? (banner.bonus.isFreebet && banner.bonus.freebetAmount != null
+                                    ? `Фрибет ${Number(banner.bonus.freebetAmount)}`
+                                    : banner.bonus.wagerMultiplier === 0
+                                      ? 'Промокод'
+                                      : `+${banner.bonus.percentage}%`)
+                                : 'Бонус'}
+                            </span>
+                          )}
+                          {banner.actionType === 'DAILY_CASE' && (
+                            <span className="text-[10px] px-2 py-1 rounded-lg bg-gradient-to-r from-pink-500/20 to-rose-500/20 text-pink-300 font-semibold leading-tight border border-pink-500/30">
+                              🎁 Ежед. кейс
                             </span>
                           )}
                           {banner.actionType === 'LINK' && (
@@ -814,10 +1025,11 @@ export function AdminBannersPage() {
                       <div className="space-y-2">
                         <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
                           <Gift size={14} className="text-blue-400" />
-                          Вейджер x
+                          Вейджер x (0 = без отыгрыша)
                         </label>
                         <input
                           type="number"
+                          min={0}
                           value={bonusForm.wagerMultiplier}
                           onChange={e => setBonusForm({...bonusForm, wagerMultiplier: e.target.value})}
                           placeholder="10"
@@ -868,10 +1080,11 @@ export function AdminBannersPage() {
                   >
                     <label className="text-[12px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
                       <Gift size={14} className="text-blue-400" />
-                      Вейджер x
+                      Вейджер x (0 = без отыгрыша)
                     </label>
                     <input
                       type="number"
+                      min={0}
                       value={bonusForm.wagerMultiplier}
                       onChange={e => setBonusForm({...bonusForm, wagerMultiplier: e.target.value})}
                       placeholder="10"
@@ -955,6 +1168,120 @@ export function AdminBannersPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL НАГРАДЫ ЕЖЕДНЕВНОГО КЕЙСА ── */}
+      <AnimatePresence>
+        {dailyCaseModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md"
+              onClick={() => { setDailyCaseModal(false); setEditingReward(null); }}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed inset-0 z-50 bg-[#0b0e14] overflow-y-auto"
+            >
+              <div className="sticky top-0 z-10 bg-[#0b0e14] border-b border-white/[0.06] px-4 py-4 flex items-center justify-between">
+                <button onClick={() => { setDailyCaseModal(false); setEditingReward(null); }} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5">
+                  <X size={20} className="text-gray-400" />
+                </button>
+                <h2 className="text-[16px] font-bold text-white">{editingReward ? 'Редактировать награду' : 'Новая награда кейса'}</h2>
+                <button onClick={saveDailyCaseReward} disabled={rewardSaving} className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-[13px] font-semibold disabled:opacity-50">
+                  {rewardSaving ? <Loader2 size={14} className="animate-spin inline" /> : 'Сохранить'}
+                </button>
+              </div>
+              <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+                <div>
+                  <label className="text-[12px] font-bold text-gray-400 uppercase block mb-2">Название награды</label>
+                  <input
+                    value={rewardForm.label}
+                    onChange={e => setRewardForm({ ...rewardForm, label: e.target.value })}
+                    placeholder="Например: 0.01 USDT на счёт"
+                    className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-white placeholder:text-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-gray-400 uppercase block mb-2">Тип</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setRewardForm({ ...rewardForm, rewardType: 'BALANCE_TOPUP' })}
+                      className={`h-12 rounded-xl border-2 text-[13px] font-medium ${rewardForm.rewardType === 'BALANCE_TOPUP' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-white/10 text-gray-400'}`}
+                    >
+                      Пополнение на счёт
+                    </button>
+                    <button
+                      onClick={() => setRewardForm({ ...rewardForm, rewardType: 'DEPOSIT_BONUS' })}
+                      className={`h-12 rounded-xl border-2 text-[13px] font-medium ${rewardForm.rewardType === 'DEPOSIT_BONUS' ? 'border-purple-500 bg-purple-500/10 text-purple-400' : 'border-white/10 text-gray-400'}`}
+                    >
+                      Бонус к пополнению
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-gray-400 uppercase block mb-2">Вес выпадения (%)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={rewardForm.dropWeight}
+                    onChange={e => setRewardForm({ ...rewardForm, dropWeight: e.target.value })}
+                    className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-white"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">Чем выше вес, тем чаще выпадает эта награда</p>
+                </div>
+                {rewardForm.rewardType === 'BALANCE_TOPUP' && (
+                  <div>
+                    <label className="text-[12px] font-bold text-gray-400 uppercase block mb-2">Сумма (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={rewardForm.amount}
+                      onChange={e => setRewardForm({ ...rewardForm, amount: e.target.value })}
+                      className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-white"
+                    />
+                  </div>
+                )}
+                {rewardForm.rewardType === 'DEPOSIT_BONUS' && (
+                  <div>
+                    <label className="text-[12px] font-bold text-gray-400 uppercase block mb-2">Промокод (бонус)</label>
+                    <select
+                      value={rewardForm.bonusTemplateId}
+                      onChange={e => setRewardForm({ ...rewardForm, bonusTemplateId: e.target.value })}
+                      className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-white"
+                    >
+                      <option value="">Выберите промокод</option>
+                      {bonuses.filter(b => b.isFreebet || b.wagerMultiplier === 0).map(b => (
+                        <option key={b.id} value={b.id}>{b.code} — {b.name} {b.isFreebet && b.freebetAmount ? `(${b.freebetAmount} USDT)` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[14px] font-semibold text-white">Активна</span>
+                  <button
+                    type="button"
+                    onClick={() => setRewardForm({ ...rewardForm, isActive: !rewardForm.isActive })}
+                    className={`relative w-14 h-8 rounded-full transition-colors ${rewardForm.isActive ? 'bg-green-500' : 'bg-gray-600'}`}
+                  >
+                    <motion.div
+                      animate={{ x: rewardForm.isActive ? 24 : 4 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="absolute top-1 w-6 h-6 rounded-full bg-white shadow"
+                    />
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
@@ -1156,13 +1483,14 @@ export function AdminBannersPage() {
                 {/* ── Действие ── */}
                 <div>
                   <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-2">Действие</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(['NONE', 'LINK', 'BONUS'] as const).map((type) => {
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(['NONE', 'LINK', 'BONUS', 'DAILY_CASE'] as const).map((type) => {
                       const active = formData.actionType === type;
                       const styles: Record<string, { label: string; icon: React.ReactNode; border: string; bg: string; text: string }> = {
-                        NONE:  { label: 'Нет',    icon: null,                border: '#6b7280', bg: 'rgba(107,114,128,0.1)', text: '#9ca3af' },
-                        LINK:  { label: 'Ссылка', icon: <LinkIcon size={13} />, border: '#3b82f6', bg: 'rgba(59,130,246,0.1)', text: '#60a5fa' },
-                        BONUS: { label: 'Бонус',  icon: <Gift size={13} />,     border: '#a855f7', bg: 'rgba(168,85,247,0.1)', text: '#c084fc' },
+                        NONE:       { label: 'Нет',   icon: null,                border: '#6b7280', bg: 'rgba(107,114,128,0.1)', text: '#9ca3af' },
+                        LINK:       { label: 'Ссылка', icon: <LinkIcon size={13} />, border: '#3b82f6', bg: 'rgba(59,130,246,0.1)', text: '#60a5fa' },
+                        BONUS:      { label: 'Бонус',  icon: <Gift size={13} />,     border: '#a855f7', bg: 'rgba(168,85,247,0.1)', text: '#c084fc' },
+                        DAILY_CASE: { label: 'Ежед. кейс', icon: <Gift size={13} />, border: '#ec4899', bg: 'rgba(236,72,153,0.1)', text: '#f472b6' },
                       };
                       const s = styles[type];
                       return (
@@ -1232,7 +1560,11 @@ export function AdminBannersPage() {
                                 </div>
                               </div>
                               <span className={`text-[13px] font-bold shrink-0 ml-2 ${selected ? 'text-purple-400' : 'text-gray-500'}`}>
-                                +{b.percentage}%
+                                {b.isFreebet && b.freebetAmount != null
+                                  ? `${Number(b.freebetAmount)} USDT`
+                                  : b.wagerMultiplier === 0
+                                    ? 'Без отыгрыша'
+                                    : `+${b.percentage}%`}
                               </span>
                             </button>
                           );

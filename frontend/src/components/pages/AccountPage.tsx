@@ -197,17 +197,29 @@ const MetricCard = ({
 // 🎁 КОМПОНЕНТ: ИНФОРМАЦИЯ ОБ АКТИВНОМ БОНУСЕ
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
+const BonusCard = ({ bonus, onCancel }: { bonus: ActiveBonus; onCancel?: () => Promise<void> }) => {
   const wagered = toNumber(bonus.wageredAmount);
   const required = toNumber(bonus.requiredWager);
   const granted = toNumber(bonus.grantedAmount);
+  const noWager = required <= 0;
   const remaining = Math.max(0, required - wagered);
-  const progress = Math.min((wagered / required) * 100, 100);
-  
-  const expiresAt = new Date(bonus.expiresAt);
+  const progress = noWager ? 100 : Math.min((wagered / required) * 100, 100);
+  const [cancelling, setCancelling] = useState(false);
+
+  const expiresAt = bonus.expiresAt ? new Date(bonus.expiresAt) : null;
   const now = new Date();
-  const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-  
+  const daysLeft = expiresAt ? Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+
+  const handleCancel = async () => {
+    if (!onCancel || !window.confirm('Отменить бонус? Весь бонусный счёт будет обнулён. Продолжить?')) return;
+    setCancelling(true);
+    try {
+      await onCancel();
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -228,7 +240,7 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
             Активный бонус
           </h3>
           <p style={{ color: COLORS.mutedForeground }} className="text-xs">
-            Отыграйте требуемую сумму чтобы вывести выигрыш
+            {noWager ? 'Бонус без отыгрыша' : 'Отыграйте требуемую сумму чтобы вывести выигрыш'}
           </p>
         </div>
       </div>
@@ -263,10 +275,10 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
           }}
         >
           <p style={{ color: COLORS.mutedForeground }} className="text-xs font-medium mb-2">
-            Осталось отыграть
+            {noWager ? 'Без отыгрыша' : 'Осталось отыграть'}
           </p>
           <p style={{ color: COLORS.primary }} className="text-2xl font-bold">
-            {remaining.toFixed(2)}
+            {noWager ? '0' : remaining.toFixed(2)}
           </p>
           <p style={{ color: COLORS.mutedForeground }} className="text-xs mt-1">
             USDT
@@ -306,25 +318,46 @@ const BonusCard = ({ bonus }: { bonus: ActiveBonus }) => {
         </div>
 
         <div className="flex justify-between text-xs mt-3" style={{ color: COLORS.mutedForeground }}>
-          <span>Отыграно: {wagered.toFixed(2)} / {required.toFixed(2)}</span>
-          <span>10x от {granted.toFixed(2)}</span>
+          <span>Отыграно: {wagered.toFixed(2)} / {noWager ? '0' : required.toFixed(2)}</span>
+          {!noWager && <span>Отыгрыш от {granted.toFixed(2)}</span>}
         </div>
       </div>
 
       {/* ДНЕЙ ДО ИСТЕЧЕНИЯ */}
-      <div
-        className="rounded-xl p-4 flex items-center gap-3 border transition-all"
-        style={{
-          background: 'color-mix(in srgb, #EF4444 15%, transparent)',
-          borderColor: '#EF4444',
-          borderOpacity: 0.3,
-        }}
-      >
-        <Clock size={18} style={{ color: '#EF4444' }} />
-        <p style={{ color: '#EF4444' }} className="font-medium">
-          ⏰ Осталось {daysLeft} дн{daysLeft !== 1 ? '' : 'я'}
-        </p>
-      </div>
+      {expiresAt && (
+        <div
+          className="rounded-xl p-4 flex items-center gap-3 border transition-all"
+          style={{
+            background: 'color-mix(in srgb, #EF4444 15%, transparent)',
+            borderColor: '#EF4444',
+            borderOpacity: 0.3,
+          }}
+        >
+          <Clock size={18} style={{ color: '#EF4444' }} />
+          <p style={{ color: '#EF4444' }} className="font-medium">
+            ⏰ Осталось {daysLeft} дн{daysLeft !== 1 ? '' : 'я'}
+          </p>
+        </div>
+      )}
+
+      {/* КНОПКА ОТМЕНЫ БОНУСА */}
+      {onCancel && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all disabled:opacity-50"
+            style={{
+              borderColor: '#EF4444',
+              color: '#EF4444',
+              background: 'color-mix(in srgb, #EF4444 10%, transparent)',
+            }}
+          >
+            {cancelling ? 'Отмена...' : 'Отменить бонус (бонусный счёт будет обнулён)'}
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -892,9 +925,29 @@ export function AccountPage() {
 
           {/* 🎁 АКТИВНЫЙ БОНУС */}
           {activeBonus && (
-            <>
-              <BonusCard bonus={activeBonus} />
-            </>
+            <BonusCard
+              bonus={activeBonus}
+              onCancel={async () => {
+                try {
+                  const res = await fetch(`${API_URL}/cancel-active-bonus`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                  });
+                  const json = await res.json();
+                  if (res.ok && json.success) {
+                    setActiveBonus(null);
+                    fetchActiveBonus().catch(() => {});
+                  } else {
+                    throw new Error(json.message || json.error || 'Ошибка отмены');
+                  }
+                } catch (e) {
+                  throw e;
+                }
+              }}
+            />
           )}
 
           {/* 📊 ОСНОВНЫЕ МЕТРИКИ */}

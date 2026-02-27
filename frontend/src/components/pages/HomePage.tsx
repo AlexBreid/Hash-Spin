@@ -4,7 +4,8 @@ import { GameCard } from '../GameCard';
 import { GameSlider } from '../GameSlider';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
-import { ChevronRight, Star, Zap, Gift, Rocket, Plus, Settings } from 'lucide-react';
+import { ChevronRight, Star, Zap, Gift, Rocket, Plus, Settings, X, Loader2 } from 'lucide-react';
+import { DailyCaseModal } from '../modals/DailyCaseModal';
 import { useNavigate } from 'react-router-dom';
 import { useFetch } from '../../hooks/useDynamicApi';
 import { useAuth } from '../../context/AuthContext';
@@ -35,13 +36,17 @@ interface Banner {
   text?: string;
   buttonText?: string;
   linkUrl?: string;
-  actionType: 'LINK' | 'BONUS' | 'NONE';
+  actionType: 'LINK' | 'BONUS' | 'NONE' | 'DAILY_CASE';
   bonusId?: number;
   bonus?: {
     id: number;
     code: string;
     name: string;
+    description?: string | null;
     percentage: number;
+    wagerMultiplier?: number;
+    isFreebet?: boolean;
+    freebetAmount?: string | number | null;
   };
 }
 
@@ -146,6 +151,9 @@ export function HomePage() {
   const isAdmin = profileData?.data?.isAdmin || profileData?.isAdmin || false;
   
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [dailyCaseModalOpen, setDailyCaseModalOpen] = useState(false);
+  const [bonusModalBonus, setBonusModalBonus] = useState<Banner['bonus'] | null>(null);
+  const [bonusActivating, setBonusActivating] = useState(false);
 
   // Загрузка баннеров напрямую (contentRoutes не в dynamic API)
   const fetchBanners = useCallback(async () => {
@@ -351,6 +359,10 @@ export function HomePage() {
   }, [profileData]);
 
   const handleBannerAction = (banner: Banner) => {
+    if (banner.actionType === 'DAILY_CASE') {
+      setDailyCaseModalOpen(true);
+      return;
+    }
     if (banner.actionType === 'LINK' && banner.linkUrl) {
       if (banner.linkUrl.startsWith('http')) {
         window.open(banner.linkUrl, '_blank');
@@ -358,14 +370,12 @@ export function HomePage() {
         navigate(banner.linkUrl);
       }
     } else if (banner.actionType === 'BONUS') {
-      // Активация бонуса
       if (banner.bonus?.code) {
-        activateBonus(banner.bonus.code);
+        setBonusModalBonus(banner.bonus);
       } else {
         toast.error('Бонус недоступен');
       }
     } else if (banner.actionType === 'NONE' && banner.linkUrl) {
-      // Баннер без действия, но с ссылкой - редирект при клике
       if (banner.linkUrl.startsWith('http')) {
         window.open(banner.linkUrl, '_blank');
       } else {
@@ -374,28 +384,35 @@ export function HomePage() {
     }
   };
 
-  const activateBonus = async (bonusCode: string) => {
+  /** Применяет промокод: фрибет — через apply-freebet. Возвращает true при успехе (чтобы закрыть модалку). */
+  const applyPromoFromBanner = async (bonusCode: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/referral/link-referrer`, {
+      const res = await fetch(`${API_URL}/api/v1/deposit/apply-freebet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ referralCode: bonusCode }),
+        body: JSON.stringify({ code: bonusCode }),
       });
-      
       const result = await res.json();
-      
-      if (res.ok && (result.success || !result.error)) {
-        toast.success(`🎉 Бонус "${bonusCode}" активирован!`);
-        // Обновляем профиль чтобы отразить новый статус
+
+      if (res.ok && result.success) {
+        toast.success(result.message || `Промокод "${bonusCode}" активирован!`);
         fetchProfile().catch(() => {});
-      } else {
-        toast.error(result.error || result.message || 'Не удалось активировать бонус');
+        return true;
       }
-    } catch (err) {
-      toast.error('Ошибка при активации бонуса');
+      const msg = result.message || result.error || '';
+      if (msg.includes('фрибет') || msg.includes('не является фрибетом')) {
+        toast.info(`Промокод ${bonusCode}: используйте при пополнении счёта`, { duration: 5000 });
+        navigate('/deposit');
+        return true;
+      }
+      toast.error(msg || 'Не удалось применить промокод');
+      return false;
+    } catch {
+      toast.error('Ошибка при активации промокода');
+      return false;
     }
   };
 
@@ -485,7 +502,7 @@ export function HomePage() {
                             }}>
                               {banner.title && (
                                 <div className="flex items-center space-x-2 mb-3">
-                                  {banner.actionType === 'BONUS' ? (
+                                  {banner.actionType === 'BONUS' || banner.actionType === 'DAILY_CASE' ? (
                                     <Gift className="w-6 h-6" style={{ color: colors.accent }} />
                                   ) : (
                                     <Star className="w-6 h-6" style={{ color: '#3b82f6' }} />
@@ -502,11 +519,21 @@ export function HomePage() {
                                 </p>
                               )}
 
+                              {banner.actionType === 'DAILY_CASE' && (
+                                <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-500/30 w-fit">
+                                  <Gift className="w-4 h-4 text-purple-400" />
+                                  <span className="text-sm font-semibold text-purple-300">Бесплатный ежедневный кейс</span>
+                                </div>
+                              )}
                               {banner.bonus && banner.actionType === 'BONUS' && (
                                 <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-500/30 w-fit">
                                   <Gift className="w-4 h-4 text-purple-400" />
                                   <span className="text-sm font-semibold text-purple-300">
-                                    +{banner.bonus.percentage}% бонус
+                                    {banner.bonus.isFreebet && banner.bonus.freebetAmount != null
+                                      ? `Фрибет ${Number(banner.bonus.freebetAmount)} USDT`
+                                      : banner.bonus.percentage === 0
+                                        ? 'Промокод'
+                                        : `+${banner.bonus.percentage}% бонус`}
                                   </span>
                                 </div>
                               )}
@@ -519,15 +546,15 @@ export function HomePage() {
                                   }}
                                   className="font-semibold shadow-lg transition-all active:scale-95 w-fit"
                                   style={{
-                                    background: banner.actionType === 'BONUS' 
+                                    background: banner.actionType === 'BONUS' || banner.actionType === 'DAILY_CASE'
                                       ? 'linear-gradient(to right, #8b5cf6, #a855f7)' 
                                       : (index % 2 === 0 ? colors.accent : 'linear-gradient(to right, #3b82f6, #8b5cf6)'),
                                     color: 'white'
                                   }}
                                 >
-                                  {banner.actionType === 'BONUS' && <Gift className="w-4 h-4 mr-2 inline" />}
+                                  {(banner.actionType === 'BONUS' || banner.actionType === 'DAILY_CASE') && <Gift className="w-4 h-4 mr-2 inline" />}
                                   {banner.actionType === 'LINK' && <Rocket className="w-4 h-4 mr-2 inline" />}
-                                  {banner.buttonText}
+                                  {banner.actionType === 'DAILY_CASE' ? (banner.buttonText || 'Открыть кейс') : banner.buttonText}
                                 </Button>
                               )}
                             </div>
@@ -637,6 +664,82 @@ export function HomePage() {
           <ChevronRight className="w-5 h-5 ml-2" />
         </Button>
       </div>
+
+      {dailyCaseModalOpen && (
+        <DailyCaseModal
+          onClose={() => setDailyCaseModalOpen(false)}
+          token={token}
+          onClaimed={() => fetchProfile().catch(() => {})}
+        />
+      )}
+
+      {/* Модалка бонуса с баннера: описание из БД + Активировать / Закрыть */}
+      {bonusModalBonus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div
+            className="w-full max-w-[340px] rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+            style={{ background: 'var(--card)', color: 'var(--foreground)' }}
+          >
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-500/20">
+                    <Gift className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <h3 className="text-lg font-bold">{bonusModalBonus.name}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBonusModalBonus(null)}
+                  className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-[13px] font-mono text-gray-400 mb-2">Промокод: {bonusModalBonus.code}</p>
+              {bonusModalBonus.description && (
+                <p className="text-sm text-gray-300 mb-4 whitespace-pre-wrap">{bonusModalBonus.description}</p>
+              )}
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3 mb-4">
+                <p className="text-sm font-semibold text-purple-300">
+                  {bonusModalBonus.isFreebet && bonusModalBonus.freebetAmount != null
+                    ? `Фрибет ${Number(bonusModalBonus.freebetAmount)} USDT`
+                    : bonusModalBonus.percentage === 0
+                      ? 'Промокод'
+                      : `Бонус +${bonusModalBonus.percentage}%`}
+                  {bonusModalBonus.wagerMultiplier === 0 ? ' · Без отыгрыша' : ` · Отыгрыш x${bonusModalBonus.wagerMultiplier}`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBonusModalBonus(null)}
+                  className="flex-1 py-3 rounded-xl border border-white/20 font-semibold text-sm hover:bg-white/5 transition-colors"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  disabled={bonusActivating}
+                  onClick={async () => {
+                    if (!bonusModalBonus?.code) return;
+                    setBonusActivating(true);
+                    try {
+                      const ok = await applyPromoFromBanner(bonusModalBonus.code);
+                      if (ok) setBonusModalBonus(null);
+                    } finally {
+                      setBonusActivating(false);
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl font-semibold text-sm text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {bonusActivating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Gift className="w-4 h-4" /> Активировать</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
