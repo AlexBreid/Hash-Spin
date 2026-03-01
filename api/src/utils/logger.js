@@ -64,8 +64,11 @@ class Logger {
       // ✅ КОНСОЛЬ
       try {
         const prefix = `${COLORS[level]}[${timestamp}] [${levelName}] [${category}]${COLORS.reset}`;
-        const output = `${prefix} ${message}`;
-        
+        let output = `${prefix} ${message}`;
+        if (level === 'error' && data && typeof data === 'object' && Object.keys(data).length > 0) {
+          const dataStr = JSON.stringify(data);
+          output += (dataStr.length <= 500 ? ` ${dataStr}` : ` ${dataStr.slice(0, 500)}...`);
+        }
         if (level === 'error') {
           console.error(output);
         } else if (level === 'warn') {

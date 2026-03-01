@@ -16,7 +16,7 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const currencySyncService = require('../services/currencySyncService');
 const plinkoService = require('../services/PlinkoService');
 const logger = require('../utils/logger');
-const { deductBetFromBalance, creditWinnings } = require('./helpers/gameReferralHelper');
+const { deductBetFromBalance, creditWinnings, updateWagerAndCheckConversion } = require('./helpers/gameReferralHelper');
 
 /**
  * 💰 GET /api/v1/plinko/balance
@@ -109,6 +109,10 @@ router.post('/api/v1/plinko/drop', authenticateToken, async (req, res) => {
     // Зачисляем выигрыш
     if (winAmount > 0) {
       await creditWinnings(userId, winAmount, tokenId, deductResult.balanceType);
+      // Plinko: в отыгрыш идёт вся выигранная сумма
+      if (deductResult.balanceType === 'BONUS' && deductResult.userBonusId) {
+        await updateWagerAndCheckConversion(userId, winAmount, tokenId, deductResult.userBonusId);
+      }
     }
 
     // Получаем обновлённый баланс
@@ -167,6 +171,10 @@ router.post('/api/v1/plinko/play', authenticateToken, async (req, res) => {
     // Зачисляем выигрыш
     if (winAmount > 0) {
       await creditWinnings(userId, winAmount, tokenId, deductResult.balanceType);
+      // Plinko: в отыгрыш идёт вся выигранная сумма
+      if (deductResult.balanceType === 'BONUS' && deductResult.userBonusId) {
+        await updateWagerAndCheckConversion(userId, winAmount, tokenId, deductResult.userBonusId);
+      }
     }
 
     // Баланс

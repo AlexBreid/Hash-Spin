@@ -94,16 +94,17 @@ router.post('/api/v1/crash/cashout-result', (req, res) => {
             }
           });
 
-          // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР СРАЗУ (если была ставка с BONUS)
+          // 🆕 ПРОВЕРЯЕМ ВЕЙДЖЕР СРАЗУ (если была ставка с BONUS). В отыгрыш идёт только чистая прибыль (выигрыш − ставка)
           if (balanceType === 'BONUS' && userBonusId) {
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
             });
             
             if (bonus) {
-              // ✅ ДОБАВЛЯЕМ ВЫИГРЫШ К WAGERED
+              const betAmountNum = parseFloat(bet.betAmount.toString());
+              const wagerProfit = Math.max(0, winningsAmount - betAmountNum);
               const currentWagered = parseFloat(bonus.wageredAmount.toString());
-              const newWagered = parseFloat((currentWagered + winningsAmount).toFixed(8));
+              const newWagered = parseFloat((currentWagered + wagerProfit).toFixed(8));
               const requiredNum = parseFloat(bonus.requiredWager.toString());
 
               await tx.userBonus.update({

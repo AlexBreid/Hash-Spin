@@ -246,25 +246,8 @@ class ReferralService {
         }
       }
 
-      // Обновляем бонус если это бонусная ставка
-      if (balanceType === 'BONUS') {
-        const activeBonus = await prisma.userBonus.findFirst({
-          where: {
-            userId: userIdNum,
-            tokenId,
-            isActive: true,
-            isCompleted: false
-          }
-        });
-
-        if (activeBonus) {
-          const newWagered = parseFloat(activeBonus.wageredAmount.toString()) + betNum;
-          await prisma.userBonus.update({
-            where: { id: activeBonus.id },
-            data: { wageredAmount: newWagered.toFixed(8) }
-          });
-        }
-      }
+      // Отыгрыш бонуса (wagered) обновляется при зачислении выигрыша в играх:
+      // в отыгрыш идёт только чистая прибыль (выигрыш − ставка), не при размещении ставки
     } catch (error) {
       logger.warn('REFERRAL', 'Error processing bet', { error: error.message });
     }

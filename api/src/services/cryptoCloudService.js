@@ -61,41 +61,104 @@ class CryptoCloudService {
   }
 
   /**
-   * Маппинг валют для CryptoCloud API
-   * CryptoCloud использует специфичные идентификаторы валют
+   * Код валюти для CryptoCloud API (вивід).
+   * Документація: https://docs.cryptocloud.plus/ru/api-reference-v2/withdrawals
+   * Дозволені коди (єдиний джерело правди):
+   * BTC, LTC, TRX, SOL, TON, BNB, ETH, ETH_ARB, ETH_BASE, ETH_OPT,
+   * USDT_ARB, USDT_BSC, USDT_ERC20, USDT_OPT, USDT_SOL, USDT_TON, USDT_TRC20,
+   * USDC_ARB, USDC_BASE, USDC_BSC, USDC_ERC20, USDC_OPT, USDC_SOL,
+   * DAI_ARB, DAI_BASE, DAI_BSC, DAI_ERC20, DAI_OPT,
+   * USDD_TRC20, PYUSD_ERC20, PYUSD_SOL, XAUT_ERC20, XAUT_TON,
+   * ARB_ARB, OP_OPT, PEPE_BSC, PEPE_ERC20, SHIB_BSC, SHIB_ERC20, TRUMP_SOL
+   * @returns {string|null} Точний код або null якщо пара symbol+network не підтримується
    */
   getCryptoCloudCurrency(symbol, network) {
+    const sym = (symbol || '').toUpperCase().trim();
+    const net = (network || '').trim();
+    const netNorm = net.replace(/-/g, '').toUpperCase();
+
+    // Маппінг (symbol_network з БД) → точний код CryptoCloud (тільки з офіційного списку)
     const mapping = {
-      // USDT на разных сетях
+      'BTC_BTC': 'BTC',
+      'LTC_LTC': 'LTC',
+      'TRX_TRC20': 'TRX',
+      'TRX_TRC-20': 'TRX',
+      'SOL_SOL': 'SOL',
+      'TON_TON': 'TON',
+      'BNB_BNB': 'BNB',
+      'BNB_BSC': 'BNB',
+      'BNB_BEP-20': 'BNB',
+      'ETH_ETH': 'ETH',
+      'ETH_ERC20': 'ETH',
+      'ETH_ERC-20': 'ETH',
+      'ETH_ARB': 'ETH_ARB',
+      'ETH_ARBITRUM': 'ETH_ARB',
+      'ETH_BASE': 'ETH_BASE',
+      'ETH_OPT': 'ETH_OPT',
+      'ETH_OP': 'ETH_OPT',
+      'ETH_OPTIMISM': 'ETH_OPT',
+      'USDT_TRC20': 'USDT_TRC20',
       'USDT_TRC-20': 'USDT_TRC20',
-      'USDT_ERC-20': 'USDT_ERC20', 
+      'USDT_ERC20': 'USDT_ERC20',
+      'USDT_ERC-20': 'USDT_ERC20',
+      'USDT_BSC': 'USDT_BSC',
       'USDT_BEP-20': 'USDT_BSC',
       'USDT_SOL': 'USDT_SOL',
       'USDT_TON': 'USDT_TON',
-      'USDT_ARB': 'USDT_ARBITRUM',
-      'USDT_OP': 'USDT_OPTIMISM',
-      // USDC
+      'USDT_ARB': 'USDT_ARB',
+      'USDT_ARBITRUM': 'USDT_ARB',
+      'USDT_OPT': 'USDT_OPT',
+      'USDT_OP': 'USDT_OPT',
+      'USDT_OPTIMISM': 'USDT_OPT',
+      'USDC_ERC20': 'USDC_ERC20',
       'USDC_ERC-20': 'USDC_ERC20',
+      'USDC_BSC': 'USDC_BSC',
       'USDC_BEP-20': 'USDC_BSC',
       'USDC_SOL': 'USDC_SOL',
-      'USDC_ARB': 'USDC_ARBITRUM',
-      'USDC_OP': 'USDC_OPTIMISM',
+      'USDC_ARB': 'USDC_ARB',
+      'USDC_ARBITRUM': 'USDC_ARB',
       'USDC_BASE': 'USDC_BASE',
-      // Основные криптовалюты
-      'BTC_BTC': 'BTC',
-      'ETH_ERC-20': 'ETH',
-      'ETH_ARB': 'ETH_ARBITRUM',
-      'ETH_OP': 'ETH_OPTIMISM',
-      'BNB_BEP-20': 'BNB_BSC',
-      'LTC_LTC': 'LTC',
-      'TRX_TRC-20': 'TRX',
-      'TON_TON': 'TON',
-      'SOL_SOL': 'SOL',
-      'SHIB_ERC-20': 'SHIB',
+      'USDC_OPT': 'USDC_OPT',
+      'USDC_OP': 'USDC_OPT',
+      'USDC_OPTIMISM': 'USDC_OPT',
+      'DAI_ERC20': 'DAI_ERC20',
+      'DAI_ERC-20': 'DAI_ERC20',
+      'DAI_BSC': 'DAI_BSC',
+      'DAI_BEP-20': 'DAI_BSC',
+      'DAI_ARB': 'DAI_ARB',
+      'DAI_ARBITRUM': 'DAI_ARB',
+      'DAI_BASE': 'DAI_BASE',
+      'DAI_OPT': 'DAI_OPT',
+      'DAI_OP': 'DAI_OPT',
+      'DAI_OPTIMISM': 'DAI_OPT',
+      'USDD_TRC20': 'USDD_TRC20',
+      'USDD_TRC-20': 'USDD_TRC20',
+      'PYUSD_ERC20': 'PYUSD_ERC20',
+      'PYUSD_ERC-20': 'PYUSD_ERC20',
+      'PYUSD_SOL': 'PYUSD_SOL',
+      'XAUT_ERC20': 'XAUT_ERC20',
+      'XAUT_ERC-20': 'XAUT_ERC20',
+      'XAUT_TON': 'XAUT_TON',
+      'ARB_ARB': 'ARB_ARB',
+      'ARB_ARBITRUM': 'ARB_ARB',
+      'OP_OPT': 'OP_OPT',
+      'OP_OPTIMISM': 'OP_OPT',
+      'PEPE_BSC': 'PEPE_BSC',
+      'PEPE_BEP-20': 'PEPE_BSC',
+      'PEPE_ERC20': 'PEPE_ERC20',
+      'PEPE_ERC-20': 'PEPE_ERC20',
+      'SHIB_BSC': 'SHIB_BSC',
+      'SHIB_BEP-20': 'SHIB_BSC',
+      'SHIB_ERC20': 'SHIB_ERC20',
+      'SHIB_ERC-20': 'SHIB_ERC20',
+      'TRUMP_SOL': 'TRUMP_SOL',
     };
-    
-    const key = `${symbol.toUpperCase()}_${network}`;
-    return mapping[key] || symbol.toUpperCase();
+
+    const key = `${sym}_${net}`;
+    if (mapping[key]) return mapping[key];
+    const keyNorm = `${sym}_${netNorm}`;
+    if (mapping[keyNorm]) return mapping[keyNorm];
+    return null;
   }
 
   /**
@@ -990,11 +1053,11 @@ class CryptoCloudService {
         usingMainKey: !CRYPTO_CLOUD_WITHDRAW_API_KEY && !!CRYPTO_CLOUD_API_KEY
       });
 
-      // Проверяем формат данных перед отправкой
+      // API: to_address* (string), amount* (number), currency_code
       const requestData = {
         currency_code: currencyCode,
-        to_address: toAddress,
-        amount: amountNum.toString()
+        to_address: String(toAddress),
+        amount: parseFloat(amountNum)
       };
 
       logger.info('CRYPTOCLOUD', 'Withdrawal request data', {
@@ -1002,9 +1065,7 @@ class CryptoCloudService {
         to_address: requestData.to_address.substring(0, 10) + '...'
       });
 
-      // Используем правильный endpoint для выводов в CryptoCloud API v2
-      // Документация: https://docs.cryptocloud.plus/ru/api-reference-v2/withdrawals
-      // Endpoint: /v2/invoice/api/out/create
+      // POST https://api.cryptocloud.plus/v2/invoice/api/out/create
       const withdrawResponse = await this.withdrawApi.post('/v2/invoice/api/out/create', requestData);
       
       logger.info('CRYPTOCLOUD', 'Withdrawal response', {
@@ -1023,23 +1084,25 @@ class CryptoCloudService {
         fullResponse: JSON.stringify(responseData, null, 2)
       });
 
-      if (responseData?.status === 'success' || responseData?.result === 'success' || responseData?.success) {
+      // По доку: 200 OK → { "status": "success", "result": { "uuid": "INV-...", "status": "created", "amount": 10.0, ... } }
+      if (responseData?.status === 'success' || responseData?.result?.status === 'created') {
+        const result = responseData?.result || responseData?.data || responseData;
+        const invoiceId = result?.uuid || result?.invoice_id || responseData?.data?.id || responseData?.uuid;
         return {
           success: true,
-          data: responseData.data || responseData.result || responseData,
-          txId: responseData.data?.id || responseData.id || responseData.result?.id || responseData.uuid
+          data: result || responseData,
+          txId: invoiceId || 'pending'
         };
       }
 
-      // Если статус не success, но есть данные - возможно это нормально
-      if (responseData?.id || responseData?.uuid) {
-        logger.info('CRYPTOCLOUD', 'Withdrawal created but status not success', {
-          responseData
+      if (responseData?.result?.uuid) {
+        logger.info('CRYPTOCLOUD', 'Withdrawal created (result.uuid present)', {
+          uuid: responseData.result.uuid
         });
         return {
           success: true,
-          data: responseData,
-          txId: responseData.id || responseData.uuid
+          data: responseData.result,
+          txId: responseData.result.uuid
         };
       }
 
@@ -1076,20 +1139,24 @@ class CryptoCloudService {
         amount
       };
 
-      logger.error('CRYPTOCLOUD', 'Error withdrawing - FULL DETAILS', {
+      const responseSummary = error.response?.data != null
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : (error.response?.status ? `HTTP ${error.response.status}` : error.message);
+      logger.error('CRYPTOCLOUD', `Error withdrawing: ${error.response?.status || 'N/A'} | ${responseSummary}`, {
         ...errorDetails,
         errorDetailsString: JSON.stringify(errorDetails, null, 2),
         responseDataString: error.response?.data ? JSON.stringify(error.response.data, null, 2) : 'no response data'
       });
 
-      // Формируем понятное сообщение об ошибке
+      // Формируем понятное сообщение об ошибке; зберігаємо сирий об'єкт для відповіді API
       let errorMessage = 'Unknown error';
-      
+      let rawCryptoCloudError = null;
+
       // Сначала пробуем получить сообщение из самого error
       if (error.message) {
         errorMessage = String(error.message);
       }
-      
+
       // Затем пробуем извлечь из response.data
       if (error.response?.data) {
         const apiError = error.response.data;
@@ -1119,7 +1186,30 @@ class CryptoCloudService {
           } else if (apiError.result?.message) {
             errorMessage = String(apiError.result.message);
           } else if (apiError.result?.error) {
-            errorMessage = String(apiError.result.error);
+            const err = apiError.result.error;
+            if (err && typeof err === 'object' && !Array.isArray(err)) {
+              rawCryptoCloudError = { code: err.code, value_min: err.value_min, value_max: err.value_max };
+              if (err.code === 'uncorrected_amount') {
+                const min = err.value_min != null ? err.value_min : 10;
+                errorMessage = `Minimum withdrawal amount is ${min} USDT`;
+              } else if (/insufficient|low_balance|not_enough/i.test(String(err.code || '') + String(err.message || ''))) {
+                errorMessage = 'Insufficient funds on your CryptoCloud wallet. Please top up the merchant balance in CryptoCloud.';
+              } else if (err.code) {
+                errorMessage = err.message ? String(err.message) : (err.code + (err.value_min != null ? ` (min: ${err.value_min})` : ''));
+              } else {
+                errorMessage = JSON.stringify(err);
+              }
+            } else {
+              errorMessage = String(err);
+            }
+          } else if (apiError.result && typeof apiError.result === 'object' && !apiError.result.error) {
+            // CryptoCloud: помилка в result.network (наприклад "Не удалось определить сеть для адреса")
+            const msg = apiError.result.network || apiError.result.message || apiError.result.address;
+            if (msg && typeof msg === 'string') {
+              errorMessage = msg;
+            } else {
+              errorMessage = JSON.stringify(apiError.result);
+            }
           } else {
             // Последняя попытка - преобразовать весь объект в JSON
             try {
@@ -1148,17 +1238,16 @@ class CryptoCloudService {
       }
       errorMessage = String(errorMessage);
 
-      logger.error('CRYPTOCLOUD', 'Withdrawal error message', { 
+      logger.error('CRYPTOCLOUD', `Withdrawal failed: ${errorMessage}`, {
         errorMessage,
-        errorType: typeof errorMessage,
-        originalError: error.message,
-        originalErrorType: typeof error.message,
         responseStatus: error.response?.status,
         responseData: error.response?.data,
         responseDataString: error.response?.data ? JSON.stringify(error.response.data) : 'no response data'
       });
 
-      throw new Error(errorMessage);
+      const err = new Error(errorMessage);
+      if (rawCryptoCloudError) err.cryptoCloudError = rawCryptoCloudError;
+      throw err;
     }
   }
 
@@ -1209,11 +1298,40 @@ class CryptoCloudService {
       const response = await this.withdrawApi.get('/invoice/api/out/balance');
       return response.data;
     } catch (error) {
-      logger.error('CRYPTOCLOUD', 'Error getting withdraw balance', {
-        error: error.message
+      const status = error.response?.status;
+      const is403Html = status === 403 && typeof error.response?.data === 'string' && error.response.data.includes('Just a moment');
+      const summary = is403Html
+        ? '403 (Cloudflare challenge — API request blocked)'
+        : `${status || 'N/A'} | ${(typeof error.response?.data === 'string' ? error.response.data : JSON.stringify(error.response?.data || error.message)).substring(0, 200)}`;
+      logger.error('CRYPTOCLOUD', `Error getting withdraw balance: ${summary}`, {
+        error: error.message,
+        responseStatus: status,
       });
       throw error;
     }
+  }
+
+  /**
+   * Отримати доступний баланс валюти для виводу з відповіді getWithdrawBalance.
+   * @param {Object} balanceData - Відповідь getWithdrawBalance()
+   * @param {string} currencyCode - Код валюти (USDT_TRC20, BTC тощо)
+   * @returns {number|null} Баланс або null якщо не вдалося визначити
+   */
+  getWithdrawBalanceForCurrency(balanceData, currencyCode) {
+    if (!balanceData || !currencyCode) return null;
+    if (typeof balanceData === 'number') return balanceData;
+    if (typeof balanceData[currencyCode] === 'number') return balanceData[currencyCode];
+    if (typeof balanceData[currencyCode] === 'string') return parseFloat(balanceData[currencyCode]) || null;
+    const list = balanceData.result || balanceData.balances || balanceData.data || (Array.isArray(balanceData) ? balanceData : null);
+    if (Array.isArray(list)) {
+      const item = list.find(
+        (c) => (c.currency || c.currency_code || c.code) === currencyCode
+      );
+      const val = item?.balance ?? item?.amount;
+      return typeof val === 'number' ? val : (typeof val === 'string' ? parseFloat(val) : null) || null;
+    }
+    const b = balanceData.balance ?? balanceData.amount;
+    return typeof b === 'number' ? b : (typeof b === 'string' ? parseFloat(b) : null) || null;
   }
 
   /**

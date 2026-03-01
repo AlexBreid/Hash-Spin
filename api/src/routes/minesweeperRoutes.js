@@ -157,10 +157,13 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
       const winAmountNum = parseFloat(result.winAmount);
       const game = await prisma.minesweeperGame.findUnique({
         where: { id: gameId },
-        select: { tokenId: true },
+        select: { tokenId: true, betAmount: true },
       });
 
       if (game) {
+        const betAmountNum = parseFloat(game.betAmount?.toString() || '0');
+        const wagerProfit = Math.max(0, winAmountNum - betAmountNum);
+
         // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS для атомарности
         await prisma.$transaction(async (tx) => {
           // 1️⃣ ЗАЧИСЛЯЕМ ВЫИГРЫШ СРАЗУ
@@ -179,7 +182,7 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
             }
           });
 
-          // 2️⃣ ЕСЛИ БЫЛА СТАВКА С BONUS - обновляем вейджер
+          // 2️⃣ ЕСЛИ БЫЛА СТАВКА С BONUS - обновляем вейджер (в отыгрыш идёт только чистая прибыль)
           if (balanceType === 'BONUS' && userBonusId) {
             const bonus = await tx.userBonus.findUnique({
               where: { id: userBonusId }
@@ -189,9 +192,8 @@ router.post('/api/v1/minesweeper/reveal', authenticateToken, async (req, res) =>
               throw new Error('Бонус не найден');
             }
 
-            // ✅ ДОБАВЛЯЕМ ВЫИГРЫШ К WAGERED
             const currentWagered = parseFloat(bonus.wageredAmount.toString());
-            const newWagered = parseFloat((currentWagered + winAmountNum).toFixed(8));
+            const newWagered = parseFloat((currentWagered + wagerProfit).toFixed(8));
             const requiredNum = parseFloat(bonus.requiredWager.toString());
 
             // Обновляем wageredAmount в БД
@@ -373,7 +375,7 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 
     const game = await prisma.minesweeperGame.findUnique({
       where: { id: gameId },
-      select: { tokenId: true, userId: true }
+      select: { tokenId: true, userId: true, betAmount: true }
     });
 
     if (!game || game.userId !== userId) {
@@ -385,10 +387,12 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
 
     const result = await minesweeperService.cashOutGame(gameId, userId);
 
-    // ✅ Зачисляем выигрыш и обновляем вейджер
+    // ✅ Зачисляем выигрыш и обновляем вейджер (в отыгрыш идёт только чистая прибыль)
     if (result.winAmount) {
       const winAmountNum = parseFloat(result.winAmount);
-      
+      const betAmountNum = parseFloat(game.betAmount?.toString() || '0');
+      const wagerProfit = Math.max(0, winAmountNum - betAmountNum);
+
       if (winAmountNum > 0) {
         // 🔒 ИСПОЛЬЗУЕМ TRANSACTIONS для атомарности
         await prisma.$transaction(async (tx) => {
@@ -418,9 +422,8 @@ router.post('/api/v1/minesweeper/cashout', authenticateToken, async (req, res) =
               throw new Error('Бонус не найден');
             }
 
-            // ✅ ДОБАВЛЯЕМ ВЫИГРЫШ К WAGERED
             const currentWagered = parseFloat(bonus.wageredAmount.toString());
-            const newWagered = parseFloat((currentWagered + winAmountNum).toFixed(8));
+            const newWagered = parseFloat((currentWagered + wagerProfit).toFixed(8));
             const requiredNum = parseFloat(bonus.requiredWager.toString());
 
             // Обновляем wageredAmount в БД

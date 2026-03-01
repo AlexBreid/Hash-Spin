@@ -14,7 +14,7 @@ const prisma = require('../../prismaClient');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const currencySyncService = require('../services/currencySyncService');
 const logger = require('../utils/logger');
-const { deductBetFromBalance, creditWinnings } = require('./helpers/gameReferralHelper');
+const { deductBetFromBalance, creditWinnings, updateWagerAndCheckConversion } = require('./helpers/gameReferralHelper');
 const CoinFlipService = require('../services/CoinFlipService');
 
 const COINFLIP_MULTIPLIER = CoinFlipService.MULTIPLIER; // 1.9x для house edge 5%
@@ -159,6 +159,11 @@ router.post('/api/v1/coinflip/play', authenticateToken, async (req, res) => {
     // 🏆 Зачисляем выигрыш
     if (winAmount > 0) {
       await creditWinnings(userId, winAmount, tokenId, deductResult.balanceType);
+      // В отыгрыш идёт только чистая прибыль (выигрыш − ставка)
+      if (deductResult.balanceType === 'BONUS' && deductResult.userBonusId) {
+        const profit = Math.max(0, winAmount - parseFloat(betAmount));
+        await updateWagerAndCheckConversion(userId, profit, tokenId, deductResult.userBonusId);
+      }
     }
 
     // 📊 Получаем обновлённый баланс

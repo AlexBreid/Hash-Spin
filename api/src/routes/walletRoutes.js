@@ -723,37 +723,82 @@ router.post('/api/v1/wallet/deposit', authenticateToken, async (req, res) => {
  */
 router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session invalid: no user in token. Please log in again (this is the login/Bearer token, not the currency).',
+      });
+    }
+
+    let userExists;
+    let balance;
+    let token;
+    try {
+      userExists = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+    } catch (dbErr) {
+      logger.error('WITHDRAWAL', 'Database error checking user', { code: dbErr?.code, message: dbErr?.message });
+      return res.status(503).json({
+        success: false,
+        error: 'Database temporarily unavailable. Please try again later.',
+      });
+    }
+    if (!userExists) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session invalid: user not found in database. Please log in again (use Telegram or login page to get a new token).',
+      });
+    }
+
     const { tokenId, amount, walletAddress } = req.body;
 
-    if (!tokenId || !amount || !walletAddress) {
+    if (tokenId == null || amount == null || walletAddress == null) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
       });
     }
+    const tokenIdInt = parseInt(Number(tokenId), 10);
+    if (isNaN(tokenIdInt) || tokenIdInt < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid tokenId',
+      });
+    }
+    // Нормалізація: amount і walletAddress можуть прийти числом/рядком з фронту
+    const rawAmount = Number(amount);
+    const rawWalletAddress = typeof walletAddress === 'string' ? walletAddress : String(walletAddress || '').trim();
 
-    const balance = await prisma.balance.findUnique({
-      where: {
-        userId_tokenId_type: {
-          userId,
-          tokenId,
-          type: 'MAIN',
+    try {
+      balance = await prisma.balance.findUnique({
+        where: {
+          userId_tokenId_type: {
+            userId,
+            tokenId: tokenIdInt,
+            type: 'MAIN',
+          },
         },
-      },
-    });
+      });
+      token = await prisma.cryptoToken.findUnique({
+        where: { id: tokenIdInt }
+      });
+    } catch (dbErr) {
+      logger.error('WITHDRAWAL', 'Database error loading balance/token', { code: dbErr?.code, message: dbErr?.message });
+      return res.status(503).json({
+        success: false,
+        error: 'Database temporarily unavailable. Please try again later.',
+      });
+    }
 
-    if (!balance || balance.amount < amount) {
+    if (!balance) {
       return res.status(400).json({
         success: false,
         error: 'Insufficient balance',
       });
     }
-
-    // Получаем информацию о токене
-    const token = await prisma.cryptoToken.findUnique({
-      where: { id: tokenId }
-    });
 
     if (!token) {
       return res.status(400).json({
@@ -762,35 +807,102 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       });
     }
 
-    // Списываем баланс
+    if (!token.symbol || token.network == null || token.network === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Token or network not configured for withdrawal',
+      });
+    }
+
+    // Сравниваем числа (Prisma Decimal может вернуть объект)
+    const balanceNum = parseFloat(balance.amount);
+    const amountNum = Number.isFinite(rawAmount) ? rawAmount : parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0 || balanceNum < amountNum) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance or invalid amount',
+      });
+    }
+
+    // CryptoCloud: мінімум виводу 10 USDT (uncorrected_amount)
+    const MIN_CRYPTO_WITHDRAWAL = 10;
+    if (amountNum < MIN_CRYPTO_WITHDRAWAL) {
+      return res.status(400).json({
+        success: false,
+        error: `Minimum withdrawal amount is ${MIN_CRYPTO_WITHDRAWAL} USDT`,
+      });
+    }
+
+    // Адресу форматом не валідуємо — чи підходить адреса для цієї валюти/мережі вирішує CryptoCloud при виводі.
+    // Тут тільки: порожня перевірка, trim, виправлення подвоєння (якщо фронт відправив адресу двічі).
+    let normalizedWalletAddress = rawWalletAddress.trim();
+    if (!normalizedWalletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet address is required',
+      });
+    }
+    const net = (token.network || '').toUpperCase();
+    if (net.includes('TRC') && normalizedWalletAddress.length === 68 && normalizedWalletAddress.slice(0, 34) === normalizedWalletAddress.slice(34)) {
+      normalizedWalletAddress = normalizedWalletAddress.slice(0, 34);
+    }
+    if ((net.includes('ERC') || net.includes('BEP')) && normalizedWalletAddress.length === 84 && normalizedWalletAddress.slice(0, 42) === normalizedWalletAddress.slice(42)) {
+      normalizedWalletAddress = normalizedWalletAddress.slice(0, 42);
+    }
+
+    // Код валюти для CryptoCloud (має бути типу USDT_TRC20, не лише USDT)
+    const cryptoCloudService = require('../services/cryptoCloudService');
+    const currencyCode = cryptoCloudService.getCryptoCloudCurrency(token.symbol, token.network);
+    if (!currencyCode || currencyCode === (token.symbol || '').toUpperCase()) {
+      return res.status(400).json({
+        success: false,
+        error: `Withdrawal not supported for ${token.symbol} ${token.network}. CryptoCloud code not found.`,
+        tokenSymbol: token.symbol,
+        tokenNetwork: token.network,
+      });
+    }
+    try {
+      const cryptoBalance = await cryptoCloudService.getWithdrawBalance();
+      const availableInCryptoCloud = cryptoCloudService.getWithdrawBalanceForCurrency(cryptoBalance, currencyCode);
+      logger.info('WITHDRAWAL', 'CryptoCloud balance check (before deduct)', {
+        availableInCryptoCloud,
+        requestedAmount: amountNum,
+        currencyCode
+      });
+      if (typeof availableInCryptoCloud === 'number' && availableInCryptoCloud < amountNum) {
+        return res.status(400).json({
+          success: false,
+          error: 'Insufficient funds on your CryptoCloud wallet. Please top up the merchant balance in CryptoCloud.',
+        });
+      }
+    } catch (balanceError) {
+      logger.warn('WITHDRAWAL', 'Failed to check CryptoCloud balance', { error: balanceError.message });
+    }
+
+    // Списываем баланс (Prisma приймає number для Decimal)
     const newBalance = await prisma.balance.update({
       where: { id: balance.id },
       data: {
         amount: {
-          decrement: amount,
+          decrement: amountNum,
         },
       },
     });
 
-    // Создаем транзакцию в БД
+    // Создаем транзакцию в БД (з нормалізованою адресою; amount як number для Decimal)
     const transaction = await prisma.transaction.create({
       data: {
         userId,
-        tokenId,
+        tokenId: tokenIdInt,
         type: 'WITHDRAW',
         status: 'PENDING',
-        amount,
-        walletAddress,
+        amount: amountNum,
+        walletAddress: normalizedWalletAddress,
       },
     });
 
-    // ✅ ОТПРАВЛЯЕМ ВЫВОД В CRYPTOCLOUD
-    const cryptoCloudService = require('../services/cryptoCloudService');
-    
+    // ✅ ОТПРАВЛЯЕМ ВЫВОД В CRYPTOCLOUD (currencyCode вже є вище)
     try {
-      // Формируем код валюты для CryptoCloud (например, USDT_TRC20)
-      const currencyCode = cryptoCloudService.getCryptoCloudCurrency(token.symbol, token.network);
-      
       logger.info('WITHDRAWAL', 'Sending withdrawal to CryptoCloud', {
         transactionId: transaction.id,
         userId,
@@ -799,34 +911,13 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
         currencyCode,
         amount,
         amountType: typeof amount,
-        walletAddress: walletAddress.substring(0, 10) + '...',
-        fullWalletAddress: walletAddress
+        walletAddress: normalizedWalletAddress.substring(0, 10) + '...',
+        fullWalletAddress: normalizedWalletAddress
       });
 
-      // Валидация адреса
-      if (!walletAddress || walletAddress.trim().length === 0) {
-        throw new Error('Wallet address is required');
-      }
-
-      // Валидация суммы
-      const amountNum = parseFloat(amount);
-      if (isNaN(amountNum) || amountNum <= 0) {
+      // Сумма вже перевірена зверху (amountNum)
+      if (!Number.isFinite(amountNum) || amountNum <= 0) {
         throw new Error('Invalid withdrawal amount');
-      }
-
-      // ✅ Проверяем баланс CryptoCloud перед выводом (опционально)
-      try {
-        const cryptoBalance = await cryptoCloudService.getWithdrawBalance();
-        logger.info('WITHDRAWAL', 'CryptoCloud balance check', {
-          balance: cryptoBalance,
-          requestedAmount: amountNum,
-          currencyCode
-        });
-      } catch (balanceError) {
-        logger.warn('WITHDRAWAL', 'Failed to check CryptoCloud balance', {
-          error: balanceError.message
-        });
-        // Продолжаем попытку вывода даже если проверка баланса не удалась
       }
 
       // Отправляем вывод в CryptoCloud
@@ -834,7 +925,7 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
       try {
         withdrawResult = await cryptoCloudService.withdraw(
           currencyCode,
-          walletAddress.trim(),
+          normalizedWalletAddress,
           amountNum
         );
       } catch (withdrawError) {
@@ -881,10 +972,13 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
           cryptoCloudTxId: withdrawResult.txId
         });
 
+        const newBalanceNum = newBalance?.amount != null
+          ? parseFloat(String(newBalance.amount))
+          : 0;
         res.json({
           success: true,
           data: {
-            newBalance: parseFloat(newBalance.amount.toString()),
+            newBalance: newBalanceNum,
             status: 'PROCESSING',
             message: 'Withdrawal request submitted and sent to CryptoCloud',
             transactionId: transaction.id
@@ -896,7 +990,7 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
           where: { id: balance.id },
           data: {
             amount: {
-              increment: amount,
+              increment: amountNum,
             },
           },
         });
@@ -915,26 +1009,33 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
 
         return res.status(500).json({
           success: false,
-          error: 'Failed to send withdrawal to CryptoCloud',
+          error: withdrawResult?.error || 'Failed to send withdrawal to CryptoCloud',
+          currencyCode,
+          tokenSymbol: token?.symbol,
+          tokenNetwork: token?.network,
         });
       }
     } catch (cryptoCloudError) {
-      // Если ошибка при отправке в CryptoCloud, возвращаем баланс
-      await prisma.balance.update({
-        where: { id: balance.id },
-        data: {
-          amount: {
-            increment: amount,
+      // Если ошибка при отправке в CryptoCloud, возвращаем баланс (безопасный откат)
+      try {
+        await prisma.balance.update({
+          where: { id: balance.id },
+          data: {
+            amount: {
+              increment: amountNum,
+            },
           },
-        },
-      });
-
-      await prisma.transaction.update({
-        where: { id: transaction.id },
-        data: {
-          status: 'FAILED'
-        }
-      });
+        });
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'FAILED' }
+        });
+      } catch (rollbackError) {
+        logger.error('WITHDRAWAL', 'Rollback failed after CryptoCloud error', {
+          transactionId: transaction.id,
+          rollbackError: rollbackError?.message,
+        });
+      }
 
       // Безопасно извлекаем сообщение об ошибке для логирования
       let logError = 'Unknown error';
@@ -1065,8 +1166,16 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
         }
       }
 
-      // Финальная гарантия - всегда строка
+      // Финальная гарантия - всегда строка; не отдаём "[object Object]"
       finalErrorMessage = String(finalErrorMessage);
+      if (finalErrorMessage === '[object Object]' && cryptoCloudError?.response?.data?.result?.error) {
+        const err = cryptoCloudError.response.data.result.error;
+        if (err?.code === 'uncorrected_amount') {
+          finalErrorMessage = `Minimum withdrawal amount is ${err.value_min != null ? err.value_min : 10} USDT`;
+        } else {
+          finalErrorMessage = err?.message || err?.code || 'Withdrawal failed';
+        }
+      }
 
       logger.error('WITHDRAWAL', 'Final error message', {
         errorMessage: finalErrorMessage,
@@ -1076,15 +1185,73 @@ router.post('/api/v1/wallet/withdraw', authenticateToken, async (req, res) => {
         errorMessagePreview: finalErrorMessage.substring(0, 200)
       });
 
-      return res.status(500).json({
+      // Якщо помилка про недостатні кошти в CryptoCloud — одне зрозуміле повідомлення
+      const isInsufficientFunds = /insufficient|недостаточно|not enough|balance|баланс|low balance/i.test(finalErrorMessage);
+      if (isInsufficientFunds) {
+        return res.status(400).json({
+          success: false,
+          error: 'Insufficient funds on your CryptoCloud wallet. Please top up the merchant balance in CryptoCloud.',
+        });
+      }
+      // Інші помилки валідації/від провайдера — 400
+      const isValidationError = /minimum|uncorrected_amount|invalid address|network|адрес|сеть|сумма/i.test(finalErrorMessage);
+      const statusCode = isValidationError ? 400 : 500;
+      let clientError = String(finalErrorMessage);
+      if (isValidationError && /uncorrected_amount/i.test(finalErrorMessage) && amountNum >= 10) {
+        clientError = 'CryptoCloud rejected the amount (uncorrected_amount). Check amount format and limits in CryptoCloud docs, or contact their support.';
+      }
+      const payload = {
         success: false,
-        error: String(finalErrorMessage),
-      });
+        error: clientError,
+        currencyCode: currencyCode || undefined,
+        tokenSymbol: token?.symbol,
+        tokenNetwork: token?.network,
+      };
+      if (cryptoCloudError?.cryptoCloudError) {
+        payload.cryptoCloudError = cryptoCloudError.cryptoCloudError;
+      }
+      return res.status(statusCode).json(payload);
     }
   } catch (error) {
+    if (res.headersSent) return;
+
+    const msg = (error?.message || String(error)) || '';
+    const msgLower = msg.toLowerCase();
+
+    // Prisma/БД: таймаут, недоступність — не показувати технічне повідомлення, віддати 503
+    const isPrismaOrDbError = (error?.code && String(error.code).startsWith('P')) ||
+      (error?.constructor?.name && /Prisma|P1001|P2024/i.test(error.constructor.name));
+    if (isPrismaOrDbError) {
+      logger.error('WITHDRAWAL', 'Database error during withdraw', {
+        code: error?.code,
+        message: error?.message,
+        stack: error?.stack,
+      });
+      return res.status(503).json({
+        success: false,
+        error: 'Database temporarily unavailable. Please try again later.',
+      });
+    }
+
+    // Користувача за цим токеном не знайдено в БД (наприклад Prisma/ORM повідомлення)
+    const isUserNotFound =
+      /user.*not found|user not found/i.test(msgLower) ||
+      (msgLower.includes('пользователь') && msgLower.includes('не найден')) ||
+      /токену не найден|данному токену|соответствующий.*токену/i.test(msgLower);
+    if (isUserNotFound) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session invalid: user not found in database. Please log in again (Telegram or login page).',
+      });
+    }
+
+    logger.error('WITHDRAWAL', 'Unhandled error in withdraw', {
+      error: error?.message,
+      stack: error?.stack,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to process withdrawal',
+      error: error?.message || 'Failed to process withdrawal',
     });
   }
 });
